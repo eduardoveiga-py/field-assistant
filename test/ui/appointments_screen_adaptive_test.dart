@@ -7,6 +7,7 @@ import 'package:ministerio_pessoal/database/repository.dart';
 import 'package:ministerio_pessoal/ui/providers.dart';
 import 'package:ministerio_pessoal/ui/screens/appointments_screen.dart';
 import 'package:ministerio_pessoal/ui/widgets/appointments/appointment_detail_pane.dart';
+import 'package:ministerio_pessoal/ui/widgets/appointments/appointments_controls_bar.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -323,6 +324,164 @@ void main() {
 
           await tester.pumpWidget(const SizedBox());
           await tester.pumpAndSettle();
+        },
+      );
+
+      testWidgets(
+        'TC-APPTS-07: AppointmentsControlsBar does not overflow at 768px (iPad portrait) and 1024px (iPad landscape) under 2.0x and 2.5x text scaling across all view modes',
+        (tester) async {
+          final viewports = [
+            const Size(768, 1024),
+            const Size(1024, 768),
+          ];
+          final textScales = [2.0, 2.5];
+          final viewModes = ['Mês', 'Semana', 'Dia', 'Lista'];
+
+          for (final viewport in viewports) {
+            for (final scale in textScales) {
+              for (final mode in viewModes) {
+                tester.view.physicalSize = viewport;
+                tester.view.devicePixelRatio = 1.0;
+                tester.platformDispatcher.textScaleFactorTestValue = scale;
+                addTearDown(tester.view.resetPhysicalSize);
+                addTearDown(tester.view.resetDevicePixelRatio);
+                addTearDown(
+                  tester.platformDispatcher.clearTextScaleFactorTestValue,
+                );
+
+                String currentMode = mode;
+                bool todayPressed = false;
+
+                await tester.pumpWidget(
+                  MaterialApp(
+                    home: Scaffold(
+                      body: AppointmentsControlsBar(
+                        viewMode: currentMode,
+                        selectedDate: DateTime(2026, 11, 18),
+                        isDark: false,
+                        onViewModeChanged: (val) => currentMode = val,
+                        onPreviousDate: () {},
+                        onNextDate: () {},
+                        onTodayPressed: () => todayPressed = true,
+                      ),
+                    ),
+                  ),
+                );
+                await tester.pumpAndSettle();
+
+                // Sem exceção de RenderFlex overflow
+                expect(
+                  tester.takeException(),
+                  isNull,
+                  reason:
+                      'Overflow detected at viewport $viewport with scale ${scale}x in mode $mode',
+                );
+
+                // Botão "Hoje" deve estar presente e interativo
+                final todayBtn = find.byTooltip('Hoje');
+                expect(todayBtn, findsOneWidget);
+                await tester.tap(todayBtn);
+                await tester.pumpAndSettle();
+                expect(todayPressed, isTrue);
+
+                // Todos os segmentos de visualização devem estar visíveis
+                for (final m in viewModes) {
+                  expect(find.text(m), findsWidgets);
+                }
+
+                await tester.pumpWidget(const SizedBox());
+                await tester.pumpAndSettle();
+              }
+            }
+          }
+        },
+      );
+
+      testWidgets(
+        'TC-APPTS-08: Month view cells with 2+ appointments do not overflow vertically under 2.0x and 2.5x text scaling',
+        (tester) async {
+          final db = AppDatabase.forTesting(NativeDatabase.memory());
+          addTearDown(db.close);
+          final repo = AppRepository(db);
+
+          final today = DateTime.now();
+
+          // Criar 3 compromissos com títulos longos no mesmo dia
+          await repo.createAppointment(
+            title: 'Estudo Bíblico com Marcos Pereira da Silva',
+            startTime: DateTime(today.year, today.month, today.day, 9, 0),
+            endTime: DateTime(today.year, today.month, today.day, 10, 0),
+            durationMinutes: 60,
+          );
+          await repo.createAppointment(
+            title: 'Revisita de Campo na Comunidade Betânia',
+            startTime: DateTime(today.year, today.month, today.day, 14, 0),
+            endTime: DateTime(today.year, today.month, today.day, 15, 0),
+            durationMinutes: 60,
+          );
+          await repo.createAppointment(
+            title: 'Reunião de Preparação e Serviço',
+            startTime: DateTime(today.year, today.month, today.day, 17, 0),
+            endTime: DateTime(today.year, today.month, today.day, 18, 0),
+            durationMinutes: 60,
+          );
+
+          final viewports = [
+            const Size(375, 800),
+            const Size(768, 1024),
+          ];
+          final textScales = [2.0, 2.5];
+
+          for (final viewport in viewports) {
+            for (final scale in textScales) {
+              tester.view.physicalSize = viewport;
+              tester.view.devicePixelRatio = 1.0;
+              tester.platformDispatcher.textScaleFactorTestValue = scale;
+              addTearDown(tester.view.resetPhysicalSize);
+              addTearDown(tester.view.resetDevicePixelRatio);
+              addTearDown(
+                tester.platformDispatcher.clearTextScaleFactorTestValue,
+              );
+
+              await tester.pumpWidget(
+                ProviderScope(
+                  overrides: [
+                    databaseProvider.overrideWithValue(db),
+                    repositoryProvider.overrideWithValue(repo),
+                  ],
+                  child: const MaterialApp(home: AppointmentsScreen()),
+                ),
+              );
+              await tester.pumpAndSettle();
+
+              // Certificar que está no modo Mês
+              await tester.tap(find.text('Mês').first);
+              await tester.pumpAndSettle();
+
+              // Sem exceção de RenderFlex vertical overflow nas células mensais
+              expect(
+                tester.takeException(),
+                isNull,
+                reason:
+                    'Vertical overflow detected in month view at $viewport under ${scale}x scale',
+              );
+
+              // Tocar no número do dia para verificar o painel inferior de detalhes
+              final dayFinder = find.text('${today.day}');
+              expect(dayFinder, findsWidgets);
+              await tester.tap(dayFinder.first);
+              await tester.pumpAndSettle();
+
+              // No painel inferior de compromissos do dia, os títulos devem estar renderizados
+              expect(
+                find.textContaining('Estudo Bíblico'),
+                findsWidgets,
+              );
+
+              await tester.pumpWidget(const SizedBox());
+              await tester.pumpAndSettle();
+            }
+          }
         },
       );
     },

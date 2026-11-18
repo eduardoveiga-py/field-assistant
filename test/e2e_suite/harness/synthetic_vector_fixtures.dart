@@ -28,8 +28,8 @@ class AmazonianCoordinates {
   static const double maxLat = -3.0000;
   static const double maxLon = -67.7000;
 
-  /// Borda fluvial do Rio Solimões (barreira natural intransponível por vias terrestres)
-  static const double solimoesNorthLat = -3.1500;
+  /// Borda fluvial do Rio Solimões (barreira natural intransponível por vias terrestres sem balsa)
+  static const double solimoesNorthLat = -3.2000;
   static const double solimoesSouthLat = -3.3800;
   static const double solimoesWestLon = -68.2500;
   static const double solimoesEastLon = -67.7000;
@@ -66,18 +66,15 @@ class AmazonianCoordinates {
     double lat2,
     double lon2,
   ) {
-    // Se ambos os pontos estiverem ao norte do rio (ex: Betânia e Santo Antônio do Içá)
-    if (lat1 > solimoesNorthLat && lat2 > solimoesNorthLat) return false;
-    // Se ambos estiverem ao sul do rio
-    if (lat1 < solimoesSouthLat && lat2 < solimoesSouthLat) return false;
-
-    // Um ponto ao norte e outro ao sul/dentro da calha representa travessia fluvial
-    final crossesLat = (lat1 > solimoesNorthLat && lat2 < solimoesNorthLat) ||
-        (lat2 > solimoesNorthLat && lat1 < solimoesNorthLat);
-    final withinLonBand = (lon1 >= solimoesWestLon && lon1 <= solimoesEastLon) ||
+    final withinLonBand =
+        (lon1 >= solimoesWestLon && lon1 <= solimoesEastLon) ||
         (lon2 >= solimoesWestLon && lon2 <= solimoesEastLon);
+    if (!withinLonBand) return false;
 
-    return crossesLat && withinLonBand;
+    // Travessia entre a margem norte (Santo Antônio do Içá / Betânia, lat > -3.20)
+    // e a margem sul (Lago Grande, lat < -3.20)
+    return (lat1 > solimoesNorthLat && lat2 < solimoesNorthLat) ||
+        (lat2 > solimoesNorthLat && lat1 < solimoesNorthLat);
   }
 }
 

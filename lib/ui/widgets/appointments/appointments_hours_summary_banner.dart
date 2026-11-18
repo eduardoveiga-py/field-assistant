@@ -27,7 +27,9 @@ class AppointmentsHoursSummaryBanner extends StatelessWidget {
           constraints: const BoxConstraints(maxWidth: 860),
           child: LayoutBuilder(
             builder: (context, boxConstraints) {
-              final isNarrowBanner = boxConstraints.maxWidth < 620;
+              final textScale = MediaQuery.textScalerOf(context).scale(1.0);
+              final isNarrowBanner =
+                  boxConstraints.maxWidth < (620 * textScale.clamp(1.0, 2.5));
               final hoursText = Text(
                 'Programado: ${scheduledHours.toStringAsFixed(1)}h  •  Efetivo: ${actualHours.toStringAsFixed(1)}h${scheduledHours > 0 ? " (${((actualHours / scheduledHours) * 100).toStringAsFixed(0)}% realizado)" : ""}',
                 style: TextStyle(
@@ -99,7 +101,8 @@ class AppointmentsHoursSummaryBanner extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   Expanded(child: hoursText),
-                  actionButtons,
+                  const SizedBox(width: 8),
+                  Flexible(child: actionButtons),
                 ],
               );
             },

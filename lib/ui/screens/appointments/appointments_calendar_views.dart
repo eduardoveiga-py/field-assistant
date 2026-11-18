@@ -231,137 +231,255 @@ extension _AppointmentsCalendarViews on _AppointmentsScreenState {
                           width: isSelected || isToday ? 2.0 : 1.0,
                         ),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          FittedBox(
-                            fit: BoxFit.scaleDown,
-                            alignment: Alignment.centerLeft,
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 4,
-                                    vertical: 1,
-                                  ),
-                                  decoration: isToday
-                                      ? BoxDecoration(
+                      child: Builder(
+                        builder: (context) {
+                          final textScale =
+                              MediaQuery.textScalerOf(context).scale(1.0);
+                          final int maxVisibleAppts = textScale >= 1.6
+                              ? 0
+                              : textScale >= 1.25
+                                  ? 1
+                                  : 2;
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerLeft,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 4,
+                                        vertical: 1,
+                                      ),
+                                      decoration: isToday
+                                          ? BoxDecoration(
+                                              color: isDark
+                                                  ? const Color(0xFF3B82F6)
+                                                  : AppTheme.primaryBlue,
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                            )
+                                          : null,
+                                      child: Text(
+                                        '$dayNumber',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: isSelected || isToday
+                                              ? FontWeight.bold
+                                              : FontWeight.w600,
+                                          color: isToday
+                                              ? Colors.white
+                                              : (index % 7 == 0
+                                                    ? AppTheme.alertRed
+                                                    : (isDark
+                                                          ? Colors.white
+                                                          : AppTheme
+                                                              .textDark)),
+                                        ),
+                                      ),
+                                    ),
+                                    if (isHoliday) ...[
+                                      const SizedBox(width: 4),
+                                      const Icon(
+                                        Icons.celebration_outlined,
+                                        size: 12,
+                                        color: Color(0xFFB45309),
+                                      ),
+                                    ] else if (maxVisibleAppts == 0 &&
+                                        dayAppts.isNotEmpty) ...[
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        '+${dayAppts.length}',
+                                        style: TextStyle(
+                                          fontSize: 8.5,
+                                          fontWeight: FontWeight.bold,
                                           color: isDark
-                                              ? const Color(0xFF3B82F6)
-                                              : AppTheme.primaryBlue,
-                                          borderRadius: BorderRadius.circular(8),
-                                        )
-                                      : null,
-                                  child: Text(
-                                    '$dayNumber',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: isSelected || isToday
-                                          ? FontWeight.bold
-                                          : FontWeight.w600,
-                                      color: isToday
-                                          ? Colors.white
-                                          : (index % 7 == 0
-                                                ? AppTheme.alertRed
-                                                : (isDark
-                                                      ? Colors.white
-                                                      : AppTheme.textDark)),
-                                    ),
-                                  ),
+                                              ? const Color(0xFF94A3B8)
+                                              : const Color(0xFF64748B),
+                                        ),
+                                      ),
+                                    ] else if (dayAppts.length >
+                                        maxVisibleAppts) ...[
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        '+${dayAppts.length - maxVisibleAppts}',
+                                        style: TextStyle(
+                                          fontSize: 8.5,
+                                          fontWeight: FontWeight.bold,
+                                          color: isDark
+                                              ? const Color(0xFF94A3B8)
+                                              : const Color(0xFF64748B),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
                                 ),
-                                if (isHoliday) ...[
-                                  const SizedBox(width: 4),
-                                  const Icon(
-                                    Icons.celebration_outlined,
-                                    size: 12,
-                                    color: Color(0xFFB45309),
-                                  ),
-                                ] else if (dayAppts.length > 2) ...[
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    '+${dayAppts.length - 2}',
-                                    style: TextStyle(
-                                      fontSize: 8.5,
-                                      fontWeight: FontWeight.bold,
-                                      color: isDark
-                                          ? const Color(0xFF94A3B8)
-                                          : const Color(0xFF64748B),
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          for (final a in dayAppts.take(2)) ...[
-                            Builder(
-                              builder: (context) {
-                                final color =
-                                    _AppointmentsScreenState._getAppointmentActivityColor(
-                                      a,
-                                    );
-                                final timeStr = AppDateUtils.formatTime(
-                                  a.startTime,
-                                );
-                                return ClipRect(
-                                  child: Container(
-                                    margin: const EdgeInsets.only(top: 2),
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 3,
-                                      vertical: 1,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: color.withValues(
-                                        alpha: isDark ? 0.35 : 0.15,
-                                      ),
-                                      borderRadius: BorderRadius.circular(3),
-                                      border: Border.all(
-                                        color: color.withValues(alpha: 0.6),
-                                        width: 0.6,
-                                      ),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Flexible(
-                                          child: Text(
-                                            timeStr,
-                                            style: TextStyle(
-                                              fontSize: 8.5,
-                                              fontWeight: FontWeight.bold,
-                                              color: isDark
-                                                  ? color.withValues(
-                                                      alpha: 0.95,
-                                                    )
-                                                  : color,
+                              ),
+                              const SizedBox(height: 1),
+                              Expanded(
+                                child: ClipRect(
+                                  child: dayAppts.isEmpty
+                                      ? const SizedBox.shrink()
+                                      : maxVisibleAppts == 0
+                                          ? Align(
+                                              alignment: Alignment.topLeft,
+                                              child: Padding(
+                                                padding: const EdgeInsets.only(
+                                                  top: 2,
+                                                ),
+                                                child: Wrap(
+                                                  spacing: 2.5,
+                                                  runSpacing: 2,
+                                                  children: [
+                                                    for (final a
+                                                        in dayAppts.take(4))
+                                                      Container(
+                                                        width: 5.5,
+                                                        height: 5.5,
+                                                        decoration:
+                                                            BoxDecoration(
+                                                          color:
+                                                              _AppointmentsScreenState
+                                                                  ._getAppointmentActivityColor(
+                                                                a,
+                                                              ),
+                                                          shape:
+                                                              BoxShape.circle,
+                                                        ),
+                                                      ),
+                                                    if (dayAppts.length > 4)
+                                                      Text(
+                                                        '+${dayAppts.length - 4}',
+                                                        style: TextStyle(
+                                                          fontSize: 7.5,
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                          color: isDark
+                                                              ? const Color(
+                                                                  0xFF94A3B8,
+                                                                )
+                                                              : const Color(
+                                                                  0xFF64748B,
+                                                                ),
+                                                        ),
+                                                      ),
+                                                  ],
+                                                ),
+                                              ),
+                                            )
+                                          : Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.stretch,
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                for (final a in dayAppts.take(
+                                                  maxVisibleAppts,
+                                                ))
+                                                  Builder(
+                                                    builder: (context) {
+                                                      final color =
+                                                          _AppointmentsScreenState
+                                                              ._getAppointmentActivityColor(
+                                                            a,
+                                                          );
+                                                      final timeStr =
+                                                          AppDateUtils
+                                                              .formatTime(
+                                                            a.startTime,
+                                                          );
+                                                      return Container(
+                                                        margin:
+                                                            const EdgeInsets
+                                                                .only(top: 2),
+                                                        padding:
+                                                            const EdgeInsets
+                                                                .symmetric(
+                                                          horizontal: 3,
+                                                          vertical: 1,
+                                                        ),
+                                                        decoration:
+                                                            BoxDecoration(
+                                                          color: color
+                                                              .withValues(
+                                                            alpha: isDark
+                                                                ? 0.35
+                                                                : 0.15,
+                                                          ),
+                                                          borderRadius:
+                                                              BorderRadius
+                                                                  .circular(3),
+                                                          border: Border.all(
+                                                            color: color
+                                                                .withValues(
+                                                              alpha: 0.6,
+                                                            ),
+                                                            width: 0.6,
+                                                          ),
+                                                        ),
+                                                        child: Row(
+                                                          children: [
+                                                            Flexible(
+                                                              child: Text(
+                                                                timeStr,
+                                                                style:
+                                                                    TextStyle(
+                                                                  fontSize: 8.5,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .bold,
+                                                                  color: isDark
+                                                                      ? color
+                                                                          .withValues(
+                                                                            alpha:
+                                                                                0.95,
+                                                                          )
+                                                                      : color,
+                                                                ),
+                                                                maxLines: 1,
+                                                                overflow:
+                                                                    TextOverflow
+                                                                        .ellipsis,
+                                                              ),
+                                                            ),
+                                                            const SizedBox(
+                                                              width: 2,
+                                                            ),
+                                                            Expanded(
+                                                              child: Text(
+                                                                a.title,
+                                                                style:
+                                                                    TextStyle(
+                                                                  fontSize: 8.5,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w600,
+                                                                  color: isDark
+                                                                      ? Colors
+                                                                          .white
+                                                                      : AppTheme
+                                                                          .textDark,
+                                                                ),
+                                                                maxLines: 1,
+                                                                overflow:
+                                                                    TextOverflow
+                                                                        .ellipsis,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      );
+                                                    },
+                                                  ),
+                                              ],
                                             ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 2),
-                                        Expanded(
-                                          child: Text(
-                                            a.title,
-                                            style: TextStyle(
-                                              fontSize: 8.5,
-                                              fontWeight: FontWeight.w600,
-                                              color: isDark
-                                                  ? Colors.white
-                                                  : AppTheme.textDark,
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ],
-                        ],
+                                ),
+                              ),
+                            ],
+                          );
+                        },
                       ),
                     ),
                   );

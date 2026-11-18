@@ -171,6 +171,7 @@ class OpaqueBoxHarness {
       effectiveUrl,
       effectiveKey,
       httpClient: mockClient,
+      authOptions: const AuthClientOptions(autoRefreshToken: false),
     );
 
     final syncService = SupabaseSyncService(
@@ -301,6 +302,10 @@ class OpaqueBoxHarness {
 
     try {
       syncService.dispose();
+    } catch (_) {}
+
+    try {
+      supabaseClient.auth.stopAutoRefresh();
     } catch (_) {}
 
     try {

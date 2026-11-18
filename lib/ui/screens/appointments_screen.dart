@@ -246,7 +246,11 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
       appBar: AppBar(
         title: Semantics(
           header: true,
-          child: const Text('Agenda do Ministério'),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: const Text('Agenda do Ministério'),
+          ),
         ),
         bottom: ScreenHeroAccentBand.agenda(),
         actions: [
@@ -255,31 +259,41 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
             child: Semantics(
               button: true,
               label: 'Sincronizar calendários conectados',
-              child: MediaQuery.of(context).size.width < 500
-                  ? IconButton(
+              child: Builder(
+                builder: (context) {
+                  final textScale = MediaQuery.textScalerOf(context).scale(1.0);
+                  final isCompact =
+                      MediaQuery.of(context).size.width <
+                          (500 * textScale.clamp(1.0, 2.5)) ||
+                      textScale >= 1.5;
+                  if (isCompact) {
+                    return IconButton(
                       icon: const Icon(Icons.sync_alt),
                       tooltip: 'Sincronizar Calendários',
                       onPressed: _isCalendarSyncing
                           ? null
                           : _syncConnectedCalendars,
-                    )
-                  : FilledButton.tonalIcon(
-                      style: FilledButton.styleFrom(
-                        visualDensity: VisualDensity.compact,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 0,
-                        ),
+                    );
+                  }
+                  return FilledButton.tonalIcon(
+                    style: FilledButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 0,
                       ),
-                      icon: const Icon(Icons.sync_alt, size: 16),
-                      label: const Text(
-                        'Sincronizar Calendários',
-                        style: TextStyle(fontSize: 12),
-                      ),
-                      onPressed: _isCalendarSyncing
-                          ? null
-                          : _syncConnectedCalendars,
                     ),
+                    icon: const Icon(Icons.sync_alt, size: 16),
+                    label: const Text(
+                      'Sincronizar Calendários',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                    onPressed: _isCalendarSyncing
+                        ? null
+                        : _syncConnectedCalendars,
+                  );
+                },
+              ),
             ),
           ),
           Semantics(

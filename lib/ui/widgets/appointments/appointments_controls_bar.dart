@@ -50,7 +50,9 @@ class AppointmentsControlsBar extends StatelessWidget {
           constraints: const BoxConstraints(maxWidth: 860),
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final isNarrow = constraints.maxWidth < 700;
+              final textScale = MediaQuery.textScalerOf(context).scale(1.0);
+              final isNarrow =
+                  constraints.maxWidth < (700 * textScale.clamp(1.0, 2.5));
               final navRow = Row(
                 mainAxisSize: isNarrow ? MainAxisSize.max : MainAxisSize.min,
                 mainAxisAlignment:
@@ -80,16 +82,21 @@ class AppointmentsControlsBar extends StatelessWidget {
                       ),
                     )
                   else
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      child: Text(
-                        viewMode == 'Mês'
-                            ? '${getMonthName(selectedDate.month)} ${selectedDate.year}'
-                            : AppDateUtils.formatDate(selectedDate),
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                          color: isDark ? Colors.white : AppTheme.textDark,
+                    Flexible(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            viewMode == 'Mês'
+                                ? '${getMonthName(selectedDate.month)} ${selectedDate.year}'
+                                : AppDateUtils.formatDate(selectedDate),
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                              color: isDark ? Colors.white : AppTheme.textDark,
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -157,14 +164,43 @@ class AppointmentsControlsBar extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 6),
-                    SizedBox(width: double.infinity, child: segButton),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: segButton,
+                      ),
+                    ),
                   ],
                 );
               }
 
               return Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [navRow, segButton],
+                children: [
+                  Flexible(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(child: navRow),
+                        IconButton(
+                          icon: const Icon(Icons.today, size: 20),
+                          tooltip: 'Hoje',
+                          visualDensity: VisualDensity.compact,
+                          onPressed: onTodayPressed,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerRight,
+                      child: segButton,
+                    ),
+                  ),
+                ],
               );
             },
           ),
