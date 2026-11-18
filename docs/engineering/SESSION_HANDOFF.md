@@ -48,7 +48,15 @@
    - **Índices de alta performance no Drift SQLite:** Adicionados índices condicionais `idx_people_coords` (`latitude, longitude`), `idx_appointments_start_time`, `idx_appointments_person_id` e `idx_visits_person_id` garantidos em `_ensurePerformanceIndexes()`, mantendo 100% de compatibilidade retroativa com migrações desde a v1.
    - **Benchmark de dataset sintético:** Suíte automatizada `test/perf/synthetic_dataset_benchmark_test.dart` comprovando inserção em lote de 5.000 contatos, busca indexada por nome e filtro espacial por bounding box respondendo em milissegundos.
 
-8. **Revisão Independente Adversarial & Correção de Bugs Críticos:**
+8. **Fase 8 — UX Adaptativa iPad & Master-Detail (`FA-UX-01`) — Commit `cca9857`:**
+   - **Split View Master-Detail nativo:** Em telas grandes (`constraints.maxWidth >= 900px`), `PeopleScreen` exibe painel mestre de contatos (420px) com seleção destacada (`BorderSide(color: primaryBlue, width: 2)`) e painel de detalhe `PersonDetailScreen` integrado à direita com placeholder informativo quando desmarcado.
+   - **Suíte de testes de layout adaptativo:** `test/ui/people_screen_adaptive_test.dart` validando tanto o layout de coluna única no iPhone (`400x800`) quanto o Master-Detail split-view no iPad (`1024x768`).
+
+9. **Fase 7 & Fase 11 — Decomposição Modular e Política LGPD (`FA-ARCH-02`, `FA-REL-01`) — Commit `0f135ad`:**
+   - **Extração de `DynamicTileLayer`:** Decomposição modular da tela gigante `contacts_map_screen.dart` (-177 LOC) com extração de `DynamicTileLayer` para `lib/ui/widgets/map/dynamic_tile_layer.dart`, mantendo isolamento de repaint e estabilidade sob rotação/arraste.
+   - **Política de Conformidade LGPD:** Criação de `docs/privacy/LGPD_COMPLIANCE.md` cobrindo bases legais, minimização de dados, criptografia em repouso (`sqlite3mc`) e trânsito (E2EE fail-closed), isolamento de contas, exercícios de direitos dos titulares (Art. 18) e auditoria de licenças de terceiros.
+
+10. **Revisão Independente Adversarial & Correção de Bugs Críticos:**
    - **Pull E2EE (`supabase_sync_service.dart`, `encrypted_record_checkpoint.dart`):** substituído retorno booleano ambíguo por `EncryptedApplyOutcome` (`applied`/`alreadyApplied`/`rejected`) impedindo o cursor `server_seq` de pular conflitos; ordenada a aplicação em lote em ordem pai-antes-de-filho (`syncTables`) evitando deadlock de FK quando um pai é atualizado após um filho; rejeitado `serverSeq <= 0`.
    - **Conflito delete-vs-update & resolução E2EE (`supabase_sync_service.dart`):** tombstone remoto contra edição local pendente agora gera conflito explícito sem corromper colunas `NOT NULL`; `resolveConflictAcceptRemote` agora atualiza atomicamente o `EncryptedRecordCheckpoint` com a revisão/envelope remoto autoritativo evitando loop infinito de conflito CAS.
    - **Mídias E2EE (`supabase_sync_service.dart`, `encrypted_media.dart`, `encrypted_media_transfer.dart`):** falhas transitórias de download agora gravam marcadores `pending_*_download_*` recuperados e limpos por `retryPendingMediaDownloads()`; `deleteEncrypted` agora inspeciona o manifesto autenticado (`EncryptedMedia.inspectChunkCount`) para remover todos os blocos em arquivos > 4 MiB (> 16 chunks) sem órfãos.
