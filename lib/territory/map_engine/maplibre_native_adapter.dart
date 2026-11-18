@@ -481,8 +481,8 @@ class MaplibreNativeAdapter implements MapEngineAdapter {
     return {
       'version': 8,
       'name': 'Field Assistant Local Vector Style',
-      if (spriteUrl != null) 'sprite': spriteUrl,
-      if (glyphsUrl != null) 'glyphs': glyphsUrl,
+      'sprite': ?spriteUrl,
+      'glyphs': ?glyphsUrl,
       'sources': sources,
       'layers': layers,
     };

@@ -168,8 +168,8 @@ jobs:
           fi
           exit "$status"
 
-      - name: Report Real Coverage Breakdown
-        run: python3 tool/ci_coverage_check.py coverage/lcov.info
+      - name: Enforce Crypto/Guard Coverage Gate (>=90%) & Report Breakdown
+        run: python3 tool/ci_coverage_check.py coverage/lcov.info --enforce-crypto-min=90
 
   build_android_and_web:
     name: Build Web & Android APK
