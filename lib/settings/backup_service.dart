@@ -395,6 +395,16 @@ class BackupService {
     final sessions = await db.select(db.studySessions).get();
     final appointments = await db.select(db.appointments).get();
     final activities = await db.select(db.activityRecords).get();
+    final syncQueue = formatVersion >= 3
+        ? const <SyncQueueEntry>[]
+        : (await db.select(db.syncQueue).get())
+            .where(
+              (sq) =>
+                  sq.status == 'pending' &&
+                  (sq.operation.toUpperCase() == 'INSERT' ||
+                      sq.operation.toUpperCase() == 'UPDATE'),
+            )
+            .toList();
     final voiceNotes = await db.select(db.voiceNotes).get();
     final phoneContacts = await db.select(db.phoneContacts).get();
     final landmarks = await db.select(db.territoryLandmarks).get();
@@ -602,7 +612,9 @@ class BackupService {
       'studySessions': sessions.map((s) => s.toJson()).toList(),
       'appointments': appointments.map((a) => a.toJson()).toList(),
       'activityRecords': activities.map((a) => a.toJson()).toList(),
-      'syncQueue': const <Map<String, dynamic>>[],
+      'syncQueue': formatVersion >= 3
+          ? const <Map<String, dynamic>>[]
+          : syncQueue.map((sq) => sq.toJson()).toList(),
       'voiceNotes': voiceNotes.map((v) => v.toJson()).toList(),
       'voiceNoteAudios': voiceNoteAudios,
       'voiceNoteAudioHashes': voiceNoteAudioHashes,
@@ -2428,11 +2440,58 @@ class BackupService {
           totalRestoredCount++;
         }
 
-        // 22. Fila de Sincronização (SyncQueue):
-        // Nunca reinjetar cegamente operações antigas de syncQueue do arquivo de
-        // backup, pois poderiam reenviar mutações obsoletas ou de outra conta.
-        // Todas as entidades efetivamente restauradas acima já foram
-        // reconstituídas com segurança via _reconstituteSyncQueue().
+        // 22. Fila de Sincronização (SyncQueue) — FA-BAK-01:
+        // Nunca reinjeta operações quando o dispositivo já está vinculado a uma
+        // conta (`automatic_sync_owner_id`), nem operações destrutivas (DELETE/HARD_DELETE)
+        // ou já finalizadas/conflitantes. Em backups v3, `syncQueue` nunca é exportada.
+        final boundOwnerRow = await (db.select(
+          db.appKvStore,
+        )..where((t) => t.key.equals('automatic_sync_owner_id'))).getSingleOrNull();
+        final hasBoundOwner =
+            boundOwnerRow != null && boundOwnerRow.value.trim().isNotEmpty;
+        if (!hasBoundOwner) {
+          final syncQueueRows = (data['syncQueue'] as List<dynamic>?) ?? [];
+          for (final item in syncQueueRows) {
+            final rawMap = Map<String, dynamic>.from(item as Map<String, dynamic>);
+            final opName = rawMap['operation']?.toString().toUpperCase() ?? '';
+            final status = rawMap['status']?.toString().toLowerCase() ?? 'pending';
+            if (status != 'pending' ||
+                (opName != 'INSERT' && opName != 'UPDATE')) {
+              continue;
+            }
+            if (rawMap.containsKey('payload') && rawMap['payload'] is String) {
+              try {
+                final decodedPayload = jsonDecode(rawMap['payload'] as String);
+                if (decodedPayload is Map<String, dynamic>) {
+                  final normalized = _normalizePayloadDates(decodedPayload);
+                  rawMap['payload'] = jsonEncode(normalized);
+                }
+              } catch (e, st) {
+                AppLogger.warning(
+                  'Falha ao normalizar payload de syncQueue na restauração',
+                  e,
+                  st,
+                );
+              }
+            }
+            final entry = SyncQueueEntry.fromJson(rawMap);
+            final existingById = await (db.select(
+              db.syncQueue,
+            )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
+            final existingForEntity = await (db.select(
+              db.syncQueue,
+            )..where((tbl) => tbl.entityId.equals(entry.entityId))).get();
+            final hasPendingForEntity = existingForEntity.any(
+              (row) =>
+                  row.entityType == entry.entityType &&
+                  row.status == 'pending',
+            );
+            if (existingById == null && !hasPendingForEntity) {
+              await db.into(db.syncQueue).insert(entry);
+              totalRestoredCount++;
+            }
+          }
+        }
       });
     } catch (e) {
       // Rollback seguro de arquivos de áudio:

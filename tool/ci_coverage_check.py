@@ -58,10 +58,10 @@ def main() -> int:
         )
         and not f.endswith(".g.dart"),
     )
-    print(f"Overall coverage:      {overall[1]:5d}/{overall[0]:5d} ({overall[2]:5.2f}%)")
-    print(f"Domain coverage:       {domain[1]:5d}/{domain[0]:5d} ({domain[2]:5.2f}%) [FAES target >=80%]")
-    print(f"Sync total coverage:   {sync[1]:5d}/{sync[0]:5d} ({sync[2]:5.2f}%) [FAES target >=90%]")
-    print(f"Crypto/Guard coverage: {crypto[1]:5d}/{crypto[0]:5d} ({crypto[2]:5.2f}%) [FAES target >=90%]")
+    print(f"Overall coverage:      {overall[0]:5d}/{overall[1]:5d} ({overall[2]:5.2f}%)")
+    print(f"Domain coverage:       {domain[0]:5d}/{domain[1]:5d} ({domain[2]:5.2f}%) [FAES target >=80%]")
+    print(f"Sync total coverage:   {sync[0]:5d}/{sync[1]:5d} ({sync[2]:5.2f}%) [FAES target >=90%]")
+    print(f"Crypto/Guard coverage: {crypto[0]:5d}/{crypto[1]:5d} ({crypto[2]:5.2f}%) [FAES target >=90%]")
 
     for arg in sys.argv[2:]:
         if arg.startswith("--enforce-crypto-min="):
