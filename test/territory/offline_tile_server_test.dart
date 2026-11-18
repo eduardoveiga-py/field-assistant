@@ -279,4 +279,70 @@ void main() {
       expect(res.statusCode, equals(404));
     });
   });
+
+  group('Offline Map Assets Serving (/assets/sprites & /assets/fonts)', () {
+    test(
+      'Serves authentic bundled SDF fonts and RGBA sprites over loopback HTTP',
+      () async {
+        server.setAssetsDirectory(Directory('assets/map'));
+        await server.start();
+
+        final spriteJsonRes = await http.get(
+          Uri.parse('${server.baseUrl}/assets/sprites/sprite.json'),
+        );
+        expect(spriteJsonRes.statusCode, equals(200));
+        expect(
+          spriteJsonRes.headers['content-type'],
+          contains('application/json'),
+        );
+        expect(spriteJsonRes.body, contains('marker-15'));
+        expect(spriteJsonRes.body, contains('landmark-15'));
+
+        final spritePngRes = await http.get(
+          Uri.parse('${server.baseUrl}/assets/sprites/sprite.png'),
+        );
+        expect(spritePngRes.statusCode, equals(200));
+        expect(spritePngRes.headers['content-type'], equals('image/png'));
+        expect(
+          spritePngRes.bodyBytes.sublist(0, 4),
+          equals([0x89, 0x50, 0x4E, 0x47]),
+        );
+
+        final fontRes = await http.get(
+          Uri.parse(
+            '${server.baseUrl}/assets/fonts/Noto%20Sans%20Regular/0-255.pbf',
+          ),
+        );
+        expect(fontRes.statusCode, equals(200));
+        expect(
+          fontRes.headers['content-type'],
+          equals('application/x-protobuf'),
+        );
+        expect(fontRes.bodyBytes.length, greaterThan(40000));
+      },
+    );
+
+    test(
+      'Rejects path traversal and non-whitelisted extensions on /assets/',
+      () async {
+        server.setAssetsDirectory(Directory('assets/map'));
+        await server.start();
+
+        final traversal = await http.get(
+          Uri.parse('${server.baseUrl}/assets/sprites/..%2Fpubspec.yaml'),
+        );
+        expect(traversal.statusCode, anyOf(equals(400), equals(404)));
+
+        final badExt = await http.get(
+          Uri.parse('${server.baseUrl}/assets/sprites/style_offline_light.txt'),
+        );
+        expect(badExt.statusCode, equals(400));
+
+        final missingFont = await http.get(
+          Uri.parse('${server.baseUrl}/assets/fonts/UnknownFont/0-255.pbf'),
+        );
+        expect(missingFont.statusCode, equals(404));
+      },
+    );
+  });
 }

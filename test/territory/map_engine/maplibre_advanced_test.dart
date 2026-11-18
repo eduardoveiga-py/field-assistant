@@ -149,13 +149,31 @@ void main() {
         await adapter.updateContactsOverlay([
           {'id': 'p1', 'name': 'Lucas', 'latitude': -3.1, 'longitude': -60.0},
         ]);
+        await adapter.updateLandmarksOverlay([
+          {
+            'id': 'lm1',
+            'title': 'Praça Central',
+            'latitude': -3.11,
+            'longitude': -60.01,
+            'category': 'poi',
+          },
+        ]);
 
         final spec = adapter.generateStyleSpecification(isDarkMode: true);
         expect(spec['version'], equals(8));
+        expect(spec['sprite'], contains('/assets/sprites/sprite'));
+        expect(
+          spec['glyphs'],
+          contains('/assets/fonts/{fontstack}/{range}.pbf'),
+        );
 
         final layers = spec['layers'] as List;
         final contactLayer = layers.firstWhere(
           (l) => l['id'] == 'contacts-layer',
+          orElse: () => <String, dynamic>{},
+        );
+        final landmarkLayer = layers.firstWhere(
+          (l) => l['id'] == 'landmarks-layer',
           orElse: () => <String, dynamic>{},
         );
 
@@ -164,6 +182,12 @@ void main() {
         // Invariante essencial para rotação: pinos e nomes de contatos não invertem!
         expect(layout['icon-rotation-alignment'], equals('viewport'));
         expect(layout['text-rotation-alignment'], equals('viewport'));
+
+        expect(landmarkLayer, isNotEmpty);
+        final lmLayout = landmarkLayer['layout'] as Map<String, dynamic>;
+        expect(lmLayout['icon-image'], equals('landmark-15'));
+        expect(lmLayout['icon-rotation-alignment'], equals('viewport'));
+        expect(lmLayout['text-rotation-alignment'], equals('viewport'));
       },
     );
   });

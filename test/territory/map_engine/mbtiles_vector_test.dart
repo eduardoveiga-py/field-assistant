@@ -149,11 +149,10 @@ void main() {
           0x07,
         ]);
 
-        // Cria cabeçalho PMTiles v3 mínimo
+        // Cria cabeçalho PMTiles v3 oficial (magic de 7 bytes "PMTiles" + versão 3 no byte 7)
         final header = Uint8List(127);
-        header[0] = 0x50;
-        header[1] = 0x4D;
-        header[2] = 3;
+        header.setRange(0, 7, [0x50, 0x4D, 0x54, 0x69, 0x6C, 0x65, 0x73]);
+        header[7] = 3;
 
         pmtilesFile.writeAsBytesSync([...header, ...fakeTile]);
 

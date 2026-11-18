@@ -193,6 +193,65 @@ void main() {
       expect(res2!.street, equals('Av. Eduardo Ribeiro'));
       expect(httpCalls, equals(1));
     });
+
+    test('reverseGeocode rejects Nominatim HTTP 200 error payloads and does not cache empty results', () async {
+      var httpCalls = 0;
+      final mockClient = MockClient((request) async {
+        httpCalls++;
+        return http.Response(
+          jsonEncode({'error': 'Unable to geocode'}),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      });
+
+      final res = await OfflineGeocodingService.reverseGeocode(
+        0.0,
+        0.0,
+        db: db,
+        httpClient: mockClient,
+      );
+      expect(res, isNull);
+      expect(httpCalls, equals(1));
+
+      final rows = await db.select(db.appKvStore).get();
+      expect(rows, isEmpty);
+    });
+
+    test('geocodeAddress parses structured addressdetails fields when returned by Nominatim', () async {
+      final mockClient = MockClient((request) async {
+        return http.Response(
+          jsonEncode([
+            {
+              'lat': '-3.1019',
+              'lon': '-60.025',
+              'display_name': 'Av. Eduardo Ribeiro, 500, Centro, Manaus, AM',
+              'address': {
+                'road': 'Av. Eduardo Ribeiro',
+                'house_number': '500',
+                'suburb': 'Centro',
+                'city': 'Manaus',
+                'state': 'Amazonas',
+              },
+            },
+          ]),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      });
+
+      final res = await OfflineGeocodingService.geocodeAddress(
+        'Av Eduardo Ribeiro 500 Manaus',
+        db: db,
+        httpClient: mockClient,
+      );
+      expect(res, isNotNull);
+      expect(res!.street, equals('Av. Eduardo Ribeiro'));
+      expect(res.houseNumber, equals('500'));
+      expect(res.neighborhood, equals('Centro'));
+      expect(res.city, equals('Manaus'));
+      expect(res.state, equals('Amazonas'));
+    });
   });
 
   group('Offline Local Search Tests (People, Landmarks, Sectors)', () {

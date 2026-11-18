@@ -28,7 +28,9 @@ import '../widgets/screen_hero_accent_band.dart';
 import 'person_detail_screen.dart';
 import 'download_maps_screen.dart';
 import '../widgets/map/dynamic_tile_layer.dart';
+import '../widgets/map/maplibre_vector_map_view.dart';
 import '../../territory/map_engine_adapter.dart';
+import '../../territory/map_engine/maplibre_native_adapter.dart';
 import '../../territory/map_engine/raster_fallback_adapter.dart';
 
 class ContactsMapScreen extends ConsumerStatefulWidget {
@@ -2929,18 +2931,114 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
 
         return Stack(
           children: [
-            RepaintBoundary(
-              child: ClipRect(
-                child: Listener(
-                  behavior: HitTestBehavior.translucent,
-                  onPointerSignal: (pointerSignal) {
-                    if (pointerSignal is PointerScrollEvent) {
-                      final now = clock.now();
-                      if (_lastZoomChangeTime == null ||
-                          now.difference(_lastZoomChangeTime!).inMilliseconds >=
-                              250) {
-                        if (pointerSignal.scrollDelta.dy < -2 && _zoom < 19) {
-                          _lastZoomChangeTime = now;
+            if (_mapEngineAdapter is MaplibreNativeAdapter &&
+                MapLibreVectorMapView.isSupportedOnCurrentPlatform)
+              Positioned.fill(
+                child: MapLibreVectorMapView(
+                  adapter: _mapEngineAdapter,
+                  initialLat: effectiveCenterLat,
+                  initialLng: effectiveCenterLng,
+                  initialZoom: _zoom.toDouble(),
+                  initialBearing: _rotationNotifier.value * (180.0 / math.pi),
+                  isDarkMode: isDark,
+                  contacts: [
+                    for (final p in orderedContacts)
+                      if (p.latitude != null && p.longitude != null)
+                        {
+                          'id': p.id,
+                          'name': p.name,
+                          'latitude': p.latitude,
+                          'longitude': p.longitude,
+                          'status': p.status,
+                          'notes': p.generalNotes ?? '',
+                        },
+                  ],
+                  landmarks: _showLandmarks
+                      ? [
+                          for (final lm in geoLandmarks)
+                            {
+                              'id': lm.id,
+                              'title': lm.name,
+                              'latitude': lm.latitude,
+                              'longitude': lm.longitude,
+                              'category': lm.category,
+                            },
+                        ]
+                      : const [],
+                  onCameraChanged: (vp) {
+                    _activeCenterLat = vp.latitude;
+                    _activeCenterLng = vp.longitude;
+                    _rotationNotifier.value =
+                        vp.bearingDegrees * (math.pi / 180.0);
+                  },
+                  onContactTapped: (contactId) {
+                    for (final p in orderedContacts) {
+                      if (p.id == contactId) {
+                        setState(() {
+                          _selectedPinPerson = p;
+                          _selectedPinLandmark = null;
+                        });
+                        break;
+                      }
+                    }
+                  },
+                  onLandmarkTapped: (landmarkId) {
+                    for (final lm in geoLandmarks) {
+                      if (lm.id == landmarkId) {
+                        setState(() {
+                          _selectedPinLandmark = lm;
+                          _selectedPinPerson = null;
+                        });
+                        break;
+                      }
+                    }
+                  },
+                ),
+              )
+            else
+              RepaintBoundary(
+                child: ClipRect(
+                  child: Listener(
+                    behavior: HitTestBehavior.translucent,
+                    onPointerSignal: (pointerSignal) {
+                      if (pointerSignal is PointerScrollEvent) {
+                        final now = clock.now();
+                        if (_lastZoomChangeTime == null ||
+                            now
+                                    .difference(_lastZoomChangeTime!)
+                                    .inMilliseconds >=
+                                250) {
+                          if (pointerSignal.scrollDelta.dy < -2 && _zoom < 19) {
+                            _lastZoomChangeTime = now;
+                            _changeZoom(
+                              _zoom + 1,
+                              constraints,
+                              originPx,
+                              originPy,
+                              viewerW: viewerW,
+                              viewerH: viewerH,
+                              gridHalfSize: gridHalfSize,
+                            );
+                          } else if (pointerSignal.scrollDelta.dy > 2 &&
+                              _zoom > 6) {
+                            _lastZoomChangeTime = now;
+                            _changeZoom(
+                              _zoom - 1,
+                              constraints,
+                              originPx,
+                              originPy,
+                              viewerW: viewerW,
+                              viewerH: viewerH,
+                              gridHalfSize: gridHalfSize,
+                            );
+                          }
+                        }
+                      }
+                    },
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.translucent,
+                      onDoubleTap: () {
+                        if (_zoom < 19) {
                           _changeZoom(
                             _zoom + 1,
                             constraints,
@@ -2950,472 +3048,466 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                             viewerH: viewerH,
                             gridHalfSize: gridHalfSize,
                           );
-                        } else if (pointerSignal.scrollDelta.dy > 2 &&
-                            _zoom > 6) {
-                          _lastZoomChangeTime = now;
-                          _changeZoom(
-                            _zoom - 1,
-                            constraints,
-                            originPx,
-                            originPy,
-                            viewerW: viewerW,
-                            viewerH: viewerH,
-                            gridHalfSize: gridHalfSize,
-                          );
                         }
-                      }
-                    }
-                  },
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.translucent,
-                    onDoubleTap: () {
-                      if (_zoom < 19) {
-                        _changeZoom(
-                          _zoom + 1,
-                          constraints,
-                          originPx,
-                          originPy,
-                          viewerW: viewerW,
-                          viewerH: viewerH,
-                          gridHalfSize: gridHalfSize,
+                      },
+                      onLongPressStart: (details) {
+                        final m = _applyPendingResizeTo(
+                          _transformationController.value,
                         );
-                      }
-                    },
-                    onLongPressStart: (details) {
-                      final m = _applyPendingResizeTo(
-                        _transformationController.value,
-                      );
-                      final currentScale = m.getMaxScaleOnAxis();
-                      final effectiveScale = currentScale > 0.01
-                          ? currentScale
-                          : 1.0;
-                      final dx = m.storage[12];
-                      final dy = m.storage[13];
-                      final offset =
-                          details.localPosition -
-                          Offset(viewportW / 2, viewportH / 2);
-                      final rotation = _rotationNotifier.value;
-                      final c = math.cos(rotation);
-                      final sn = math.sin(rotation);
-                      final localX =
-                          offset.dx * c + offset.dy * sn + viewerW / 2;
-                      final localY =
-                          -offset.dx * sn + offset.dy * c + viewerH / 2;
-                      final touchCanvasX = (localX - dx) / effectiveScale;
-                      final touchCanvasY = (localY - dy) / effectiveScale;
-                      final touchWorldPx = originPx + touchCanvasX;
-                      final touchWorldPy = originPy + touchCanvasY;
-                      final touchLng = _pixelX2lon(touchWorldPx, _zoom);
-                      final touchLat = _pixelY2lat(touchWorldPy, _zoom);
-                      _showAddLandmarkModal(
-                        context,
-                        initialLat: touchLat,
-                        initialLng: touchLng,
-                      );
-                    },
-                    child: Listener(
-                      behavior: HitTestBehavior.translucent,
-                      onPointerDown: (event) {
-                        _touchPointers[event.pointer] = event.position;
-                        if (event.kind == PointerDeviceKind.mouse &&
-                            (event.buttons & kSecondaryMouseButton != 0 ||
-                                HardwareKeyboard.instance.isShiftPressed)) {
-                          _isMouseRotating = true;
-                          _mouseRotateStartAngle = math.atan2(
-                            event.localPosition.dy - viewportH / 2,
-                            event.localPosition.dx - viewportW / 2,
-                          );
-                          _rotationAtMouseStart = _rotationNotifier.value;
-                        } else if (_touchPointers.length >= 2) {
-                          final pts = _touchPointers.values.take(2).toList();
-                          _twoFingerStartAngle = math.atan2(
-                            pts[1].dy - pts[0].dy,
-                            pts[1].dx - pts[0].dx,
-                          );
-                          _rotationAtTouchStart = _rotationNotifier.value;
-                        }
+                        final currentScale = m.getMaxScaleOnAxis();
+                        final effectiveScale = currentScale > 0.01
+                            ? currentScale
+                            : 1.0;
+                        final dx = m.storage[12];
+                        final dy = m.storage[13];
+                        final offset =
+                            details.localPosition -
+                            Offset(viewportW / 2, viewportH / 2);
+                        final rotation = _rotationNotifier.value;
+                        final c = math.cos(rotation);
+                        final sn = math.sin(rotation);
+                        final localX =
+                            offset.dx * c + offset.dy * sn + viewerW / 2;
+                        final localY =
+                            -offset.dx * sn + offset.dy * c + viewerH / 2;
+                        final touchCanvasX = (localX - dx) / effectiveScale;
+                        final touchCanvasY = (localY - dy) / effectiveScale;
+                        final touchWorldPx = originPx + touchCanvasX;
+                        final touchWorldPy = originPy + touchCanvasY;
+                        final touchLng = _pixelX2lon(touchWorldPx, _zoom);
+                        final touchLat = _pixelY2lat(touchWorldPy, _zoom);
+                        _showAddLandmarkModal(
+                          context,
+                          initialLat: touchLat,
+                          initialLng: touchLng,
+                        );
                       },
-                      onPointerMove: (event) {
-                        if (_touchPointers.containsKey(event.pointer)) {
+                      child: Listener(
+                        behavior: HitTestBehavior.translucent,
+                        onPointerDown: (event) {
                           _touchPointers[event.pointer] = event.position;
-                        }
-                        if (_isMouseRotating) {
-                          final currentAngle = math.atan2(
-                            event.localPosition.dy - viewportH / 2,
-                            event.localPosition.dx - viewportW / 2,
-                          );
-                          var diff = currentAngle - _mouseRotateStartAngle;
-                          while (diff > math.pi) {
-                            diff -= 2 * math.pi;
+                          if (event.kind == PointerDeviceKind.mouse &&
+                              (event.buttons & kSecondaryMouseButton != 0 ||
+                                  HardwareKeyboard.instance.isShiftPressed)) {
+                            _isMouseRotating = true;
+                            _mouseRotateStartAngle = math.atan2(
+                              event.localPosition.dy - viewportH / 2,
+                              event.localPosition.dx - viewportW / 2,
+                            );
+                            _rotationAtMouseStart = _rotationNotifier.value;
+                          } else if (_touchPointers.length >= 2) {
+                            final pts = _touchPointers.values.take(2).toList();
+                            _twoFingerStartAngle = math.atan2(
+                              pts[1].dy - pts[0].dy,
+                              pts[1].dx - pts[0].dx,
+                            );
+                            _rotationAtTouchStart = _rotationNotifier.value;
                           }
-                          while (diff < -math.pi) {
-                            diff += 2 * math.pi;
+                        },
+                        onPointerMove: (event) {
+                          if (_touchPointers.containsKey(event.pointer)) {
+                            _touchPointers[event.pointer] = event.position;
                           }
-                          _rotationAnimController.stop();
-                          _rotationNotifier.value =
-                              _rotationAtMouseStart + diff;
-                        } else if (_touchPointers.length >= 2) {
-                          final pts = _touchPointers.values.take(2).toList();
-                          final currentAngle = math.atan2(
-                            pts[1].dy - pts[0].dy,
-                            pts[1].dx - pts[0].dx,
-                          );
-                          var diff = currentAngle - _twoFingerStartAngle;
-                          while (diff > math.pi) {
-                            diff -= 2 * math.pi;
+                          if (_isMouseRotating) {
+                            final currentAngle = math.atan2(
+                              event.localPosition.dy - viewportH / 2,
+                              event.localPosition.dx - viewportW / 2,
+                            );
+                            var diff = currentAngle - _mouseRotateStartAngle;
+                            while (diff > math.pi) {
+                              diff -= 2 * math.pi;
+                            }
+                            while (diff < -math.pi) {
+                              diff += 2 * math.pi;
+                            }
+                            _rotationAnimController.stop();
+                            _rotationNotifier.value =
+                                _rotationAtMouseStart + diff;
+                          } else if (_touchPointers.length >= 2) {
+                            final pts = _touchPointers.values.take(2).toList();
+                            final currentAngle = math.atan2(
+                              pts[1].dy - pts[0].dy,
+                              pts[1].dx - pts[0].dx,
+                            );
+                            var diff = currentAngle - _twoFingerStartAngle;
+                            while (diff > math.pi) {
+                              diff -= 2 * math.pi;
+                            }
+                            while (diff < -math.pi) {
+                              diff += 2 * math.pi;
+                            }
+                            _rotationAnimController.stop();
+                            _rotationNotifier.value =
+                                _rotationAtTouchStart + diff;
                           }
-                          while (diff < -math.pi) {
-                            diff += 2 * math.pi;
+                        },
+                        onPointerUp: (event) {
+                          _touchPointers.remove(event.pointer);
+                          _isMouseRotating = false;
+                          _rotationAtTouchStart = _rotationNotifier.value;
+                          if (_touchPointers.length >= 2) {
+                            final pts = _touchPointers.values.take(2).toList();
+                            _twoFingerStartAngle = math.atan2(
+                              pts[1].dy - pts[0].dy,
+                              pts[1].dx - pts[0].dx,
+                            );
                           }
-                          _rotationAnimController.stop();
-                          _rotationNotifier.value =
-                              _rotationAtTouchStart + diff;
-                        }
-                      },
-                      onPointerUp: (event) {
-                        _touchPointers.remove(event.pointer);
-                        _isMouseRotating = false;
-                        _rotationAtTouchStart = _rotationNotifier.value;
-                        if (_touchPointers.length >= 2) {
-                          final pts = _touchPointers.values.take(2).toList();
-                          _twoFingerStartAngle = math.atan2(
-                            pts[1].dy - pts[0].dy,
-                            pts[1].dx - pts[0].dx,
-                          );
-                        }
-                      },
-                      onPointerCancel: (event) {
-                        _touchPointers.remove(event.pointer);
-                        _isMouseRotating = false;
-                        _rotationAtTouchStart = _rotationNotifier.value;
-                        if (_touchPointers.length >= 2) {
-                          final pts = _touchPointers.values.take(2).toList();
-                          _twoFingerStartAngle = math.atan2(
-                            pts[1].dy - pts[0].dy,
-                            pts[1].dx - pts[0].dx,
-                          );
-                        }
-                      },
-                      child: SizedBox(
-                        width: viewportW,
-                        height: viewportH,
-                        child: Center(
-                          child: OverflowBox(
-                            minWidth: viewerW,
-                            maxWidth: viewerW,
-                            minHeight: viewerH,
-                            maxHeight: viewerH,
-                            child: ValueListenableBuilder<double>(
-                              valueListenable: _rotationNotifier,
-                              builder: (context, rotation, child) {
-                                return Transform.rotate(
-                                  angle: rotation,
-                                  child: child,
-                                );
-                              },
-                              child: InteractiveViewer(
-                                transformationController:
-                                    _transformationController,
-                                constrained: false, // Permite que o mapa ocupe 100% da área sem distorção ou cortes pretos
-                                boundaryMargin: EdgeInsets.zero, // O canvas dinâmico já excede a diagonal em todos os zooms, evitando áreas vazias
-                                panEnabled: true,
-                                scaleEnabled: true, // Habilita zoom fluido por gesto de pinça na tela e trackpad
-                                trackpadScrollCausesScale: true, // Garante que pinça de trackpad aplique ZOOM em vez de deslizar para os lados
-                                minScale: 0.6,
-                                maxScale: 2.0,
-                                // Quase sem inércia: a origem é realinhada ao fim do gesto.
-                                interactionEndFrictionCoefficient: 1e-100,
-                                onInteractionEnd: (details) {
-                                  _hasAppliedInitialMatrix = true;
-                                  final m = _applyPendingResizeTo(
-                                    _transformationController.value,
-                                  );
-                                  final currentScale = m.getMaxScaleOnAxis();
-                                  final effectiveScale = currentScale > 0.01
-                                      ? currentScale
-                                      : 1.0;
-                                  final dx = m.storage[12];
-                                  final dy = m.storage[13];
-                                  final canvasCenterX =
-                                      ((viewerW / 2.0) - dx) / effectiveScale;
-                                  final canvasCenterY =
-                                      ((viewerH / 2.0) - dy) / effectiveScale;
-                                  final worldPx = originPx + canvasCenterX;
-                                  final worldPy = originPy + canvasCenterY;
-                                  final focalLng = _pixelX2lon(
-                                    worldPx,
-                                    _zoom,
-                                  ).clamp(-179.999999, 179.999999);
-                                  final focalLat = _pixelY2lat(
-                                    worldPy,
-                                    _zoom,
-                                  ).clamp(-85.0511, 85.0511);
-
-                                  final now = clock.now();
-                                  if (_lastZoomChangeTime == null ||
-                                      now
-                                              .difference(_lastZoomChangeTime!)
-                                              .inMilliseconds >=
-                                          250) {
-                                    if (currentScale >= 1.35 && _zoom < 19) {
-                                      _lastZoomChangeTime = now;
-                                      _changeZoom(
-                                        _zoom + 1,
-                                        constraints,
-                                        originPx,
-                                        originPy,
-                                        viewerW: viewerW,
-                                        viewerH: viewerH,
-                                        gridHalfSize: gridHalfSize,
-                                      );
-                                      return;
-                                    } else if (currentScale <= 0.75 &&
-                                        _zoom > 6) {
-                                      _lastZoomChangeTime = now;
-                                      _changeZoom(
-                                        _zoom - 1,
-                                        constraints,
-                                        originPx,
-                                        originPy,
-                                        viewerW: viewerW,
-                                        viewerH: viewerH,
-                                        gridHalfSize: gridHalfSize,
-                                      );
-                                      return;
-                                    }
-                                  }
-                                  final newCenterTileX = _lon2tileX(
-                                    focalLng,
-                                    _zoom,
-                                  );
-                                  final newCenterTileY = _lat2tileY(
-                                    focalLat,
-                                    _zoom,
-                                  );
-                                  if (newCenterTileX == centerTileX &&
-                                      newCenterTileY == centerTileY) {
-                                    _activeCenterLng = focalLng;
-                                    _activeCenterLat = focalLat;
-                                    return;
-                                  }
-                                  final newMinTileX =
-                                      newCenterTileX - gridHalfSize;
-                                  final newMinTileY =
-                                      newCenterTileY - gridHalfSize;
-                                  final newOriginX = newMinTileX * _tileSize;
-                                  final newOriginY = newMinTileY * _tileSize;
-                                  final nextDx =
-                                      dx +
-                                      (newOriginX - originPx) * effectiveScale;
-                                  final nextDy =
-                                      dy +
-                                      (newOriginY - originPy) * effectiveScale;
-                                  _cancelPendingResizeSync();
-                                  setState(() {
-                                    _activeCenterLng = focalLng;
-                                    _activeCenterLat = focalLat;
-                                  });
-                                  _setMatrixWithRebuildPending(
-                                    Matrix4.identity()
-                                      ..translateByDouble(nextDx, nextDy, 0, 1)
-                                      ..scaleByDouble(
-                                        effectiveScale,
-                                        effectiveScale,
-                                        1,
-                                        1,
-                                      ),
+                        },
+                        onPointerCancel: (event) {
+                          _touchPointers.remove(event.pointer);
+                          _isMouseRotating = false;
+                          _rotationAtTouchStart = _rotationNotifier.value;
+                          if (_touchPointers.length >= 2) {
+                            final pts = _touchPointers.values.take(2).toList();
+                            _twoFingerStartAngle = math.atan2(
+                              pts[1].dy - pts[0].dy,
+                              pts[1].dx - pts[0].dx,
+                            );
+                          }
+                        },
+                        child: SizedBox(
+                          width: viewportW,
+                          height: viewportH,
+                          child: Center(
+                            child: OverflowBox(
+                              minWidth: viewerW,
+                              maxWidth: viewerW,
+                              minHeight: viewerH,
+                              maxHeight: viewerH,
+                              child: ValueListenableBuilder<double>(
+                                valueListenable: _rotationNotifier,
+                                builder: (context, rotation, child) {
+                                  return Transform.rotate(
+                                    angle: rotation,
+                                    child: child,
                                   );
                                 },
-                                child: Container(
-                                  width: canvasWidth,
-                                  height: canvasHeight,
-                                  color: isDark
-                                      ? const Color(0xFF0F172A)
-                                      : const Color(0xFFF1F5F9),
-                                  child: Stack(
-                                    children: [
-                                      // Camada de Tiles dinâmica isolada (sem rebuild da tela inteira durante arraste/zoom/rotação)
-                                      Positioned.fill(
-                                        child: _DynamicTileLayer(
-                                          transformationController:
-                                              _transformationController,
-                                          rotationListenable: _rotationNotifier,
-                                          zoom: _zoom,
-                                          minTileX: minTileX,
-                                          maxTileX: maxTileX,
-                                          minTileY: minTileY,
-                                          maxTileY: maxTileY,
-                                          originPx: originPx,
-                                          originPy: originPy,
-                                          viewportW: viewportW,
-                                          viewportH: viewportH,
+                                child: InteractiveViewer(
+                                  transformationController:
+                                      _transformationController,
+                                  constrained: false, // Permite que o mapa ocupe 100% da área sem distorção ou cortes pretos
+                                  boundaryMargin: EdgeInsets.zero, // O canvas dinâmico já excede a diagonal em todos os zooms, evitando áreas vazias
+                                  panEnabled: true,
+                                  scaleEnabled: true, // Habilita zoom fluido por gesto de pinça na tela e trackpad
+                                  trackpadScrollCausesScale: true, // Garante que pinça de trackpad aplique ZOOM em vez de deslizar para os lados
+                                  minScale: 0.6,
+                                  maxScale: 2.0,
+                                  // Quase sem inércia: a origem é realinhada ao fim do gesto.
+                                  interactionEndFrictionCoefficient: 1e-100,
+                                  onInteractionEnd: (details) {
+                                    _hasAppliedInitialMatrix = true;
+                                    final m = _applyPendingResizeTo(
+                                      _transformationController.value,
+                                    );
+                                    final currentScale = m.getMaxScaleOnAxis();
+                                    final effectiveScale = currentScale > 0.01
+                                        ? currentScale
+                                        : 1.0;
+                                    final dx = m.storage[12];
+                                    final dy = m.storage[13];
+                                    final canvasCenterX =
+                                        ((viewerW / 2.0) - dx) / effectiveScale;
+                                    final canvasCenterY =
+                                        ((viewerH / 2.0) - dy) / effectiveScale;
+                                    final worldPx = originPx + canvasCenterX;
+                                    final worldPy = originPy + canvasCenterY;
+                                    final focalLng = _pixelX2lon(
+                                      worldPx,
+                                      _zoom,
+                                    ).clamp(-179.999999, 179.999999);
+                                    final focalLat = _pixelY2lat(
+                                      worldPy,
+                                      _zoom,
+                                    ).clamp(-85.0511, 85.0511);
+
+                                    final now = clock.now();
+                                    if (_lastZoomChangeTime == null ||
+                                        now
+                                                .difference(
+                                                  _lastZoomChangeTime!,
+                                                )
+                                                .inMilliseconds >=
+                                            250) {
+                                      if (currentScale >= 1.35 && _zoom < 19) {
+                                        _lastZoomChangeTime = now;
+                                        _changeZoom(
+                                          _zoom + 1,
+                                          constraints,
+                                          originPx,
+                                          originPy,
                                           viewerW: viewerW,
                                           viewerH: viewerH,
-                                          tileSize: _tileSize,
-                                          isDark: isDark,
-                                          layerStyle: activeLayerStyle,
-                                          initialMatrixOverride:
-                                              frameMatrixOverride,
-                                          shouldIgnoreTransformUpdates: () =>
-                                              _suppressTileBoundsListener,
+                                          gridHalfSize: gridHalfSize,
+                                        );
+                                        return;
+                                      } else if (currentScale <= 0.75 &&
+                                          _zoom > 6) {
+                                        _lastZoomChangeTime = now;
+                                        _changeZoom(
+                                          _zoom - 1,
+                                          constraints,
+                                          originPx,
+                                          originPy,
+                                          viewerW: viewerW,
+                                          viewerH: viewerH,
+                                          gridHalfSize: gridHalfSize,
+                                        );
+                                        return;
+                                      }
+                                    }
+                                    final newCenterTileX = _lon2tileX(
+                                      focalLng,
+                                      _zoom,
+                                    );
+                                    final newCenterTileY = _lat2tileY(
+                                      focalLat,
+                                      _zoom,
+                                    );
+                                    if (newCenterTileX == centerTileX &&
+                                        newCenterTileY == centerTileY) {
+                                      _activeCenterLng = focalLng;
+                                      _activeCenterLat = focalLat;
+                                      return;
+                                    }
+                                    final newMinTileX =
+                                        newCenterTileX - gridHalfSize;
+                                    final newMinTileY =
+                                        newCenterTileY - gridHalfSize;
+                                    final newOriginX = newMinTileX * _tileSize;
+                                    final newOriginY = newMinTileY * _tileSize;
+                                    final nextDx =
+                                        dx +
+                                        (newOriginX - originPx) *
+                                            effectiveScale;
+                                    final nextDy =
+                                        dy +
+                                        (newOriginY - originPy) *
+                                            effectiveScale;
+                                    _cancelPendingResizeSync();
+                                    setState(() {
+                                      _activeCenterLng = focalLng;
+                                      _activeCenterLat = focalLat;
+                                    });
+                                    _setMatrixWithRebuildPending(
+                                      Matrix4.identity()
+                                        ..translateByDouble(
+                                          nextDx,
+                                          nextDy,
+                                          0,
+                                          1,
+                                        )
+                                        ..scaleByDouble(
+                                          effectiveScale,
+                                          effectiveScale,
+                                          1,
+                                          1,
                                         ),
-                                      ),
+                                    );
+                                  },
+                                  child: Container(
+                                    width: canvasWidth,
+                                    height: canvasHeight,
+                                    color: isDark
+                                        ? const Color(0xFF0F172A)
+                                        : const Color(0xFFF1F5F9),
+                                    child: Stack(
+                                      children: [
+                                        // Camada de Tiles dinâmica isolada (sem rebuild da tela inteira durante arraste/zoom/rotação)
+                                        Positioned.fill(
+                                          child: _DynamicTileLayer(
+                                            transformationController:
+                                                _transformationController,
+                                            rotationListenable:
+                                                _rotationNotifier,
+                                            zoom: _zoom,
+                                            minTileX: minTileX,
+                                            maxTileX: maxTileX,
+                                            minTileY: minTileY,
+                                            maxTileY: maxTileY,
+                                            originPx: originPx,
+                                            originPy: originPy,
+                                            viewportW: viewportW,
+                                            viewportH: viewportH,
+                                            viewerW: viewerW,
+                                            viewerH: viewerH,
+                                            tileSize: _tileSize,
+                                            isDark: isDark,
+                                            layerStyle: activeLayerStyle,
+                                            initialMatrixOverride:
+                                                frameMatrixOverride,
+                                            shouldIgnoreTransformUpdates: () =>
+                                                _suppressTileBoundsListener,
+                                          ),
+                                        ),
 
-                                      // Renderização dos Marcos / Pontos de Referência geolocalizados
-                                      if (_showLandmarks)
+                                        // Renderização dos Marcos / Pontos de Referência geolocalizados
+                                        if (_showLandmarks)
+                                          for (
+                                            int i = 0;
+                                            i < geoLandmarks.length;
+                                            i++
+                                          )
+                                            _buildLandmarkPin(
+                                              geoLandmarks[i],
+                                              i,
+                                              geoLandmarks.length,
+                                              originPx: originPx,
+                                              originPy: originPy,
+                                              canvasWidth: canvasWidth,
+                                              canvasHeight: canvasHeight,
+                                            ),
+
+                                        // Ponto Azul Pulsante de Localização GPS Nativa (Regra 12)
+                                        if (_userGpsLocation != null) ...[
+                                          () {
+                                            final userX =
+                                                _lon2pixelX(
+                                                  _userGpsLocation!.longitude,
+                                                  _zoom,
+                                                ) -
+                                                originPx;
+                                            final userY =
+                                                _lat2pixelY(
+                                                  _userGpsLocation!.latitude,
+                                                  _zoom,
+                                                ) -
+                                                originPy;
+                                            return Positioned(
+                                              left: userX - 22,
+                                              top: userY - 22,
+                                              child: IgnorePointer(
+                                                child: Stack(
+                                                  alignment: Alignment.center,
+                                                  children: [
+                                                    Container(
+                                                      width: 44,
+                                                      height: 44,
+                                                      decoration: BoxDecoration(
+                                                        shape: BoxShape.circle,
+                                                        color: Colors.blue
+                                                            .withValues(
+                                                              alpha: 0.22,
+                                                            ),
+                                                        border: Border.all(
+                                                          color: Colors
+                                                              .blueAccent
+                                                              .withValues(
+                                                                alpha: 0.5,
+                                                              ),
+                                                          width: 1.5,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    Container(
+                                                      width: 14,
+                                                      height: 14,
+                                                      decoration: BoxDecoration(
+                                                        shape: BoxShape.circle,
+                                                        color: const Color(
+                                                          0xFF2563EB,
+                                                        ),
+                                                        border: Border.all(
+                                                          color: Colors.white,
+                                                          width: 2.5,
+                                                        ),
+                                                        boxShadow: const [
+                                                          BoxShadow(
+                                                            color:
+                                                                Colors.black38,
+                                                            blurRadius: 4,
+                                                            offset: Offset(
+                                                              0,
+                                                              1,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            );
+                                          }(),
+                                        ],
+
+                                        // Camada de Sobreposição Translúcida de Zonas Esquecidas (>90 dias sem visita)
+                                        for (final p in orderedContacts) ...[
+                                          () {
+                                            final layer = pinLayers[p.id];
+                                            if (layer !=
+                                                TerritoryPinLayer.forgottenZone)
+                                              return const SizedBox.shrink();
+
+                                            final hasGeo =
+                                                p.latitude != null &&
+                                                p.longitude != null &&
+                                                (p.latitude != 0.0 ||
+                                                    p.longitude != 0.0) &&
+                                                p.latitude!.abs() <= 90 &&
+                                                p.longitude!.abs() <= 180;
+                                            if (!hasGeo)
+                                              return const SizedBox.shrink();
+
+                                            final x =
+                                                _lon2pixelX(
+                                                  p.longitude!,
+                                                  _zoom,
+                                                ) -
+                                                originPx;
+                                            final y =
+                                                _lat2pixelY(
+                                                  p.latitude!,
+                                                  _zoom,
+                                                ) -
+                                                originPy;
+                                            const double haloRadius = 42.0;
+
+                                            return Positioned(
+                                              left: x - haloRadius,
+                                              top: y - haloRadius,
+                                              child: IgnorePointer(
+                                                child: Container(
+                                                  width: haloRadius * 2,
+                                                  height: haloRadius * 2,
+                                                  decoration: BoxDecoration(
+                                                    shape: BoxShape.circle,
+                                                    color: const Color(
+                                                      0xFFDC2626,
+                                                    ).withValues(alpha: 0.18),
+                                                    border: Border.all(
+                                                      color: const Color(
+                                                        0xFFDC2626,
+                                                      ).withValues(alpha: 0.45),
+                                                      width: 1.5,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            );
+                                          }(),
+                                        ],
+
+                                        // Renderização de cada pino de contato com coordenadas válidas (destacado por último)
                                         for (
                                           int i = 0;
-                                          i < geoLandmarks.length;
+                                          i < orderedContacts.length;
                                           i++
                                         )
-                                          _buildLandmarkPin(
-                                            geoLandmarks[i],
+                                          _buildMapPin(
+                                            orderedContacts[i],
                                             i,
-                                            geoLandmarks.length,
+                                            orderedContacts.length,
                                             originPx: originPx,
                                             originPy: originPy,
                                             canvasWidth: canvasWidth,
                                             canvasHeight: canvasHeight,
+                                            pinLayer:
+                                                pinLayers[orderedContacts[i]
+                                                    .id] ??
+                                                TerritoryPinLayer.interested,
                                           ),
-
-                                      // Ponto Azul Pulsante de Localização GPS Nativa (Regra 12)
-                                      if (_userGpsLocation != null) ...[
-                                        () {
-                                          final userX =
-                                              _lon2pixelX(
-                                                _userGpsLocation!.longitude,
-                                                _zoom,
-                                              ) -
-                                              originPx;
-                                          final userY =
-                                              _lat2pixelY(
-                                                _userGpsLocation!.latitude,
-                                                _zoom,
-                                              ) -
-                                              originPy;
-                                          return Positioned(
-                                            left: userX - 22,
-                                            top: userY - 22,
-                                            child: IgnorePointer(
-                                              child: Stack(
-                                                alignment: Alignment.center,
-                                                children: [
-                                                  Container(
-                                                    width: 44,
-                                                    height: 44,
-                                                    decoration: BoxDecoration(
-                                                      shape: BoxShape.circle,
-                                                      color: Colors.blue
-                                                          .withValues(
-                                                            alpha: 0.22,
-                                                          ),
-                                                      border: Border.all(
-                                                        color: Colors.blueAccent
-                                                            .withValues(
-                                                              alpha: 0.5,
-                                                            ),
-                                                        width: 1.5,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                  Container(
-                                                    width: 14,
-                                                    height: 14,
-                                                    decoration: BoxDecoration(
-                                                      shape: BoxShape.circle,
-                                                      color: const Color(
-                                                        0xFF2563EB,
-                                                      ),
-                                                      border: Border.all(
-                                                        color: Colors.white,
-                                                        width: 2.5,
-                                                      ),
-                                                      boxShadow: const [
-                                                        BoxShadow(
-                                                          color: Colors.black38,
-                                                          blurRadius: 4,
-                                                          offset: Offset(0, 1),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          );
-                                        }(),
                                       ],
-
-                                      // Camada de Sobreposição Translúcida de Zonas Esquecidas (>90 dias sem visita)
-                                      for (final p in orderedContacts) ...[
-                                        () {
-                                          final layer = pinLayers[p.id];
-                                          if (layer !=
-                                              TerritoryPinLayer.forgottenZone)
-                                            return const SizedBox.shrink();
-
-                                          final hasGeo =
-                                              p.latitude != null &&
-                                              p.longitude != null &&
-                                              (p.latitude != 0.0 ||
-                                                  p.longitude != 0.0) &&
-                                              p.latitude!.abs() <= 90 &&
-                                              p.longitude!.abs() <= 180;
-                                          if (!hasGeo)
-                                            return const SizedBox.shrink();
-
-                                          final x =
-                                              _lon2pixelX(p.longitude!, _zoom) -
-                                              originPx;
-                                          final y =
-                                              _lat2pixelY(p.latitude!, _zoom) -
-                                              originPy;
-                                          const double haloRadius = 42.0;
-
-                                          return Positioned(
-                                            left: x - haloRadius,
-                                            top: y - haloRadius,
-                                            child: IgnorePointer(
-                                              child: Container(
-                                                width: haloRadius * 2,
-                                                height: haloRadius * 2,
-                                                decoration: BoxDecoration(
-                                                  shape: BoxShape.circle,
-                                                  color: const Color(0xFFDC2626)
-                                                      .withValues(alpha: 0.18),
-                                                  border: Border.all(
-                                                    color: const Color(
-                                                      0xFFDC2626,
-                                                    ).withValues(alpha: 0.45),
-                                                    width: 1.5,
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                          );
-                                        }(),
-                                      ],
-
-                                      // Renderização de cada pino de contato com coordenadas válidas (destacado por último)
-                                      for (
-                                        int i = 0;
-                                        i < orderedContacts.length;
-                                        i++
-                                      )
-                                        _buildMapPin(
-                                          orderedContacts[i],
-                                          i,
-                                          orderedContacts.length,
-                                          originPx: originPx,
-                                          originPy: originPy,
-                                          canvasWidth: canvasWidth,
-                                          canvasHeight: canvasHeight,
-                                          pinLayer:
-                                              pinLayers[orderedContacts[i]
-                                                  .id] ??
-                                              TerritoryPinLayer.interested,
-                                        ),
-                                    ],
+                                    ),
                                   ),
                                 ),
                               ),
@@ -3427,7 +3519,6 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                   ),
                 ),
               ),
-            ),
 
             if (_highlightPersonId != null && highlightPerson != null)
               Positioned(

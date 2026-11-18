@@ -12,8 +12,22 @@ import 'recovery_vault_verifier.dart';
 /// Utiliza o serviço de credenciais nativo do sistema (Keychain / Keystore / DPAPI).
 /// Armazena exclusivamente a chave derivada (SecretKey), nunca a frase em texto claro.
 class RecoveryKeyStore {
+  static const IOSOptions defaultIosOptions = IOSOptions(
+    accessibility: KeychainAccessibility.first_unlock_this_device,
+    synchronizable: false,
+  );
+
+  static const AndroidOptions defaultAndroidOptions = AndroidOptions(
+    resetOnError: false,
+  );
+
   RecoveryKeyStore({FlutterSecureStorage? storage})
-    : _storage = storage ?? const FlutterSecureStorage();
+    : _storage =
+          storage ??
+          const FlutterSecureStorage(
+            iOptions: defaultIosOptions,
+            aOptions: defaultAndroidOptions,
+          );
 
   final FlutterSecureStorage _storage;
   static Future<void> _tail = Future<void>.value();

@@ -97,17 +97,32 @@ class PmtilesHeader {
     required this.centerLat,
   });
 
+  /// Assinatura mágica oficial PMTiles v3 (7 bytes ASCII: "PMTiles").
+  static const List<int> magicBytes = <int>[
+    0x50,
+    0x4D,
+    0x54,
+    0x69,
+    0x6C,
+    0x65,
+    0x73,
+  ];
+
   factory PmtilesHeader.fromBytes(Uint8List bytes) {
     if (bytes.length < 127) {
       throw const FormatException(
         'Cabeçalho PMTiles inválido: menor que 127 bytes.',
       );
     }
-    // Magic: "PM" (0x50, 0x4D)
-    if (bytes[0] != 0x50 || bytes[1] != 0x4D) {
-      throw const FormatException('Assinatura mágica PMTiles ausente.');
+    // Magic: "PMTiles" (7 bytes: 0x50 0x4D 0x54 0x69 0x6C 0x65 0x73)
+    for (var i = 0; i < magicBytes.length; i++) {
+      if (bytes[i] != magicBytes[i]) {
+        throw const FormatException(
+          'Assinatura mágica PMTiles v3 ("PMTiles") ausente.',
+        );
+      }
     }
-    final version = bytes[2];
+    final version = bytes[7];
     if (version != 3) {
       throw FormatException(
         'Versão PMTiles não suportada: $version (apenas v3 suportada).',
@@ -117,7 +132,7 @@ class PmtilesHeader {
     final bd = ByteData.sublistView(bytes);
 
     int getUint64(int offset) {
-      // Dart ByteData não tem getUint64 em todas plataformas sem 64-bit int; lemos little-endian
+      // Leitura little-endian de 64 bits compatível com todas as plataformas Dart.
       final low = bd.getUint32(offset, Endian.little);
       final high = bd.getUint32(offset + 4, Endian.little);
       return (high << 32) | low;
@@ -125,35 +140,38 @@ class PmtilesHeader {
 
     return PmtilesHeader(
       specVersion: version,
-      rootDirOffset: getUint64(3),
-      rootDirLength: getUint64(11),
-      jsonMetadataOffset: getUint64(19),
-      jsonMetadataLength: getUint64(27),
-      leafDirsOffset: getUint64(35),
-      leafDirsLength: getUint64(43),
-      tileDataOffset: getUint64(51),
-      tileDataLength: getUint64(59),
-      numAddressedTiles: getUint64(67),
-      numTileEntries: getUint64(75),
-      numTileContents: getUint64(83),
-      clustered: bytes[91] == 1,
-      internalCompression: PmtilesCompression.fromCode(bytes[92]),
-      tileCompression: PmtilesCompression.fromCode(bytes[93]),
-      tileType: PmtilesTileType.fromCode(bytes[94]),
-      minZoom: bytes[95],
-      maxZoom: bytes[96],
-      minLon: bd.getInt32(97, Endian.little) / 10000000.0,
-      minLat: bd.getInt32(101, Endian.little) / 10000000.0,
-      maxLon: bd.getInt32(105, Endian.little) / 10000000.0,
-      maxLat: bd.getInt32(109, Endian.little) / 10000000.0,
-      centerZoom: bytes[113],
-      centerLon: bd.getInt32(114, Endian.little) / 10000000.0,
-      centerLat: bd.getInt32(118, Endian.little) / 10000000.0,
+      rootDirOffset: getUint64(8),
+      rootDirLength: getUint64(16),
+      jsonMetadataOffset: getUint64(24),
+      jsonMetadataLength: getUint64(32),
+      leafDirsOffset: getUint64(40),
+      leafDirsLength: getUint64(48),
+      tileDataOffset: getUint64(56),
+      tileDataLength: getUint64(64),
+      numAddressedTiles: getUint64(72),
+      numTileEntries: getUint64(80),
+      numTileContents: getUint64(88),
+      clustered: bytes[96] == 1,
+      internalCompression: PmtilesCompression.fromCode(bytes[97]),
+      tileCompression: PmtilesCompression.fromCode(bytes[98]),
+      tileType: PmtilesTileType.fromCode(bytes[99]),
+      minZoom: bytes[100],
+      maxZoom: bytes[101],
+      minLon: bd.getInt32(102, Endian.little) / 10000000.0,
+      minLat: bd.getInt32(106, Endian.little) / 10000000.0,
+      maxLon: bd.getInt32(110, Endian.little) / 10000000.0,
+      maxLat: bd.getInt32(114, Endian.little) / 10000000.0,
+      centerZoom: bytes[118],
+      centerLon: bd.getInt32(119, Endian.little) / 10000000.0,
+      centerLat: bd.getInt32(123, Endian.little) / 10000000.0,
     );
   }
 }
 
 /// Entrada no diretório PMTiles v3 (mapeia TileId -> Offset + Length).
+/// Quando `runLength == 0`, representa um ponteiro de diretório folha (leaf directory)
+/// relativo a `header.leafDirsOffset`; quando `runLength > 0`, representa dados de tile
+/// relativos a `header.tileDataOffset`.
 class PmtilesEntry {
   final int tileId;
   final int offset;
@@ -166,37 +184,50 @@ class PmtilesEntry {
     required this.length,
     required this.runLength,
   });
+
+  bool get isLeafDirectory => runLength == 0;
 }
 
-/// Leitor de arquivo PMTiles (v3) em disco com decodificação de coordenadas Hilbert.
+/// Leitor de arquivo PMTiles (v3) em disco com decodificação de coordenadas Hilbert,
+/// busca binária O(log N) em intervalos RLE e resolução de diretórios folha (leaf directories).
 class PmtilesReader {
+  static const int _maxLeafDepth = 3;
+
   final File file;
   PmtilesHeader? _header;
-  final Map<int, PmtilesEntry> _entries = {};
+  List<PmtilesEntry> _rootEntries = const [];
+  final Map<int, List<PmtilesEntry>> _leafCache = {};
+  final Map<int, PmtilesEntry> _manualEntries = {};
   bool _parsed = false;
 
   PmtilesReader(this.file);
 
   /// Converte coordenadas (z, x, y) em TileID da curva de Hilbert (PMTiles v3 spec).
   static int zxyToTileId(int z, int x, int y) {
+    if (z < 0 || z > 26) {
+      throw RangeError.range(z, 0, 26, 'z');
+    }
     if (z == 0) return 0;
-    int base = 0;
-    for (int i = 0; i < z; i++) {
+    final n = 1 << z;
+    if (x < 0 || x >= n || y < 0 || y >= n) {
+      throw RangeError('Coordenadas (z=$z, x=$x, y=$y) fora dos limites.');
+    }
+    var base = 0;
+    for (var i = 0; i < z; i++) {
       base += 1 << (2 * i);
     }
-    int d = 0;
-    int s = 1 << (z - 1);
-    int rx, ry;
-    int curX = x;
-    int curY = y;
+    var d = 0;
+    var s = n >> 1;
+    var curX = x;
+    var curY = y;
     while (s > 0) {
-      rx = (curX & s) > 0 ? 1 : 0;
-      ry = (curY & s) > 0 ? 1 : 0;
+      final rx = (curX & s) > 0 ? 1 : 0;
+      final ry = (curY & s) > 0 ? 1 : 0;
       d += s * s * ((3 * rx) ^ ry);
       if (ry == 0) {
         if (rx == 1) {
-          curX = s - 1 - curX;
-          curY = s - 1 - curY;
+          curX = n - 1 - curX;
+          curY = n - 1 - curY;
         }
         final t = curX;
         curX = curY;
@@ -205,6 +236,32 @@ class PmtilesReader {
       s >>= 1;
     }
     return base + d;
+  }
+
+  /// Busca binária O(log N) conforme especificação oficial PMTiles v3.
+  static PmtilesEntry? findEntry(List<PmtilesEntry> entries, int tileId) {
+    var m = 0;
+    var n = entries.length - 1;
+    while (m <= n) {
+      final k = (n + m) >> 1;
+      final cmp = tileId - entries[k].tileId;
+      if (cmp > 0) {
+        m = k + 1;
+      } else if (cmp < 0) {
+        n = k - 1;
+      } else {
+        return entries[k];
+      }
+    }
+    if (n >= 0) {
+      if (entries[n].runLength == 0) {
+        return entries[n];
+      }
+      if (tileId - entries[n].tileId < entries[n].runLength) {
+        return entries[n];
+      }
+    }
+    return null;
   }
 
   Future<PmtilesHeader> getHeader() async {
@@ -219,7 +276,23 @@ class PmtilesReader {
     }
   }
 
-  /// Lê o diretório raiz e constrói o índice de tiles em memória.
+  Uint8List _decompressInternal(
+    Uint8List rawBytes,
+    PmtilesCompression compression,
+  ) {
+    if (compression == PmtilesCompression.gzip) {
+      return Uint8List.fromList(gzip.decode(rawBytes));
+    }
+    if (compression == PmtilesCompression.none ||
+        compression == PmtilesCompression.unknown) {
+      return rawBytes;
+    }
+    throw UnsupportedError(
+      'Compressão interna PMTiles não suportada: ${compression.name}',
+    );
+  }
+
+  /// Lê o diretório raiz e constrói a lista compacta de entradas em memória.
   Future<void> _ensureParsed() async {
     if (_parsed) return;
     final header = await getHeader();
@@ -228,13 +301,11 @@ class PmtilesReader {
       if (header.rootDirLength > 0) {
         await raf.setPosition(header.rootDirOffset);
         final rawDirBytes = await raf.read(header.rootDirLength);
-        Uint8List dirBytes;
-        if (header.internalCompression == PmtilesCompression.gzip) {
-          dirBytes = Uint8List.fromList(gzip.decode(rawDirBytes));
-        } else {
-          dirBytes = rawDirBytes;
-        }
-        _parseDirectory(dirBytes, header.tileDataOffset);
+        final dirBytes = _decompressInternal(
+          rawDirBytes,
+          header.internalCompression,
+        );
+        _rootEntries = parseDirectoryBytes(dirBytes);
       }
       _parsed = true;
     } catch (e, st) {
@@ -243,13 +314,15 @@ class PmtilesReader {
         e,
         st,
       );
+      rethrow;
     } finally {
       await raf.close();
     }
   }
 
-  void _parseDirectory(Uint8List dirBytes, int tileDataOffset) {
-    if (dirBytes.isEmpty) return;
+  /// Decodifica um diretório PMTiles v3 (raiz ou folha) em lista ordenada de [PmtilesEntry].
+  static List<PmtilesEntry> parseDirectoryBytes(Uint8List dirBytes) {
+    if (dirBytes.isEmpty) return const [];
     var pos = 0;
 
     int readVarint() {
@@ -259,78 +332,137 @@ class PmtilesReader {
         final b = dirBytes[pos++];
         result |= (b & 0x7f) << shift;
         shift += 7;
-        if ((b & 0x80) == 0) break;
+        if ((b & 0x80) == 0) return result;
       }
-      return result;
+      throw const FormatException('Varint truncado no diretório PMTiles.');
     }
 
-    if (pos >= dirBytes.length) return;
     final numEntries = readVarint();
+    if (numEntries == 0) return const [];
 
-    final tileIds = <int>[];
+    final tileIds = List<int>.filled(numEntries, 0);
     var lastTileId = 0;
-    for (var i = 0; i < numEntries && pos < dirBytes.length; i++) {
-      final delta = readVarint();
-      lastTileId += delta;
-      tileIds.add(lastTileId);
+    for (var i = 0; i < numEntries; i++) {
+      lastTileId += readVarint();
+      tileIds[i] = lastTileId;
     }
 
-    final runLengths = <int>[];
-    for (var i = 0; i < numEntries && pos < dirBytes.length; i++) {
-      runLengths.add(readVarint());
+    final runLengths = List<int>.filled(numEntries, 0);
+    for (var i = 0; i < numEntries; i++) {
+      runLengths[i] = readVarint();
     }
 
-    final lengths = <int>[];
-    for (var i = 0; i < numEntries && pos < dirBytes.length; i++) {
-      lengths.add(readVarint());
+    final lengths = List<int>.filled(numEntries, 0);
+    for (var i = 0; i < numEntries; i++) {
+      lengths[i] = readVarint();
     }
 
+    final entries = <PmtilesEntry>[];
     var lastOffset = 0;
-    for (var i = 0; i < numEntries && pos < dirBytes.length; i++) {
+    for (var i = 0; i < numEntries; i++) {
       final offsetVal = readVarint();
-      int absoluteOffset;
-      if (offsetVal == 0 && i > 0) {
-        absoluteOffset = lastOffset + lengths[i - 1];
+      final int relativeOffset;
+      if (offsetVal == 0) {
+        if (i == 0) {
+          throw const FormatException(
+            'Offset PMTiles inválido (0) na primeira entrada do diretório.',
+          );
+        }
+        relativeOffset = lastOffset + lengths[i - 1];
       } else {
-        absoluteOffset = offsetVal - 1;
+        relativeOffset = offsetVal - 1;
       }
-      lastOffset = absoluteOffset;
+      lastOffset = relativeOffset;
 
-      final tileId = tileIds[i];
-      final length = lengths[i];
-      final runLen = i < runLengths.length ? runLengths[i] : 1;
-
-      for (var r = 0; r < runLen; r++) {
-        _entries[tileId + r] = PmtilesEntry(
-          tileId: tileId + r,
-          offset: tileDataOffset + absoluteOffset,
-          length: length,
-          runLength: runLen,
-        );
-      }
+      entries.add(
+        PmtilesEntry(
+          tileId: tileIds[i],
+          offset: relativeOffset,
+          length: lengths[i],
+          runLength: runLengths[i],
+        ),
+      );
     }
+    return entries;
   }
 
-  /// Obtém os bytes do tile vetorial/raster para as coordenadas dadas.
-  Future<Uint8List?> getTile(int z, int x, int y) async {
-    await _ensureParsed();
-    final tileId = zxyToTileId(z, x, y);
-    final entry = _entries[tileId];
-    if (entry == null || entry.length <= 0) return null;
+  Future<List<PmtilesEntry>> _loadLeafDirectory(
+    PmtilesHeader header,
+    int leafOffset,
+    int leafLength,
+  ) async {
+    final cached = _leafCache[leafOffset];
+    if (cached != null) return cached;
 
     final raf = await file.open(mode: FileMode.read);
     try {
-      await raf.setPosition(entry.offset);
-      return await raf.read(entry.length);
+      await raf.setPosition(header.leafDirsOffset + leafOffset);
+      final rawBytes = await raf.read(leafLength);
+      final decoded = _decompressInternal(rawBytes, header.internalCompression);
+      final entries = parseDirectoryBytes(decoded);
+      _leafCache[leafOffset] = entries;
+      return entries;
     } finally {
       await raf.close();
     }
   }
 
+  /// Obtém os bytes do tile vetorial/raster para as coordenadas dadas,
+  /// percorrendo diretório raiz e diretórios folha quando presentes.
+  Future<Uint8List?> getTile(int z, int x, int y) async {
+    final int tileId;
+    try {
+      tileId = zxyToTileId(z, x, y);
+    } on RangeError {
+      return null;
+    }
+
+    final manual = _manualEntries[tileId];
+    if (manual != null && manual.length > 0) {
+      final raf = await file.open(mode: FileMode.read);
+      try {
+        await raf.setPosition(manual.offset);
+        return await raf.read(manual.length);
+      } finally {
+        await raf.close();
+      }
+    }
+
+    if (_parsed && _rootEntries.isEmpty) return null;
+    await _ensureParsed();
+    final header = _header;
+    if (header == null || _rootEntries.isEmpty) return null;
+
+    var currentEntries = _rootEntries;
+    for (var depth = 0; depth <= _maxLeafDepth; depth++) {
+      final entry = findEntry(currentEntries, tileId);
+      if (entry == null || entry.length <= 0) return null;
+
+      if (entry.isLeafDirectory) {
+        if (depth == _maxLeafDepth) return null;
+        currentEntries = await _loadLeafDirectory(
+          header,
+          entry.offset,
+          entry.length,
+        );
+        continue;
+      }
+
+      final raf = await file.open(mode: FileMode.read);
+      try {
+        await raf.setPosition(header.tileDataOffset + entry.offset);
+        return await raf.read(entry.length);
+      } finally {
+        await raf.close();
+      }
+    }
+    return null;
+  }
+
   /// Permite injetar manualmente entradas (para pacotes sintetizados em testes).
   void registerEntry(int z, int x, int y, int offset, int length) {
     final tileId = zxyToTileId(z, x, y);
-    _entries[tileId] = PmtilesEntry(
+    _manualEntries[tileId] = PmtilesEntry(
       tileId: tileId,
       offset: offset,
       length: length,

@@ -2,13 +2,16 @@ import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_theme.dart';
+import '../../database/app_database.dart';
 import '../../territory/geocoding_service.dart';
 import '../../territory/geolocation_helper.dart';
 import '../../territory/map_engine/raster_fallback_adapter.dart';
 import '../../territory/map_engine_adapter.dart';
 import '../../territory/tile_cache/tile_cache_service.dart';
+import '../providers.dart';
 
 class MapLocationPickerDialog extends StatefulWidget {
   final double? initialLat;
@@ -20,6 +23,7 @@ class MapLocationPickerDialog extends StatefulWidget {
   final Future<ReverseGeocodingResult?> Function(double, double)?
   reverseGeocode;
   final MapEngineAdapter? mapEngineAdapter;
+  final AppDatabase? db;
 
   const MapLocationPickerDialog({
     super.key,
@@ -29,6 +33,7 @@ class MapLocationPickerDialog extends StatefulWidget {
     this.initialNeighborhood,
     this.reverseGeocode,
     this.mapEngineAdapter,
+    this.db,
   });
 
   @override
@@ -226,10 +231,22 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
 
     ReverseGeocodingResult? res;
     try {
-      res = await (widget.reverseGeocode ?? GeocodingService.reverseGeocode)(
-        lat,
-        lng,
-      );
+      if (widget.reverseGeocode != null) {
+        res = await widget.reverseGeocode!(lat, lng);
+      } else {
+        AppDatabase? resolvedDb = widget.db;
+        if (resolvedDb == null && mounted) {
+          try {
+            resolvedDb = ProviderScope.containerOf(
+              context,
+              listen: false,
+            ).read(databaseProvider);
+          } catch (_) {
+            // Permite renderização isolada em testes sem ProviderScope.
+          }
+        }
+        res = await GeocodingService.reverseGeocode(lat, lng, db: resolvedDb);
+      }
     } catch (_) {
       // A localização escolhida continua válida mesmo se a busca falhar.
     }

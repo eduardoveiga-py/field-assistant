@@ -63,39 +63,41 @@ class OfflineGeocodingService {
 
   static final Map<String, _CachedEntry> _memoryCache = {};
   static DateTime? _lastRequestTime;
-  static Future<void>? _rateLimitLock;
+  static Future<void> _rateLimitChain = Future<void>.value();
 
   /// Limpa o cache em memória (utilizado em testes unitários).
   static void clearMemoryCache() {
     _memoryCache.clear();
     _lastRequestTime = null;
-    _rateLimitLock = null;
+    _rateLimitChain = Future<void>.value();
   }
 
-  /// Garante estrita obediência ao rate limit de 1 req/s para a API OSM Nominatim.
-  static Future<void> _enforceRateLimit() async {
-    while (_rateLimitLock != null) {
-      await _rateLimitLock;
-    }
+  /// Garante estrita obediência ao rate limit de 1 req/s para a API OSM Nominatim
+  /// sem deixar timers pendentes após o término da requisição.
+  static Future<void> _enforceRateLimit() {
+    final prev = _rateLimitChain;
     final completer = Completer<void>();
-    _rateLimitLock = completer.future;
+    _rateLimitChain = completer.future;
 
-    final now = DateTime.now();
-    if (_lastRequestTime != null) {
-      final elapsed = now.difference(_lastRequestTime!);
-      if (elapsed < const Duration(milliseconds: 1000)) {
-        await Future.delayed(const Duration(milliseconds: 1000) - elapsed);
+    Future<void> run() async {
+      try {
+        await prev;
+      } catch (_) {}
+      try {
+        final now = DateTime.now();
+        if (_lastRequestTime != null) {
+          final elapsed = now.difference(_lastRequestTime!);
+          if (elapsed < const Duration(milliseconds: 1000)) {
+            await Future.delayed(const Duration(milliseconds: 1000) - elapsed);
+          }
+        }
+        _lastRequestTime = DateTime.now();
+      } finally {
+        if (!completer.isCompleted) completer.complete();
       }
     }
-    _lastRequestTime = DateTime.now();
 
-    // Libera a trava após 1000ms
-    Future.delayed(const Duration(milliseconds: 1000), () {
-      if (!completer.isCompleted) completer.complete();
-      if (_rateLimitLock == completer.future) {
-        _rateLimitLock = null;
-      }
-    });
+    return run();
   }
 
   /// Geocodificação reversa (coordenadas -> endereço) com cache SQLite Drift (TTL 30 dias)
@@ -184,7 +186,15 @@ class OfflineGeocodingService {
         final data = json.decode(
           utf8.decode(response.bodyBytes),
         ) as Map<String, dynamic>;
+        if (data['error'] != null) {
+          return null;
+        }
         final address = data['address'] as Map<String, dynamic>?;
+        final displayName = data['display_name'] as String?;
+        if (address == null &&
+            (displayName == null || displayName.trim().isEmpty)) {
+          return null;
+        }
 
         final road =
             address?['road'] ??
@@ -211,7 +221,6 @@ class OfflineGeocodingService {
             address?['county'];
 
         final state = address?['state'];
-        final displayName = data['display_name'] as String?;
 
         final result = ReverseGeocodingResult(
           latitude: lat,
@@ -348,9 +357,35 @@ class OfflineGeocodingService {
           final lat = double.tryParse(first['lat']?.toString() ?? '');
           final lon = double.tryParse(first['lon']?.toString() ?? '');
           if (lat != null && lon != null) {
+            final address = first['address'] as Map<String, dynamic>?;
+            final road =
+                address?['road'] ??
+                address?['pedestrian'] ??
+                address?['street'] ??
+                address?['footway'] ??
+                address?['residential'] ??
+                address?['avenue'] ??
+                address?['highway'];
+            final suburb =
+                address?['suburb'] ??
+                address?['neighbourhood'] ??
+                address?['quarter'] ??
+                address?['city_district'] ??
+                address?['residential'];
+            final city =
+                address?['city'] ??
+                address?['town'] ??
+                address?['municipality'] ??
+                address?['village'] ??
+                address?['county'];
             final result = ReverseGeocodingResult(
               latitude: lat,
               longitude: lon,
+              street: road?.toString(),
+              houseNumber: address?['house_number']?.toString(),
+              neighborhood: suburb?.toString(),
+              city: city?.toString(),
+              state: address?['state']?.toString(),
               fullAddress: first['display_name'] as String?,
             );
 

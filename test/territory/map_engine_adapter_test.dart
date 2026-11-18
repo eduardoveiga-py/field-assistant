@@ -212,6 +212,16 @@ void main() {
 
       final style = adapter.generateStyleSpecification();
       expect(style['version'], equals(8));
+      expect(
+        style['sprite'],
+        equals('http://127.0.0.1:${tileServer.port}/assets/sprites/sprite'),
+      );
+      expect(
+        style['glyphs'],
+        equals(
+          'http://127.0.0.1:${tileServer.port}/assets/fonts/{fontstack}/{range}.pbf',
+        ),
+      );
       expect(style['sources'], isA<Map>());
       final source =
           (style['sources'] as Map)['offline-source'] as Map<String, dynamic>;
@@ -220,6 +230,19 @@ void main() {
       expect(
         tiles.first,
         contains('http://127.0.0.1:${tileServer.port}/tiles/mbtiles'),
+      );
+      final layerIds = (style['layers'] as List)
+          .map((l) => (l as Map)['id'])
+          .toList();
+      expect(
+        layerIds,
+        containsAll([
+          'background',
+          'water',
+          'building',
+          'transportation',
+          'place-city',
+        ]),
       );
 
       final jsonStr = adapter.generateStyleJsonString();

@@ -24,9 +24,10 @@ class OfflineTileServer {
   final Map<String, File> _mbtilesPackages = {};
   final Map<String, PmtilesReader> _pmtilesReaders = {};
   Directory? packagesDir;
+  Directory? assetsDir;
   bool _disposed = false;
 
-  OfflineTileServer({this.tileLookup, this.packagesDir});
+  OfflineTileServer({this.tileLookup, this.packagesDir, this.assetsDir});
 
   /// Indica se o servidor HTTP está ativo e escutando conexões.
   bool get isRunning => _server != null && !_disposed;
@@ -45,6 +46,11 @@ class OfflineTileServer {
   /// Define o diretório físico onde pacotes .pmtiles e .mbtiles residem.
   void setPackagesDirectory(Directory dir) {
     packagesDir = dir;
+  }
+
+  /// Define o diretório físico onde fontes SDF (.pbf) e sprites offline residem.
+  void setAssetsDirectory(Directory dir) {
+    assetsDir = dir;
   }
 
   /// Registra explicitamente um arquivo PMTiles mapeado a um identificador seguro.
@@ -192,6 +198,13 @@ class OfflineTileServer {
         return shelf.Response(HttpStatus.badRequest);
       }
 
+      // Rota de ativos cartográficos offline (fontes SDF .pbf e sprites RGBA/JSON):
+      // 1) /assets/sprites/:filename
+      // 2) /assets/fonts/:fontstack/:range
+      if (segments.isNotEmpty && segments[0] == 'assets') {
+        return await _handleAssetRequest(segments);
+      }
+
       // Rota Tiles legado / compatibilidade:
       // 1) /tiles/:z/:x/:y
       // 2) /tiles/mbtiles/:z/:x/:y
@@ -218,11 +231,80 @@ class OfflineTileServer {
       'registeredMbtiles': _mbtilesPackages.keys.toList(),
       'hasTileLookup': tileLookup != null,
       'hasPackagesDir': packagesDir != null,
+      'hasAssetsDir': assetsDir != null,
     });
     return shelf.Response.ok(
       body,
       headers: {HttpHeaders.contentTypeHeader: 'application/json'},
     );
+  }
+
+  static bool _isSafeAssetSegment(String segment) {
+    if (segment.isEmpty ||
+        segment == '.' ||
+        segment == '..' ||
+        segment.contains('..') ||
+        segment.contains('/') ||
+        segment.contains('\\') ||
+        segment.contains('\x00')) {
+      return false;
+    }
+    return true;
+  }
+
+  /// Serve fontes SDF (.pbf) e sprites (JSON/PNG) offline a partir de [assetsDir].
+  Future<shelf.Response> _handleAssetRequest(List<String> segments) async {
+    final baseDir = assetsDir;
+    if (baseDir == null || !baseDir.existsSync()) {
+      return shelf.Response.notFound('Diretório de ativos offline ausente');
+    }
+
+    File? target;
+    String contentType = 'application/octet-stream';
+
+    if (segments.length == 3 && segments[1] == 'sprites') {
+      final filename = Uri.decodeComponent(segments[2]);
+      if (!_isSafeAssetSegment(filename)) {
+        return shelf.Response(HttpStatus.badRequest);
+      }
+      if (filename.endsWith('.json')) {
+        contentType = 'application/json';
+      } else if (filename.endsWith('.png')) {
+        contentType = 'image/png';
+      } else {
+        return shelf.Response(HttpStatus.badRequest);
+      }
+      target = File('${baseDir.path}/sprites/$filename');
+    } else if (segments.length == 4 && segments[1] == 'fonts') {
+      final fontstack = Uri.decodeComponent(segments[2]);
+      final rangeFile = Uri.decodeComponent(segments[3]);
+      if (!_isSafeAssetSegment(fontstack) ||
+          !_isSafeAssetSegment(rangeFile) ||
+          !rangeFile.endsWith('.pbf')) {
+        return shelf.Response(HttpStatus.badRequest);
+      }
+      contentType = 'application/x-protobuf';
+      target = File('${baseDir.path}/fonts/$fontstack/$rangeFile');
+    } else {
+      return shelf.Response(HttpStatus.badRequest);
+    }
+
+    if (!target.existsSync()) {
+      return shelf.Response.notFound('Ativo cartográfico não encontrado');
+    }
+
+    final bytes = await target.readAsBytes();
+    final headers = <String, String>{
+      HttpHeaders.contentTypeHeader: contentType,
+      HttpHeaders.contentLengthHeader: bytes.length.toString(),
+    };
+    if (contentType == 'application/x-protobuf' &&
+        bytes.length >= 2 &&
+        bytes[0] == 0x1f &&
+        bytes[1] == 0x8b) {
+      headers[HttpHeaders.contentEncodingHeader] = 'gzip';
+    }
+    return shelf.Response.ok(bytes, headers: headers);
   }
 
   /// Trata rota `/tiles/{format?}/{z}/{x}/{y}`
@@ -335,7 +417,15 @@ class OfflineTileServer {
 
     Uint8List? tileBytes;
     if (reader != null) {
-      tileBytes = await reader.getTile(z, x, y);
+      try {
+        tileBytes = await reader.getTile(z, x, y);
+      } catch (e, st) {
+        AppLogger.warning(
+          'Erro ao ler tile ($z/$x/$y) do pacote PMTiles $cleanRegion',
+          e,
+          st,
+        );
+      }
     }
     if ((tileBytes == null || tileBytes.isEmpty) && tileLookup != null) {
       tileBytes = await tileLookup!(z, x, y);

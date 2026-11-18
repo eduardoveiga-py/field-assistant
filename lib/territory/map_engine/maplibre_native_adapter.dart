@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math' as math;
 
 import '../../core/app_logger.dart';
@@ -31,6 +32,7 @@ class MaplibreNativeAdapter implements MapEngineAdapter {
   Map<String, dynamic>? _contactsGeoJson;
   Map<String, dynamic>? _landmarksGeoJson;
   Map<String, dynamic>? _sectorsGeoJson;
+  Directory? _assetsDir;
 
   MaplibreNativeAdapter({
     this.tileServer,
@@ -78,6 +80,10 @@ class MaplibreNativeAdapter implements MapEngineAdapter {
     if (assetManager != null) {
       try {
         await assetManager!.copyAssetsToDisk();
+        _assetsDir = await assetManager!.getAssetsDirectory();
+        if (tileServer != null && _assetsDir != null) {
+          tileServer!.setAssetsDirectory(_assetsDir!);
+        }
         AppLogger.info(
           'MaplibreNativeAdapter: Ativos offline garantidos no disco.',
         );
@@ -306,6 +312,72 @@ class MaplibreNativeAdapter implements MapEngineAdapter {
         'type': 'background',
         'paint': {'background-color': isDarkMode ? '#1a1a1a' : '#f8f4f0'},
       });
+      layers.add({
+        'id': 'water',
+        'type': 'fill',
+        'source': 'offline-source',
+        'source-layer': 'water',
+        'paint': {'fill-color': isDarkMode ? '#142d4c' : '#a0c8f0'},
+      });
+      layers.add({
+        'id': 'landuse-residential',
+        'type': 'fill',
+        'source': 'offline-source',
+        'source-layer': 'landuse',
+        'filter': ['==', 'class', 'residential'],
+        'paint': {
+          'fill-color': isDarkMode ? '#242424' : '#e8e6e0',
+          'fill-opacity': 0.6,
+        },
+      });
+      layers.add({
+        'id': 'building',
+        'type': 'fill',
+        'source': 'offline-source',
+        'source-layer': 'building',
+        'paint': {
+          'fill-color': isDarkMode ? '#2b2b2b' : '#dcd8d0',
+          'fill-outline-color': isDarkMode ? '#383838' : '#c8c4bc',
+        },
+      });
+      layers.add({
+        'id': 'transportation',
+        'type': 'line',
+        'source': 'offline-source',
+        'source-layer': 'transportation',
+        'layout': {'line-cap': 'round', 'line-join': 'round'},
+        'paint': {
+          'line-color': isDarkMode ? '#3a3a3a' : '#ffffff',
+          'line-width': {
+            'base': 1.2,
+            'stops': [
+              [4, 0.5],
+              [8, 1.0],
+              [12, 3.0],
+              [16, 8.0],
+            ],
+          },
+        },
+      });
+      layers.add({
+        'id': 'place-city',
+        'type': 'symbol',
+        'source': 'offline-source',
+        'source-layer': 'place',
+        'filter': ['==', 'class', 'city'],
+        'layout': {
+          'text-field': '{name}',
+          'text-font': ['Noto Sans Regular'],
+          'text-size': 14,
+          'text-max-width': 8,
+          'text-rotation-alignment': 'viewport',
+        },
+        'paint': {
+          'text-color': isDarkMode ? '#e0e0e0' : '#333333',
+          'text-halo-color': isDarkMode ? '#1a1a1a' : '#ffffff',
+          'text-halo-width': 1.5,
+        },
+      });
     }
 
     // Fontes GeoJSON locais para overlays
@@ -327,6 +399,34 @@ class MaplibreNativeAdapter implements MapEngineAdapter {
         'paint': {
           'line-color': ['get', 'color'],
           'line-width': 2.0,
+        },
+      });
+    }
+
+    if (_landmarksGeoJson != null) {
+      sources['landmarks-source'] = {
+        'type': 'geojson',
+        'data': _landmarksGeoJson,
+      };
+      layers.add({
+        'id': 'landmarks-layer',
+        'type': 'symbol',
+        'source': 'landmarks-source',
+        'layout': {
+          'icon-image': 'landmark-15',
+          'icon-size': 1.0,
+          'icon-rotation-alignment': 'viewport',
+          'text-field': '{title}',
+          'text-font': ['Noto Sans Regular'],
+          'text-size': 11,
+          'text-offset': [0, 1.2],
+          'text-anchor': 'top',
+          'text-rotation-alignment': 'viewport',
+        },
+        'paint': {
+          'text-color': isDarkMode ? '#93c5fd' : '#1d4ed8',
+          'text-halo-color': isDarkMode ? '#000000' : '#ffffff',
+          'text-halo-width': 1.5,
         },
       });
     }
@@ -361,9 +461,28 @@ class MaplibreNativeAdapter implements MapEngineAdapter {
       });
     }
 
+    final String? spriteUrl;
+    final String? glyphsUrl;
+    if (serverBase != null) {
+      spriteUrl = '$serverBase/assets/sprites/sprite';
+      glyphsUrl = '$serverBase/assets/fonts/{fontstack}/{range}.pbf';
+    } else if (_assetsDir != null) {
+      final assetsUri = _assetsDir!.uri.toString().replaceAll(
+        RegExp(r'/$'),
+        '',
+      );
+      spriteUrl = '$assetsUri/sprites/sprite';
+      glyphsUrl = '$assetsUri/fonts/{fontstack}/{range}.pbf';
+    } else {
+      spriteUrl = null;
+      glyphsUrl = null;
+    }
+
     return {
       'version': 8,
       'name': 'Field Assistant Local Vector Style',
+      if (spriteUrl != null) 'sprite': spriteUrl,
+      if (glyphsUrl != null) 'glyphs': glyphsUrl,
       'sources': sources,
       'layers': layers,
     };
