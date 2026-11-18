@@ -130,7 +130,7 @@ class _AuthGateShellState extends ConsumerState<AuthGateShell>
           // Nunca imprimir a URI: ela pode conter códigos ou tokens.
           if (mounted) setState(() => _gateState = _AuthGateState.callbackError);
         }
-      }, onError: (Object _, StackTrace __) {
+      }, onError: (Object _, StackTrace _) {
         if (mounted) setState(() => _gateState = _AuthGateState.callbackError);
       });
     }
@@ -311,7 +311,7 @@ class _AuthGateShellState extends ConsumerState<AuthGateShell>
               setState(() {
                 _gateState = _AuthGateState.authenticated;
               });
-              ref.read(supabaseSyncServiceProvider).sync();
+              // Modo offline local: nunca dispara sincronização remota com Supabase.
               ref.read(calendarSyncCoordinatorProvider).syncAll();
             }
           },

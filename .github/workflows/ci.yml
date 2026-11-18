@@ -136,7 +136,7 @@ jobs:
         run: flutter pub get
 
       - name: Verify Formatting on Security & Sync Core
-        run: dart format --output=none --set-exit-if-changed lib/sync/media_bytes_io.dart lib/sync/sync_privacy_policy.dart
+        run: dart format --output=none --set-exit-if-changed lib/sync/media_bytes_io.dart lib/sync/sync_owner_guard.dart lib/sync/sync_privacy_policy.dart lib/sync/crypto/e2ee_service.dart lib/sync/crypto/encrypted_media_transfer.dart lib/sync/crypto/encrypted_record_checkpoint.dart lib/sync/crypto/encrypted_record_sync.dart lib/sync/crypto/recovery_vault_transport.dart
 
       - name: Check Outdated Dependencies (Informative M11)
         run: flutter pub outdated --no-dev-dependencies || true

@@ -16,8 +16,12 @@ import '../ui/providers.dart';
 import 'media_bytes.dart';
 import 'native_auth_callback.dart';
 import 'sync_engine.dart';
+import 'sync_owner_guard.dart';
+import 'sync_privacy_policy.dart';
 import 'supabase_config.dart';
 import 'crypto/e2ee_service.dart';
+import 'crypto/encrypted_media_transfer.dart';
+import 'crypto/encrypted_record_sync.dart';
 
 class SyncProcessResult {
   final int totalProcessed;
@@ -232,30 +236,101 @@ class SupabaseSyncService {
     this.documentsDirectoryProvider,
     this.strictStorageAuth = false,
     this.allowLegacySyncForTesting = false,
+    this.allowEncryptedSyncForTesting = false,
+    this.authenticatedOwnerOverrideForTesting,
     E2eeService? e2eeServiceOverride,
   }) : e2eeService = e2eeServiceOverride ?? E2eeService(client: clientOverride, db: db);
 
   /// Serviço de criptografia de ponta a ponta (E2EE)
   final E2eeService e2eeService;
 
-  /// Apenas testes com cliente simulado; nunca habilita transferência em release.
+  /// Apenas testes legados com cliente simulado; nunca habilita transferência em release.
   @visibleForTesting
   final bool allowLegacySyncForTesting;
 
+  /// Apenas testes automatizados do motor E2EE completo; nunca habilita produção em release.
+  @visibleForTesting
+  final bool allowEncryptedSyncForTesting;
+
+  /// Apenas testes automatizados sem sessão JWT real do Supabase Auth.
+  @visibleForTesting
+  final String? authenticatedOwnerOverrideForTesting;
+
   bool get _legacyTestMode => kDebugMode && allowLegacySyncForTesting && clientOverride != null;
+  bool get _encryptedTestMode => kDebugMode && allowEncryptedSyncForTesting && clientOverride != null;
 
   static const _encryptedSyncPending =
       'Sincronização com Supabase pausada: criptografia ponta a ponta requer configuração ou restauração da frase nas Configurações. Dados e fila locais preservados.';
 
-  Future<bool> _isE2eeConfigured() async {
-    try {
-      final client = clientOverride ?? (isInitialized ? Supabase.instance.client : null);
-      final currentUserId = client?.auth.currentUser?.id ?? client?.auth.currentSession?.user.id;
-      if (currentUserId == null || currentUserId.isEmpty) return false;
-      return await e2eeService.isKeyInstalled(currentUserId);
-    } catch (_) {
-      return false;
+  static const _cloudSyncPausedUntilHomologation =
+      'Sincronização em nuvem pausada em produção até homologação integral do E2EE em staging e dispositivos reais. Seus dados locais permanecem preservados offline.';
+
+  static const _webSyncPausedMessage =
+      'Sincronização persistente na Web está desabilitada por segurança (sem armazenamento de chaves hardware). Seus dados locais permanecem preservados.';
+
+  String? _resolveAuthenticatedUserId(SupabaseClient? client) {
+    final fromClient =
+        client?.auth.currentUser?.id ?? client?.auth.currentSession?.user.id;
+    if (fromClient != null && fromClient.trim().isNotEmpty) {
+      return fromClient.trim();
     }
+    if (kDebugMode &&
+        clientOverride != null &&
+        authenticatedOwnerOverrideForTesting != null &&
+        authenticatedOwnerOverrideForTesting!.trim().isNotEmpty) {
+      return authenticatedOwnerOverrideForTesting!.trim();
+    }
+    return null;
+  }
+
+  /// Gate centralizado fail-closed (FA-SEC-01, FA-SEC-04, FA-SEC-05):
+  /// Valida política de privacidade, isolamento de conta (`SyncOwnerGuard`) e chave E2EE.
+  Future<({String? ownerId, SyncProcessResult? blockedResult})> _evaluateSyncGate(
+    SupabaseClient? client,
+  ) async {
+    if (!SyncPrivacyPolicy.canRunRemoteSync(allowInTesting: _encryptedTestMode)) {
+      final msg = kIsWeb && !SyncPrivacyPolicy.webPersistentSyncAllowed
+          ? _webSyncPausedMessage
+          : _cloudSyncPausedUntilHomologation;
+      _setStatus(SyncStatus.savedLocally);
+      return (
+        ownerId: null,
+        blockedResult: SyncProcessResult(
+          totalProcessed: 0,
+          successCount: 0,
+          failureCount: 0,
+          conflictCount: 0,
+          errors: [msg],
+          message: msg,
+        ),
+      );
+    }
+
+    final currentUserId = _resolveAuthenticatedUserId(client);
+    final ownerDecision = await SyncOwnerGuard.evaluate(
+      db: db,
+      authenticatedUserId: currentUserId,
+    );
+    if (!ownerDecision.isAllowed) {
+      _setStatus(SyncStatus.savedLocally);
+      return (
+        ownerId: null,
+        blockedResult: SyncProcessResult(
+          totalProcessed: 0,
+          successCount: 0,
+          failureCount: 0,
+          conflictCount: 0,
+          errors: [ownerDecision.message],
+          message: ownerDecision.message,
+        ),
+      );
+    }
+
+    if (!await e2eeService.isKeyInstalled(ownerDecision.activeUserId!)) {
+      return (ownerId: null, blockedResult: _blockedUntilEncryption());
+    }
+
+    return (ownerId: ownerDecision.activeUserId!, blockedResult: null);
   }
 
   SyncProcessResult _blockedUntilEncryption() {
@@ -462,6 +537,47 @@ class SupabaseSyncService {
       case 'person_photo':
       case 'person_photos':
         return 'person_photos';
+      case 'inboxentry':
+      case 'inboxentries':
+      case 'inbox_entry':
+      case 'inbox_entries':
+        return 'inbox_entries';
+      case 'project':
+      case 'projects':
+        return 'projects';
+      case 'task':
+      case 'tasks':
+        return 'tasks';
+      case 'knowledgenote':
+      case 'knowledgenotes':
+      case 'knowledge_note':
+      case 'knowledge_notes':
+        return 'knowledge_notes';
+      case 'knowledgequestion':
+      case 'knowledgequestions':
+      case 'knowledge_question':
+      case 'knowledge_questions':
+        return 'knowledge_questions';
+      case 'knowledgedocument':
+      case 'knowledgedocuments':
+      case 'knowledge_document':
+      case 'knowledge_documents':
+        return 'knowledge_documents';
+      case 'knowledgeresource':
+      case 'knowledgeresources':
+      case 'knowledge_resource':
+      case 'knowledge_resources':
+        return 'knowledge_resources';
+      case 'ticunaword':
+      case 'ticunawords':
+      case 'ticuna_word':
+      case 'ticuna_words':
+        return 'ticuna_words';
+      case 'ticunaphrase':
+      case 'ticunaphrases':
+      case 'ticuna_phrase':
+      case 'ticuna_phrases':
+        return 'ticuna_phrases';
       default:
         return entityType.toLowerCase();
     }
@@ -1322,11 +1438,20 @@ class SupabaseSyncService {
     return await resolveDefaultDocumentsDir();
   }
 
+  void _assertPlaintextMediaAllowedInLegacyTestOnly() {
+    if (!_legacyTestMode && !SyncPrivacyPolicy.unencryptedMediaAllowed) {
+      throw StateError(
+        'Transferência de mídia em texto claro bloqueada por SyncPrivacyPolicy (FA-SEC-01/03).',
+      );
+    }
+  }
+
   Future<bool> _uploadVoiceNoteAudio(
     String id,
     SupabaseClient client,
     List<String> errors,
   ) async {
+    _assertPlaintextMediaAllowedInLegacyTestOnly();
     try {
       final vn = await (db.select(
         db.voiceNotes,
@@ -1371,6 +1496,7 @@ class SupabaseSyncService {
     SupabaseClient client,
     List<String> errors,
   ) async {
+    _assertPlaintextMediaAllowedInLegacyTestOnly();
     try {
       final audioPath = cleanPayload['audio_path']?.toString() ??
           cleanPayload['audioPath']?.toString();
@@ -1555,13 +1681,25 @@ class SupabaseSyncService {
   /// Exclui o arquivo de áudio de uma nota de voz no Supabase Storage
   Future<bool> deleteVoiceNoteAudio(String id) async {
     if (!isConfigured) return false;
-    if (!await _isE2eeConfigured() && !_legacyTestMode) return false;
     SupabaseClient? client;
     try {
       client = clientOverride ?? Supabase.instance.client;
     } catch (e, st) {
       AppLogger.debug('Supabase client indisponível em deleteVoiceNoteAudio ($id): $e', st);
       return false;
+    }
+    if (!_legacyTestMode) {
+      final gate = await _evaluateSyncGate(client);
+      if (gate.blockedResult != null) return false;
+      final transfer = await _getEncryptedMediaTransfer(client, gate.ownerId!);
+      if (transfer == null) return false;
+      try {
+        await transfer.deleteEncrypted(bucket: 'voice_notes', mediaId: id);
+        return true;
+      } catch (e, st) {
+        AppLogger.debug('Falha ao excluir áudio E2EE voice_notes ($id): $e', st);
+        return false;
+      }
     }
     return _deleteVoiceNoteAudio(id, client);
   }
@@ -1585,13 +1723,26 @@ class SupabaseSyncService {
   /// Exclui o arquivo de pronúncia Ticuna no Supabase Storage
   Future<bool> deleteTicunaAudio(String id) async {
     if (!isConfigured) return false;
-    if (!await _isE2eeConfigured() && !_legacyTestMode) return false;
     SupabaseClient? client;
     try {
       client = clientOverride ?? Supabase.instance.client;
     } catch (e, st) {
       AppLogger.debug('Supabase client indisponível em deleteTicunaAudio ($id): $e', st);
       return false;
+    }
+    if (!_legacyTestMode) {
+      final gate = await _evaluateSyncGate(client);
+      if (gate.blockedResult != null) return false;
+      final transfer = await _getEncryptedMediaTransfer(client, gate.ownerId!);
+      if (transfer == null) return false;
+      try {
+        await transfer.deleteEncrypted(bucket: 'ticuna_audio', mediaId: 'ticuna_words_$id');
+        await transfer.deleteEncrypted(bucket: 'ticuna_audio', mediaId: 'ticuna_phrases_$id');
+        return true;
+      } catch (e, st) {
+        AppLogger.debug('Falha ao remover áudio E2EE Ticuna ($id): $e', st);
+        return false;
+      }
     }
     return _deleteTicunaAudio(id, client);
   }
@@ -1622,6 +1773,7 @@ class SupabaseSyncService {
     SupabaseClient client,
     List<String> errors,
   ) async {
+    _assertPlaintextMediaAllowedInLegacyTestOnly();
     try {
       final doc = await (db.select(
         db.knowledgeDocuments,
@@ -1789,6 +1941,7 @@ class SupabaseSyncService {
     SupabaseClient client,
     List<String> errors,
   ) async {
+    _assertPlaintextMediaAllowedInLegacyTestOnly();
     try {
       final photo = await (db.select(db.personPhotos)
             ..where((t) => t.id.equals(id)))
@@ -1953,13 +2106,20 @@ class SupabaseSyncService {
   /// Retenta o download de áudios que falharam durante a recepção de metadados
   Future<int> retryPendingMediaDownloads() async {
     if (!isConfigured) return 0;
-    if (!await _isE2eeConfigured() && !_legacyTestMode) return 0;
     SupabaseClient? client;
     try {
       client = clientOverride ?? Supabase.instance.client;
     } catch (e, st) {
       AppLogger.debug('Cliente Supabase indisponível para retry de mídias: $e', st);
       return 0;
+    }
+
+    EncryptedMediaTransfer? e2eeTransfer;
+    if (!_legacyTestMode) {
+      final gate = await _evaluateSyncGate(client);
+      if (gate.blockedResult != null) return 0;
+      e2eeTransfer = await _getEncryptedMediaTransfer(client, gate.ownerId!);
+      if (e2eeTransfer == null) return 0;
     }
 
     final pendingVoiceNotes = await (db.select(
@@ -1969,7 +2129,13 @@ class SupabaseSyncService {
     int recovered = 0;
     for (final row in pendingVoiceNotes) {
       final id = row.key.replaceFirst('pending_audio_download_', '');
-      final ok = await _downloadVoiceNoteAudio(id, client);
+      final ok = e2eeTransfer != null
+          ? await _downloadEncryptedMediaForTable(
+              tableName: 'voice_notes',
+              entityId: id,
+              transfer: e2eeTransfer,
+            )
+          : await _downloadVoiceNoteAudio(id, client);
       if (ok) recovered++;
     }
 
@@ -1984,7 +2150,13 @@ class SupabaseSyncService {
       if (parts.length >= 3) {
         final table = '${parts[0]}_${parts[1]}';
         final id = parts.sublist(2).join('_');
-        final ok = await _downloadTicunaAudio(id, table, client);
+        final ok = e2eeTransfer != null
+            ? await _downloadEncryptedMediaForTable(
+                tableName: table,
+                entityId: id,
+                transfer: e2eeTransfer,
+              )
+            : await _downloadTicunaAudio(id, table, client);
         if (ok) recovered++;
       }
     }
@@ -1995,7 +2167,13 @@ class SupabaseSyncService {
 
     for (final row in pendingDocs) {
       final id = row.key.replaceFirst('pending_doc_download_', '');
-      final ok = await _downloadKnowledgeDocument(id, client);
+      final ok = e2eeTransfer != null
+          ? await _downloadEncryptedMediaForTable(
+              tableName: 'knowledge_documents',
+              entityId: id,
+              transfer: e2eeTransfer,
+            )
+          : await _downloadKnowledgeDocument(id, client);
       if (ok) recovered++;
     }
 
@@ -2005,7 +2183,13 @@ class SupabaseSyncService {
 
     for (final row in pendingPhotos) {
       final id = row.key.replaceFirst('pending_photo_download_', '');
-      final ok = await _downloadPersonPhoto(id, client);
+      final ok = e2eeTransfer != null
+          ? await _downloadEncryptedMediaForTable(
+              tableName: 'person_photos',
+              entityId: id,
+              transfer: e2eeTransfer,
+            )
+          : await _downloadPersonPhoto(id, client);
       if (ok) recovered++;
     }
 
@@ -2338,9 +2522,6 @@ class SupabaseSyncService {
       _serializeSyncOperation(_fetchRemoteChanges);
 
   Future<SyncProcessResult> _fetchRemoteChanges() async {
-    if (isConfigured && !await _isE2eeConfigured() && !_legacyTestMode) {
-      return _blockedUntilEncryption();
-    }
     if (!isConfigured) {
       _setStatus(SyncStatus.waitingConnection);
       return const SyncProcessResult(
@@ -2366,6 +2547,12 @@ class SupabaseSyncService {
         message: 'Cliente Supabase indisponível.',
         errors: ['Cliente Supabase indisponível.'],
       );
+    }
+
+    if (!_legacyTestMode) {
+      final gate = await _evaluateSyncGate(client);
+      if (gate.blockedResult != null) return gate.blockedResult!;
+      return _fetchRemoteChangesE2ee(client, gate.ownerId!);
     }
 
     await _coalescePendingChanges();
@@ -2501,7 +2688,18 @@ class SupabaseSyncService {
   /// Resolve um conflito da sync_queue aceitando a versão remota armazenada (ou baixando do servidor).
   Future<bool> resolveConflictAcceptRemote(String syncQueueId) async {
     if (!isConfigured && !_legacyTestMode) return false;
-    if (!await _isE2eeConfigured() && !_legacyTestMode) return false;
+    SupabaseClient? client;
+    String? activeOwnerId;
+    if (!_legacyTestMode) {
+      try {
+        client = clientOverride ?? Supabase.instance.client;
+      } catch (_) {
+        return false;
+      }
+      final gate = await _evaluateSyncGate(client);
+      if (gate.blockedResult != null) return false;
+      activeOwnerId = gate.ownerId;
+    }
     final op = await (db.select(db.syncQueue)
           ..where((t) => t.id.equals(syncQueueId)))
         .getSingleOrNull();
@@ -2529,14 +2727,27 @@ class SupabaseSyncService {
 
     if (remoteMap == null && isConfigured) {
       try {
-        final client = clientOverride ?? Supabase.instance.client;
-        final rows = await client
-            .from(tableName)
-            .select()
-            .eq('id', op.entityId)
-            .limit(1);
-        if (rows.isNotEmpty) {
-          remoteMap = normalizeRemotePayload(rows.first);
+        if (!_legacyTestMode && activeOwnerId != null) {
+          final recordSync = await e2eeService.getRecordSync(activeOwnerId);
+          final remoteRead = await recordSync?.read(
+            entityType: tableName,
+            entityId: op.entityId,
+          );
+          if (remoteRead != null && remoteRead['data'] is Map) {
+            remoteMap = normalizeRemotePayload(
+              Map<String, dynamic>.from(remoteRead['data'] as Map),
+            );
+          }
+        } else {
+          final legacyClient = clientOverride ?? Supabase.instance.client;
+          final rows = await legacyClient
+              .from(tableName)
+              .select()
+              .eq('id', op.entityId)
+              .limit(1);
+          if (rows.isNotEmpty) {
+            remoteMap = normalizeRemotePayload(rows.first);
+          }
         }
       } catch (e, st) {
         AppLogger.warning('Falha ao buscar registro remoto para resolução de conflito', e, st);
@@ -2560,9 +2771,66 @@ class SupabaseSyncService {
       _serializeSyncOperation(_processQueue);
 
   Future<SyncProcessResult> _processQueue() async {
-    if (isConfigured && !await _isE2eeConfigured() && !_legacyTestMode) {
-      return _blockedUntilEncryption();
+    if (!isConfigured) {
+      await _coalescePendingChanges();
+      final pendingOps = await repository.getPendingSyncOperations();
+      if (pendingOps.isEmpty) {
+        final unresolved = await repository.getUnresolvedSyncOperations();
+        if (unresolved.isNotEmpty) {
+          final conflicts = unresolved.where((op) => op.status == 'conflict').length;
+          final failures = unresolved.length - conflicts;
+          _setStatus(conflicts > 0 ? SyncStatus.conflict : SyncStatus.error);
+          return SyncProcessResult(
+            totalProcessed: 0, successCount: 0, failureCount: failures,
+            conflictCount: conflicts,
+            errors: ['Há ${unresolved.length} operações não resolvidas na fila.'],
+            message: 'Existem alterações locais pendentes de resolução.',
+          );
+        }
+        _setStatus(SyncStatus.synced);
+        return const SyncProcessResult(
+          totalProcessed: 0,
+          successCount: 0,
+          failureCount: 0,
+          conflictCount: 0,
+          message: 'Fila de sincronização vazia. Todos os registros locais estão preservados.',
+        );
+      }
+      _setStatus(SyncStatus.waitingConnection);
+      return SyncProcessResult(
+        totalProcessed: pendingOps.length,
+        successCount: 0,
+        failureCount: 0,
+        conflictCount: 0,
+        errors: const ['Supabase não configurado; alterações ainda não enviadas.'],
+        message:
+            'Supabase não configurado. ${pendingOps.length} registros mantidos salvos localmente no SQLite.',
+      );
     }
+
+    SupabaseClient? client;
+    try {
+      client = clientOverride ?? Supabase.instance.client;
+    } catch (e, st) {
+      AppLogger.warning('Cliente Supabase não inicializado no processQueue', e, st);
+      _setStatus(SyncStatus.waitingConnection);
+      final pendingOps = await repository.getPendingSyncOperations();
+      return SyncProcessResult(
+        totalProcessed: pendingOps.length,
+        successCount: 0,
+        failureCount: 0,
+        conflictCount: 0,
+        errors: const ['Cliente Supabase não inicializado.'],
+        message: 'Cliente Supabase não inicializado. Registros salvos com segurança localmente.',
+      );
+    }
+
+    if (!_legacyTestMode) {
+      final gate = await _evaluateSyncGate(client);
+      if (gate.blockedResult != null) return gate.blockedResult!;
+      return _processQueueE2ee(client, gate.ownerId!);
+    }
+
     await _coalescePendingChanges();
     final pendingOps = await repository.getPendingSyncOperations();
     if (pendingOps.isEmpty) {
@@ -2588,36 +2856,7 @@ class SupabaseSyncService {
       );
     }
 
-    if (!isConfigured) {
-      _setStatus(SyncStatus.waitingConnection);
-      return SyncProcessResult(
-        totalProcessed: pendingOps.length,
-        successCount: 0,
-        failureCount: 0,
-        conflictCount: 0,
-        errors: const ['Supabase não configurado; alterações ainda não enviadas.'],
-        message:
-            'Supabase não configurado. ${pendingOps.length} registros mantidos salvos localmente no SQLite.',
-      );
-    }
-
     _setStatus(SyncStatus.syncing);
-
-    SupabaseClient? client;
-    try {
-      client = clientOverride ?? Supabase.instance.client;
-    } catch (e, st) {
-      AppLogger.warning('Cliente Supabase não inicializado no processQueue', e, st);
-      _setStatus(SyncStatus.waitingConnection);
-      return SyncProcessResult(
-        totalProcessed: pendingOps.length,
-        successCount: 0,
-        failureCount: 0,
-        conflictCount: 0,
-        errors: const ['Cliente Supabase não inicializado.'],
-        message: 'Cliente Supabase não inicializado. Registros salvos com segurança localmente.',
-      );
-    }
 
     int success = 0;
     int failure = 0;
@@ -2772,25 +3011,13 @@ class SupabaseSyncService {
             }
           }
 
+          // Caminho exclusivo do harness legado de testes (_legacyTestMode).
+          // Em produção (! _legacyTestMode), _processQueue já delegou a _processQueueE2ee.
           final remotePayload = toRemotePayload(op.entityType, cleanPayload);
           final currentUserId =
               client.auth.currentUser?.id ?? client.auth.currentSession?.user.id;
           if (currentUserId != null && currentUserId.isNotEmpty) {
             remotePayload['owner_id'] = currentUserId;
-            try {
-              final recordSync = await e2eeService.getRecordSync(currentUserId);
-              if (recordSync != null) {
-                final localRev = (cleanPayload['revision'] as num?)?.toInt() ?? 1;
-                await recordSync.write(
-                  entityType: op.entityType,
-                  entityId: op.entityId,
-                  expectedRevision: localRev > 1 ? localRev - 1 : 0,
-                  data: cleanPayload,
-                );
-              }
-            } catch (e2eeErr, e2eeSt) {
-              AppLogger.warning('Aviso no envio cifrado E2EE para ${op.entityType} (${op.entityId}): $e2eeErr', e2eeSt);
-            }
           }
 
           if (tableName == 'person_photos') {
@@ -3075,6 +3302,748 @@ class SupabaseSyncService {
       }
     }
     return false;
+  }
+
+  // =========================================================================
+  // MOTOR E2EE FAIL-CLOSED DE PRODUÇÃO (FA-SEC-01, FA-SEC-02, FA-SEC-03)
+  // Zero chamadas às 26 tabelas plaintext; zero upload/download plaintext.
+  // =========================================================================
+
+  static String _e2eeCursorKey(String ownerId) => 'e2ee_last_server_seq_$ownerId';
+
+  Future<EncryptedMediaTransfer?> _getEncryptedMediaTransfer(
+    SupabaseClient client,
+    String ownerId,
+  ) async {
+    final key = await e2eeService.getKey(ownerId);
+    if (key == null) return null;
+    return EncryptedMediaTransfer(client: client, owner: ownerId, key: key);
+  }
+
+  Future<bool> _uploadEncryptedMediaIfApplicable({
+    required String tableName,
+    required String entityId,
+    required Map<String, dynamic> cleanPayload,
+    required EncryptedMediaTransfer transfer,
+    required List<String> errors,
+  }) async {
+    try {
+      if (tableName == 'voice_notes') {
+        final vn = await (db.select(
+          db.voiceNotes,
+        )..where((t) => t.id.equals(entityId))).getSingleOrNull();
+        if (vn == null) {
+          errors.add('Nota de voz local ausente ($entityId); upload E2EE abortado.');
+          return false;
+        }
+        if (vn.audioFilePath != null && vn.audioFilePath!.isNotEmpty) {
+          final bytes = await readMediaBytes(vn.audioFilePath!);
+          if (bytes == null || bytes.isEmpty) {
+            errors.add('Arquivo de áudio local ausente ou vazio ($entityId).');
+            return false;
+          }
+          await transfer.uploadEncrypted(
+            bucket: 'voice_notes',
+            mediaId: entityId,
+            plaintextBytes: bytes,
+          );
+          cleanPayload['e2ee_media_bucket'] = 'voice_notes';
+          cleanPayload['e2ee_media_id'] = entityId;
+        }
+        return true;
+      }
+
+      if (tableName == 'ticuna_words' || tableName == 'ticuna_phrases') {
+        final audioPath = cleanPayload['audio_path']?.toString() ??
+            cleanPayload['audioPath']?.toString();
+        if (audioPath != null &&
+            audioPath.isNotEmpty &&
+            !audioPath.startsWith('http') &&
+            !audioPath.startsWith('e2ee://')) {
+          final bytes = await readMediaBytes(audioPath);
+          if (bytes == null || bytes.isEmpty) {
+            errors.add('Arquivo de áudio Ticuna local ausente ou vazio ($entityId).');
+            return false;
+          }
+          final mediaId = '${tableName}_$entityId';
+          await transfer.uploadEncrypted(
+            bucket: 'ticuna_audio',
+            mediaId: mediaId,
+            plaintextBytes: bytes,
+          );
+          cleanPayload['audio_path'] = 'e2ee://ticuna_audio/$mediaId';
+          cleanPayload['audioPath'] = 'e2ee://ticuna_audio/$mediaId';
+        }
+        return true;
+      }
+
+      if (tableName == 'knowledge_documents') {
+        final doc = await (db.select(
+          db.knowledgeDocuments,
+        )..where((t) => t.id.equals(entityId))).getSingleOrNull();
+        if (doc == null) {
+          errors.add('Documento local ausente ($entityId); upload E2EE abortado.');
+          return false;
+        }
+        Uint8List? bytes;
+        if (doc.filePath.isNotEmpty && !doc.filePath.startsWith('e2ee://')) {
+          bytes = await readMediaBytes(doc.filePath);
+        }
+        if (bytes == null || bytes.isEmpty) {
+          final kv = await (db.select(
+            db.appKvStore,
+          )..where((t) => t.key.equals('doc_bytes_$entityId'))).getSingleOrNull();
+          if (kv != null && kv.value.isNotEmpty) {
+            bytes = base64Decode(kv.value);
+          }
+        }
+        if (bytes == null || bytes.isEmpty) {
+          errors.add('Binário do documento ausente ou vazio ($entityId); upload E2EE abortado.');
+          return false;
+        }
+        await transfer.uploadEncrypted(
+          bucket: 'knowledge_vault',
+          mediaId: entityId,
+          plaintextBytes: bytes,
+        );
+        cleanPayload['filePath'] = 'e2ee://knowledge_vault/$entityId';
+        return true;
+      }
+
+      if (tableName == 'person_photos') {
+        final photo = await (db.select(
+          db.personPhotos,
+        )..where((t) => t.id.equals(entityId))).getSingleOrNull();
+        if (photo == null) {
+          errors.add('Foto local ausente ($entityId); upload E2EE abortado.');
+          return false;
+        }
+        Uint8List? bytes;
+        final fp = photo.filePath;
+        if (fp != null &&
+            fp.isNotEmpty &&
+            !fp.startsWith('http') &&
+            !fp.startsWith('e2ee://')) {
+          bytes = await readMediaBytes(fp);
+        }
+        if ((bytes == null || bytes.isEmpty) &&
+            photo.imageData.startsWith('data:image/')) {
+          final commaIdx = photo.imageData.indexOf(',');
+          if (commaIdx != -1) {
+            bytes = Uint8List.fromList(
+              base64Decode(photo.imageData.substring(commaIdx + 1)),
+            );
+          }
+        }
+        if (bytes != null && bytes.isNotEmpty) {
+          await transfer.uploadEncrypted(
+            bucket: 'person_photos',
+            mediaId: entityId,
+            plaintextBytes: bytes,
+          );
+          cleanPayload['filePath'] = 'e2ee://person_photos/$entityId';
+          cleanPayload['imageData'] = '';
+        }
+        return true;
+      }
+
+      return true;
+    } catch (e, st) {
+      AppLogger.warning(
+        'Falha na criptografia/upload de mídia E2EE ($tableName/$entityId)',
+        e,
+        st,
+      );
+      errors.add('Falha no upload cifrado de mídia ($tableName/$entityId): $e');
+      return false;
+    }
+  }
+
+  Future<bool> _downloadEncryptedMediaForTable({
+    required String tableName,
+    required String entityId,
+    required EncryptedMediaTransfer transfer,
+  }) async {
+    try {
+      if (tableName == 'voice_notes') {
+        final bytes = await transfer.downloadDecrypted(
+          bucket: 'voice_notes',
+          mediaId: entityId,
+        );
+        final baseDir = await _resolveBaseDocsDir();
+        final fileName = entityId.endsWith('.m4a') ? entityId : '$entityId.m4a';
+        final localPath = await saveMediaBytes(
+          baseDir: baseDir,
+          subDir: 'voice_notes',
+          fileName: fileName,
+          bytes: bytes,
+          mimeType: 'audio/m4a',
+        );
+        if (localPath != null && localPath.isNotEmpty) {
+          await (db.update(db.voiceNotes)..where((t) => t.id.equals(entityId)))
+              .write(VoiceNotesCompanion(audioFilePath: drift.Value(localPath)));
+        }
+        return true;
+      }
+
+      if (tableName == 'ticuna_words' || tableName == 'ticuna_phrases') {
+        final mediaId = '${tableName}_$entityId';
+        final bytes = await transfer.downloadDecrypted(
+          bucket: 'ticuna_audio',
+          mediaId: mediaId,
+        );
+        final baseDir = await _resolveBaseDocsDir();
+        final localPath = await saveMediaBytes(
+          baseDir: baseDir,
+          subDir: 'ticuna_audio',
+          fileName: '${entityId}_pronunciation.m4a',
+          bytes: bytes,
+          mimeType: 'audio/m4a',
+        );
+        if (localPath != null && localPath.isNotEmpty) {
+          await db.customUpdate(
+            'UPDATE $tableName SET audio_path = ? WHERE id = ?',
+            variables: [
+              drift.Variable.withString(localPath),
+              drift.Variable.withString(entityId),
+            ],
+          );
+        }
+        return true;
+      }
+
+      if (tableName == 'knowledge_documents') {
+        final doc = await (db.select(
+          db.knowledgeDocuments,
+        )..where((t) => t.id.equals(entityId))).getSingleOrNull();
+        if (doc == null) return false;
+        final bytes = await transfer.downloadDecrypted(
+          bucket: 'knowledge_vault',
+          mediaId: entityId,
+        );
+        final baseDir = await _resolveBaseDocsDir();
+        final safeName = doc.fileName.isNotEmpty ? doc.fileName : '$entityId.pdf';
+        if (!kIsWeb && baseDir.isNotEmpty) {
+          final localPath = await saveMediaBytes(
+            baseDir: baseDir,
+            subDir: 'documents',
+            fileName: safeName,
+            bytes: bytes,
+          );
+          if (localPath != null && localPath.isNotEmpty) {
+            await (db.update(db.knowledgeDocuments)
+                  ..where((t) => t.id.equals(entityId)))
+                .write(KnowledgeDocumentsCompanion(filePath: drift.Value(localPath)));
+          }
+        }
+        return true;
+      }
+
+      if (tableName == 'person_photos') {
+        final bytes = await transfer.downloadDecrypted(
+          bucket: 'person_photos',
+          mediaId: entityId,
+        );
+        final baseDir = await _resolveBaseDocsDir();
+        if (!kIsWeb && baseDir.isNotEmpty) {
+          final localPath = await saveMediaBytes(
+            baseDir: baseDir,
+            subDir: 'person_photos',
+            fileName: '$entityId.jpg',
+            bytes: bytes,
+          );
+          if (localPath != null && localPath.isNotEmpty) {
+            await (db.update(db.personPhotos)..where((t) => t.id.equals(entityId)))
+                .write(
+              PersonPhotosCompanion(
+                filePath: drift.Value(localPath),
+                imageData: const drift.Value(''),
+              ),
+            );
+          }
+        }
+        return true;
+      }
+      return true;
+    } catch (e, st) {
+      AppLogger.warning(
+        'Download de mídia E2EE adiado ($tableName/$entityId)',
+        e,
+        st,
+      );
+      return false;
+    }
+  }
+
+  Future<SyncProcessResult> _fetchRemoteChangesE2ee(
+    SupabaseClient client,
+    String ownerId,
+  ) async {
+    final recordSync = await e2eeService.getRecordSync(ownerId);
+    final checkpoint = await e2eeService.getCheckpoint(ownerId);
+    final mediaTransfer = await _getEncryptedMediaTransfer(client, ownerId);
+    if (recordSync == null || checkpoint == null || mediaTransfer == null) {
+      return _blockedUntilEncryption();
+    }
+    final transport = recordSync.transport;
+    if (transport is! PaginatedEncryptedRecordTransport) {
+      _setStatus(SyncStatus.error);
+      const msg =
+          'Transporte E2EE sem suporte a pull paginado (server_seq); sincronização abortada fail-closed.';
+      return const SyncProcessResult(
+        totalProcessed: 0,
+        successCount: 0,
+        failureCount: 1,
+        conflictCount: 0,
+        errors: [msg],
+        message: msg,
+      );
+    }
+
+    await _coalescePendingChanges();
+    final cursorKey = _e2eeCursorKey(ownerId);
+    final cursorRow = await (db.select(
+      db.appKvStore,
+    )..where((t) => t.key.equals(cursorKey))).getSingleOrNull();
+    var currentCursor = int.tryParse(cursorRow?.value ?? '0') ?? 0;
+
+    int totalProcessed = 0;
+    int successCount = 0;
+    int failureCount = 0;
+    int conflictCount = 0;
+    final errors = <String>[];
+    final pendingMediaDownloads = <({String table, String id})>[];
+
+    const pageSize = 100;
+    try {
+      while (true) {
+        final page = await transport.pullSince(
+          sinceSeq: currentCursor,
+          limit: pageSize,
+        );
+        if (page.isEmpty) break;
+
+        var pageHadFailure = false;
+        var highestAppliedSeq = currentCursor;
+
+        for (final remote in page) {
+          totalProcessed++;
+          if (remote.serverSeq <= currentCursor && remote.serverSeq != 0) {
+            pageHadFailure = true;
+            failureCount++;
+            errors.add(
+              'Cursor server_seq não monotônico detectado (${remote.serverSeq} <= $currentCursor).',
+            );
+            break;
+          }
+          try {
+            String? appliedTable;
+            String? appliedId;
+            var hasEncryptedMediaRef = false;
+            final applied = await checkpoint.applyRemoteRecord(
+              remote: remote,
+              apply: (entityType, entityId, data, revision) async {
+                final table = mapEntityToRemoteTable(entityType);
+                appliedTable = table;
+                appliedId = entityId;
+                final recordMap = Map<String, dynamic>.from(data);
+                recordMap['id'] ??= entityId;
+                recordMap['revision'] = revision;
+                if (recordMap['_tombstone'] == true) {
+                  recordMap['deletedAt'] ??=
+                      DateTime.now().toUtc().toIso8601String();
+                  final localExisting = await _getLocalMap(table, entityId);
+                  if (localExisting == null) return true;
+                  return _applyRemoteRecord(
+                    table: table,
+                    remoteRecord: recordMap,
+                    client: null,
+                    errors: errors,
+                  );
+                }
+                hasEncryptedMediaRef =
+                    recordMap['e2ee_media_bucket'] != null ||
+                    recordMap['filePath']?.toString().startsWith('e2ee://') ==
+                        true ||
+                    recordMap['audioPath']?.toString().startsWith('e2ee://') ==
+                        true ||
+                    recordMap['audio_path']?.toString().startsWith('e2ee://') ==
+                        true;
+                return _applyRemoteRecord(
+                  table: table,
+                  remoteRecord: recordMap,
+                  client: null,
+                  errors: errors,
+                );
+              },
+            );
+            if (applied) {
+              successCount++;
+              if (hasEncryptedMediaRef &&
+                  appliedTable != null &&
+                  appliedId != null) {
+                pendingMediaDownloads.add((table: appliedTable!, id: appliedId!));
+              }
+            }
+            if (!pageHadFailure && remote.serverSeq > highestAppliedSeq) {
+              highestAppliedSeq = remote.serverSeq;
+            }
+          } catch (e) {
+            pageHadFailure = true;
+            if (_currentStatus == SyncStatus.conflict) {
+              conflictCount++;
+            } else {
+              failureCount++;
+            }
+            errors.add('Falha ao aplicar registro cifrado (${remote.route}): $e');
+          }
+        }
+
+        if (!pageHadFailure && highestAppliedSeq > currentCursor) {
+          currentCursor = highestAppliedSeq;
+          await db.into(db.appKvStore).insertOnConflictUpdate(
+            AppKvStoreCompanion.insert(
+              key: cursorKey,
+              value: currentCursor.toString(),
+              updatedAt: drift.Value(DateTime.now()),
+            ),
+          );
+        }
+        if (pageHadFailure || page.length < pageSize) break;
+      }
+    } catch (e) {
+      failureCount++;
+      errors.add('Erro no pull cifrado E2EE: $e');
+    }
+
+    for (final media in pendingMediaDownloads) {
+      await _downloadEncryptedMediaForTable(
+        tableName: media.table,
+        entityId: media.id,
+        transfer: mediaTransfer,
+      );
+    }
+
+    if (conflictCount > 0) {
+      _setStatus(SyncStatus.conflict);
+    } else if (failureCount > 0 || errors.isNotEmpty) {
+      _setStatus(SyncStatus.error);
+    } else {
+      _setStatus(SyncStatus.synced);
+    }
+
+    return SyncProcessResult(
+      totalProcessed: totalProcessed,
+      successCount: successCount,
+      failureCount: failureCount,
+      conflictCount: conflictCount,
+      errors: errors,
+      message:
+          '$totalProcessed registros cifrados avaliados. $successCount aplicados, $conflictCount conflitos, $failureCount falhas.',
+    );
+  }
+
+  Future<SyncProcessResult> _processQueueE2ee(
+    SupabaseClient client,
+    String ownerId,
+  ) async {
+    final recordSync = await e2eeService.getRecordSync(ownerId);
+    final checkpoint = await e2eeService.getCheckpoint(ownerId);
+    final mediaTransfer = await _getEncryptedMediaTransfer(client, ownerId);
+    if (recordSync == null || checkpoint == null || mediaTransfer == null) {
+      return _blockedUntilEncryption();
+    }
+
+    await _coalescePendingChanges();
+    final pendingOps = await repository.getPendingSyncOperations();
+    if (pendingOps.isEmpty) {
+      final unresolved = await repository.getUnresolvedSyncOperations();
+      if (unresolved.isNotEmpty) {
+        final conflicts = unresolved.where((op) => op.status == 'conflict').length;
+        final failures = unresolved.length - conflicts;
+        _setStatus(conflicts > 0 ? SyncStatus.conflict : SyncStatus.error);
+        return SyncProcessResult(
+          totalProcessed: 0,
+          successCount: 0,
+          failureCount: failures,
+          conflictCount: conflicts,
+          errors: ['Há ${unresolved.length} operações não resolvidas na fila.'],
+          message: 'Existem alterações locais pendentes de resolução.',
+        );
+      }
+      _setStatus(SyncStatus.synced);
+      return const SyncProcessResult(
+        totalProcessed: 0,
+        successCount: 0,
+        failureCount: 0,
+        conflictCount: 0,
+        message: 'Fila E2EE vazia. Todos os registros locais estão protegidos.',
+      );
+    }
+
+    _setStatus(SyncStatus.syncing);
+    int success = 0;
+    int failure = 0;
+    int conflicts = 0;
+    int deferred = 0;
+    final errors = <String>[];
+
+    for (final op in pendingOps) {
+      if (op.attempts >= AppRepository.maxSyncAttempts) {
+        failure++;
+        final maxErr =
+            'Operação ${op.id} (${op.entityType}) excedeu o limite máximo de ${AppRepository.maxSyncAttempts} tentativas.';
+        errors.add(maxErr);
+        await repository.markSyncOperationFailed(
+          op.id,
+          maxErr,
+          forceFailed: true,
+        );
+        continue;
+      }
+
+      final backoffSeconds = pow(2, op.attempts).clamp(1, 300).toInt();
+      final now = DateTime.now();
+      final lastAttempt = op.lastAttemptAt ?? op.createdAt;
+      if (now.difference(lastAttempt).inSeconds < backoffSeconds &&
+          op.attempts > 0) {
+        deferred++;
+        continue;
+      }
+
+      try {
+        final tableName = mapEntityToRemoteTable(op.entityType);
+        final related = (await (db.select(db.syncQueue)
+                  ..where(
+                    (t) =>
+                        t.entityId.equals(op.entityId) &
+                        (t.status.equals('pending') |
+                            t.status.equals('in_progress') |
+                            t.status.equals('conflict') |
+                            t.status.equals('failed')),
+                  ))
+                .get())
+            .where((item) => mapEntityToRemoteTable(item.entityType) == tableName)
+            .toList();
+        if (related.length > 1 ||
+            related.any(
+              (item) => item.status == 'conflict' || item.status == 'failed',
+            )) {
+          failure++;
+          errors.add(
+            'Operações não resolvidas para $tableName (${op.entityId}); envio E2EE suspenso.',
+          );
+          continue;
+        }
+
+        final rawPayload = jsonDecode(op.payload) as Map<String, dynamic>;
+        final operation = op.operation.toUpperCase();
+
+        var cleanPayload = SyncTimestamp.normalizeMapDates(
+          normalizeRemotePayload(sanitizePayload(op.entityType, rawPayload)),
+        );
+        final localRowMap = await _getLocalMap(tableName, op.entityId);
+        if (localRowMap != null && operation != 'DELETE') {
+          final isMinimalStub =
+              cleanPayload.length <= 3 && cleanPayload.containsKey('id');
+          if (isMinimalStub) {
+            cleanPayload = Map<String, dynamic>.from(localRowMap);
+          } else {
+            for (final entry in localRowMap.entries) {
+              cleanPayload.putIfAbsent(entry.key, () => entry.value);
+            }
+          }
+          cleanPayload = sanitizePayload(op.entityType, cleanPayload);
+        }
+
+        if (operation == 'INSERT' || operation == 'UPDATE') {
+          final mediaOk = await _uploadEncryptedMediaIfApplicable(
+            tableName: tableName,
+            entityId: op.entityId,
+            cleanPayload: cleanPayload,
+            transfer: mediaTransfer,
+            errors: errors,
+          );
+          if (!mediaOk) {
+            failure++;
+            await repository.markSyncOperationFailed(
+              op.id,
+              'Falha no upload cifrado de mídia ($tableName/${op.entityId}); zero fallback plaintext.',
+            );
+            continue;
+          }
+
+          final expectedRevision = await checkpoint.getKnownRevision(
+            entityType: tableName,
+            entityId: op.entityId,
+          );
+          final sealedWrite = await recordSync.writeSealed(
+            entityType: tableName,
+            entityId: op.entityId,
+            expectedRevision: expectedRevision,
+            data: cleanPayload,
+          );
+
+          if (!sealedWrite.result.success) {
+            conflicts++;
+            _setStatus(SyncStatus.conflict);
+            Map<String, dynamic>? remoteData;
+            try {
+              final remoteRead = await recordSync.read(
+                entityType: tableName,
+                entityId: op.entityId,
+                minimumRevision: expectedRevision,
+              );
+              if (remoteRead != null && remoteRead['data'] is Map) {
+                remoteData = Map<String, dynamic>.from(
+                  remoteRead['data'] as Map,
+                );
+              }
+            } catch (_) {}
+            final err =
+                'Conflito CAS E2EE detectado em $tableName (${op.entityId}); revisão remota ${sealedWrite.result.revision}.';
+            errors.add(err);
+            await repository.markSyncOperationConflict(
+              op.id,
+              err,
+              remoteData: remoteData,
+            );
+            continue;
+          }
+
+          await db.transaction(() async {
+            await checkpoint.recordPushedEnvelope(
+              route: sealedWrite.route,
+              revision: sealedWrite.result.revision!,
+              envelope: sealedWrite.envelope,
+            );
+            final ack = await (db.update(db.syncQueue)
+                  ..where(
+                    (t) =>
+                        t.id.equals(op.id) &
+                        t.payload.equals(op.payload) &
+                        t.status.isIn(['pending', 'in_progress']),
+                  ))
+                .write(const SyncQueueCompanion(status: drift.Value('synced')));
+            if (ack == 0) {
+              throw StateError(
+                'A operação ${op.id} mudou durante o envio E2EE e permanece pendente.',
+              );
+            }
+          });
+          success++;
+        } else if (operation == 'DELETE') {
+          final expectedRevision = await checkpoint.getKnownRevision(
+            entityType: tableName,
+            entityId: op.entityId,
+          );
+          final nowIso = DateTime.now().toUtc().toIso8601String();
+          final tombstonePayload = <String, dynamic>{
+            '_tombstone': true,
+            'id': op.entityId,
+            'deletedAt': cleanPayload['deletedAt'] ?? nowIso,
+            'updatedAt': nowIso,
+            'revision': expectedRevision + 1,
+          };
+          final sealedWrite = await recordSync.writeSealed(
+            entityType: tableName,
+            entityId: op.entityId,
+            expectedRevision: expectedRevision,
+            data: tombstonePayload,
+          );
+          if (!sealedWrite.result.success) {
+            conflicts++;
+            _setStatus(SyncStatus.conflict);
+            final err =
+                'Conflito CAS E2EE ao sincronizar exclusão de $tableName (${op.entityId}).';
+            errors.add(err);
+            await repository.markSyncOperationConflict(op.id, err);
+            continue;
+          }
+          await db.transaction(() async {
+            await checkpoint.recordPushedEnvelope(
+              route: sealedWrite.route,
+              revision: sealedWrite.result.revision!,
+              envelope: sealedWrite.envelope,
+            );
+            final ack = await (db.update(db.syncQueue)
+                  ..where(
+                    (t) =>
+                        t.id.equals(op.id) &
+                        t.payload.equals(op.payload) &
+                        t.status.isIn(['pending', 'in_progress']),
+                  ))
+                .write(const SyncQueueCompanion(status: drift.Value('synced')));
+            if (ack == 0) {
+              throw StateError(
+                'A operação DELETE ${op.id} mudou durante o envio E2EE.',
+              );
+            }
+          });
+          success++;
+        } else if (operation == 'HARD_DELETE') {
+          conflicts++;
+          final message =
+              'Exclusão definitiva remota suspensa para proteger dados; requer revisão (${op.entityType}).';
+          errors.add(message);
+          await repository.markSyncOperationConflict(op.id, message);
+        } else {
+          failure++;
+          final message = 'Operação de sincronização desconhecida: $operation';
+          errors.add(message);
+          await repository.markSyncOperationFailed(
+            op.id,
+            message,
+            forceFailed: true,
+          );
+        }
+      } catch (e, st) {
+        AppLogger.warning(
+          'Falha fail-closed no envio E2EE da operação ${op.id} (${op.entityType}); nenhum dado enviado em texto claro.',
+          e,
+          st,
+        );
+        failure++;
+        final err = 'Erro E2EE na operação ${op.id} (${op.entityType}): $e';
+        errors.add(err);
+        await repository.markSyncOperationFailed(op.id, err);
+      }
+    }
+
+    final remaining = await repository.getUnresolvedSyncOperations();
+    if (remaining.any((op) => op.status == 'conflict') || conflicts > 0) {
+      _setStatus(SyncStatus.conflict);
+    } else if (failure > 0 ||
+        errors.isNotEmpty ||
+        remaining.any((op) => op.status == 'failed')) {
+      _setStatus(SyncStatus.error);
+    } else if (remaining.isNotEmpty || deferred > 0) {
+      _setStatus(SyncStatus.savedLocally);
+    } else {
+      _setStatus(SyncStatus.synced);
+    }
+    if (remaining.isNotEmpty && errors.isEmpty) {
+      errors.add('${remaining.length} operações ainda aguardam sincronização.');
+    }
+
+    try {
+      await repository.pruneOldSyncedOperations();
+    } catch (e, st) {
+      AppLogger.debug(
+        'Falha ao limpar operações sincronizadas antigas: $e',
+        st,
+      );
+    }
+
+    return SyncProcessResult(
+      totalProcessed: pendingOps.length,
+      successCount: success,
+      failureCount: failure,
+      conflictCount: conflicts,
+      errors: errors,
+      message:
+          'Sincronização E2EE: $success enviados, $failure falhas, $conflicts conflitos, ${remaining.length} pendentes.',
+    );
   }
 
   void dispose() {

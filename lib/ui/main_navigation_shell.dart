@@ -6,10 +6,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/app_theme.dart';
 import '../core/i18n/app_locale_strings.dart';
-import '../database/app_database.dart';
 import '../appointments/calendar_provider.dart';
 import '../appointments/calendar_sync_coordinator.dart';
 import '../sync/supabase_sync_service.dart';
+import '../sync/sync_owner_guard.dart';
 import 'providers.dart';
 import '../core/feature_registry.dart';
 import 'screens/today_screen.dart';
@@ -66,36 +66,11 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
       _autoSyncRunning = true;
       final repo = ref.read(repositoryProvider);
       final userId = Supabase.instance.client.auth.currentUser?.id;
-      if (userId == null) return;
-      final db = repo.db;
-      final demoFlag = await (db.select(db.appKvStore)
-            ..where((row) => row.key.equals('demo_mode')))
-          .getSingleOrNull();
-      if (demoFlag?.value == 'true') return;
-
-      const ownerKey = 'automatic_sync_owner_id';
-      final owner = await (db.select(db.appKvStore)
-            ..where((row) => row.key.equals(ownerKey)))
-          .getSingleOrNull();
-      if (owner != null && owner.value != userId) return;
-      if (owner == null) {
-        await db.into(db.appKvStore).insert(
-          AppKvStoreCompanion.insert(key: ownerKey, value: userId),
-        );
-      }
-      final people = await repo.getAllPeople();
-      // Proteção adicional contra cadastros demo legados sem flag demo_mode.
-      const demoNames = {
-        'Maria Oliveira (Demo)', 'Carlos Pereira (Demo)',
-        'Luciana Martins (Demo)', 'Beatriz Martins (Demo)',
-        'Beatriz Martins (Demo - Filha)',
-      };
-      if (people.any((person) => demoNames.contains(person.name))) return;
-      final appointments = await repo.getAllAppointments();
-      const demoTitles = {'Estudo Bíblico - Maria', 'Revisita - Carlos'};
-      if (appointments.any((appointment) => demoTitles.contains(appointment.title))) {
-        return;
-      }
+      final guard = await SyncOwnerGuard.evaluate(
+        db: repo.db,
+        authenticatedUserId: userId,
+      );
+      if (!guard.isAllowed) return;
       if (!mounted) return;
       await ref.read(supabaseSyncServiceProvider).sync();
       if (!mounted) return;

@@ -350,7 +350,6 @@ class BackupService {
     final sessions = await db.select(db.studySessions).get();
     final appointments = await db.select(db.appointments).get();
     final activities = await db.select(db.activityRecords).get();
-    final syncQueue = await db.select(db.syncQueue).get();
     final voiceNotes = await db.select(db.voiceNotes).get();
     final phoneContacts = await db.select(db.phoneContacts).get();
     final landmarks = await db.select(db.territoryLandmarks).get();
@@ -558,7 +557,7 @@ class BackupService {
       'studySessions': sessions.map((s) => s.toJson()).toList(),
       'appointments': appointments.map((a) => a.toJson()).toList(),
       'activityRecords': activities.map((a) => a.toJson()).toList(),
-      'syncQueue': syncQueue.map((sq) => sq.toJson()).toList(),
+      'syncQueue': const <Map<String, dynamic>>[],
       'voiceNotes': voiceNotes.map((v) => v.toJson()).toList(),
       'voiceNoteAudios': voiceNoteAudios,
       'voiceNoteAudioHashes': voiceNoteAudioHashes,
@@ -589,7 +588,10 @@ class BackupService {
       'ticunaTags': ticunaTags,
       'ticunaAudios': ticunaAudios,
       'ticunaAudioHashes': ticunaAudioHashes,
-      'appKvStore': kvStore.map((k) => k.toJson()).toList(),
+      'appKvStore': kvStore
+          .where((k) => !isProtectedKvKey(k.key))
+          .map((k) => k.toJson())
+          .toList(),
     };
 
     final rawJson = jsonEncode(payload);
@@ -1133,7 +1135,9 @@ class BackupService {
   Future<RestoreResult> commitRestore(RestorePreview preview) async {
     final db = repository.db;
     final data = preview.rawDecryptedData;
-    _shouldReconstituteSyncQueue = !data.containsKey('syncQueue');
+    // Sempre reconstitui sync_queue limpa e normalizada apenas para entidades
+    // efetivamente restauradas, jamais reinjetando a fila bruta antiga do backup (FA-BAK-01).
+    _shouldReconstituteSyncQueue = true;
     final corruptedFiles = <String>[];
     int totalRestoredCount = 0;
 
@@ -2355,11 +2359,12 @@ class BackupService {
           }
         }
 
-        // 28. Configurações da App (Key-Value Store)
+        // 28. Configurações da App (Key-Value Store) — preserva chaves de
+        // identidade de conta, segurança local, cursores e checkpoints E2EE (FA-BAK-01).
         final kvRows = (data['appKvStore'] as List<dynamic>?) ?? [];
         for (final item in kvRows) {
           final entry = AppKvEntry.fromJson(item as Map<String, dynamic>);
-          if (entry.key == _silentBackupKeySecret) continue;
+          if (isProtectedKvKey(entry.key)) continue;
           await db
               .into(db.appKvStore)
               .insertOnConflictUpdate(
@@ -2372,30 +2377,11 @@ class BackupService {
           totalRestoredCount++;
         }
 
-        // 22. Fila de Sincronização (SyncQueue)
-        final syncQueueRows = (data['syncQueue'] as List<dynamic>?) ?? [];
-        for (final item in syncQueueRows) {
-          final rawMap = Map<String, dynamic>.from(item as Map<String, dynamic>);
-          if (rawMap.containsKey('payload') && rawMap['payload'] is String) {
-            try {
-              final decodedPayload = jsonDecode(rawMap['payload'] as String);
-              if (decodedPayload is Map<String, dynamic>) {
-                final normalized = _normalizePayloadDates(decodedPayload);
-                rawMap['payload'] = jsonEncode(normalized);
-              }
-            } catch (e, st) {
-              AppLogger.warning('Falha ao normalizar payload de syncQueue na restauração', e, st);
-            }
-          }
-          final entry = SyncQueueEntry.fromJson(rawMap);
-          final existing = await (db.select(
-            db.syncQueue,
-          )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
-          if (existing == null) {
-            await db.into(db.syncQueue).insert(entry);
-            totalRestoredCount++;
-          }
-        }
+        // 22. Fila de Sincronização (SyncQueue):
+        // Nunca reinjetar cegamente operações antigas de syncQueue do arquivo de
+        // backup, pois poderiam reenviar mutações obsoletas ou de outra conta.
+        // Todas as entidades efetivamente restauradas acima já foram
+        // reconstituídas com segurança via _reconstituteSyncQueue().
       });
     } catch (e) {
       // Rollback seguro de arquivos de áudio:
@@ -2473,6 +2459,44 @@ class BackupService {
 
   static const String _silentBackupKey = 'last_silent_backup_timestamp';
   static const String _silentBackupKeySecret = 'device_silent_backup_secret';
+
+  static const Set<String> _protectedKvExactKeys = {
+    'automatic_sync_owner_id',
+    'offline_mode_enabled',
+    'demo_mode',
+    'device_silent_backup_secret',
+    'last_safety_snapshot_path',
+    'last_safety_snapshot_data',
+    'last_silent_backup_timestamp',
+    'app_pin_hash',
+    'app_pin_salt',
+    'app_pin_enabled',
+    'biometric_auth_enabled',
+    'runtime_supabase_url',
+    'runtime_supabase_anon_key',
+  };
+
+  static const List<String> _protectedKvPrefixes = [
+    'e2ee_',
+    'last_synced_at_',
+    'pending_audio_download_',
+    'pending_ticuna_audio_download_',
+    'pending_doc_download_',
+    'pending_photo_download_',
+    'app_pin_',
+    'biometric_',
+    'runtime_supabase_',
+  ];
+
+  /// Chaves de identidade de conta, segurança local, cursores e checkpoints
+  /// que nunca devem ser exportadas nem sobrescritas durante restore (FA-BAK-01).
+  static bool isProtectedKvKey(String key) {
+    if (_protectedKvExactKeys.contains(key)) return true;
+    for (final prefix in _protectedKvPrefixes) {
+      if (key.startsWith(prefix)) return true;
+    }
+    return false;
+  }
 
   Future<String> _getOrCreateSilentBackupKey() async {
     final db = repository.db;
