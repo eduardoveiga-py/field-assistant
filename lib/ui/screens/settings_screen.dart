@@ -850,7 +850,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: const Icon(
-                              Icons.cloud_done_outlined,
+                              Icons.sd_storage_outlined,
                               color: AppTheme.successGreen,
                               size: 20,
                             ),
@@ -860,14 +860,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Backup Silencioso Automático',
+                                'Backup Local Automático',
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 14,
                                 ),
                               ),
                               Text(
-                                'Proteção diária em segundo plano',
+                                'Cópia criptografada no dispositivo (não é nuvem)',
                                 style: TextStyle(
                                   fontSize: 11,
                                   color: AppTheme.textMuted,

@@ -51,8 +51,6 @@ typedef SyncResult = SyncProcessResult;
 class SupabaseSyncService {
   static const String runtimeUrlStorageKey = 'runtime_supabase_url';
   static const String runtimeAnonKeyStorageKey = 'runtime_supabase_anon_key';
-  static const String defaultUrl = 'https://pchwrcwrvnbiywrdsvum.supabase.co';
-  static const String defaultAnonKey = 'sb_publishable_TUOpxRmQESlufGuNMqrhUA_Bltscqvy';
 
   static bool get isInitialized {
     try {
@@ -124,8 +122,11 @@ class SupabaseSyncService {
         url = runtimeCfg.url;
         anonKey = runtimeCfg.anonKey;
       } else {
-        url = defaultUrl;
-        anonKey = defaultAnonKey;
+        AppLogger.info(
+          'Supabase não configurado (--dart-define ou armazenamento seguro runtime); '
+          'aplicativo operando em modo offline-first sem credenciais hardcoded.',
+        );
+        return;
       }
     }
 
@@ -228,11 +229,11 @@ class SupabaseSyncService {
     required this.repository,
     this.supabaseUrl = const String.fromEnvironment(
       'SUPABASE_URL',
-      defaultValue: defaultUrl,
+      defaultValue: '',
     ),
     this.supabaseAnonKey = const String.fromEnvironment(
       'SUPABASE_ANON_KEY',
-      defaultValue: defaultAnonKey,
+      defaultValue: '',
     ),
     this.clientOverride,
     this.documentsDirectoryProvider,

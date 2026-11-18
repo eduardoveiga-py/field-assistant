@@ -1240,7 +1240,7 @@ class JwEmailService {
       // Cada lote é confirmado antes de solicitar o próximo. Em interrupção,
       // a próxima execução consulta o banco e busca somente UIDs ausentes.
       await db.transaction(() async {
-        final now = DateTime.now();
+        final now = DateTime.now().toUtc();
         for (final msg in page) {
           final entryId = 'email_${msg.id}';
           final existing = await (db.select(db.inboxEntries)
@@ -1259,10 +1259,11 @@ class JwEmailService {
             sourceType: drift.Value(sourceType),
             suggestedCategory: drift.Value(msg.isHubCommunication ? 'hub_comms' : 'email_jw'),
             attachments: drift.Value(jsonEncode(msg.attachments)),
-            capturedAt: msg.date,
+            capturedAt: msg.date.toUtc(),
             metadata: drift.Value(jsonEncode(metadata)),
             createdAt: now,
             updatedAt: now,
+            revision: const drift.Value(1),
           ));
           final inserted = await (db.select(db.inboxEntries)..where((t) => t.id.equals(entryId))).getSingle();
           await db.into(db.syncQueue).insert(SyncQueueCompanion.insert(
@@ -1362,10 +1363,10 @@ class JwEmailService {
     });
   }
 
-  /// Salva rascunho de e-mail teocrático
+  /// Salva rascunho de e-mail teocrático de forma transacional com controle de revisão e snapshot `_base`.
   Future<void> saveDraft(JwEmailMessage draft) async {
     final entryId = 'email_draft_${draft.id}';
-    final now = DateTime.now();
+    final now = DateTime.now().toUtc();
 
     final metadata = {
       'permanentRetention': true,
@@ -1373,32 +1374,53 @@ class JwEmailService {
       'email': draft.copyWith(isDraft: true).toJson(),
     };
 
-    final companion = InboxEntriesCompanion.insert(
-      id: entryId,
-      content: '${draft.subject}\n\n${draft.bodyText}',
-      sourceType: const drift.Value('email_draft'),
-      suggestedCategory: const drift.Value('email_jw'),
-      capturedAt: now,
-      metadata: drift.Value(jsonEncode(metadata)),
-      createdAt: now,
-      updatedAt: now,
-    );
+    await db.transaction(() async {
+      final existingDraft = await (db.select(
+        db.inboxEntries,
+      )..where((t) => t.id.equals(entryId))).getSingleOrNull();
+      final isUpdate = existingDraft != null;
+      final nextRevision = isUpdate ? existingDraft.revision + 1 : 1;
 
-    final existingDraft = await (db.select(db.inboxEntries)..where((t) => t.id.equals(entryId))).getSingleOrNull();
-    final op = existingDraft != null ? 'UPDATE' : 'INSERT';
-    await db.into(db.inboxEntries).insertOnConflictUpdate(companion);
-    final insertedDraft = await (db.select(db.inboxEntries)..where((t) => t.id.equals(entryId))).getSingle();
-    await db.into(db.syncQueue).insert(SyncQueueCompanion.insert(
-      id: const Uuid().v4(),
-      entityType: 'inbox_entries',
-      entityId: entryId,
-      operation: op,
-      payload: jsonEncode(SyncTimestamp.normalizeMapDates(insertedDraft.toJson())),
-      createdAt: now,
-    ));
+      final companion = InboxEntriesCompanion.insert(
+        id: entryId,
+        content: '${draft.subject}\n\n${draft.bodyText}',
+        sourceType: const drift.Value('email_draft'),
+        suggestedCategory: const drift.Value('email_jw'),
+        attachments: drift.Value(jsonEncode(draft.attachments)),
+        capturedAt: isUpdate ? existingDraft.capturedAt : now,
+        metadata: drift.Value(jsonEncode(metadata)),
+        createdAt: isUpdate ? existingDraft.createdAt : now,
+        updatedAt: now,
+        revision: drift.Value(nextRevision),
+      );
+
+      await db.into(db.inboxEntries).insertOnConflictUpdate(companion);
+      final persisted = await (db.select(
+        db.inboxEntries,
+      )..where((t) => t.id.equals(entryId))).getSingle();
+
+      final payload = SyncTimestamp.normalizeMapDates(persisted.toJson());
+      if (isUpdate) {
+        payload['_base'] = SyncTimestamp.normalizeMapDates(
+          existingDraft.toJson(),
+        );
+      }
+
+      await db.into(db.syncQueue).insert(
+        SyncQueueCompanion.insert(
+          id: const Uuid().v4(),
+          entityType: 'inbox_entries',
+          entityId: entryId,
+          operation: isUpdate ? 'UPDATE' : 'INSERT',
+          payload: jsonEncode(payload),
+          createdAt: now,
+        ),
+      );
+    });
   }
 
-  /// Envia e-mail real via servidor SMTP autenticado e persiste registro local retido.
+  /// Envia e-mail real via servidor SMTP autenticado e persiste registro local retido
+  /// em transação única com incremento de `revision` e snapshot `_base`.
   /// Nunca simula envio: falhas de configuração, autenticação ou rede lançam [JwEmailException].
   Future<JwEmailMessage> sendEmail({
     required String host,
@@ -1418,7 +1440,7 @@ class JwEmailService {
       securityMode: securityMode,
     );
 
-    final now = DateTime.now();
+    final now = DateTime.now().toUtc();
     final sentMsg = message.copyWith(
       from: message.from.trim().isNotEmpty && message.from != 'local@dispositivo'
           ? message.from
@@ -1429,12 +1451,8 @@ class JwEmailService {
       isPermanentRetained: true,
     );
 
-    final targetId = draftId != null ? 'email_draft_$draftId' : 'email_${sentMsg.id}';
-    final existingDraft = await (db.select(db.inboxEntries)
-          ..where((t) => t.id.equals('email_draft_${sentMsg.id}')))
-        .getSingleOrNull();
-    final resolvedEntryId =
-        draftId != null ? targetId : (existingDraft != null ? existingDraft.id : targetId);
+    final targetId =
+        draftId != null ? 'email_draft_$draftId' : 'email_${sentMsg.id}';
 
     final metadata = {
       'permanentRetention': true,
@@ -1445,30 +1463,57 @@ class JwEmailService {
       'email': sentMsg.toJson(),
     };
 
-    final companion = InboxEntriesCompanion.insert(
-      id: resolvedEntryId,
-      content: '${sentMsg.subject}\n\n${sentMsg.bodyText}',
-      sourceType: const drift.Value('email'),
-      suggestedCategory: const drift.Value('email_jw'),
-      attachments: drift.Value(jsonEncode(sentMsg.attachments)),
-      capturedAt: now,
-      metadata: drift.Value(jsonEncode(metadata)),
-      createdAt: now,
-      updatedAt: now,
-    );
+    await db.transaction(() async {
+      final existingDraft = draftId == null
+          ? await (db.select(db.inboxEntries)
+                ..where((t) => t.id.equals('email_draft_${sentMsg.id}')))
+              .getSingleOrNull()
+          : null;
+      final resolvedEntryId =
+          draftId != null ? targetId : (existingDraft?.id ?? targetId);
 
-    final existingSent = await (db.select(db.inboxEntries)..where((t) => t.id.equals(resolvedEntryId))).getSingleOrNull();
-    final op = existingSent != null ? 'UPDATE' : 'INSERT';
-    await db.into(db.inboxEntries).insertOnConflictUpdate(companion);
-    final insertedSent = await (db.select(db.inboxEntries)..where((t) => t.id.equals(resolvedEntryId))).getSingle();
-    await db.into(db.syncQueue).insert(SyncQueueCompanion.insert(
-      id: const Uuid().v4(),
-      entityType: 'inbox_entries',
-      entityId: resolvedEntryId,
-      operation: op,
-      payload: jsonEncode(SyncTimestamp.normalizeMapDates(insertedSent.toJson())),
-      createdAt: now,
-    ));
+      final existingSent = await (db.select(
+        db.inboxEntries,
+      )..where((t) => t.id.equals(resolvedEntryId))).getSingleOrNull();
+      final isUpdate = existingSent != null;
+      final nextRevision = isUpdate ? existingSent.revision + 1 : 1;
+
+      final companion = InboxEntriesCompanion.insert(
+        id: resolvedEntryId,
+        content: '${sentMsg.subject}\n\n${sentMsg.bodyText}',
+        sourceType: const drift.Value('email'),
+        suggestedCategory: const drift.Value('email_jw'),
+        attachments: drift.Value(jsonEncode(sentMsg.attachments)),
+        capturedAt: now,
+        metadata: drift.Value(jsonEncode(metadata)),
+        createdAt: isUpdate ? existingSent.createdAt : now,
+        updatedAt: now,
+        revision: drift.Value(nextRevision),
+      );
+
+      await db.into(db.inboxEntries).insertOnConflictUpdate(companion);
+      final persisted = await (db.select(
+        db.inboxEntries,
+      )..where((t) => t.id.equals(resolvedEntryId))).getSingle();
+
+      final payload = SyncTimestamp.normalizeMapDates(persisted.toJson());
+      if (isUpdate) {
+        payload['_base'] = SyncTimestamp.normalizeMapDates(
+          existingSent.toJson(),
+        );
+      }
+
+      await db.into(db.syncQueue).insert(
+        SyncQueueCompanion.insert(
+          id: const Uuid().v4(),
+          entityType: 'inbox_entries',
+          entityId: resolvedEntryId,
+          operation: isUpdate ? 'UPDATE' : 'INSERT',
+          payload: jsonEncode(payload),
+          createdAt: now,
+        ),
+      );
+    });
     return sentMsg;
   }
 

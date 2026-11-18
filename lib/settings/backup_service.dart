@@ -1222,6 +1222,7 @@ class BackupService {
     // efetivamente restauradas, jamais reinjetando a fila bruta antiga do backup (FA-BAK-01).
     _shouldReconstituteSyncQueue = true;
     final corruptedFiles = <String>[];
+    final missingFiles = <String>[];
     int totalRestoredCount = 0;
 
     // Snapshot de segurança obrigatório: falha ABORTA a restauração — não continua silenciosamente.
@@ -1319,6 +1320,33 @@ class BackupService {
         );
         await stagingDir.create(recursive: true);
         await audioBackupDir.create(recursive: true);
+
+        for (final item in voiceNotes) {
+          final vnMap = item as Map<String, dynamic>;
+          final id = vnMap['id'] as String?;
+          final pathVal = (vnMap['audioFilePath'] ?? vnMap['audio_file_path'])
+              ?.toString()
+              .trim();
+          if (id != null &&
+              pathVal != null &&
+              pathVal.isNotEmpty &&
+              !voiceNoteAudios.containsKey(id)) {
+            missingFiles.add(id);
+          }
+        }
+        for (final item in docRows) {
+          final docMap = item as Map<String, dynamic>;
+          final id = docMap['id'] as String?;
+          final pathVal = (docMap['filePath'] ?? docMap['file_path'])
+              ?.toString()
+              .trim();
+          if (id != null &&
+              pathVal != null &&
+              pathVal.isNotEmpty &&
+              !docFiles.containsKey(id)) {
+            missingFiles.add(id);
+          }
+        }
 
         if (voiceNoteAudios.isNotEmpty) {
           restoredAudioDir = Directory('${docsDir.path}/voice_notes');
@@ -2583,6 +2611,7 @@ class BackupService {
     return RestoreResult(
       isIntegral: corruptedFiles.isEmpty,
       corruptedFiles: corruptedFiles,
+      missingFiles: missingFiles,
       restoredRecordsCount: totalRestoredCount,
     );
   }

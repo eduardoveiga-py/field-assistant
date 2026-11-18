@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/app_logger.dart';
 import 'core/app_theme.dart';
 import 'core/i18n/app_locale_strings.dart';
+import 'core/ios_storage_security.dart';
 import 'database/connection/db_status.dart';
 import 'sync/supabase_sync_service.dart';
 import 'ui/screens/auth_splash_screen.dart';
@@ -13,6 +14,7 @@ import 'ui/providers.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await IosStorageSecurity.protectSensitiveStorage();
   try {
     await SupabaseSyncService.initialize();
   } catch (e, st) {
