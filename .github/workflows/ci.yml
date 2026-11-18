@@ -136,8 +136,8 @@ jobs:
       - name: Install Dependencies
         run: flutter pub get
 
-      - name: Verify Formatting on Security, Sync & Regression Core
-        run: dart format --output=none --set-exit-if-changed lib/sync/media_bytes_io.dart lib/sync/sync_owner_guard.dart lib/sync/sync_privacy_policy.dart lib/sync/crypto/e2ee_service.dart lib/sync/crypto/encrypted_media.dart lib/sync/crypto/encrypted_media_transfer.dart lib/sync/crypto/encrypted_record_checkpoint.dart lib/sync/crypto/encrypted_record_sync.dart lib/sync/crypto/recovery_vault_transport.dart lib/core/biometric_auth_service.dart lib/database/connection/local_db_encryption_state.dart lib/territory/map_engine_adapter.dart lib/territory/map_engine/offline_tile_server.dart lib/territory/map_engine/maplibre_native_adapter.dart lib/territory/map_engine/raster_fallback_adapter.dart test/security/adversarial_review_regressions_test.dart test/security/phase2_kdf_and_p1_hardening_test.dart test/sync/media_bytes_security_test.dart test/backup/restore_identity_protection_test.dart test/sync/account_isolation_test.dart test/sync/crypto/e2ee_sync_flow_test.dart test/sync/domain_conflict_adversarial_test.dart test/territory/offline_tile_server_test.dart test/territory/map_engine_adapter_test.dart test/e2e/stabilization_master_e2e_test.dart integration_test/app_stabilization_e2e_test.dart
+      - name: Verify Formatting Across Entire Repository (lib, test, integration_test)
+        run: dart format --output=none --set-exit-if-changed lib test integration_test
 
       - name: Check Outdated Dependencies (Informative M11)
         run: flutter pub outdated --no-dev-dependencies || true

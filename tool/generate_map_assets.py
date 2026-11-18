@@ -1,178 +1,180 @@
 #!/usr/bin/env python3
 """
-Generates authentic MapLibre Style Specification v8 compliant assets:
-1. Font Glyphs Protobuf (Noto Sans Regular/0-255.pbf) adhering strictly to glyphs.proto.
-2. Sprite atlas PNG (sprite.png: 32x16 RGBA) and @2x (sprite@2x.png: 64x32 RGBA).
-3. Sprite metadata JSON (sprite.json and sprite@2x.json).
+Validates authentic MapLibre Style Specification v8 font glyphs (SDF PBF) and
+generates RGBA sprite atlases for offline rendering:
+1. Verifies authentic SDF Font Glyphs Protobuf (Noto Sans Regular/0-255.pbf)
+   adhering strictly to glyphs.proto with (width + 6) * (height + 6) SDF buffers.
+   (Never overwrites real SDF glyphs with synthetic placeholder rectangles.)
+2. Generates Sprite atlas PNG (sprite.png: 32x16 RGBA) and @2x (sprite@2x.png: 64x32 RGBA).
+3. Generates Sprite metadata JSON (sprite.json and sprite@2x.json).
 """
 
+import json
 import os
 import struct
+import sys
 import zlib
-import json
 
-def encode_varint(value):
-    bytes_out = bytearray()
-    while value > 0x7F:
-        bytes_out.append((value & 0x7F) | 0x80)
-        value >>= 7
-    bytes_out.append(value & 0x7F)
-    return bytes(bytes_out)
 
-def encode_zigzag(n):
-    if n >= 0:
-        return encode_varint(n << 1)
-    else:
-        return encode_varint(((-n) << 1) - 1)
+def _read_varint(buf, pos):
+    val = 0
+    shift = 0
+    while True:
+        if pos >= len(buf):
+            raise ValueError("Unexpected EOF while reading protobuf varint")
+        b = buf[pos]
+        pos += 1
+        val |= (b & 0x7F) << shift
+        if not (b & 0x80):
+            return val, pos
+        shift += 7
 
-def encode_field(field_num, wire_type, data):
-    tag = (field_num << 3) | wire_type
-    return encode_varint(tag) + data
 
-def encode_varint_field(field_num, value):
-    return encode_field(field_num, 0, encode_varint(value))
+def verify_font_pbf(font_path, expected_name="Noto Sans Regular", expected_range="0-255"):
+    if not os.path.isfile(font_path):
+        raise FileNotFoundError(f"Font PBF missing: {font_path}")
 
-def encode_zigzag_field(field_num, value):
-    return encode_field(field_num, 0, encode_zigzag(value))
+    with open(font_path, "rb") as f:
+        data = f.read()
 
-def encode_bytes_field(field_num, data):
-    return encode_field(field_num, 2, encode_varint(len(data)) + data)
+    if len(data) < 40000:
+        raise ValueError(f"Font PBF too small ({len(data)} bytes); expected authentic SDF > 40 KB")
 
-def encode_string_field(field_num, s):
-    return encode_bytes_field(field_num, s.encode('utf-8'))
+    pos = 0
+    tag, pos = _read_varint(data, pos)
+    if tag != 0x0A:
+        raise ValueError(f"Invalid outer glyphs.proto tag: {hex(tag)}")
 
-def encode_glyph(char_id, width, height, left, top, advance, bitmap_bytes):
-    parts = []
-    parts.append(encode_varint_field(1, char_id))
-    if bitmap_bytes:
-        parts.append(encode_bytes_field(2, bitmap_bytes))
-    parts.append(encode_varint_field(3, width))
-    parts.append(encode_varint_field(4, height))
-    parts.append(encode_zigzag_field(5, left))
-    parts.append(encode_zigzag_field(6, top))
-    parts.append(encode_varint_field(7, advance))
-    glyph_body = b''.join(parts)
-    return encode_bytes_field(3, glyph_body)
+    fs_len, pos = _read_varint(data, pos)
+    if pos + fs_len != len(data):
+        raise ValueError("Outer fontstack length does not match file size")
 
-def generate_font_pbf(output_path):
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    
-    font_name = "Noto Sans Regular"
-    font_range = "0-255"
-    glyph_entries = []
-    
-    # Range 0-255: printable characters
-    for cp in range(0, 256):
-        if cp < 32:
-            continue
-        elif cp == 32: # space
-            glyph_entries.append(encode_glyph(cp, 0, 0, 0, 0, 8, b''))
-        elif 33 <= cp <= 126 or 160 <= cp <= 255:
-            w, h = 12, 18
-            left = 1
-            top = 14
-            advance = 14
-            # Generate authentic SDF (Signed Distance Field) bitmap: 12x18 = 216 bytes
-            # Core foreground pixels set to 255/192, background to 0/32
-            bitmap = bytearray(w * h)
-            for y in range(h):
-                for x in range(w):
-                    # Stroke pattern for glyph representation
-                    if 2 <= x <= 9 and 2 <= y <= 15:
-                        if x in (2, 9) or y in (2, 8, 15):
-                            bitmap[y * w + x] = 220
-                        else:
-                            bitmap[y * w + x] = 80
-                    else:
-                        bitmap[y * w + x] = 0
-            glyph_entries.append(encode_glyph(cp, w, h, left, top, advance, bytes(bitmap)))
-    
-    fontstack_parts = []
-    fontstack_parts.append(encode_string_field(1, font_name))
-    fontstack_parts.append(encode_string_field(2, font_range))
-    for g in glyph_entries:
-        fontstack_parts.append(g)
-    
-    fontstack_body = b''.join(fontstack_parts)
-    fontstack_message = encode_bytes_field(1, fontstack_body)
-    
-    with open(output_path, 'wb') as f:
-        f.write(fontstack_message)
-    print(f"Generated font PBF: {output_path} ({os.path.getsize(output_path)} bytes)")
+    fs_body = data[pos : pos + fs_len]
+    p = 0
+    name = None
+    font_range = None
+    glyph_count = 0
+    unique_bitmaps = set()
+
+    while p < len(fs_body):
+        t, p = _read_varint(fs_body, p)
+        fnum, wtype = t >> 3, t & 7
+        if wtype == 2:
+            length, p = _read_varint(fs_body, p)
+            val = fs_body[p : p + length]
+            p += length
+            if fnum == 1:
+                name = val.decode("utf-8")
+            elif fnum == 2:
+                font_range = val.decode("utf-8")
+            elif fnum == 3:
+                glyph_count += 1
+                gp = 0
+                g = {}
+                while gp < len(val):
+                    gt, gp = _read_varint(val, gp)
+                    gf, gw = gt >> 3, gt & 7
+                    if gw == 0:
+                        gv, gp = _read_varint(val, gp)
+                        g[gf] = gv
+                    elif gw == 2:
+                        gl, gp = _read_varint(val, gp)
+                        g[gf] = val[gp : gp + gl]
+                        gp += gl
+                w = g.get(3, 0)
+                h = g.get(4, 0)
+                bmp = g.get(2, b"")
+                if w > 0 and h > 0:
+                    expected_sdf_len = (w + 6) * (h + 6)
+                    if len(bmp) != expected_sdf_len:
+                        raise ValueError(
+                            f"Glyph {g.get(1)} has invalid SDF length {len(bmp)} "
+                            f"(expected (w+6)*(h+6)={expected_sdf_len})"
+                        )
+                    unique_bitmaps.add(bmp)
+        elif wtype == 0:
+            _, p = _read_varint(fs_body, p)
+        else:
+            raise ValueError(f"Unsupported protobuf wire type {wtype} in fontstack")
+
+    if name != expected_name:
+        raise ValueError(f"Fontstack name mismatch: got {name!r}, expected {expected_name!r}")
+    if font_range != expected_range:
+        raise ValueError(f"Fontstack range mismatch: got {font_range!r}, expected {expected_range!r}")
+    if glyph_count < 180 or len(unique_bitmaps) < 150:
+        raise ValueError(
+            f"Font PBF lacks authentic glyph diversity: {glyph_count} glyphs, "
+            f"{len(unique_bitmaps)} unique bitmaps"
+        )
+
+    print(
+        f"Verified authentic SDF font PBF: {font_path} "
+        f"({len(data)} bytes, {glyph_count} glyphs, {len(unique_bitmaps)} unique SDF bitmaps)"
+    )
+
 
 def create_png(width, height, get_pixel_rgba):
     raw_scanlines = bytearray()
     for y in range(height):
-        raw_scanlines.append(0) # Filter type None
+        raw_scanlines.append(0)  # Filter type None
         for x in range(width):
             r, g, b, a = get_pixel_rgba(x, y)
             raw_scanlines.extend([r, g, b, a])
-    
+
     def png_chunk(chunk_type, data):
-        return struct.pack('>I', len(data)) + chunk_type + data + struct.pack('>I', zlib.crc32(chunk_type + data) & 0xffffffff)
-    
-    sig = b'\x89PNG\r\n\x1a\n'
-    ihdr_data = struct.pack('>IIBBBBB', width, height, 8, 6, 0, 0, 0)
-    ihdr = png_chunk(b'IHDR', ihdr_data)
-    idat = png_chunk(b'IDAT', zlib.compress(bytes(raw_scanlines), 9))
-    iend = png_chunk(b'IEND', b'')
+        return (
+            struct.pack(">I", len(data))
+            + chunk_type
+            + data
+            + struct.pack(">I", zlib.crc32(chunk_type + data) & 0xFFFFFFFF)
+        )
+
+    sig = b"\x89PNG\r\n\x1a\n"
+    ihdr_data = struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0)
+    ihdr = png_chunk(b"IHDR", ihdr_data)
+    idat = png_chunk(b"IDAT", zlib.compress(bytes(raw_scanlines), 9))
+    iend = png_chunk(b"IEND", b"")
     return sig + ihdr + idat + iend
+
 
 def generate_sprites(sprites_dir):
     os.makedirs(sprites_dir, exist_ok=True)
-    
+
     # 1. 1x Sprite (32x16)
     # [0..14] = marker-15 (pin icon: red teardrop with white dot)
     # [16..30] = landmark-15 (landmark cross icon: blue square with white cross)
     def pixel_1x(x, y):
-        # marker-15: x in 0..14, y in 0..14
         if 0 <= x < 15 and 0 <= y < 15:
-            # Circle centered at (7, 6), radius ~5
             dx = x - 7
             dy = y - 6
-            dist_sq = dx*dx + dy*dy
-            if dist_sq <= 3: # center white dot
+            dist_sq = dx * dx + dy * dy
+            if dist_sq <= 3:
                 return (255, 255, 255, 255)
-            elif dist_sq <= 28 or (y >= 6 and abs(dx) <= (14 - y) * 0.7): # red pin body
-                return (220, 38, 38, 255) # Red #DC2626
+            elif dist_sq <= 28 or (y >= 6 and abs(dx) <= (14 - y) * 0.7):
+                return (220, 38, 38, 255)
             return (0, 0, 0, 0)
-        # landmark-15: x in 16..30, y in 0..14
         elif 16 <= x < 31 and 0 <= y < 15:
             lx = x - 16
             ly = y
-            # Blue rounded box with white cross
             if 1 <= lx <= 13 and 1 <= ly <= 13:
-                # White cross in center
                 if (5 <= lx <= 9 and 3 <= ly <= 11) or (3 <= lx <= 11 and 5 <= ly <= 9):
                     return (255, 255, 255, 255)
-                return (37, 99, 235, 255) # Blue #2563EB
+                return (37, 99, 235, 255)
             return (0, 0, 0, 0)
         return (0, 0, 0, 0)
 
     png_1x = create_png(32, 16, pixel_1x)
-    png_1x_path = os.path.join(sprites_dir, 'sprite.png')
-    with open(png_1x_path, 'wb') as f:
+    png_1x_path = os.path.join(sprites_dir, "sprite.png")
+    with open(png_1x_path, "wb") as f:
         f.write(png_1x)
     print(f"Generated sprite 1x: {png_1x_path} ({len(png_1x)} bytes)")
 
     json_1x = {
-        "marker-15": {
-            "width": 15,
-            "height": 15,
-            "x": 0,
-            "y": 0,
-            "pixelRatio": 1
-        },
-        "landmark-15": {
-            "width": 15,
-            "height": 15,
-            "x": 16,
-            "y": 0,
-            "pixelRatio": 1
-        }
+        "marker-15": {"width": 15, "height": 15, "x": 0, "y": 0, "pixelRatio": 1},
+        "landmark-15": {"width": 15, "height": 15, "x": 16, "y": 0, "pixelRatio": 1},
     }
-    json_1x_path = os.path.join(sprites_dir, 'sprite.json')
-    with open(json_1x_path, 'w', encoding='utf-8') as f:
+    json_1x_path = os.path.join(sprites_dir, "sprite.json")
+    with open(json_1x_path, "w", encoding="utf-8") as f:
         json.dump(json_1x, f, indent=2)
     print(f"Generated sprite JSON 1x: {json_1x_path}")
 
@@ -181,37 +183,29 @@ def generate_sprites(sprites_dir):
         return pixel_1x(x // 2, y // 2)
 
     png_2x = create_png(64, 32, pixel_2x)
-    png_2x_path = os.path.join(sprites_dir, 'sprite@2x.png')
-    with open(png_2x_path, 'wb') as f:
+    png_2x_path = os.path.join(sprites_dir, "sprite@2x.png")
+    with open(png_2x_path, "wb") as f:
         f.write(png_2x)
     print(f"Generated sprite 2x: {png_2x_path} ({len(png_2x)} bytes)")
 
     json_2x = {
-        "marker-15": {
-            "width": 30,
-            "height": 30,
-            "x": 0,
-            "y": 0,
-            "pixelRatio": 2
-        },
-        "landmark-15": {
-            "width": 30,
-            "height": 30,
-            "x": 32,
-            "y": 0,
-            "pixelRatio": 2
-        }
+        "marker-15": {"width": 30, "height": 30, "x": 0, "y": 0, "pixelRatio": 2},
+        "landmark-15": {"width": 30, "height": 30, "x": 32, "y": 0, "pixelRatio": 2},
     }
-    json_2x_path = os.path.join(sprites_dir, 'sprite@2x.json')
-    with open(json_2x_path, 'w', encoding='utf-8') as f:
+    json_2x_path = os.path.join(sprites_dir, "sprite@2x.json")
+    with open(json_2x_path, "w", encoding="utf-8") as f:
         json.dump(json_2x, f, indent=2)
     print(f"Generated sprite JSON 2x: {json_2x_path}")
 
-if __name__ == '__main__':
-    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-    font_file = os.path.join(base_dir, 'assets', 'map', 'fonts', 'Noto Sans Regular', '0-255.pbf')
-    sprites_folder = os.path.join(base_dir, 'assets', 'map', 'sprites')
-    
-    generate_font_pbf(font_file)
-    generate_sprites(sprites_folder)
-    print("All authentic cartographic assets generated successfully.")
+
+if __name__ == "__main__":
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    font_file = os.path.join(
+        base_dir, "assets", "map", "fonts", "Noto Sans Regular", "0-255.pbf"
+    )
+    sprites_folder = os.path.join(base_dir, "assets", "map", "sprites")
+
+    verify_font_pbf(font_file)
+    if "--verify-only" not in sys.argv:
+        generate_sprites(sprites_folder)
+    print("All authentic cartographic assets verified successfully.")

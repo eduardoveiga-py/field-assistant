@@ -349,6 +349,7 @@ Future<void> showAddPersonDialog(BuildContext context, WidgetRef ref) async {
                           final geo = await GeocodingService.reverseGeocode(
                             lat,
                             lng,
+                            db: ref.read(databaseProvider),
                           );
                           if (geo != null) {
                             setDialogState(() {

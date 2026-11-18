@@ -278,12 +278,15 @@ class MaplibreNativeAdapter implements MapEngineAdapter {
   /// em camadas de símbolos (icon-rotation-alignment: viewport).
   Map<String, dynamic> generateStyleSpecification({
     String? packageId,
+    OfflineMapFormat packageFormat = OfflineMapFormat.pmtiles,
     bool isDarkMode = false,
   }) {
     final serverBase = tileServer?.baseUrl;
     final tileUrl = serverBase != null
         ? (packageId != null
-              ? '$serverBase/pmtiles/$packageId'
+              ? (packageFormat == OfflineMapFormat.mbtiles
+                    ? '$serverBase/mbtiles/$packageId/{z}/{x}/{y}.pbf'
+                    : '$serverBase/pmtiles/$packageId/{z}/{x}/{y}.pbf')
               : '$serverBase/tiles/mbtiles/{z}/{x}/{y}')
         : null;
 
@@ -367,9 +370,17 @@ class MaplibreNativeAdapter implements MapEngineAdapter {
   }
 
   /// Retorna o Style JSON serializado em UTF-8.
-  String generateStyleJsonString({String? packageId, bool isDarkMode = false}) {
+  String generateStyleJsonString({
+    String? packageId,
+    OfflineMapFormat packageFormat = OfflineMapFormat.pmtiles,
+    bool isDarkMode = false,
+  }) {
     return jsonEncode(
-      generateStyleSpecification(packageId: packageId, isDarkMode: isDarkMode),
+      generateStyleSpecification(
+        packageId: packageId,
+        packageFormat: packageFormat,
+        isDarkMode: isDarkMode,
+      ),
     );
   }
 

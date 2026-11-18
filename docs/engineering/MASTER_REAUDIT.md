@@ -394,4 +394,32 @@ Embora o aplicativo demonstre fundamentos avançados em criptografia remota de r
 O roteiro delineado nas Seções 5 e 6 é auto-suficiente e vinculante para a execução imediata das Fases M1 (P0 Criptografia Fail-Closed), M2 (P1 Mídias e Supabase), M3 (Fase Estratégica MapLibre), M4 (CI/CD, Áudio e UX) e M5 (Modularização e Fechamento FAES 10/10).
 
 ---
+
+## 9. ADENDO DE VERIFICAÇÃO FORENSE PÓS-ESTABILIZAÇÃO (18/11/2026)
+
+Após os commits `fecd4b0` e `fa6e294`, foi executada uma **auditoria forense independente linha a linha** (retificando narrativas infladas da mensagem do commit `fecd4b0`, que havia declarado erroneamente *"Screen decomposition"* e *"FAES 9.93/10 certification"*):
+
+### 9.1. Achados Confirmadamente Remediados (com Evidência Empírica)
+- **[P0-01 — FECHADO NO CÓDIGO]:** Fallback silencioso para SQLite plaintext removido em `lib/database/connection/native.dart` e `lib/database/connection/local_database_encryption.dart`; máquina de 5 estados (`LocalDatabaseEncryptionState`) e `_SafeNativeUnavailableQueryExecutor` fail-closed verificados por testes unitários.
+- **[P1-01 — FECHADO NO CÓDIGO]:** Versionamento imutável de chunks (`v_$versionId/chunk_$index.enc` com `upsert: false`), manifesto versionado e ponteiro raiz atômico implementados em `lib/sync/crypto/encrypted_media_transfer.dart` e conectados aos 4 buckets em `lib/sync/supabase_sync_service.dart`.
+- **[P1-02 — FECHADO E TESTADO EM PGLITE]:** `supabase/migrations/20261112000000_hardening_storage_indexes_rls.sql` cria formalmente `public.handle_soft_delete_and_resurrection_guard()` com `SET search_path = public`. Todos os 5 testes SQL em `test/sql/` passaram (exit 0).
+- **[P1-03 — FECHADO NO CÓDIGO]:** `ios/Runner/Runner.entitlements` e `ios/Runner/AppDelegate.swift` atualizados para `NSFileProtectionCompleteUntilFirstUserAuthentication` (Classe B). *(Pendente validação em hardware físico iPhone/iPad.)*
+- **[P1-04 — FECHADO NO CÓDIGO]:** `lib/territory/mbtiles/mbtiles_native.dart` aceita tiles vetoriais MVT/PBF; `OfflineTileServer` + `PmtilesReader` + `MapAssetManager` implementados; `assets/map/fonts/Noto Sans Regular/0-255.pbf` corrigido para glifos SDF autênticos (76.049 bytes, 195 glifos, 188 bitmaps `(w+6)*(h+6)` distintos) e sprites RGBA 1x/2x validados por `map_asset_authenticity_test.dart`.
+- **[P1-05 — FECHADO NO CÓDIGO]:** `OfflineGeocodingService` (cache Drift `AppKvStore` 30 dias + rate-limit 1 req/s + busca offline local) agora é a implementação única por trás de `GeocodingService` (eliminando `dynamicDbCompanion` quebrado) e recebe `db` nos fluxos de UI.
+- **[P1-06 — PARCIALMENTE FECHADO]:** Contra-rotação individual de pinos de contatos e marcos implementada em `contacts_map_screen.dart:4159, 4298`. Textos das ruas continuam raster até ativação do renderizador vetorial MapLibre Native na UI.
+- **[P1-07 — PARCIALMENTE FECHADO]:** `.github/workflows/ci.yml` atualizado para validar `dart format --output=none --set-exit-if-changed lib test integration_test` em 100% do repositório. `integration_test/` exige dispositivo conectado (`-d windows`/`-d macos`/emulador), portanto segue fora do job headless `ubuntu-latest`, enquanto `test/e2e/stabilization_master_e2e_test.dart` executa o mesmo fluxo na VM.
+- **[P2-04 — FECHADO NO CÓDIGO]:** `BibleStudyDomainConflictDetector` e `TaskDomainConflictDetector` adicionados e conectados em `supabase_sync_service.dart`.
+
+### 9.2. Achados Ainda Abertos / Bloqueadores de Aprovação FAES (>= 9.7/10)
+- **[P0-02 — ABERTO PARCIALMENTE]:** `maplibre_gl: ^0.28.0` está no `pubspec.yaml`, mas **nenhum arquivo em `lib/` importa `package:maplibre_gl`** e `ContactsMapScreen` / `MapLocationPickerDialog` continuam usando `RasterFallbackAdapter` + `InteractiveViewer`. Ativação real do widget `MapLibreMap` e validação em GPU Metal iOS/iPadOS continuam pendentes.
+- **[P1-08 — PARCIAL]:** `RealAudioRecordingService` escuta `onStateChanged()` do pacote `record`, mas não integra `AVAudioSession` explícito (`audio_session`) nem foi validado sob chamada telefônica real em iPhone.
+- **[P2-01 — PARCIAL]:** Split-view iPad (`>= 900px`) existe apenas em `people_screen.dart` e `appointments_screen.dart` (2 de 26 telas; `studies_screen.dart` e demais telas permanecem sem adaptação).
+- **[P2-02 — ABERTO]:** Apenas **4** ocorrências de `Semantics(` em toda a pasta `lib/`.
+- **[P2-03 — ABERTO]:** Telas monolíticas **não foram decompostas** (`person_detail_screen.dart`: 7.635L; `appointments_screen.dart`: 4.842L; `contacts_map_screen.dart`: 4.390L; `settings_screen.dart`: 3.859L; `studies_screen.dart`: 3.434L).
+- **[HARD GATES EXTERNOS — BLOCKED]:** Ausência de testes em hardware físico Apple (iPhone/iPad + Xcode), ausência de execução `supabase test db` (pgTAP) contra Supabase staging/Docker real, e decisão de licença raiz pendente do proprietário.
+
+### 9.3. Veredito Atualizado do Quality Gate (Honesto / Fail-Closed)
+**STATUS: NOT APPROVED / BLOCKED — Score Empírico Revisado: 8.18 / 10.0** (melhoria substancial em relação à linha de base `6.72/10`, porém abaixo do corte FAES `>= 9.7/10` e com hard gates externos e P0-02/P2 estruturais pendentes).
+
+---
 *Relatório consolidado e certificado pela equipe técnica em estrita observância ao Field Assistant Engineering Standard (FAES).*

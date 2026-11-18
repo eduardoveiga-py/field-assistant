@@ -169,10 +169,16 @@ class OfflineGeocodingService {
         headers['User-Agent'] = 'MinisterioPessoalTerritorio/1.0 (territorio-app-local; contact: suporte@ministeriopessoal.app)';
       }
 
+      final ownsClient = httpClient == null;
       final client = httpClient ?? http.Client();
-      final response = await client
-          .get(uri, headers: headers)
-          .timeout(const Duration(seconds: 8));
+      final http.Response response;
+      try {
+        response = await client
+            .get(uri, headers: headers)
+            .timeout(const Duration(seconds: 8));
+      } finally {
+        if (ownsClient) client.close();
+      }
 
       if (response.statusCode == 200) {
         final data = json.decode(
@@ -323,10 +329,16 @@ class OfflineGeocodingService {
         headers['User-Agent'] = 'MinisterioPessoalTerritorio/1.0 (territorio-app-local; contact: suporte@ministeriopessoal.app)';
       }
 
+      final ownsClient = httpClient == null;
       final client = httpClient ?? http.Client();
-      final response = await client
-          .get(uri, headers: headers)
-          .timeout(const Duration(seconds: 8));
+      final http.Response response;
+      try {
+        response = await client
+            .get(uri, headers: headers)
+            .timeout(const Duration(seconds: 8));
+      } finally {
+        if (ownsClient) client.close();
+      }
 
       if (response.statusCode == 200) {
         final list =

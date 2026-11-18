@@ -1859,6 +1859,7 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                                               await GeocodingService.reverseGeocode(
                                                 pos.latitude,
                                                 pos.longitude,
+                                                db: ref.read(databaseProvider),
                                               );
                                           if (geo != null) {
                                             setDialogState(() {

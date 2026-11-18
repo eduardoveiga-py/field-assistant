@@ -204,9 +204,12 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
       Future.delayed(const Duration(milliseconds: 250), () async {
         try {
           if (!mounted) return;
-          final geocode =
-              widget.geocodeAddress ?? GeocodingService.geocodeAddress;
-          final res = await geocode(personToGeocode.address!);
+          final res = widget.geocodeAddress != null
+              ? await widget.geocodeAddress!(personToGeocode.address!)
+              : await GeocodingService.geocodeAddress(
+                  personToGeocode.address!,
+                  db: ref.read(databaseProvider),
+                );
           if (res == null || !mounted) return;
           final review = await showDialog<bool>(
             context: context,
@@ -1011,6 +1014,7 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                                     await GeocodingService.reverseGeocode(
                                       pos.latitude,
                                       pos.longitude,
+                                      db: ref.read(databaseProvider),
                                     );
                                 if (geo != null &&
                                     addressController.text.trim().isEmpty) {

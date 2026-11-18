@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:ministerio_pessoal/database/app_database.dart';
 import 'package:ministerio_pessoal/territory/geocoding/offline_geocoding_service.dart';
+import 'package:ministerio_pessoal/territory/geocoding_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -147,6 +148,49 @@ void main() {
       );
       expect(resCached, isNotNull);
       expect(resCached!.latitude, closeTo(-3.10719, 0.0001));
+      expect(httpCalls, equals(1));
+    });
+
+    test('GeocodingService delegates to OfflineGeocodingService and persists cleanly in Drift AppKvStore', () async {
+      var httpCalls = 0;
+      final mockClient = MockClient((request) async {
+        httpCalls++;
+        return http.Response(
+          jsonEncode({
+            'display_name': 'Av. Eduardo Ribeiro, 500, Manaus, AM',
+            'address': {
+              'road': 'Av. Eduardo Ribeiro',
+              'house_number': '500',
+              'suburb': 'Centro',
+              'city': 'Manaus',
+              'state': 'Amazonas',
+            },
+          }),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      });
+
+      final res1 = await GeocodingService.reverseGeocode(
+        -3.13163,
+        -60.02305,
+        db: db,
+        httpClient: mockClient,
+      );
+      expect(res1, isNotNull);
+      expect(res1!.street, equals('Av. Eduardo Ribeiro'));
+      expect(httpCalls, equals(1));
+
+      // Clear memory cache and verify SQLite AppKvStore actually persisted the entry
+      GeocodingService.clearMemoryCache();
+      final res2 = await GeocodingService.reverseGeocode(
+        -3.13163,
+        -60.02305,
+        db: db,
+        httpClient: mockClient,
+      );
+      expect(res2, isNotNull);
+      expect(res2!.street, equals('Av. Eduardo Ribeiro'));
       expect(httpCalls, equals(1));
     });
   });

@@ -207,27 +207,52 @@ void main() {
       expect(adapter.currentViewport.tiltDegrees, equals(30.0));
     });
 
-    test(
-      'Generates local Style JSON specification pointing to loopback server',
-      () async {
-        await adapter.initialize();
+    test('Generates local Style JSON specification pointing to loopback server', () async {
+      await adapter.initialize();
 
-        final style = adapter.generateStyleSpecification();
-        expect(style['version'], equals(8));
-        expect(style['sources'], isA<Map>());
-        final source =
-            (style['sources'] as Map)['offline-source'] as Map<String, dynamic>;
-        expect(source['type'], equals('vector'));
-        final tiles = source['tiles'] as List;
-        expect(
-          tiles.first,
-          contains('http://127.0.0.1:${tileServer.port}/tiles/mbtiles'),
-        );
+      final style = adapter.generateStyleSpecification();
+      expect(style['version'], equals(8));
+      expect(style['sources'], isA<Map>());
+      final source =
+          (style['sources'] as Map)['offline-source'] as Map<String, dynamic>;
+      expect(source['type'], equals('vector'));
+      final tiles = source['tiles'] as List;
+      expect(
+        tiles.first,
+        contains('http://127.0.0.1:${tileServer.port}/tiles/mbtiles'),
+      );
 
-        final jsonStr = adapter.generateStyleJsonString();
-        expect(jsonStr, contains('Field Assistant Local Vector Style'));
-      },
-    );
+      final jsonStr = adapter.generateStyleJsonString();
+      expect(jsonStr, contains('Field Assistant Local Vector Style'));
+
+      final pmtilesStyle = adapter.generateStyleSpecification(
+        packageId: 'br_am_solimoes',
+        packageFormat: OfflineMapFormat.pmtiles,
+      );
+      final pmtilesSource =
+          (pmtilesStyle['sources'] as Map)['offline-source']
+              as Map<String, dynamic>;
+      expect(
+        (pmtilesSource['tiles'] as List).first,
+        equals(
+          'http://127.0.0.1:${tileServer.port}/pmtiles/br_am_solimoes/{z}/{x}/{y}.pbf',
+        ),
+      );
+
+      final mbtilesStyle = adapter.generateStyleSpecification(
+        packageId: 'br_am_solimoes',
+        packageFormat: OfflineMapFormat.mbtiles,
+      );
+      final mbtilesSource =
+          (mbtilesStyle['sources'] as Map)['offline-source']
+              as Map<String, dynamic>;
+      expect(
+        (mbtilesSource['tiles'] as List).first,
+        equals(
+          'http://127.0.0.1:${tileServer.port}/mbtiles/br_am_solimoes/{z}/{x}/{y}.pbf',
+        ),
+      );
+    });
   });
 
   group('RasterFallbackAdapter Contract Tests', () {

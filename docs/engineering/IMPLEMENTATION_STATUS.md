@@ -1,5 +1,7 @@
 # INVENTÁRIO E ESTADO DE IMPLEMENTAÇÃO DAS FUNCIONALIDADES
 
+> **Nota de Vigência (18/11/2026):** Este inventário reflete o snapshot histórico inicial de 05/11/2026. Defeitos históricos como inicialização Supabase, tabelas ausentes, timer de 30s de gravação, criptografia SQLite local e conflitos de domínio foram posteriormente remediados; para o estado forense vigente na branch `master`, consulte [`MASTER_REAUDIT.md` (Seção 9)](MASTER_REAUDIT.md) e [`SESSION_HANDOFF.md`](SESSION_HANDOFF.md).
+
 Este documento mapeia o status real de cada funcionalidade do **Field Assistant**, contrastando código implementado, arquivos envolvidos, testes associados e problemas conhecidos.
 
 ---

@@ -1,6 +1,8 @@
 # CHECKLIST E CLASSIFICAÇÃO DE PRONTIDÃO PARA PRODUÇÃO
 
-## 1. Classificação Atual
+> **Nota de Vigência (18/11/2026):** Este checklist reflete o levantamento histórico inicial de 05/11/2026 (508 testes; P0s antigos de inicialização Supabase e migrações iniciais já foram corrigidos). Para o status forense vigente no branch `master` e a matriz atualizada de bloqueadores FAES, consulte [`MASTER_REAUDIT.md` (Seção 9)](MASTER_REAUDIT.md) e [`SESSION_HANDOFF.md`](SESSION_HANDOFF.md).
+
+## 1. Classificação Atual (Snapshot Histórico 05/11/2026 — Ver `MASTER_REAUDIT.md` Seção 9 para Estado Vigente)
 **Status Geral: REPROVADO PARA PRODUÇÃO**
 
 ### Justificativa Técnica

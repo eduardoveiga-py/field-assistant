@@ -4,6 +4,20 @@ import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 
+({int value, int nextPos}) _readVarint(Uint8List buf, int pos) {
+  var value = 0;
+  var shift = 0;
+  var i = pos;
+  while (true) {
+    final b = buf[i++];
+    value |= (b & 0x7f) << shift;
+    if ((b & 0x80) == 0) {
+      return (value: value, nextPos: i);
+    }
+    shift += 7;
+  }
+}
+
 void main() {
   group('Map Asset Authenticity & Forensic Integrity Tests (FAES M3)', () {
     final fontFile = File('assets/map/fonts/Noto Sans Regular/0-255.pbf');
@@ -13,7 +27,7 @@ void main() {
     final sprite2xJsonFile = File('assets/map/sprites/sprite@2x.json');
     final pubspecFile = File('pubspec.yaml');
 
-    test('Font PBF is authentic MapLibre Protobuf (> 40 KB with valid fontstack header)', () {
+    test('Font PBF is authentic MapLibre SDF Protobuf (> 40 KB, valid fontstack header & unique (w+6)*(h+6) SDF glyphs)', () {
       expect(fontFile.existsSync(), isTrue, reason: 'Font PBF file must exist');
       final bytes = fontFile.readAsBytesSync();
       expect(
@@ -24,11 +38,81 @@ void main() {
 
       // Byte 0: 0x0A (tag 1, wire type 2 for repeated fontstack)
       expect(bytes[0], equals(0x0A));
+      final outerLen = _readVarint(bytes, 1);
+      expect(outerLen.nextPos + outerLen.value, equals(bytes.length));
 
-      // Fontstack name tag: 0x0A, followed by length and "Noto Sans Regular"
-      final contentStr = String.fromCharCodes(bytes.sublist(0, 50));
-      expect(contentStr, contains('Noto Sans Regular'));
-      expect(contentStr, contains('0-255'));
+      final fsEnd = bytes.length;
+      var pos = outerLen.nextPos;
+      String? fontName;
+      String? fontRange;
+      var glyphCount = 0;
+      var visibleGlyphCount = 0;
+      final uniqueBitmaps = <String>{};
+
+      while (pos < fsEnd) {
+        final tag = _readVarint(bytes, pos);
+        pos = tag.nextPos;
+        final fieldNum = tag.value >> 3;
+        final wireType = tag.value & 7;
+        if (wireType == 2) {
+          final len = _readVarint(bytes, pos);
+          pos = len.nextPos;
+          final slice = bytes.sublist(pos, pos + len.value);
+          pos += len.value;
+          if (fieldNum == 1) {
+            fontName = utf8.decode(slice);
+          } else if (fieldNum == 2) {
+            fontRange = utf8.decode(slice);
+          } else if (fieldNum == 3) {
+            glyphCount++;
+            var gp = 0;
+            var width = 0;
+            var height = 0;
+            Uint8List bitmap = Uint8List(0);
+            while (gp < slice.length) {
+              final gt = _readVarint(slice, gp);
+              gp = gt.nextPos;
+              final gf = gt.value >> 3;
+              final gw = gt.value & 7;
+              if (gw == 0) {
+                final gv = _readVarint(slice, gp);
+                gp = gv.nextPos;
+                if (gf == 3) width = gv.value;
+                if (gf == 4) height = gv.value;
+              } else if (gw == 2) {
+                final gl = _readVarint(slice, gp);
+                gp = gl.nextPos;
+                final gval = slice.sublist(gp, gp + gl.value);
+                gp += gl.value;
+                if (gf == 2) bitmap = gval;
+              }
+            }
+            if (width > 0 && height > 0) {
+              visibleGlyphCount++;
+              // MapLibre Native SDF specification requires 3px buffer on all 4 sides
+              expect(
+                bitmap.length,
+                equals((width + 6) * (height + 6)),
+                reason: 'Every visible SDF glyph must have (width + 6) * (height + 6) bytes',
+              );
+              uniqueBitmaps.add(base64Encode(bitmap));
+            }
+          }
+        } else if (wireType == 0) {
+          final v = _readVarint(bytes, pos);
+          pos = v.nextPos;
+        }
+      }
+
+      expect(fontName, equals('Noto Sans Regular'));
+      expect(fontRange, equals('0-255'));
+      expect(glyphCount, greaterThanOrEqualTo(180));
+      expect(visibleGlyphCount, greaterThanOrEqualTo(180));
+      expect(
+        uniqueBitmaps.length,
+        greaterThanOrEqualTo(150),
+        reason: 'Font PBF must contain distinct authentic SDF glyph bitmaps, not repeated dummy boxes',
+      );
     });
 
     test('Sprite PNG 1x is valid RGBA image with dimensions >= 32x16', () {
