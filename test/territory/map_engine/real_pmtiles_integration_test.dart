@@ -47,13 +47,17 @@ void main() {
       catalog: [manifest],
       httpClient: MockClient((request) async {
         calls++;
-        if (calls == 1) return http.Response.bytes(bytes.sublist(0, split), 200);
+        if (calls == 1)
+          return http.Response.bytes(bytes.sublist(0, split), 200);
         if (calls == 2) {
           expect(request.headers['Range'], 'bytes=$split-');
           return http.Response.bytes(
             bytes.sublist(split),
             206,
-            headers: {'content-range': 'bytes $split-${bytes.length - 1}/${bytes.length}'},
+            headers: {
+              'content-range':
+                  'bytes $split-${bytes.length - 1}/${bytes.length}',
+            },
           );
         }
         final corrupted = List<int>.from(bytes);
@@ -78,7 +82,10 @@ void main() {
         throwsA(isA<CorruptedPackageException>()),
       );
       expect(await installed.localFile!.readAsBytes(), equals(bytes));
-      expect(await PmtilesReader(installed.localFile!).getTile(14, 5099, 8333), equals(expected));
+      expect(
+        await PmtilesReader(installed.localFile!).getTile(14, 5099, 8333),
+        equals(expected),
+      );
     } finally {
       manager.dispose();
       await directory.delete(recursive: true);
