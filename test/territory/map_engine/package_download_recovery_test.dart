@@ -105,4 +105,33 @@ void main() {
     release.complete();
     expect((await first).isInstalled, isTrue);
   });
+  for (final preserve in [false, true]) {
+    test('cancel closes the response before ${preserve ? 'preserving' : 'purging'} temporary data', () async {
+      final firstChunk = Completer<void>();
+      final controller = StreamController<List<int>>();
+      final manager = OfflineMapPackageManager(
+        storageDir: directory,
+        httpClient: MockClient.streaming((_, __) async => http.StreamedResponse(controller.stream, 200)),
+      );
+      addTearDown(manager.dispose);
+      final download = manager.downloadAndInstall(
+        manifest: manifest,
+        onProgress: (progress) {
+          if (progress > 0 && !firstChunk.isCompleted) firstChunk.complete();
+        },
+      );
+      final result = expectLater(download, throwsA(isA<DownloadCancelledException>()));
+      controller.add(bytes.sublist(0, 80));
+      await firstChunk.future;
+      await manager.cancelDownload(manifest.id, purgeTempFile: !preserve);
+      await result;
+      await controller.close();
+      final target = await manager.getPackageFile(manifest);
+      final partial = File('${target.path}.tmp');
+      expect(partial.existsSync(), preserve);
+      if (preserve) expect(await partial.readAsBytes(), bytes.sublist(0, 80));
+      expect(target.existsSync(), isFalse);
+    });
+  }
+
 }

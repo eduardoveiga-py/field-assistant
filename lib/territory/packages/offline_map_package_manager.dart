@@ -608,15 +608,21 @@ class OfflineMapPackageManager {
 
       try {
         stagingFile.renameSync(finalFile.path);
-        if (backupFile.existsSync()) {
-          backupFile.deleteSync();
-        }
       } catch (renameError) {
-        // Rollback para versão anterior caso o rename falhe
-        if (backupFile.existsSync()) {
+        // Rollback only if the new file was not placed at the destination.
+        if (!finalFile.existsSync() && backupFile.existsSync()) {
           backupFile.renameSync(finalFile.path);
         }
         rethrow;
+      }
+      // A cleanup failure must never roll back over the new installed file.
+      // Preserve the backup; the next replacement will refuse to overwrite it.
+      if (backupFile.existsSync()) {
+        try {
+          backupFile.deleteSync();
+        } on FileSystemException catch (error, stack) {
+          AppLogger.warning('Não foi possível remover o backup anterior.', error, stack);
+        }
       }
 
       // Registro no TileServer
