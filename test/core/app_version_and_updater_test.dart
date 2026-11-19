@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -12,10 +13,13 @@ import 'package:ministerio_pessoal/core/i18n/app_locale_strings.dart';
 void main() {
   group('AppVersion Contract & Semver Parser', () {
     test('1. Metadados e versão centralizada estão consistentes', () {
-      expect(AppVersion.version, equals('1.3.6'));
-      expect(AppVersion.buildNumber, equals(13));
-      expect(AppVersion.displayVersion, equals('v1.3.6'));
-      expect(AppVersion.userAgent, contains('MinisterioPessoal/1.3.6'));
+      final pubspec = File('pubspec.yaml').readAsStringSync();
+      final match = RegExp(r'^version:\s*([0-9]+\.[0-9]+\.[0-9]+)\+([0-9]+)', multiLine: true).firstMatch(pubspec);
+      expect(match, isNotNull);
+      expect(AppVersion.version, match!.group(1));
+      expect(AppVersion.buildNumber, int.parse(match.group(2)!));
+      expect(AppVersion.displayVersion, 'v${AppVersion.version}');
+      expect(AppVersion.userAgent, contains('MinisterioPessoal/${AppVersion.version}'));
       expect(
         AppVersion.liveContainerSourceUrl,
         startsWith('livecontainer://sources?url='),
@@ -45,8 +49,9 @@ void main() {
       expect(AppVersion.compare('1.3.3', '2.0.0'), lessThan(0));
 
       // isNewerThanCurrent
-      expect(AppVersion.isNewerThanCurrent('1.3.7'), isTrue);
-      expect(AppVersion.isNewerThanCurrent('2.0.0'), isTrue);
+      expect(AppVersion.isNewerThanCurrent(AppVersion.version), isFalse);
+      final currentMajor = int.parse(AppVersion.version.split('.').first);
+      expect(AppVersion.isNewerThanCurrent('${currentMajor + 1}.0.0'), isTrue);
       expect(AppVersion.isNewerThanCurrent('1.3.3'), isFalse);
       expect(AppVersion.isNewerThanCurrent('1.3.2'), isFalse);
       expect(AppVersion.isNewerThanCurrent('1.3.1'), isFalse);

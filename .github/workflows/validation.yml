@@ -36,7 +36,22 @@ jobs:
         with:
           channel: stable
           cache: true
-      - run: flutter pub get --enforce-lockfile
+      - name: Resolve locked dependencies
+        shell: bash
+        run: |
+          flutter --version
+          set +e
+          flutter pub get --enforce-lockfile > /tmp/locked-pub.txt 2>&1
+          status=$?
+          cat /tmp/locked-pub.txt
+          if [ "$status" -ne 0 ]; then
+            python3 - <<'PYCODE'
+          from pathlib import Path
+          for line in Path('/tmp/locked-pub.txt').read_text(errors='replace').splitlines()[-25:]:
+              print('::error::' + line.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A'))
+          PYCODE
+          fi
+          exit "$status"
       - name: Analyze and summarize diagnostics
         shell: bash
         run: |
@@ -46,6 +61,31 @@ jobs:
           cat /tmp/analysis.txt
           if [ "$status" -ne 0 ]; then
             python3 tool/ci_diagnostics_summary.py analyze /tmp/analysis.txt
+          fi
+          exit "$status"
+  locked_sdk_probe:
+    name: Flutter 3.47.8 lockfile compatibility
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: '3.47.8'
+          cache: true
+      - name: Test SDK and locked dependencies
+        shell: bash
+        run: |
+          flutter --version
+          set +e
+          flutter pub get --enforce-lockfile > /tmp/probe.txt 2>&1
+          status=$?
+          cat /tmp/probe.txt
+          if [ "$status" -ne 0 ]; then
+            python3 - <<'PYCODE'
+          from pathlib import Path
+          for line in Path('/tmp/probe.txt').read_text(errors='replace').splitlines()[-25:]:
+              print('::error::' + line.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A'))
+          PYCODE
           fi
           exit "$status"
   containment_diagnostics:

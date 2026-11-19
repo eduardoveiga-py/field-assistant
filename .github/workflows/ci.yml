@@ -40,43 +40,10 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - name: Verify Version Metadata Matches Across Files
+      - name: Validate build and distribution metadata
         run: |
-          python3 - <<'PY'
-          import json, os, re, sys
-          from pathlib import Path
-
-          pubspec = Path("pubspec.yaml").read_text(encoding="utf-8")
-          m_pub = re.search(r"^version:\s*([0-9]+\.[0-9]+\.[0-9]+)\+([0-9]+)", pubspec, re.M)
-          assert m_pub, "pubspec.yaml version not found"
-          pub_ver, pub_build = m_pub.group(1), int(m_pub.group(2))
-
-          app_ver_src = Path("lib/core/app_version.dart").read_text(encoding="utf-8")
-          m_ver = re.search(r"static const String version\s*=\s*'([^']+)'", app_ver_src)
-          m_bld = re.search(r"static const int buildNumber\s*=\s*(\d+)", app_ver_src)
-          assert m_ver and m_bld, "AppVersion constants not found"
-          assert m_ver.group(1) == pub_ver, f"AppVersion.version ({m_ver.group(1)}) != pubspec ({pub_ver})"
-          assert int(m_bld.group(1)) == pub_build, f"AppVersion.buildNumber ({m_bld.group(1)}) != pubspec ({pub_build})"
-
-          apps_root = json.loads(Path("apps.json").read_text(encoding="utf-8"))
-          apps = apps_root["apps"][0]
-          assert apps["version"] == pub_ver, f"apps.json version ({apps['version']}) != pubspec ({pub_ver})"
-          for label, url_val in [
-              ("root iconURL", apps_root.get("iconURL", "")),
-              ("root headerURL", apps_root.get("headerURL", "")),
-              ("app iconURL", apps.get("iconURL", "")),
-              ("sourceURL", apps_root.get("sourceURL", "")),
-          ]:
-              assert "@master" not in url_val and "@main" not in url_val, (
-                  f"apps.json {label} points to mutable branch: {url_val}"
-              )
-
-          ref = os.environ.get("GITHUB_REF", "")
-          if ref.startswith("refs/tags/v"):
-              tag_ver = ref[len("refs/tags/v"):]
-              assert tag_ver == pub_ver, f"Git tag v{tag_ver} != pubspec {pub_ver}"
-          print(f"Version consistency OK: {pub_ver}+{pub_build}")
-          PY
+          python3 tool/verify_version_metadata.py
+          python3 -m unittest discover -s test/tool -p test_version_metadata.py
 
   verify_release_configuration:
     name: Verify release configuration

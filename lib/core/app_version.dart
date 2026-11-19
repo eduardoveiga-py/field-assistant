@@ -28,17 +28,18 @@ class AppVersion {
   static const String latestReleaseApiUrl =
       'https://api.github.com/repos/eduardoveiga-py/field-assistant/releases/latest';
 
-  /// URL oficial imutável do arquivo apps.json fixada na tag da versão atual (A10)
-  static const String pinnedAppsJsonUrl =
-      'https://cdn.jsdelivr.net/gh/eduardoveiga-py/field-assistant@v$version/apps.json';
-
-  /// URL de manifesto apps.json anexado diretamente à última GitHub Release
+  /// Manifesto da última release estável. Pode mudar quando outra release
+  /// legítima for publicada; nunca aponta para uma branch de desenvolvimento.
   static const String releaseAppsJsonUrl =
       'https://github.com/eduardoveiga-py/field-assistant/releases/latest/download/apps.json';
 
-  /// URL legada de fallback do apps.json (usada apenas se fontes imutáveis falharem)
-  static const String appsJsonUrl =
-      'https://cdn.jsdelivr.net/gh/eduardoveiga-py/field-assistant@master/apps.json';
+  /// Último manifesto estável conhecido com asset confirmado (fallback).
+  /// Não é a versão do build de desenvolvimento nem uma promessa de release.
+  static const String pinnedAppsJsonUrl =
+      'https://github.com/eduardoveiga-py/field-assistant/releases/download/v1.3.3/apps.json';
+
+  /// Alias preservado para consumidores existentes; não usa branch mutável.
+  static const String appsJsonUrl = releaseAppsJsonUrl;
 
   /// URL de download direto do IPA unsigned
   static const String latestIpaDownloadUrl =

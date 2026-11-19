@@ -780,16 +780,22 @@ void main() {
       ) as Map<String, dynamic>;
       expect(appsJson['sourceURL'], equals(AppVersion.releaseAppsJsonUrl));
       final firstApp = (appsJson['apps'] as List).first as Map<String, dynamic>;
+      final catalogVersion = firstApp['version'] as String;
+      expect(AppVersion.compare(catalogVersion, AppVersion.version), lessThanOrEqualTo(0));
       for (final key in ['iconURL', 'headerURL']) {
         final url = appsJson[key]?.toString() ?? '';
         expect(url, isNotEmpty);
         expect(url, isNot(contains('@master')));
-        expect(url, contains('@v${AppVersion.version}'));
+        expect(url, contains('@v$catalogVersion'));
       }
       final appIcon = firstApp['iconURL']?.toString() ?? '';
       expect(appIcon, isNotEmpty);
       expect(appIcon, isNot(contains('@master')));
-      expect(appIcon, contains('@v${AppVersion.version}'));
+      expect(appIcon, contains('@v$catalogVersion'));
+      expect(firstApp['downloadURL'], contains('/releases/download/v$catalogVersion/'));
+      expect(AppVersion.appsJsonUrl, isNot(contains('@master')));
+      expect(AppVersion.pinnedAppsJsonUrl, contains('/releases/download/'));
+      expect(AppVersion.pinnedAppsJsonUrl, isNot(contains('@master')));
     });
 
     testWidgets(

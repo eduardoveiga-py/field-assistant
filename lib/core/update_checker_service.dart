@@ -261,7 +261,7 @@ class UpdateCheckerService {
       );
     }
 
-    // 2. Fallback: consulta ao apps.json no jsDelivr CDN
+    // 2. Fallback: consulta aos manifestos de releases publicadas.
     bool appsJsonNetworkError = false;
     String? appsJsonErrorMsg;
 
@@ -422,7 +422,7 @@ class UpdateCheckerService {
         releaseDate: releaseDate,
         releaseNotes: body,
         downloadUrl: downloadUrl,
-        sourceCatalogUrl: AppVersion.pinnedAppsJsonUrl,
+        sourceCatalogUrl: AppVersion.releaseAppsJsonUrl,
         sizeBytes: sizeBytes,
         sha256: assetSha256,
       );
@@ -446,11 +446,10 @@ class UpdateCheckerService {
     const candidateUrls = [
       AppVersion.releaseAppsJsonUrl,
       AppVersion.pinnedAppsJsonUrl,
-      AppVersion.appsJsonUrl,
     ];
 
     http.Response? okResponse;
-    String usedUrl = AppVersion.pinnedAppsJsonUrl;
+    String usedUrl = AppVersion.releaseAppsJsonUrl;
     Object? lastNetworkError;
 
     for (final candidate in candidateUrls) {
