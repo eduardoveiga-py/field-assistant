@@ -93,7 +93,10 @@ void main() {
       );
 
       expect(
-        find.descendant(of: find.byType(NavigationRail), matching: find.text('Inbox')),
+        find.descendant(
+          of: find.byType(NavigationRail),
+          matching: find.text('Inbox'),
+        ),
         findsOneWidget,
       );
 
@@ -151,7 +154,10 @@ void main() {
       expect(find.byTooltip('Salvo Localmente'), findsOneWidget);
 
       expect(
-        find.descendant(of: find.byType(NavigationBar), matching: find.text('Inbox')),
+        find.descendant(
+          of: find.byType(NavigationBar),
+          matching: find.text('Inbox'),
+        ),
         findsOneWidget,
       );
 

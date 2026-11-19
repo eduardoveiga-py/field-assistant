@@ -1028,7 +1028,9 @@ class JwSmtpClient {
       if (part.trim().isEmpty) continue;
       final address = extractValidEmailAddress(part);
       if (address == null) {
-        throw const JwEmailException('Há um destinatário inválido. Confira Para, Cc e Cco.');
+        throw const JwEmailException(
+          'Há um destinatário inválido. Confira Para, Cc e Cco.',
+        );
       }
       recipients.add(address);
     }
@@ -1146,7 +1148,11 @@ class JwSmtpClient {
       final bccRecipients = parseRecipientsStrict(messageToSend.bcc);
       final unique = <String>{};
       recipients = [
-        for (final address in [...toRecipients, ...ccRecipients, ...bccRecipients])
+        for (final address in [
+          ...toRecipients,
+          ...ccRecipients,
+          ...bccRecipients,
+        ])
           if (unique.add(address.toLowerCase())) address,
       ];
       if (toRecipients.isEmpty) {
@@ -1367,7 +1373,11 @@ class JwSmtpClient {
         final payload = StringBuffer()
           ..write('From: <$senderAddr>\r\n')
           ..write('To: ${toRecipients.map((r) => '<$r>').join(', ')}\r\n')
-          ..write(ccRecipients.isEmpty ? '' : 'Cc: ${ccRecipients.map((r) => '<$r>').join(', ')}\r\n')
+          ..write(
+            ccRecipients.isEmpty
+                ? ''
+                : 'Cc: ${ccRecipients.map((r) => '<$r>').join(', ')}\r\n',
+          )
           ..write('Subject: ${encodeHeaderValue(messageToSend.subject)}\r\n')
           ..write('Date: ${_formatRfc2822Date(nowUtc)}\r\n')
           ..write('Message-ID: $messageId\r\n')
@@ -1607,11 +1617,14 @@ class JwEmailService {
             if (meta.containsKey('email')) {
               final emailMap = Map<String, dynamic>.from(meta['email'] as Map);
               var msg = JwEmailMessage.fromJson(emailMap);
-              const legacyNotice = '[Prévia experimental do Exchange: corpo pode estar incompleto; anexos não são importados. Consulte a mensagem original.]\n\n';
+              const legacyNotice =
+                  '[Prévia experimental do Exchange: corpo pode estar incompleto; anexos não são importados. Consulte a mensagem original.]\n\n';
               if (meta['exchangePreview'] == true &&
                   meta['bodyPrefixAdded'] != false &&
                   msg.bodyText.startsWith(legacyNotice)) {
-                msg = msg.copyWith(bodyText: msg.bodyText.substring(legacyNotice.length));
+                msg = msg.copyWith(
+                  bodyText: msg.bodyText.substring(legacyNotice.length),
+                );
               }
               if (hubOnly && !msg.isHubCommunication) continue;
               if (tagFilter != null &&

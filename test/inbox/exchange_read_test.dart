@@ -184,20 +184,30 @@ void main() {
   );
 
   test('Exchange body preserves literal text and hides only legacy injected prefix', () async {
-    const prefix = '[Prévia experimental do Exchange: corpo pode estar incompleto; anexos não são importados. Consulte a mensagem original.]\n\n';
+    const prefix =
+        '[Prévia experimental do Exchange: corpo pode estar incompleto; anexos não são importados. Consulte a mensagem original.]\n\n';
     final first = FakeExchange([
       page('k1'),
-      page('k2', emails: [const eas.EasEmail(serverId: 'm', body: '${prefix}texto original')]),
+      page(
+        'k2',
+        emails: [
+          const eas.EasEmail(serverId: 'm', body: '${prefix}texto original'),
+        ],
+      ),
     ]);
     await sync(first);
     final entry = (await db.select(db.inboxEntries).get()).single;
-    final service = JwEmailService(db: db, biometricAuth: BiometricAuthService());
+    final service = JwEmailService(
+      db: db,
+      biometricAuth: BiometricAuthService(),
+    );
     final fresh = (await service.watchRetainedEmails().first).single;
     expect(fresh.bodyText, '${prefix}texto original');
     final meta = jsonDecode(entry.metadata) as Map<String, dynamic>;
     expect(meta['bodyPrefixAdded'], false);
     meta.remove('bodyPrefixAdded');
-    (meta['email'] as Map<String, dynamic>)['bodyText'] = '$prefix${prefix}texto original';
+    (meta['email'] as Map<String, dynamic>)['bodyText'] =
+        '$prefix${prefix}texto original';
     final stored = jsonEncode(meta);
     await (db.update(db.inboxEntries)..where((t) => t.id.equals(entry.id)))
         .write(InboxEntriesCompanion(metadata: drift.Value(stored)));

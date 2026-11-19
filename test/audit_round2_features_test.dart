@@ -297,9 +297,11 @@ void main() {
         tags: const ['relatorio'],
       );
       await emailService.saveDraft(draft);
-      final persistedDraft = await (db.select(db.inboxEntries)
-        ..where((t) => t.id.equals('email_draft_draft-100'))).getSingle();
-      final draftMetadata = jsonDecode(persistedDraft.metadata) as Map<String, dynamic>;
+      final persistedDraft = await (db.select(
+        db.inboxEntries,
+      )..where((t) => t.id.equals('email_draft_draft-100'))).getSingle();
+      final draftMetadata =
+          jsonDecode(persistedDraft.metadata) as Map<String, dynamic>;
       expect((draftMetadata['email'] as Map)['bcc'], 'reservado@jw.org');
 
       final sent = await emailService.sendEmail(
@@ -317,7 +319,12 @@ void main() {
       expect(captured.receivedMailFrom, equals('<publicador@jw.org>'));
       expect(
         captured.receivedRcptTo,
-        equals(['<secretario@jw.org>', '<corpo@jw.org>', '<copia@jw.org>', '<reservado@jw.org>']),
+        equals([
+          '<secretario@jw.org>',
+          '<corpo@jw.org>',
+          '<copia@jw.org>',
+          '<reservado@jw.org>',
+        ]),
       );
       expect(captured.receivedDataPayload, contains('Cc: <copia@jw.org>'));
       expect(captured.receivedDataPayload, isNot(contains('reservado@jw.org')));
@@ -341,13 +348,28 @@ void main() {
     test('Rejects invalid Cco before opening an SMTP connection', () async {
       const smtp = JwSmtpClient();
       final message = JwEmailMessage(
-        id: 'bad', subject: 'Test', from: 'sender@example.org',
-        to: 'valid@example.org', bcc: 'broken-address',
-        date: DateTime.utc(2026), bodyText: 'body',
+        id: 'bad',
+        subject: 'Test',
+        from: 'sender@example.org',
+        to: 'valid@example.org',
+        bcc: 'broken-address',
+        date: DateTime.utc(2026),
+        bodyText: 'body',
       );
       await expectLater(
-        smtp.sendMail(host: 'invalid.invalid', username: 'sender@example.org', password: 'test', message: message),
-        throwsA(isA<JwEmailException>().having((e) => e.toString(), 'validation', contains('destinatário inválido'))),
+        smtp.sendMail(
+          host: 'invalid.invalid',
+          username: 'sender@example.org',
+          password: 'test',
+          message: message,
+        ),
+        throwsA(
+          isA<JwEmailException>().having(
+            (e) => e.toString(),
+            'validation',
+            contains('destinatário inválido'),
+          ),
+        ),
       );
     });
 
@@ -777,6 +799,12 @@ void main() {
           find.widgetWithText(TextField, 'Para (ex: corpo.anciaos@jw.org)'),
           'secretario@jw.org',
         );
+        final ccField = find.widgetWithText(TextField, 'Cc');
+        final bccField = find.widgetWithText(TextField, 'Cco');
+        await tester.ensureVisible(ccField);
+        await tester.enterText(ccField, 'copia@jw.org');
+        await tester.ensureVisible(bccField);
+        await tester.enterText(bccField, 'reservado@jw.org');
         await tester.enterText(
           find.widgetWithText(TextField, 'Assunto *'),
           'Relatório UI SMTP',
@@ -860,7 +888,9 @@ void main() {
         final captured = capturedSession! as _CapturedSmtpSession;
         await tester.pumpAndSettle();
         expect(captured.receivedMailFrom, equals('<publicador@jw.org>'));
-        expect(captured.receivedRcptTo, equals(['<secretario@jw.org>']));
+        expect(captured.receivedRcptTo, equals(['<secretario@jw.org>', '<copia@jw.org>', '<reservado@jw.org>']));
+        expect(captured.receivedDataPayload, contains('Cc: <copia@jw.org>'));
+        expect(captured.receivedDataPayload, isNot(contains('reservado@jw.org')));
         expect(
           captured.receivedDataPayload,
           isNotNull,

@@ -2626,6 +2626,10 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                         'Para: ${msg.to}',
                         style: const TextStyle(fontSize: 12),
                       ),
+                      if (msg.cc.isNotEmpty)
+                        Text('Cc: ${msg.cc}', style: const TextStyle(fontSize: 12)),
+                      if (msg.bcc.isNotEmpty)
+                        Text('Cco: ${msg.bcc}', style: const TextStyle(fontSize: 12)),
                       Text(
                         'Data: ${msg.date.day}/${msg.date.month}/${msg.date.year} às ${msg.date.hour}:${msg.date.minute.toString().padLeft(2, '0')}',
                         style: const TextStyle(fontSize: 12),
@@ -2791,7 +2795,14 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (ctx) => ManagedTextControllers(
-        initialTexts: [initTo, initSubject, initBody, initTags, initCc, initBcc],
+        initialTexts: [
+          initTo,
+          initSubject,
+          initBody,
+          initTags,
+          initCc,
+          initBcc,
+        ],
         builder: (ctx, ctrls) {
           final toCtrl = ctrls[0];
           final subjectCtrl = ctrls[1];
@@ -2892,14 +2903,20 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                       TextField(
                         controller: ccCtrl,
                         enabled: !isSending,
-                        decoration: const InputDecoration(labelText: 'Cc', isDense: true),
+                        decoration: const InputDecoration(
+                          labelText: 'Cc',
+                          isDense: true,
+                        ),
                         keyboardType: TextInputType.emailAddress,
                       ),
                       const SizedBox(height: 10),
                       TextField(
                         controller: bccCtrl,
                         enabled: !isSending,
-                        decoration: const InputDecoration(labelText: 'Cco', isDense: true),
+                        decoration: const InputDecoration(
+                          labelText: 'Cco',
+                          isDense: true,
+                        ),
                         keyboardType: TextInputType.emailAddress,
                       ),
                       const SizedBox(height: 10),
@@ -2922,7 +2939,10 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                         ),
                       ),
                       const SizedBox(height: 12),
-                      const Text('Mensagem em texto simples', style: TextStyle(fontSize: 12)),
+                      const Text(
+                        'Mensagem em texto simples',
+                        style: TextStyle(fontSize: 12),
+                      ),
                       const SizedBox(height: 6),
                       TextField(
                         controller: contentCtrl,
@@ -3035,8 +3055,12 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                     final bodyText = contentCtrl.text.trim();
                                     try {
                                       JwSmtpClient.parseRecipientsStrict(to);
-                                      JwSmtpClient.parseRecipientsStrict(ccCtrl.text);
-                                      JwSmtpClient.parseRecipientsStrict(bccCtrl.text);
+                                      JwSmtpClient.parseRecipientsStrict(
+                                        ccCtrl.text,
+                                      );
+                                      JwSmtpClient.parseRecipientsStrict(
+                                        bccCtrl.text,
+                                      );
                                     } on JwEmailException catch (error) {
                                       setSheetState(() {
                                         inlineError = error.toString();
