@@ -380,6 +380,27 @@ void main() {
     },
   );
 
+  test('renomear ou remover pasta da lista não apaga snapshots nem SyncKeys', () async {
+    const original = [
+      eas.EasFolder(serverId: 'inbox', parentId: '0', displayName: 'Entrada', type: eas.EasFolderType.defaultInbox),
+      eas.EasFolder(serverId: 'sent', parentId: '0', displayName: 'Enviados', type: eas.EasFolderType.defaultSentItems),
+      eas.EasFolder(serverId: 'draft', parentId: '0', displayName: 'Rascunhos', type: eas.EasFolderType.defaultDrafts),
+    ];
+    Future<void> run(List<eas.EasFolder> list, bool messages) => ExchangeReadService(db).sync(session: CatalogExchange(list, message: messages), host: 'mail.example.org', account: 'first', deviceId: 'device', allMailFolders: true).then((_) {});
+    await run(original, true);
+    final before = await db.select(db.inboxEntries).get();
+    final keysBefore = (await db.select(db.appKvStore).get()).where((r) => r.key.startsWith('eas_sync_')).map((r) => r.key).toSet();
+    const changed = [
+      eas.EasFolder(serverId: 'inbox', parentId: '0', displayName: 'Entrada', type: eas.EasFolderType.defaultInbox),
+      eas.EasFolder(serverId: 'sent', parentId: '0', displayName: 'Enviados renomeados', type: eas.EasFolderType.defaultSentItems),
+    ];
+    await run(changed, false);
+    expect((await ExchangeFolderCatalog.watch(db, 'mail.example.org', 'first').first)!.folders.map((f) => f.name), ['Entrada', 'Enviados renomeados']);
+    expect((await db.select(db.inboxEntries).get()).map((r) => r.metadata), before.map((r) => r.metadata));
+    final keysAfter = (await db.select(db.appKvStore).get()).where((r) => r.key.startsWith('eas_sync_')).map((r) => r.key).toSet();
+    expect(keysAfter, keysBefore);
+  });
+
   test(
     'catálogo válido é salvo mesmo se leitura das mensagens falhar',
     () async {
@@ -630,6 +651,18 @@ void main() {
       session.close();
     },
   );
+
+  test('FolderSync inicial recusa contagem divergente', () async {
+    eas.WbxmlElement node(String tag, {String? text, List<eas.WbxmlElement>? children}) => eas.WbxmlElement(namespace: 'FolderHierarchy', tag: tag, text: text, children: children, codePageIndex: 7);
+    final response = eas.WbxmlEncoder().encode(eas.WbxmlDocument(root: node('FolderSync', children: [
+      node('Status', text: '1'), node('SyncKey', text: '1'),
+      node('Changes', children: [node('Count', text: '2'), node('Add', children: [node('ServerId', text: 'inbox'), node('ParentId', text: '0'), node('DisplayName', text: 'Inbox'), node('Type', text: '2')])]),
+    ])));
+    final client = MockClient((_) async => http.Response.bytes(response, 200));
+    final session = ExchangeProtocolSession(host: 'mail.example.org', username: 'a', password: 'test', deviceId: 'd', httpClient: client);
+    await expectLater(session.mailFolders(), throwsA(isA<ExchangeException>()));
+    session.close();
+  });
 
   test(
     'pedido de política é recusado sem confirmação de conformidade',
