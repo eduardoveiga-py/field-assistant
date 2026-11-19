@@ -154,12 +154,20 @@ jobs:
           if [ "$SUITE" = maps ]; then
             flutter test --concurrency=1 --reporter expanded test/territory/map_navigation_regression_test.dart test/territory/offline_parent_cache_test.dart test/territory/tile_cache_race_test.dart test/territory/location_picker_safety_test.dart test/territory/map_safety_regression_test.dart test/territory/mbtiles_service_real_test.dart test/tile_cache_test.dart test/layout_fixes_and_map_highlight_test.dart > /tmp/tests.txt 2>&1
           else
-            flutter test --reporter expanded > /tmp/tests.txt 2>&1
+            # Bound the full suite and preserve its last output if it hangs.
+            timeout --kill-after=30s 20m flutter test --reporter expanded > /tmp/tests.txt 2>&1
           fi
           status=$?
           cat /tmp/tests.txt
           if [ "$status" -ne 0 ]; then
             python3 tool/ci_diagnostics_summary.py test /tmp/tests.txt
+            if [ "$status" -eq 124 ] || [ "$status" -eq 137 ]; then
+              python3 - <<'PYCODE'
+          from pathlib import Path
+          lines = Path('/tmp/tests.txt').read_text(errors='replace').splitlines()[-30:]
+          print('::error::Flutter test timed out; tail: ' + '%0A'.join(lines).replace('%', '%25'))
+          PYCODE
+            fi
           fi
           exit "$status"
   build_windows_check:

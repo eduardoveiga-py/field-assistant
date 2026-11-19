@@ -141,11 +141,14 @@ jobs:
       - name: Run Automated Tests
         run: |
           set +e
-          flutter test --coverage --reporter expanded > /tmp/flutter-tests.txt 2>&1
+          timeout --kill-after=30s 20m flutter test --coverage --reporter expanded > /tmp/flutter-tests.txt 2>&1
           status=$?
           cat /tmp/flutter-tests.txt
           if [ "$status" -ne 0 ]; then
             python3 -c 'from pathlib import Path; lines=Path("/tmp/flutter-tests.txt").read_text(errors="replace").splitlines(); hits=[i for i,line in enumerate(lines) if ("[E]" in line or "EXCEPTION" in line or "Expected:" in line or "Actual:" in line or "Some tests failed" in line or "timed out" in line.lower())]; [print("::error::" + "%0A".join(lines[max(0,i-6):i+14]).replace("%", "%25")) for i in hits[:6]]'
+            if [ "$status" -eq 124 ] || [ "$status" -eq 137 ]; then
+              python3 -c 'from pathlib import Path; lines=Path("/tmp/flutter-tests.txt").read_text(errors="replace").splitlines()[-30:]; print("::error::Flutter test timed out; tail: " + "%0A".join(lines).replace("%", "%25"))'
+            fi
           fi
           exit "$status"
 
