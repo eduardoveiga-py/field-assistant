@@ -29,6 +29,9 @@ class JwEmailMessage {
   final int? remoteUid;
   final String? folderId;
   final String? folderName;
+  /// Account-scoped identifier for newer Exchange snapshots. Old snapshots
+  /// have no reliable account attribution and remain explicitly unscoped.
+  final String? mailboxScope;
   final String subject;
   final String from;
   final String to;
@@ -53,6 +56,7 @@ class JwEmailMessage {
     this.remoteUid,
     this.folderId,
     this.folderName,
+    this.mailboxScope,
     required this.subject,
     required this.from,
     required this.to,
@@ -76,6 +80,7 @@ class JwEmailMessage {
     'remoteUid': remoteUid,
     'folderId': folderId,
     'folderName': folderName,
+    'mailboxScope': mailboxScope,
     'subject': subject,
     'from': from,
     'to': to,
@@ -99,6 +104,7 @@ class JwEmailMessage {
     remoteUid: json['remoteUid'] as int?,
     folderId: json['folderId'] as String?,
     folderName: json['folderName'] as String?,
+    mailboxScope: json['mailboxScope'] as String?,
     subject: json['subject'] as String? ?? '(Sem Assunto)',
     from: json['from'] as String? ?? 'jw@jw.org',
     to: json['to'] as String? ?? '',
@@ -130,6 +136,7 @@ class JwEmailMessage {
     int? remoteUid,
     String? folderId,
     String? folderName,
+    String? mailboxScope,
     String? subject,
     String? from,
     String? to,
@@ -152,6 +159,7 @@ class JwEmailMessage {
       remoteUid: remoteUid ?? this.remoteUid,
       folderId: folderId ?? this.folderId,
       folderName: folderName ?? this.folderName,
+      mailboxScope: mailboxScope ?? this.mailboxScope,
       subject: subject ?? this.subject,
       from: from ?? this.from,
       to: to ?? this.to,

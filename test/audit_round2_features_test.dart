@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:drift/drift.dart' show driftRuntimeOptions;
+import 'package:drift/drift.dart' show driftRuntimeOptions, Value;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,6 +12,7 @@ import 'package:ministerio_pessoal/core/biometric_auth_service.dart';
 import 'package:ministerio_pessoal/database/app_database.dart';
 import 'package:ministerio_pessoal/database/repository.dart';
 import 'package:ministerio_pessoal/inbox/jw_email_service.dart';
+import 'package:ministerio_pessoal/inbox/exchange_service.dart';
 import 'package:ministerio_pessoal/sync/supabase_sync_service.dart';
 import 'package:ministerio_pessoal/territory/geolocation_helper.dart';
 import 'package:ministerio_pessoal/territory/mbtiles/mbtiles_native.dart';
@@ -1136,6 +1137,69 @@ void main() {
         await tester.pump(const Duration(milliseconds: 100));
       },
     );
+
+    testWidgets('Exchange folder selector includes empty folders and keeps accounts distinct', (tester) async {
+      tester.view.physicalSize = const Size(1024, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final db = AppDatabase.forTesting(NativeDatabase.memory());
+      addTearDown(db.close);
+      final bio = BiometricAuthService();
+      const host = 'mail.example.org';
+      const a = 'first@example.org';
+      const b = 'second@example.org';
+      final scopeA = ExchangeFolderCatalog.scopeFor(host, a);
+      final scopeB = ExchangeFolderCatalog.scopeFor(host, b);
+      await tester.runAsync(() async {
+        await bio.setPin('1234');
+        Future<void> kv(String key, String value) async {
+          await db.into(db.appKvStore).insertOnConflictUpdate(AppKvStoreCompanion.insert(key: key, value: value));
+        }
+        await kv('jw_mail_protocol', 'exchange');
+        await kv('jw_eas_host', host);
+        await kv('jw_eas_email', a);
+        await kv(ExchangeFolderCatalog.keyFor(host, a), jsonEncode({'version': 1, 'folders': [{'id': 'same', 'name': 'Enviados'}, {'id': 'drafts', 'name': 'Rascunhos vazios'}]}));
+        await kv(ExchangeFolderCatalog.keyFor(host, b), jsonEncode({'version': 1, 'folders': [{'id': 'same', 'name': 'Outra pasta'}]}));
+        Future<void> entry(String id, String subject, String? scope) async {
+          final msg = JwEmailMessage(id: id, subject: subject, from: 'a@example.org', to: 'b@example.org', date: DateTime.utc(2026), bodyText: 'Corpo', folderId: 'same', folderName: 'Enviados', mailboxScope: scope);
+          final now = DateTime.now();
+          await db.into(db.inboxEntries).insert(InboxEntriesCompanion.insert(id: 'email_$id', content: subject, sourceType: const Value('email'), capturedAt: now, metadata: Value(jsonEncode({'email': msg.toJson()})), createdAt: now, updatedAt: now));
+        }
+        await entry('a', 'Mensagem da conta A', scopeA);
+        await entry('b', 'Mensagem da conta B', scopeB);
+        await entry('old', 'Mensagem antiga sem conta', null);
+      });
+      final service = JwEmailService(db: db, biometricAuth: bio);
+      await tester.pumpWidget(ProviderScope(overrides: [databaseProvider.overrideWithValue(db), biometricAuthServiceProvider.overrideWithValue(bio), jwEmailServiceProvider.overrideWithValue(service)], child: const MaterialApp(home: InboxScreen())));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('JW Mail'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byType(DropdownButton<String>));
+      await tester.pumpAndSettle();
+      expect(find.text('Rascunhos vazios').last, findsOneWidget);
+      await tester.tap(find.text('Rascunhos vazios').last);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Nenhuma cópia local nesta pasta'), findsOneWidget);
+      await tester.tap(find.byType(DropdownButton<String>));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Enviados').last);
+      await tester.pumpAndSettle();
+      expect(find.text('Mensagem da conta A'), findsOneWidget);
+      expect(find.text('Mensagem da conta B'), findsNothing);
+      expect(find.text('Mensagem antiga sem conta'), findsNothing);
+      await tester.runAsync(() => db.into(db.appKvStore).insertOnConflictUpdate(AppKvStoreCompanion.insert(key: 'jw_eas_email', value: b)));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byType(DropdownButton<String>));
+      await tester.pumpAndSettle();
+      expect(find.text('Outra pasta').last, findsOneWidget);
+      await tester.tap(find.text('Outra pasta').last);
+      await tester.pumpAndSettle();
+      expect(find.text('Mensagem da conta B'), findsOneWidget);
+      expect(find.text('Mensagem da conta A'), findsNothing);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(milliseconds: 100));
+    });
 
     testWidgets(
       'SettingsScreen exposes SMTP fields and validates runtime Supabase dialog',

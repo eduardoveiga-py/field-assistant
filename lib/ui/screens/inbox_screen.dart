@@ -1970,143 +1970,112 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
         ),
         const Divider(height: 1),
 
-        // Lista Reativa de E-mails
+        // The catalog belongs only to the currently configured Exchange account.
         Expanded(
-          child: StreamBuilder<List<JwEmailMessage>>(
-            stream: emailService.watchRetainedEmails(
-              hubOnly: false,
-              tagFilter: _selectedEmailTag,
-              searchQuery: _emailSearchController.text,
-            ),
-            builder: (ctx, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              final emails = snapshot.data ?? [];
-              if (emails.isEmpty) {
-                return Center(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.mark_email_unread_outlined,
-                          size: 52,
-                          color: Colors.grey.shade400,
-                        ),
-                        const SizedBox(height: 14),
-                        const Text(
-                          'Nenhuma correspondência teocrática retida',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Configure Exchange ActiveSync ou IMAP em Ajustes e toque em Sincronizar Agora. Exchange salva apenas prévias experimentais, sem anexos; mantenha o correio oficial e seu backup.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.grey,
-                            height: 1.4,
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        Wrap(
-                          spacing: 12,
-                          runSpacing: 8,
-                          alignment: WrapAlignment.center,
-                          children: [
-                            OutlinedButton.icon(
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const SettingsScreen(),
-                                  ),
-                                );
-                              },
-                              icon: const Icon(
-                                Icons.settings_outlined,
-                                size: 18,
-                              ),
-                              label: const Text('Configurar E-mail'),
-                            ),
-                            FilledButton.icon(
-                              onPressed: _syncEmails,
-                              icon: const Icon(Icons.sync, size: 18),
-                              label: const Text('Sincronizar Agora'),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
+          child: StreamBuilder<List<AppKvEntry>>(
+            stream: (ref.read(repositoryProvider).db.select(ref.read(repositoryProvider).db.appKvStore)
+              ..where((t) => t.key.isIn(['jw_mail_protocol', 'jw_eas_host', 'jw_eas_email'])))
+                .watch(),
+            builder: (ctx, configSnapshot) {
+              final config = {for (final row in configSnapshot.data ?? <AppKvEntry>[]) row.key: row.value};
+              final host = config['jw_eas_host']?.trim() ?? '';
+              final account = config['jw_eas_email']?.trim() ?? '';
+              final configured = config['jw_mail_protocol'] == 'exchange' && host.isNotEmpty && account.isNotEmpty;
+              final scope = configured ? ExchangeFolderCatalog.scopeFor(host, account) : '';
+              return StreamBuilder<ExchangeFolderCatalog?>(
+                // A new key prevents StreamBuilder retaining a different account's last data.
+                key: ValueKey(scope),
+                stream: configured
+                    ? ExchangeFolderCatalog.watch(ref.read(repositoryProvider).db, host, account)
+                    : Stream<ExchangeFolderCatalog?>.value(null),
+                builder: (ctx, folderSnapshot) => StreamBuilder<List<JwEmailMessage>>(
+                  stream: emailService.watchRetainedEmails(
+                    hubOnly: false,
+                    tagFilter: _selectedEmailTag,
+                    searchQuery: _emailSearchController.text,
                   ),
-                );
-              }
-
-              final folders = <String, String>{};
-              for (final email in emails) {
-                if (email.folderId != null) {
-                  folders[email.folderId!] =
-                      email.folderName ?? 'Pasta Exchange';
-                }
-              }
-              final selected = folders.containsKey(_selectedEmailFolder)
-                  ? _selectedEmailFolder
-                  : null;
-              final visible = selected == null
-                  ? emails
-                  : emails
-                        .where((email) => email.folderId == selected)
-                        .toList();
-              return Column(
-                children: [
-                  if (folders.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: DropdownButton<String>(
-                        isExpanded: true,
-                        value: selected ?? '',
-                        items: [
-                          const DropdownMenuItem(
-                            value: '',
-                            child: Text('Todas as pastas'),
-                          ),
-                          ...folders.entries.map(
-                            (e) => DropdownMenuItem(
-                              value: e.key,
-                              child: Text(
-                                e.value,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ),
-                        ],
-                        onChanged: (value) => setState(
-                          () =>
-                              _selectedEmailFolder = value == '' ? null : value,
-                        ),
-                      ),
-                    ),
-                  Expanded(
-                    child: ListView.separated(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                      itemCount: visible.length,
-                      separatorBuilder: (c, i) => const SizedBox(height: 10),
-                      itemBuilder: (c, i) =>
-                          _buildEmailCard(visible[i], isDark, isHub: false),
-                    ),
-                  ),
-                ],
+                  builder: (ctx, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting || configSnapshot.connectionState == ConnectionState.waiting || folderSnapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    return _buildRetainedEmailList(snapshot.data ?? [], folderSnapshot.data, isDark);
+                  },
+                ),
               );
             },
           ),
+        ),
+      ],
+    );
+  }
+
+  // JSON tuples avoid collisions between opaque server IDs and account scopes.
+  String _emailFolderKey(String? scope, String id) => jsonEncode([scope ?? '', id]);
+
+  Widget _buildRetainedEmailList(List<JwEmailMessage> emails, ExchangeFolderCatalog? catalog, bool isDark) {
+    final folders = <String, String>{};
+    for (final folder in catalog?.folders ?? <ExchangeFolderInfo>[]) {
+      folders[_emailFolderKey(catalog!.scope, folder.id)] = folder.name.isEmpty ? 'Pasta Exchange' : folder.name;
+    }
+    for (final email in emails) {
+      if (email.folderId == null) continue;
+      final key = _emailFolderKey(email.mailboxScope, email.folderId!);
+      folders.putIfAbsent(key, () {
+        final name = email.folderName ?? 'Pasta Exchange';
+        if (email.mailboxScope == null) return '$name (cópias antigas: conta não identificada)';
+        if (email.mailboxScope != catalog?.scope) return '$name (outra conta ou catálogo indisponível)';
+        return name;
+      });
+    }
+    final selected = folders.containsKey(_selectedEmailFolder) ? _selectedEmailFolder : null;
+    final visible = selected == null ? emails : emails.where((email) => email.folderId != null && _emailFolderKey(email.mailboxScope, email.folderId!) == selected).toList();
+
+    return Column(
+      children: [
+        if (folders.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                DropdownButton<String>(
+                  isExpanded: true,
+                  value: selected ?? '',
+                  items: [
+                    const DropdownMenuItem(value: '', child: Text('Todas as pastas')),
+                    ...folders.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value, overflow: TextOverflow.ellipsis))),
+                  ],
+                  onChanged: (value) => setState(() => _selectedEmailFolder = value == '' ? null : value),
+                ),
+                if (catalog != null)
+                  const Text('Lista da última consulta Exchange; conteúdo e anexos podem estar incompletos.', style: TextStyle(fontSize: 11)),
+              ],
+            ),
+          ),
+        Expanded(
+          child: visible.isEmpty
+              ? Center(child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    Text(selected != null
+                        ? 'Nenhuma cópia local nesta pasta para os filtros atuais.'
+                        : 'Nenhuma mensagem encontrada. Configure o correio e sincronize; cópias Exchange podem ser parciais.',
+                      textAlign: TextAlign.center),
+                    if (selected == null && emails.isEmpty) ...[
+                      const SizedBox(height: 16),
+                      Wrap(spacing: 12, runSpacing: 8, alignment: WrapAlignment.center, children: [
+                        OutlinedButton.icon(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())), icon: const Icon(Icons.settings_outlined), label: const Text('Configurar E-mail')),
+                        FilledButton.icon(onPressed: _isSyncingEmails ? null : _syncEmails, icon: const Icon(Icons.sync), label: const Text('Sincronizar Agora')),
+                      ]),
+                    ],
+                  ]),
+                ))
+              : ListView.separated(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  itemCount: visible.length,
+                  separatorBuilder: (c, i) => const SizedBox(height: 10),
+                  itemBuilder: (c, i) => _buildEmailCard(visible[i], isDark, isHub: false),
+                ),
         ),
       ],
     );

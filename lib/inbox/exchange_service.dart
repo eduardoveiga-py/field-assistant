@@ -96,9 +96,14 @@ class ExchangeProtocolSession implements ExchangeSession {
         'Exchange recusou a listagem de pastas (código ${folders.status}).',
       );
     }
-    final result = folders.addedFolders
-        .where((f) => f.isMailFolder && f.serverId.isNotEmpty)
-        .toList();
+    if (folders.syncKey.isEmpty || folders.syncKey == '0' ||
+        folders.updatedFolders.isNotEmpty || folders.deletedFolderIds.isNotEmpty ||
+        (folders.count != null && folders.count != folders.addedFolders.length) ||
+        folders.addedFolders.any((f) => f.serverId.isEmpty || f.serverId.length > 64) ||
+        folders.addedFolders.map((f) => f.serverId).toSet().length != folders.addedFolders.length) {
+      throw const ExchangeException('Exchange retornou uma listagem de pastas incompleta ou inválida.');
+    }
+    final result = folders.addedFolders.where((f) => f.isMailFolder).toList();
     if (result.where((f) => f.type == eas.EasFolderType.defaultInbox).length !=
             1 ||
         result.map((f) => f.serverId).toSet().length != result.length) {
@@ -142,6 +147,49 @@ class ExchangeProtocolSession implements ExchangeSession {
 String _digest(Object value) =>
     crypto.sha256.convert(utf8.encode(jsonEncode(value))).toString();
 
+/// Last successfully discovered mail folders. Local cache, not a backup.
+class ExchangeFolderCatalog {
+  final String scope;
+  final List<ExchangeFolderInfo> folders;
+  const ExchangeFolderCatalog(this.scope, this.folders);
+
+  static String scopeFor(String host, String account) =>
+      _digest([host.trim().toLowerCase(), account.trim()]);
+
+  static String keyFor(String host, String account) =>
+      'eas_folders_${scopeFor(host, account)}';
+
+  static Stream<ExchangeFolderCatalog?> watch(AppDatabase db, String host, String account) {
+    final scope = scopeFor(host, account);
+    final key = keyFor(host, account);
+    return (db.select(db.appKvStore)..where((t) => t.key.equals(key)))
+        .watchSingleOrNull().map((row) {
+      if (row == null) return null;
+      try {
+        final data = jsonDecode(row.value);
+        if (data is! Map || data['version'] != 1 || data['folders'] is! List) return null;
+        final folders = <ExchangeFolderInfo>[];
+        final seen = <String>{};
+        for (final entry in data['folders'] as List) {
+          if (entry is! Map || entry['id'] is! String || entry['name'] is! String) return null;
+          final id = entry['id'] as String;
+          if (id.isEmpty || id.length > 64 || !seen.add(id)) return null;
+          folders.add(ExchangeFolderInfo(id, entry['name'] as String));
+        }
+        return ExchangeFolderCatalog(scope, folders);
+      } catch (_) {
+        return null;
+      }
+    });
+  }
+}
+
+class ExchangeFolderInfo {
+  final String id;
+  final String name;
+  const ExchangeFolderInfo(this.id, this.name);
+}
+
 class ExchangeReadResult {
   final int saved;
   final bool moreAvailable;
@@ -180,10 +228,28 @@ class ExchangeReadService {
               ),
             ];
       if (folders.isEmpty ||
-          folders.any((f) => !f.isMailFolder || f.serverId.isEmpty) ||
+          folders.where((f) => f.type == eas.EasFolderType.defaultInbox).length != 1 ||
+          folders.any((f) => !f.isMailFolder || f.serverId.isEmpty || f.serverId.length > 64) ||
           folders.map((f) => f.serverId).toSet().length != folders.length) {
         throw const ExchangeException(
           'Exchange retornou pastas de correio inválidas; nada foi apagado.',
+        );
+      }
+      // Only allMailFolders is an actual hierarchy discovery. Do not replace
+      // a complete cached hierarchy with the single-folder compatibility path.
+      if (allMailFolders) {
+        final now = DateTime.now();
+        await db.into(db.appKvStore).insertOnConflictUpdate(
+          AppKvStoreCompanion.insert(
+            key: ExchangeFolderCatalog.keyFor(host, account),
+            value: jsonEncode({
+              'version': 1,
+              'folders': [
+                for (final f in folders) {'id': f.serverId, 'name': f.displayName},
+              ],
+            }),
+            updatedAt: drift.Value(now),
+          ),
         );
       }
       var totalSaved = 0;
@@ -316,6 +382,7 @@ class ExchangeReadService {
               final message = JwEmailMessage(
                 folderId: folder,
                 folderName: mailFolder.displayName,
+                mailboxScope: ExchangeFolderCatalog.scopeFor(host, account),
                 id: id.substring('email_'.length),
                 subject: item.subject.isEmpty ? '(Sem assunto)' : item.subject,
                 from: item.from,
