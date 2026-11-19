@@ -1133,6 +1133,7 @@ void main() {
         expect(find.text('Texto a preservar'), findsOneWidget);
         expect(find.text('Salvar Rascunho'), findsOneWidget);
         await tester.pumpWidget(const SizedBox());
+        await tester.pump(const Duration(milliseconds: 100));
       },
     );
 
