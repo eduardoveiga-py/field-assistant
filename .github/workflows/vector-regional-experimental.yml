@@ -2,7 +2,7 @@ name: Experimental regional vector extraction
 on:
   push:
     branches: ['arena/**']
-    paths: ['tool/map/extract_regional_pmtiles.py', 'tool/map/requirements-extraction.txt', 'test/tool/test_regional_pmtiles.py', '.github/workflows/vector-regional-experimental.yml']
+    paths: ['tool/map/extract_regional_pmtiles.py', 'tool/map/requirements-extraction.txt', 'test/tool/test_regional_pmtiles.py', 'test/territory/map_engine/real_pmtiles_integration_test.dart', 'lib/territory/packages/offline_map_package_manager.dart', '.github/workflows/vector-regional-experimental.yml']
   workflow_dispatch:
 permissions:
   contents: read

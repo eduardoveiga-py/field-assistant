@@ -1179,7 +1179,7 @@ void main() {
         expect(OfflineMapPackageManager.isValidRange(500, 200), isFalse);
       });
 
-      test('TC-F12-B03: Download cancellation mid-download cleans up partial .tmp files', () async {
+      test('TC-F12-B03: Transport interruption preserves partial .tmp files for resume', () async {
         final payload = createValidPmtilesHeader('A' * 2048);
         final sha = crypto.sha256.convert(payload).toString();
 
@@ -1234,7 +1234,7 @@ void main() {
         final targetFile = await manager.getPackageFile(manifest);
         final stagingFile = File('${targetFile.path}.tmp');
 
-        expect(stagingFile.existsSync(), isFalse);
+        expect(stagingFile.existsSync(), isTrue);
         expect(targetFile.existsSync(), isFalse);
         expect(
           manager.currentStates[manifest.id]?.status,

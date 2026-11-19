@@ -22,6 +22,7 @@ typedef OfflineMapPackageMetadata = OfflineMapPackageManifest;
 /// Token cooperativo para cancelamento de download e purga de arquivos temporários.
 class CancellationToken {
   bool _isCancelled = false;
+  bool _purgeOnCancel = true;
   final List<void Function()> _listeners = [];
 
   bool get isCancelled => _isCancelled;
@@ -123,6 +124,10 @@ class PackageDownloadException extends HttpException {
       'PackageDownloadException: $message (status: $statusCode)';
 }
 
+class DownloadInterruptedException extends PackageDownloadException {
+  DownloadInterruptedException(String message) : super(message);
+}
+
 class RangeNotSatisfiableException extends PackageDownloadException {
   final int requestedStart;
   final int remoteFileSize;
@@ -190,6 +195,7 @@ class OfflineMapPackageManager {
 
   final Map<String, PackageState> _states = {};
   final Map<String, CancellationToken> _activeTokens = {};
+  final Set<String> _installingIds = {};
   final StreamController<Map<String, PackageState>> _statesController =
       StreamController<Map<String, PackageState>>.broadcast();
 
@@ -251,10 +257,27 @@ class OfflineMapPackageManager {
     final dir = await getStorageDirectory();
 
     for (final manifest in _catalog) {
+      if (_installingIds.contains(manifest.id)) continue;
       final ext = manifest.format == OfflineMapFormat.pmtiles
           ? 'pmtiles'
           : 'mbtiles';
       final file = File('${dir.path}/${manifest.id}.$ext');
+      final backup = File('${file.path}.bak');
+      if (!file.existsSync() && backup.existsSync()) {
+        // Restore the only known copy after interruption between renames.
+        // Registration still requires validation against the current manifest.
+        try {
+          await backup.rename(file.path);
+        } on FileSystemException {
+          _states[manifest.id] = PackageState(
+            manifest: manifest,
+            status: PackageDownloadStatus.failed,
+            localFile: backup,
+            errorMessage: 'Não foi possível restaurar a cópia anterior do pacote.',
+          );
+          continue;
+        }
+      }
 
       if (!file.existsSync()) {
         if (manifest.format == OfflineMapFormat.pmtiles) {
@@ -342,6 +365,27 @@ class OfflineMapPackageManager {
     CancellationToken? cancellationToken,
   }) async {
     manifest.validate();
+    if (!_installingIds.add(manifest.id)) {
+      throw StateError('Já existe uma instalação em andamento para ${manifest.id}.');
+    }
+    try {
+      return await _downloadAndInstallLocked(
+        manifest: manifest,
+        onProgress: onProgress,
+        allowResume: allowResume,
+        cancellationToken: cancellationToken,
+      );
+    } finally {
+      _installingIds.remove(manifest.id);
+    }
+  }
+
+  Future<PackageState> _downloadAndInstallLocked({
+    required OfflineMapPackageMetadata manifest,
+    void Function(double progress)? onProgress,
+    required bool allowResume,
+    CancellationToken? cancellationToken,
+  }) async {
     final finalFile = await getPackageFile(manifest);
     final stagingFile = File('${finalFile.path}.tmp');
     final backupFile = File('${finalFile.path}.bak');
@@ -387,6 +431,10 @@ class OfflineMapPackageManager {
       }
 
       final response = await _httpClient.send(request);
+      if (token.isCancelled) {
+        await response.stream.listen(null).cancel();
+        throw DownloadCancelledException(manifest.id);
+      }
 
       // Tratamento RFC 7233: 416 Range Not Satisfiable
       if (response.statusCode == 416) {
@@ -411,6 +459,21 @@ class OfflineMapPackageManager {
       }
 
       final isPartial = response.statusCode == 206;
+      if (isPartial) {
+        final contentRange = response.headers['content-range'] ?? '';
+        final match = RegExp(r'^bytes (\d+)-(\d+)/(\d+)$', caseSensitive: false)
+            .firstMatch(contentRange);
+        final start = match == null ? null : int.tryParse(match[1]!);
+        final end = match == null ? null : int.tryParse(match[2]!);
+        final length = match == null ? null : int.tryParse(match[3]!);
+        if (existingBytes == 0 || start != existingBytes ||
+            end != manifest.sizeBytes - 1 || length != manifest.sizeBytes) {
+          await response.stream.listen(null).cancel();
+          throw InvalidPackageFormatException(
+            'Content-Range inválido para a retomada do pacote.',
+          );
+        }
+      }
       final fileMode = (isPartial && existingBytes > 0)
           ? FileMode.append
           : FileMode.write;
@@ -426,12 +489,7 @@ class OfflineMapPackageManager {
 
       token.onCancel(() {
         if (!completer.isCompleted) {
-          sink?.flush().then((_) => sink?.close());
-          if (stagingFile.existsSync()) {
-            try {
-              stagingFile.deleteSync();
-            } catch (_) {}
-          }
+          responseSub?.cancel();
           completer.completeError(DownloadCancelledException(manifest.id));
         }
       });
@@ -440,6 +498,15 @@ class OfflineMapPackageManager {
         (chunk) {
           if (token.isCancelled) {
             responseSub?.cancel();
+            return;
+          }
+          if (received + chunk.length > total) {
+            responseSub?.cancel();
+            if (!completer.isCompleted) {
+              completer.completeError(
+                InvalidPackageFormatException('Download excedeu o tamanho do manifesto.'),
+              );
+            }
             return;
           }
           sink?.add(chunk);
@@ -484,7 +551,12 @@ class OfflineMapPackageManager {
 
       // Validação 1: Tamanho do arquivo
       final stagingLength = stagingFile.lengthSync();
-      if (manifest.sizeBytes > 0 && stagingLength != manifest.sizeBytes) {
+      if (stagingLength < manifest.sizeBytes) {
+        throw DownloadInterruptedException(
+          'Download incompleto ($stagingLength de ${manifest.sizeBytes} bytes); retomada disponível.',
+        );
+      }
+      if (stagingLength != manifest.sizeBytes) {
         throw InvalidPackageFormatException(
           'Tamanho do pacote baixado ($stagingLength bytes) difere do manifesto (${manifest.sizeBytes} bytes).',
         );
@@ -513,6 +585,10 @@ class OfflineMapPackageManager {
         );
       }
 
+      if (token.isCancelled) {
+        throw DownloadCancelledException(manifest.id);
+      }
+
       // Transição de estado: INSTALLING
       _updateState(
         manifest.id,
@@ -520,8 +596,13 @@ class OfflineMapPackageManager {
       );
 
       // Instalação Atômica com Rollback Seguro
+      if (backupFile.existsSync()) {
+        throw FileSystemException(
+          'Cópia anterior preservada; resolva o backup antes de instalar.',
+          backupFile.path,
+        );
+      }
       if (finalFile.existsSync()) {
-        if (backupFile.existsSync()) backupFile.deleteSync();
         finalFile.renameSync(backupFile.path);
       }
 
@@ -557,12 +638,17 @@ class OfflineMapPackageManager {
       );
       return installedState;
     } catch (e) {
+      await responseSub?.cancel();
       if (sink != null) {
         try {
           await sink.close();
         } catch (_) {}
       }
-      if (stagingFile.existsSync()) {
+      final preservePartial = e is DownloadInterruptedException ||
+          e is SocketException ||
+          e is http.ClientException ||
+          (e is DownloadCancelledException && !token._purgeOnCancel);
+      if (!preservePartial && stagingFile.existsSync()) {
         try {
           stagingFile.deleteSync();
         } catch (_) {}
@@ -591,9 +677,12 @@ class OfflineMapPackageManager {
     bool purgeTempFile = true,
   }) async {
     final token = _activeTokens[packageId];
-    token?.cancel();
+    if (token != null) {
+      token._purgeOnCancel = purgeTempFile;
+      token.cancel();
+    }
 
-    if (purgeTempFile) {
+    if (purgeTempFile && token == null) {
       final state = _states[packageId];
       if (state != null) {
         final finalFile = await getPackageFile(state.manifest);
@@ -606,6 +695,7 @@ class OfflineMapPackageManager {
       }
     }
 
+    if (token != null) return;
     _updateState(
       packageId,
       (s) => s.copyWith(
@@ -619,6 +709,9 @@ class OfflineMapPackageManager {
 
   /// Remove com segurança um pacote instalado e desregistra do servidor local.
   Future<void> removePackage(String packageId) async {
+    if (_installingIds.contains(packageId)) {
+      throw StateError('Cancele e aguarde o download antes de remover o pacote.');
+    }
     final state = _states[packageId];
     if (state == null) return;
 
