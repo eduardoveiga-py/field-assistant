@@ -133,6 +133,26 @@ jobs:
           PYCODE
           fi
           exit "$status"
+  smtp_widget_regression:
+    name: SMTP widget loopback repeatability
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: '3.47.8'
+          cache: true
+      - run: flutter pub get --enforce-lockfile
+      - name: Repeat SMTP widget flow five times
+        shell: bash
+        run: |
+          for i in 1 2 3 4 5; do
+            if ! flutter test --no-pub --reporter expanded test/audit_round2_features_test.dart --plain-name 'InboxScreen compose sheet validates missing credentials and sends via SMTP when configured' > /tmp/smtp-test.log 2>&1; then
+              cat /tmp/smtp-test.log
+              python3 tool/ci_diagnostics_summary.py test /tmp/smtp-test.log
+              exit 1
+            fi
+          done
   tests:
     name: Flutter tests (${{ matrix.suite }})
     runs-on: ubuntu-latest

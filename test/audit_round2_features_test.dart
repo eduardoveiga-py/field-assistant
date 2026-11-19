@@ -29,6 +29,7 @@ class _CapturedSmtpSession {
   String? receivedMailFrom;
   final List<String> receivedRcptTo = [];
   String? receivedDataPayload;
+  Object? socketError;
 }
 
 Future<({ServerSocket server, Future<_CapturedSmtpSession> sessionFuture})>
@@ -126,6 +127,15 @@ _startLoopbackSmtpServer({
           completer.complete(session);
         }
       },
+      onError: (Object error, StackTrace stack) {
+        // The client may close immediately after the server accepted DATA.
+        // Record the error so assertions can distinguish an early disconnect.
+        session.socketError = error;
+        if (!completer.isCompleted) {
+          completer.complete(session);
+        }
+      },
+      cancelOnError: true,
     );
   });
 
@@ -836,6 +846,9 @@ void main() {
           await tester.pumpAndSettle();
           expect(captured.receivedMailFrom, equals('<publicador@jw.org>'));
           expect(captured.receivedRcptTo, equals(['<secretario@jw.org>']));
+          expect(captured.receivedDataPayload, isNotNull,
+              reason: 'SMTP connection ended before the message was accepted: ${captured.socketError}');
+          expect(captured.receivedDataPayload, contains('Content-Transfer-Encoding: base64'));
 
           await tester.pumpWidget(const SizedBox());
           await tester.pump(const Duration(milliseconds: 100));
