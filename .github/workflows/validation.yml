@@ -14,6 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - run: bash test/tool/vector_generator_safety_test.sh
+      - run: python3 -m unittest discover -s test/tool -p 'test_*.py'
   sql_safety:
     name: SQL isolation and compare-and-swap
     runs-on: ubuntu-latest
