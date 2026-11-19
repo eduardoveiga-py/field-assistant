@@ -2,7 +2,14 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:drift/native.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ministerio_pessoal/database/app_database.dart';
+import 'package:ministerio_pessoal/database/repository.dart';
+import 'package:ministerio_pessoal/sync/crypto/e2ee_service.dart';
+import 'package:ministerio_pessoal/sync/crypto/recovery_key_store.dart';
+import 'package:ministerio_pessoal/sync/supabase_sync_service.dart';
 import 'package:ministerio_pessoal/sync/crypto/encrypted_media_transfer.dart';
 import 'package:ministerio_pessoal/sync/crypto/encrypted_record_sync.dart';
 import 'package:ministerio_pessoal/sync/crypto/recovery_crypto.dart';
@@ -11,6 +18,7 @@ import 'package:ministerio_pessoal/sync/crypto/recovery_vault_verifier.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   final enabled = Platform.environment['FA_RUN_LOCAL_SUPABASE_E2E'] == '1';
   test(
     'isolated Auth, vault, encrypted CAS, account isolation and Storage',
@@ -194,4 +202,61 @@ void main() {
     },
     skip: !enabled,
   );
+  test('isolated two-client Drift outbox and encrypted person pull', () async {
+    const url = 'http://127.0.0.1:54321';
+    final anon = Platform.environment['FA_LOCAL_SUPABASE_ANON_KEY'];
+    if (anon == null || anon.isEmpty) throw StateError('Local anonymous key missing');
+    const auth = AuthClientOptions(authFlowType: AuthFlowType.implicit);
+    final client1 = SupabaseClient(url, anon, authOptions: auth);
+    final client2 = SupabaseClient(url, anon, authOptions: auth);
+    final db1 = AppDatabase.forTesting(NativeDatabase.memory());
+    final db2 = AppDatabase.forTesting(NativeDatabase.memory());
+    final repo1 = AppRepository(db1);
+    final repo2 = AppRepository(db2);
+    FlutterSecureStorage.setMockInitialValues({});
+    RecoveryKeyStore.resetForTesting();
+    final email = 'fa-app-${DateTime.now().microsecondsSinceEpoch}@example.com';
+    const password = 'synthetic-local-password-2026';
+    SupabaseSyncService? sync1;
+    SupabaseSyncService? sync2;
+    try {
+      final signed = await client1.auth.signUp(email: email, password: password);
+      expect(signed.session, isNotNull);
+      final owner = signed.user!.id;
+      await client2.auth.signInWithPassword(email: email, password: password);
+      final phrase = RecoveryCrypto.createPhrase();
+      final e2ee1 = E2eeService(db: db1, client: client1);
+      await e2ee1.setupVaultWithPhrase(owner, phrase);
+      final e2ee2 = E2eeService(db: db2, client: client2);
+      expect(await e2ee2.restoreVault(owner, phrase), isTrue);
+      sync1 = SupabaseSyncService(
+        db: db1, repository: repo1, clientOverride: client1,
+        e2eeServiceOverride: e2ee1, allowEncryptedSyncForTesting: true,
+      );
+      sync2 = SupabaseSyncService(
+        db: db2, repository: repo2, clientOverride: client2,
+        e2eeServiceOverride: e2ee2, allowEncryptedSyncForTesting: true,
+      );
+      const secretName = 'Synthetic Local Private Person';
+      final person = await repo1.createPerson(name: secretName);
+      expect(await db1.select(db1.syncQueue).get(), isNotEmpty);
+      final pushed = await sync1.processQueue();
+      expect(pushed.failureCount, 0, reason: pushed.errors.join('; '));
+      expect(pushed.successCount, greaterThanOrEqualTo(1));
+      final remote = await client1.from('encrypted_records').select('envelope');
+      expect(remote, isNotEmpty);
+      expect(jsonEncode(remote), isNot(contains(secretName)));
+      final pulled = await sync2.fetchRemoteChanges();
+      expect(pulled.failureCount, 0, reason: pulled.errors.join('; '));
+      expect((await repo2.getPersonById(person.id))?.name, secretName);
+    } finally {
+      sync1?.dispose();
+      sync2?.dispose();
+      await db1.close();
+      await db2.close();
+      client1.dispose();
+      client2.dispose();
+    }
+  }, skip: !enabled);
+
 }
