@@ -48,6 +48,49 @@ jobs:
             python3 tool/ci_diagnostics_summary.py analyze /tmp/analysis.txt
           fi
           exit "$status"
+  containment_diagnostics:
+    name: Containment diagnostics (unlocked dependencies)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          channel: stable
+          cache: true
+      # Additional diagnostic only: does not replace the strict-lockfile gate.
+      - run: flutter pub get
+      - name: Analyze containment changes
+        shell: bash
+        run: |
+          set +e
+          dart analyze lib test integration_test --fatal-warnings --format machine > /tmp/containment-analyze.txt 2>&1
+          status=$?
+          cat /tmp/containment-analyze.txt
+          if [ "$status" -ne 0 ]; then
+            python3 - <<'PYCODE'
+          from pathlib import Path
+          for line in Path('/tmp/containment-analyze.txt').read_text().splitlines():
+              if line.startswith(('ERROR|', 'WARNING|')):
+                  print('::error::' + line.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A'))
+          PYCODE
+          fi
+          exit "$status"
+      - name: Test containment changes
+        shell: bash
+        run: |
+          set +e
+          flutter test --concurrency=1 --reporter expanded test/sync/crypto/e2ee_service_test.dart test/sync/crypto/supabase_crypto_transport_and_service_test.dart test/sync/account_isolation_test.dart test/territory/map_engine/offline_map_package_manager_test.dart test/ui/widgets/e2ee_setup_dialog_test.dart test/ui/map_rotation_and_e2ee_settings_test.dart > /tmp/containment-tests.txt 2>&1
+          status=$?
+          cat /tmp/containment-tests.txt
+          if [ "$status" -ne 0 ]; then
+            python3 - <<'PYCODE'
+          from pathlib import Path
+          lines = Path('/tmp/containment-tests.txt').read_text().splitlines()
+          for line in lines[-80:]:
+              print('::error::' + line.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A'))
+          PYCODE
+          fi
+          exit "$status"
   tests:
     name: Flutter tests (${{ matrix.suite }})
     runs-on: ubuntu-latest

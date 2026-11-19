@@ -178,9 +178,7 @@ class _E2eeSetupDialogState extends ConsumerState<E2eeSetupDialog>
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    return PopScope(
-      canPop: !_isLoading,
-      child: AlertDialog(
+    return AlertDialog(
       titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       actionsPadding: const EdgeInsets.all(16),
@@ -274,7 +272,6 @@ class _E2eeSetupDialogState extends ConsumerState<E2eeSetupDialog>
           child: const Text('Cancelar / Manter Local'),
         ),
       ],
-      ),
     );
   }
 

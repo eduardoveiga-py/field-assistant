@@ -164,6 +164,19 @@ void main() {
       expect(await (await keyStore.load(E2eeService.localUserId))!.extractBytes(), localBefore);
     });
 
+    test('falha ao reler cofre criado preserva frase para restauração', () async {
+      final phrase = RecoveryCrypto.createPhrase();
+      transport.failFetch = true;
+      await expectLater(
+        () => service.setupVaultWithPhrase(testOwner, phrase),
+        throwsStateError,
+      );
+      expect(await keyStore.load(testOwner), isNull);
+      expect(transport.marker, isNotNull);
+      transport.failFetch = false;
+      expect(await service.restoreVault(testOwner, phrase), isTrue);
+    });
+
     test('resposta perdida permite restaurar com a frase já anotada', () async {
       final phrase = RecoveryCrypto.createPhrase();
       transport.failAfterCreate = true;

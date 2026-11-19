@@ -166,10 +166,8 @@ class E2eeService {
         throw StateError('Cofre remoto indisponível; nenhuma chave foi instalada.');
       }
       final marker = await RecoveryVaultVerifier.create(root: key, owner: effectiveId);
-      final created = await RecoveryVaultSetup(
-        owner: effectiveId,
-        transport: transport,
-      ).createConfirmed(
+      final setup = RecoveryVaultSetup(owner: effectiveId, transport: transport);
+      final created = await setup.createConfirmed(
         key: key,
         marker: marker,
         expectedVaultId: marker['vaultId'] as String,
@@ -177,6 +175,10 @@ class E2eeService {
       if (!created) {
         throw StateError('Já existe um cofre remoto. Use a frase existente para restaurá-lo.');
       }
+      await setup.fetchVerified(
+        key: key,
+        expectedVaultId: marker['vaultId'] as String,
+      );
     }
     await keyStore.install(owner: effectiveId, phrase: phrase, confirmation: phrase);
   }
