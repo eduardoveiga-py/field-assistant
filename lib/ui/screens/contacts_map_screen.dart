@@ -34,7 +34,6 @@ import '../../territory/map_engine_adapter.dart';
 import '../../territory/map_engine/map_engine_selector.dart';
 import '../../territory/map_engine/maplibre_native_adapter.dart';
 import '../../territory/geocoding/offline_geocoding_service.dart';
-import '../../territory/routing/offline_routing_engine.dart';
 import 'contacts_map/offline_search_modal.dart';
 
 part 'contacts_map/territory_modals.dart';
@@ -870,136 +869,16 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
     );
   }
 
-  void _showOfflineRouteDialog({
-    required String destinationName,
-    required double destLat,
-    required double destLon,
-  }) {
-    final engine = OfflineRoutingEngine.createAltoSolimoesNetwork();
-    final originLat = _activeCenterLat ?? -3.1022;
-    final originLon = _activeCenterLng ?? -67.9397;
-
-    String nearestStartId = 'SAI_CENTRO';
-    double minStartDist = double.infinity;
-    String nearestGoalId = 'BETANIA_CENTRO';
-    double minGoalDist = double.infinity;
-
-    for (final node in engine.nodes.values) {
-      final dStart = OfflineRoutingEngine.haversineDistanceMeters(
-        originLat,
-        originLon,
-        node.latitude,
-        node.longitude,
-      );
-      if (dStart < minStartDist) {
-        minStartDist = dStart;
-        nearestStartId = node.id;
-      }
-
-      final dGoal = OfflineRoutingEngine.haversineDistanceMeters(
-        destLat,
-        destLon,
-        node.latitude,
-        node.longitude,
-      );
-      if (dGoal < minGoalDist) {
-        minGoalDist = dGoal;
-        nearestGoalId = node.id;
-      }
-    }
-
-    final walkRoute = engine.findRoute(
-      startId: nearestStartId,
-      goalId: nearestGoalId,
-      mode: RoutingMode.walking,
-    );
-
-    final driveRoute = engine.findRoute(
-      startId: nearestStartId,
-      goalId: nearestGoalId,
-      mode: RoutingMode.driving,
-    );
-
-    showDialog(
+  void _showOfflineRouteDialog({required String destinationName}) {
+    showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            const Icon(Icons.alt_route, color: AppTheme.primaryTeal),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'Rota Offline (A*): $destinationName',
-                style: const TextStyle(fontSize: 16),
-              ),
-            ),
-          ],
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (walkRoute.isSuccess) ...[
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(
-                    Icons.directions_walk,
-                    color: AppTheme.primaryTeal,
-                  ),
-                  title: const Text('A pé (1.25 m/s)'),
-                  subtitle: Text(walkRoute.formattedSummary),
-                ),
-              ],
-              if (driveRoute.isSuccess) ...[
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.directions_car, color: Colors.blue),
-                  title: const Text('Carro / Moto'),
-                  subtitle: Text(driveRoute.formattedSummary),
-                ),
-              ],
-              if (!walkRoute.isSuccess && !driveRoute.isSuccess)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Text(
-                    walkRoute.errorMessage ??
-                        'Não foi possível encontrar rota offline segura.',
-                    style: const TextStyle(color: Colors.red),
-                  ),
-                ),
-              const Divider(),
-              const Text(
-                'Etapas do trajeto offline:',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 6),
-              ...((walkRoute.isSuccess ? walkRoute.steps : driveRoute.steps).map(
-                (step) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(
-                        step.isFerryCrossing
-                            ? Icons.directions_boat
-                            : Icons.turn_right,
-                        size: 16,
-                        color: step.isFerryCrossing ? Colors.blue : Colors.grey,
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          '${step.instruction} (${step.distanceMeters.round()} m)',
-                          style: const TextStyle(fontSize: 13),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              )),
-            ],
-          ),
+        title: const Text('Rota offline indisponível'),
+        content: Text(
+          'Não há uma rede de roteamento offline verificada para $destinationName. '
+          'O mapa offline não fornece instruções de navegação. '
+          'Você pode abrir uma rota em um aplicativo externo, sujeito à '
+          'conectividade e às condições locais.',
         ),
         actions: [
           TextButton(

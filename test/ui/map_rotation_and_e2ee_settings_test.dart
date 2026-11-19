@@ -978,9 +978,9 @@ void main() {
         });
         await tester.pumpAndSettle();
 
-        // O card deve indicar E2EE Ativa e permitir reconfigurar ou verificar status
+        // O card deve indicar chave local e permitir reconfigurar ou verificar status
         expect(
-          find.text('Criptografia de Ponta a Ponta Ativa (E2EE)'),
+          find.text('Chave de recuperação instalada'),
           findsOneWidget,
         );
         expect(

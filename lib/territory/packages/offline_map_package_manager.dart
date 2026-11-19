@@ -183,6 +183,7 @@ class OfflineMapPackageManager {
   final Directory? _customStorageDir;
   final http.Client _httpClient;
   final OfflineTileServer? tileServer;
+  final List<OfflineMapPackageManifest> _catalog;
 
   final Map<String, PackageState> _states = {};
   final Map<String, CancellationToken> _activeTokens = {};
@@ -193,13 +194,15 @@ class OfflineMapPackageManager {
     Directory? storageDir,
     http.Client? httpClient,
     this.tileServer,
+    List<OfflineMapPackageManifest>? catalog,
   })  : _customStorageDir = storageDir,
-        _httpClient = httpClient ?? http.Client() {
+        _httpClient = httpClient ?? http.Client(),
+        _catalog = List.unmodifiable(catalog ?? OfflineMapCatalog.defaultCatalog) {
     _initCatalog();
   }
 
   void _initCatalog() {
-    for (final manifest in OfflineMapCatalog.defaultCatalog) {
+    for (final manifest in _catalog) {
       _states[manifest.id] = PackageState(
         manifest: manifest,
         status: PackageDownloadStatus.available,
@@ -242,34 +245,58 @@ class OfflineMapPackageManager {
   Future<void> syncWithDisk() async {
     final dir = await getStorageDirectory();
 
-    for (final manifest in OfflineMapCatalog.defaultCatalog) {
+    for (final manifest in _catalog) {
       final ext = manifest.format == OfflineMapFormat.pmtiles
           ? 'pmtiles'
           : 'mbtiles';
       final file = File('${dir.path}/${manifest.id}.$ext');
 
-      if (file.existsSync()) {
-        final length = file.lengthSync();
-        if (length == manifest.sizeBytes || manifest.sizeBytes <= 0) {
-          _states[manifest.id] = PackageState(
-            manifest: manifest,
-            status: PackageDownloadStatus.installed,
-            progress: 1.0,
-            downloadedBytes: length,
-            localFile: file,
-          );
-          _registerWithTileServer(manifest.id, file, manifest.format);
+      if (!file.existsSync()) {
+        if (manifest.format == OfflineMapFormat.pmtiles) {
+          tileServer?.unregisterPmtilesPackage(manifest.id);
         } else {
-          _states[manifest.id] = PackageState(
-            manifest: manifest,
-            status: PackageDownloadStatus.available,
-            localFile: file,
-          );
+          tileServer?.unregisterMbtilesPackage(manifest.id);
         }
-      } else {
         _states[manifest.id] = PackageState(
           manifest: manifest,
           status: PackageDownloadStatus.available,
+        );
+        continue;
+      }
+      try {
+        final length = await file.length();
+        if (length != manifest.sizeBytes ||
+            await calculateSha256(file) != manifest.sha256.toLowerCase()) {
+          throw const FormatException('Tamanho ou checksum divergente.');
+        }
+        if (manifest.format == OfflineMapFormat.pmtiles) {
+          final raf = await file.open();
+          try {
+            validatePmtilesHeader(await raf.read(127));
+          } finally {
+            await raf.close();
+          }
+        }
+        _states[manifest.id] = PackageState(
+          manifest: manifest,
+          status: PackageDownloadStatus.installed,
+          progress: 1.0,
+          downloadedBytes: length,
+          localFile: file,
+        );
+        _registerWithTileServer(manifest.id, file, manifest.format);
+      } catch (_) {
+        if (manifest.format == OfflineMapFormat.pmtiles) {
+          tileServer?.unregisterPmtilesPackage(manifest.id);
+        } else {
+          tileServer?.unregisterMbtilesPackage(manifest.id);
+        }
+        // Nunca remover um arquivo do usuário em uma verificação falha.
+        _states[manifest.id] = PackageState(
+          manifest: manifest,
+          status: PackageDownloadStatus.corrupted,
+          localFile: file,
+          errorMessage: 'Não foi possível verificar a integridade do pacote.',
         );
       }
     }

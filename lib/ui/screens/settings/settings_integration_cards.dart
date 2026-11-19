@@ -394,7 +394,7 @@ extension _SettingsIntegrationCards on _SettingsScreenState {
                               const SizedBox(width: 8),
                               const Expanded(
                                 child: Text(
-                                  'Criptografia de Ponta a Ponta Ativa (E2EE)',
+                                  'Chave de recuperação instalada',
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 13,
@@ -404,7 +404,7 @@ extension _SettingsIntegrationCards on _SettingsScreenState {
                               ),
                               Chip(
                                 label: const Text(
-                                  'Protegido',
+                                  'Local',
                                   style: TextStyle(
                                     fontSize: 10,
                                     color: Colors.white,
@@ -418,7 +418,7 @@ extension _SettingsIntegrationCards on _SettingsScreenState {
                           ),
                           const SizedBox(height: 4),
                           const Text(
-                            'Seus registros e mídias são cifrados no aparelho com chave BIP-39 e AES-256-GCM antes de trafegar na nuvem.',
+                            'A sincronização cifrada está em validação e depende da conta e do cofre remoto. A chave local não comprova sincronização nem proteção do banco local.',
                             style: TextStyle(fontSize: 11),
                           ),
                           const SizedBox(height: 8),
@@ -447,24 +447,26 @@ extension _SettingsIntegrationCards on _SettingsScreenState {
                                   final isInstalled = await ref
                                       .read(e2eeServiceProvider)
                                       .isKeyInstalled(effectiveUserId);
-                                  final hasVault = currentUser != null
-                                      ? await ref
-                                            .read(e2eeServiceProvider)
-                                            .hasRemoteVault(currentUser.id)
-                                      : false;
+                                  var message = isInstalled
+                                      ? 'Chave E2EE instalada localmente neste dispositivo.'
+                                      : 'Chave E2EE não encontrada.';
+                                  if (currentUser != null) {
+                                    try {
+                                      final hasVault = await ref
+                                          .read(e2eeServiceProvider)
+                                          .hasRemoteVault(currentUser.id);
+                                      message = hasVault
+                                          ? 'Cofre remoto encontrado. A compatibilidade da chave é verificada antes da sincronização.'
+                                          : 'Cofre remoto não encontrado.';
+                                    } catch (_) {
+                                      message = 'Não foi possível consultar o cofre remoto. Verifique a conexão e a conta.';
+                                    }
+                                  }
                                   if (context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
-                                        content: Text(
-                                          hasVault
-                                              ? 'Cofre remoto E2EE ativo e sincronizado com este dispositivo.'
-                                              : (isInstalled
-                                                    ? 'Chave E2EE instalada localmente neste dispositivo.'
-                                                    : 'Chave E2EE não encontrada.'),
-                                        ),
-                                        backgroundColor: isInstalled
-                                            ? Colors.green
-                                            : Colors.orange,
+                                        content: Text(message),
+                                        backgroundColor: Colors.orange,
                                       ),
                                     );
                                   }

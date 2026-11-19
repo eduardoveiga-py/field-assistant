@@ -12,12 +12,21 @@ import 'package:ministerio_pessoal/database/app_database.dart';
 import 'package:ministerio_pessoal/database/repository.dart';
 import 'package:ministerio_pessoal/settings/backup_service.dart';
 import 'package:ministerio_pessoal/sync/crypto/e2ee_service.dart';
+import 'package:ministerio_pessoal/sync/crypto/recovery_crypto.dart';
 import 'package:ministerio_pessoal/sync/crypto/encrypted_record_sync.dart';
 import 'package:ministerio_pessoal/sync/crypto/recovery_key_store.dart';
 import 'package:ministerio_pessoal/sync/crypto/recovery_vault_transport.dart';
 import 'package:ministerio_pessoal/sync/supabase_sync_service.dart';
 import 'package:ministerio_pessoal/sync/sync_owner_guard.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+// Test helper: keep the phrase before initiating the create-only request.
+Future<String> _createTestVault(E2eeService service, String owner) async {
+  final phrase = RecoveryCrypto.createPhrase();
+  await service.setupVaultWithPhrase(owner, phrase);
+  return phrase;
+}
+
 
 class _CloudStub {
   final Map<String, Map<String, dynamic>> vaults = {};
@@ -165,7 +174,7 @@ void main() {
       vaultTransportOverride: _StubVault(cloud, ownerA),
       recordTransportOverride: _StubRecords(cloud, ownerA),
     );
-    final phraseA = await e2ee1.setupNewVault(ownerA);
+    final phraseA = await _createTestVault(e2ee1, ownerA);
     final sync1 = SupabaseSyncService(
       db: db1,
       repository: repo1,

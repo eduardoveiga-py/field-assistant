@@ -366,6 +366,24 @@ class SupabaseSyncService {
       return (ownerId: null, blockedResult: _blockedUntilEncryption());
     }
 
+    try {
+      await e2eeService.verifyRemoteVaultForSync(ownerDecision.activeUserId!);
+    } catch (_) {
+      _setStatus(SyncStatus.savedLocally);
+      const message = 'Sincronização pausada: não foi possível verificar o cofre remoto com a chave desta conta. Seus dados locais foram preservados.';
+      return (
+        ownerId: null,
+        blockedResult: const SyncProcessResult(
+          totalProcessed: 0,
+          successCount: 0,
+          failureCount: 0,
+          conflictCount: 0,
+          errors: [message],
+          message: message,
+        ),
+      );
+    }
+
     return (ownerId: ownerDecision.activeUserId!, blockedResult: null);
   }
 

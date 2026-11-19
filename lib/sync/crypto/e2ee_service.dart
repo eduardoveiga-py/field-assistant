@@ -102,23 +102,12 @@ class E2eeService {
         'Conta de destino inválida para migração E2EE.',
       );
     }
-    final existingTargetKey = await keyStore.load(target);
-    if (existingTargetKey != null) {
-      throw StateError(
-        'A conta de destino já possui chave E2EE instalada neste dispositivo.',
-      );
-    }
-    if (await hasRemoteVault(target)) {
-      throw StateError(
-        'A conta de destino já possui um cofre E2EE remoto. Use a restauração pela frase de recuperação.',
-      );
-    }
-    final localKey = await keyStore.load(localUserId);
-    if (localKey == null) {
-      throw StateError('Nenhuma chave local encontrada para migração.');
-    }
-    await keyStore.copyOwnerKey(fromOwner: localUserId, toOwner: target);
-    await keyStore.clear(localUserId);
+    // Consultar ausência e copiar a chave não cria um cofre remoto de forma
+    // atômica. Até existir um protocolo recuperável, não mover nenhuma chave.
+    throw StateError(
+      'Migração de chave local temporariamente indisponível; '
+      'nenhuma chave foi alterada.',
+    );
   }
 
   /// Obtém o transporte do cofre de recuperação para a conta.
@@ -146,57 +135,63 @@ class E2eeService {
   /// Verifica se já existe um cofre cadastrado para este usuário no Supabase.
   Future<bool> hasRemoteVault(String ownerId) async {
     final transport = getVaultTransport(ownerId);
-    if (transport == null) return false;
-    try {
-      final marker = await transport.fetch();
-      return marker != null;
-    } catch (e, st) {
-      AppLogger.warning(
-        'Erro ao consultar cofre remoto E2EE para $ownerId',
-        e,
-        st,
-      );
-      return false;
+    if (transport == null) {
+      throw StateError('Cofre remoto indisponível para esta conta.');
     }
+    return await transport.fetch() != null;
   }
 
-  /// Inicializa um novo cofre E2EE com frase mnemônica de 24 palavras BIP-39,
-  /// grava no cofre remoto e instala EXCLUSIVAMENTE sob [ownerId].
+  /// Gera uma frase apenas para o modo local. Para contas remotas a frase
+  /// deve ser mostrada ao usuário *antes* da operação de rede.
   Future<String> setupNewVault(String ownerId) async {
-    final effectiveId = _normalizeOwner(ownerId);
+    if (_normalizeOwner(ownerId) != localUserId) {
+      throw StateError('Para contas remotas, confirme a frase antes de criar o cofre.');
+    }
     final phrase = RecoveryCrypto.createPhrase();
-    final key = await RecoveryCrypto.keyFromPhrase(phrase);
-    final marker = await RecoveryVaultVerifier.create(
-      root: key,
-      owner: effectiveId,
-    );
-    final vaultId = marker['vaultId'] as String;
+    await setupVaultWithPhrase(ownerId, phrase);
+    return phrase;
+  }
 
-    final transport = getVaultTransport(effectiveId);
-    if (transport != null) {
-      final setup = RecoveryVaultSetup(
+  /// O chamador deve mostrar e confirmar a frase antes desta operação e
+  /// conservá-la em caso de resposta de rede incerta para permitir restauração.
+  Future<void> setupVaultWithPhrase(String ownerId, String phrase) async {
+    final effectiveId = _normalizeOwner(ownerId);
+    if (await keyStore.load(effectiveId) != null) {
+      throw StateError('Já existe uma chave local para esta conta; ela não foi alterada.');
+    }
+    final key = await RecoveryCrypto.keyFromPhrase(phrase);
+    if (effectiveId != localUserId) {
+      final transport = getVaultTransport(effectiveId);
+      if (transport == null) {
+        throw StateError('Cofre remoto indisponível; nenhuma chave foi instalada.');
+      }
+      final marker = await RecoveryVaultVerifier.create(root: key, owner: effectiveId);
+      final created = await RecoveryVaultSetup(
         owner: effectiveId,
         transport: transport,
-      );
-      final created = await setup.createConfirmed(
+      ).createConfirmed(
         key: key,
         marker: marker,
-        expectedVaultId: vaultId,
+        expectedVaultId: marker['vaultId'] as String,
       );
       if (!created) {
-        throw StateError(
-          'Já existe um cofre de criptografia cadastrado para esta conta. Use sua frase de recuperação existente.',
-        );
+        throw StateError('Já existe um cofre remoto. Use a frase existente para restaurá-lo.');
       }
     }
+    await keyStore.install(owner: effectiveId, phrase: phrase, confirmation: phrase);
+  }
 
-    await keyStore.install(
-      owner: effectiveId,
-      phrase: phrase,
-      confirmation: phrase,
-    );
-    AppLogger.info('Novo cofre E2EE configurado com sucesso para $effectiveId');
-    return phrase;
+  /// Confirma que a chave instalada corresponde ao cofre remoto atual.
+  /// A ausência ou falha de rede nunca autoriza sincronização.
+  Future<void> verifyRemoteVaultForSync(String ownerId) async {
+    final key = await keyStore.load(ownerId);
+    final transport = getVaultTransport(ownerId);
+    if (key == null || transport == null) {
+      throw StateError('Chave ou cofre remoto indisponível.');
+    }
+    final marker = await transport.fetch();
+    if (marker == null) throw StateError('Cofre remoto não encontrado.');
+    await RecoveryVaultVerifier.verify(root: key, owner: ownerId, marker: marker);
   }
 
   /// Restaura o acesso ao cofre a partir da frase de 24 palavras digitada pelo usuário.
@@ -205,7 +200,13 @@ class E2eeService {
     final effectiveId = _normalizeOwner(ownerId);
     final key = await RecoveryCrypto.keyFromPhrase(phrase);
     final transport = getVaultTransport(effectiveId);
-    if (transport != null) {
+    if (transport == null && effectiveId != localUserId) {
+      throw StateError('Cofre remoto indisponível; nenhuma chave foi instalada.');
+    }
+    if (effectiveId == localUserId && await keyStore.load(effectiveId) == null) {
+      throw StateError('Não é possível verificar uma frase local sem chave existente.');
+    }
+    if (transport != null && effectiveId != localUserId) {
       final remoteMarker = await transport.fetch();
       if (remoteMarker == null) {
         throw StateError(

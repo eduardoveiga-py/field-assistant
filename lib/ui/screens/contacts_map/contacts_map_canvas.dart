@@ -1629,15 +1629,11 @@ extension _ContactsMapCanvas on _ContactsMapScreenState {
                             Expanded(
                               child: OutlinedButton.icon(
                                 icon: const Icon(Icons.alt_route, size: 16),
-                                label: const Text('Rota Offline (A*)'),
+                                label: const Text('Rota offline'),
                                 onPressed: () {
                                   final p = _selectedPinPerson!;
-                                  final lat = p.latitude ?? -3.1022;
-                                  final lon = p.longitude ?? -67.9397;
                                   _showOfflineRouteDialog(
                                     destinationName: p.name,
-                                    destLat: lat,
-                                    destLon: lon,
                                   );
                                 },
                               ),

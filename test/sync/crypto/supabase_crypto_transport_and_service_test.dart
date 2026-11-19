@@ -17,6 +17,14 @@ import 'package:ministerio_pessoal/sync/crypto/recovery_key_store.dart';
 import 'package:ministerio_pessoal/sync/crypto/recovery_vault_transport.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+// Test helper: keep the phrase before initiating the create-only request.
+Future<String> _createTestVault(E2eeService service, String owner) async {
+  final phrase = RecoveryCrypto.createPhrase();
+  await service.setupVaultWithPhrase(owner, phrase);
+  return phrase;
+}
+
+
 class _FakeAuthClient extends GoTrueClient {
   final User? _fakeUser;
 
@@ -436,12 +444,12 @@ void main() {
       );
 
       // Install key on target-user -> migration blocked because target already has key
-      await service.setupNewVault('target-user');
+      await _createTestVault(service, 'target-user');
       expect(await service.hasRemoteVault('target-user'), isTrue);
 
       // Second setupNewVault on same owner throws conflict StateError
       await expectLater(
-        () => service.setupNewVault('target-user'),
+        () => _createTestVault(service, 'target-user'),
         throwsStateError,
       );
 
@@ -464,9 +472,12 @@ void main() {
         throwsStateError,
       );
 
-      // hasRemoteVault fails closed (returns false) on transport exception
+      // Falha de rede não deve ser confundida com cofre ausente.
       vaultTransport.throwOnFetch = true;
-      expect(await service.hasRemoteVault('target-user'), isFalse);
+      await expectLater(
+        () => service.hasRemoteVault('target-user'),
+        throwsStateError,
+      );
     });
 
     test('EncryptedMediaTransfer validates bucket, owner, mediaId, and cleans up failed uploads', () async {

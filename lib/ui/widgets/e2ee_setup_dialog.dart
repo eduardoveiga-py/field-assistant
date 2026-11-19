@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/app_logger.dart';
 import '../../core/biometric_auth_service.dart';
 import '../../sync/crypto/recovery_crypto.dart';
-import '../../sync/crypto/recovery_vault_verifier.dart';
 import '../../sync/supabase_sync_service.dart';
 
 /// Diálogo completo para configuração e restauração do cofre E2EE.
@@ -72,6 +71,7 @@ class _E2eeSetupDialogState extends ConsumerState<E2eeSetupDialog>
   }
 
   void _initGeneratePhrase() {
+    if (_isLoading) return;
     setState(() {
       _generatedPhrase = RecoveryCrypto.createPhrase();
       _confirmedPhraseWritten = false;
@@ -88,46 +88,17 @@ class _E2eeSetupDialogState extends ConsumerState<E2eeSetupDialog>
 
     try {
       final e2ee = ref.read(e2eeServiceProvider);
-      // Salva e confirma no servidor Supabase
-      await e2ee.keyStore.install(
-        owner: widget.userId,
-        phrase: _generatedPhrase!,
-        confirmation: _generatedPhrase!,
-      );
-      if (widget.userId != 'local_user') {
-        await e2ee.keyStore.copyOwnerKey(
-          fromOwner: widget.userId,
-          toOwner: 'local_user',
-        );
-      }
-
-      final key = await RecoveryCrypto.keyFromPhrase(_generatedPhrase!);
-      final marker = await RecoveryVaultVerifier.create(
-        root: key,
-        owner: widget.userId,
-      );
-      final transport = e2ee.getVaultTransport(widget.userId);
-      if (transport != null) {
-        try {
-          await transport.createIfAbsent(marker);
-        } catch (e) {
-          AppLogger.warning(
-            'Não foi possível gravar marcador remoto imediatamente: $e',
-          );
-        }
-      }
+      await e2ee.setupVaultWithPhrase(widget.userId, _generatedPhrase!);
 
       AppLogger.info(
         'Cofre E2EE configurado com sucesso para ${widget.userId}',
       );
       if (mounted) {
-        // Dispara a sincronização imediatamente
-        ref.read(supabaseSyncServiceProvider).sync();
         Navigator.of(context).pop(true);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'Criptografia E2EE ativada! Sincronização em nuvem liberada.',
+              'Chave configurada. A sincronização depende das verificações de segurança.',
             ),
             backgroundColor: Colors.green,
           ),
@@ -137,7 +108,7 @@ class _E2eeSetupDialogState extends ConsumerState<E2eeSetupDialog>
       AppLogger.error('Erro ao configurar novo cofre E2EE', e, st);
       if (mounted) {
         setState(() {
-          _errorMessage = 'Falha ao ativar cofre E2EE: $e';
+          _errorMessage = 'Não foi possível confirmar o cofre. Guarde esta frase: se a criação remota tiver ocorrido, use-a para restaurar. $e';
         });
       }
     } finally {
@@ -165,21 +136,12 @@ class _E2eeSetupDialogState extends ConsumerState<E2eeSetupDialog>
     try {
       final e2ee = ref.read(e2eeServiceProvider);
       await e2ee.restoreVault(widget.userId, phrase);
-      if (widget.userId != 'local_user') {
-        await e2ee.keyStore.copyOwnerKey(
-          fromOwner: widget.userId,
-          toOwner: 'local_user',
-        );
-      }
-
       if (mounted) {
-        // Dispara sincronização após restauração
-        ref.read(supabaseSyncServiceProvider).sync();
         Navigator.of(context).pop(true);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'Cofre E2EE restaurado com sucesso! Sincronização iniciada.',
+              'Chave restaurada. A sincronização depende das verificações de segurança.',
             ),
             backgroundColor: Colors.green,
           ),
@@ -216,7 +178,9 @@ class _E2eeSetupDialogState extends ConsumerState<E2eeSetupDialog>
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    return AlertDialog(
+    return PopScope(
+      canPop: !_isLoading,
+      child: AlertDialog(
       titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       actionsPadding: const EdgeInsets.all(16),
@@ -240,7 +204,7 @@ class _E2eeSetupDialogState extends ConsumerState<E2eeSetupDialog>
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'Seus dados e territórios são protegidos com AES-256-GCM. Nem a equipe de desenvolvimento nem terceiros podem ler suas informações sem sua chave privada.',
+                'A sincronização cifrada está em validação. Guarde a frase de recuperação em local seguro; ela é necessária para recuperar o acesso ao cofre.',
                 style: TextStyle(
                   fontSize: 13,
                   color: isDark ? Colors.grey.shade300 : Colors.grey.shade700,
@@ -310,6 +274,7 @@ class _E2eeSetupDialogState extends ConsumerState<E2eeSetupDialog>
           child: const Text('Cancelar / Manter Local'),
         ),
       ],
+      ),
     );
   }
 
@@ -417,7 +382,7 @@ class _E2eeSetupDialogState extends ConsumerState<E2eeSetupDialog>
             ),
             const SizedBox(width: 8),
             TextButton.icon(
-              onPressed: _initGeneratePhrase,
+              onPressed: _isLoading ? null : _initGeneratePhrase,
               icon: const Icon(Icons.refresh, size: 16),
               label: const Text('Gerar Outra'),
             ),

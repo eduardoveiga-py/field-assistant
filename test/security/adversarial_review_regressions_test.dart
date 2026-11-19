@@ -19,6 +19,7 @@ import 'package:ministerio_pessoal/database/app_database.dart';
 import 'package:ministerio_pessoal/database/repository.dart';
 import 'package:ministerio_pessoal/settings/backup_service.dart';
 import 'package:ministerio_pessoal/sync/crypto/e2ee_service.dart';
+import 'package:ministerio_pessoal/sync/crypto/recovery_crypto.dart';
 import 'package:ministerio_pessoal/sync/crypto/encrypted_media.dart';
 import 'package:ministerio_pessoal/sync/crypto/encrypted_media_transfer.dart';
 import 'package:ministerio_pessoal/sync/crypto/encrypted_record_sync.dart';
@@ -32,6 +33,14 @@ import 'package:ministerio_pessoal/ui/screens/today_screen.dart';
 import 'package:ministerio_pessoal/voice_notes/voice_dictation_service.dart';
 import 'package:path/path.dart' as p;
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+// Test helper: keep the phrase before initiating the create-only request.
+Future<String> _createTestVault(E2eeService service, String owner) async {
+  final phrase = RecoveryCrypto.createPhrase();
+  await service.setupVaultWithPhrase(owner, phrase);
+  return phrase;
+}
+
 
 class _AdvCloud {
   final Map<String, Map<String, dynamic>> vaults = {};
@@ -215,7 +224,7 @@ void main() {
         vaultTransportOverride: _AdvVault(cloud, owner),
         recordTransportOverride: _AdvRecords(cloud),
       );
-      final phrase = await e2ee1.setupNewVault(owner);
+      final phrase = await _createTestVault(e2ee1, owner);
       final sync1 = SupabaseSyncService(
         db: db1,
         repository: repo1,
@@ -336,7 +345,7 @@ void main() {
         vaultTransportOverride: _AdvVault(cloud, owner),
         recordTransportOverride: _AdvRecords(cloud),
       );
-      final phrase = await e2ee1.setupNewVault(owner);
+      final phrase = await _createTestVault(e2ee1, owner);
       final sync1 = SupabaseSyncService(
         db: db1,
         repository: repo1,
@@ -444,7 +453,7 @@ void main() {
         vaultTransportOverride: _AdvVault(cloud, owner),
         recordTransportOverride: _AdvRecords(cloud),
       );
-      final phrase = await e2ee1.setupNewVault(owner);
+      final phrase = await _createTestVault(e2ee1, owner);
       final sync1 = SupabaseSyncService(
         db: db1,
         repository: repo1,
@@ -524,7 +533,7 @@ void main() {
         vaultTransportOverride: _AdvVault(cloud, owner),
         recordTransportOverride: _AdvRecords(cloud),
       );
-      final phrase = await e2ee1.setupNewVault(owner);
+      final phrase = await _createTestVault(e2ee1, owner);
       final sync1 = SupabaseSyncService(
         db: db1,
         repository: repo1,
@@ -602,7 +611,7 @@ void main() {
         keyStore: RecoveryKeyStore(),
         vaultTransportOverride: _AdvVault(cloud, owner),
       );
-      await e2ee.setupNewVault(owner);
+      await _createTestVault(e2ee, owner);
       final key = (await e2ee.getKey(owner))!;
       final transfer = EncryptedMediaTransfer(
         client: client,
