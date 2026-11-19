@@ -76,6 +76,27 @@ class SupabaseSyncService {
   static const String runtimeUrlStorageKey = 'runtime_supabase_url';
   static const String runtimeAnonKeyStorageKey = 'runtime_supabase_anon_key';
 
+  // Only associate the effective URL with the exact client we initialized.
+  // Runtime settings or injected test clients alone cannot authorize sync.
+  static SupabaseClient? _managedClient;
+  static String? _managedClientUrl;
+
+  static String? _verifiedManagedUrl(SupabaseClient? client) {
+    if (client == null || !identical(client, _managedClient)) return null;
+    return _managedClientUrl;
+  }
+
+  static bool get localTestSyncActive {
+    if (!SyncPrivacyPolicy.localTestBuildEnabled || !isInitialized) return false;
+    try {
+      return SyncPrivacyPolicy.isLocalTestEndpoint(
+        _verifiedManagedUrl(Supabase.instance.client),
+      );
+    } catch (_) {
+      return false;
+    }
+  }
+
   static bool get isInitialized {
     try {
       Supabase.instance.client;
@@ -163,15 +184,19 @@ class SupabaseSyncService {
           detectSessionInUri: !NativeAuthCallback.enabled,
         ),
       );
+      _managedClient = Supabase.instance.client;
+      _managedClientUrl = url;
     }
   }
 
   /// Salva credenciais Supabase em runtime no armazenamento seguro e (re)inicializa o cliente.
+  /// [authOptionsForTesting] é ignorado fora do modo debug.
   static Future<void> configureAndInitialize({
     required String url,
     required String anonKey,
     FlutterSecureStorage? storage,
     bool initializeClient = true,
+    FlutterAuthClientOptions? authOptionsForTesting,
   }) async {
     final cleanUrl = url.trim();
     final cleanKey = anonKey.trim();
@@ -182,16 +207,27 @@ class SupabaseSyncService {
 
     final secure = storage ?? const FlutterSecureStorage();
     if (initializeClient) {
+      if (localTestSyncActive) {
+        throw StateError(
+          'Feche o aplicativo e reinicie sem as flags de teste antes de alterar o servidor.',
+        );
+      }
+      _managedClient = null;
+      _managedClientUrl = null;
       if (isInitialized) {
         await Supabase.instance.dispose();
       }
       await Supabase.initialize(
         url: cleanUrl,
         publishableKey: cleanKey,
-        authOptions: FlutterAuthClientOptions(
-          detectSessionInUri: !NativeAuthCallback.enabled,
-        ),
+        authOptions: kDebugMode && authOptionsForTesting != null
+            ? authOptionsForTesting
+            : FlutterAuthClientOptions(
+                detectSessionInUri: !NativeAuthCallback.enabled,
+              ),
       );
+      _managedClient = Supabase.instance.client;
+      _managedClientUrl = cleanUrl;
     }
 
     await secure.write(key: runtimeUrlStorageKey, value: cleanUrl);
@@ -204,10 +240,18 @@ class SupabaseSyncService {
     bool disposeClientIfNoCompileTime = true,
   }) async {
     final secure = storage ?? const FlutterSecureStorage();
+    if (localTestSyncActive &&
+        (disposeClientIfNoCompileTime || SupabaseConfig.isConfigured)) {
+      throw StateError(
+        'Feche o aplicativo e reinicie sem as flags de teste antes de remover o servidor.',
+      );
+    }
     await secure.delete(key: runtimeUrlStorageKey);
     await secure.delete(key: runtimeAnonKeyStorageKey);
     if (isInitialized &&
         (disposeClientIfNoCompileTime || SupabaseConfig.isConfigured)) {
+      _managedClient = null;
+      _managedClientUrl = null;
       await Supabase.instance.dispose();
     }
   }
@@ -324,6 +368,13 @@ class SupabaseSyncService {
   _evaluateSyncGate(SupabaseClient? client) async {
     if (!SyncPrivacyPolicy.canRunRemoteSync(
       allowInTesting: _encryptedTestMode,
+      verifiedLocalClientUrl:
+          clientOverride == null &&
+              e2eeService.client == null &&
+              e2eeService.vaultTransportOverride == null &&
+              e2eeService.recordTransportOverride == null
+          ? _verifiedManagedUrl(client)
+          : null,
     )) {
       final msg = kIsWeb && !SyncPrivacyPolicy.webPersistentSyncAllowed
           ? _webSyncPausedMessage

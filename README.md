@@ -22,7 +22,37 @@
 </div>
 
 > [!WARNING]
-> **Estado atual:** o código 2.0.0 está em desenvolvimento e não é uma release publicada. A sincronização em nuvem está bloqueada inclusive com a flag de desenvolvimento, até corrigir o protocolo de mídia; o roteamento offline e o catálogo vetorial estão indisponíveis até existirem dados reais validados. O projeto Supabase existente não deve ser usado para testes: use apenas uma instância local isolada com dados fictícios. Consulte [avaliação e evidências](docs/engineering/impact-assessments/FA-REGIONAL-MAPS-STAGING-202611.md).
+> **Estado atual:** o código 2.0.0 está em desenvolvimento e não é uma release publicada. A sincronização em nuvem permanece bloqueada até corrigir o protocolo de mídia. Há um opt-in de **teste local inseguro**, descrito abaixo, ainda sem validação neste ambiente. O roteamento offline e o catálogo vetorial estão indisponíveis até existirem dados reais validados. Não use o projeto Supabase existente para testes. Consulte [avaliação e evidências](docs/engineering/impact-assessments/FA-REGIONAL-MAPS-STAGING-202611.md).
+
+### Sincronização local: experimento não homologado
+
+A pedido do proprietário, a compilação nativa **debug** pode tentar sincronizar
+com uma instância descartável em `http://127.0.0.1:54321`, com as duas flags
+abaixo. **Ainda não foi testada nesta revisão**: não foi executada no Windows,
+Flutter nem Supabase local. Use exclusivamente dados fictícios que possam ser
+perdidos ou sobrescritos. O app também pode sincronizar automaticamente quando
+o modo está habilitado; pare-o antes de trocar ou alterar o servidor de teste.
+A mídia antiga ainda pode sobrescrever ou excluir dados, e a reconciliação de
+registros antigos continua incompleta. Esta opção não prova E2EE fim a fim,
+backup ou segurança; não use em produção, na Web ou com dados reais.
+
+Para uma futura verificação, prepare previamente uma instalação Supabase local
+**separada e descartável** com as migrações desta branch, sem vinculá-la ao
+projeto remoto existente. Não rode reset ou comandos destrutivos em bases já
+existentes. Em um ambiente isolado, com Flutter 3.47.8 e ferramentas configuradas:
+
+```powershell
+flutter run -d windows --debug --dart-define=FA_ENABLE_UNSAFE_LOCAL_TEST_SYNC=true --dart-define=FA_ACK_TEST_DATA_MAY_BE_LOST=true
+```
+
+Configure no app a URL literal acima e a chave pública da instância local,
+autentique uma conta fictícia e configure o cofre correspondente. O cliente ativo
+precisa ter sido inicializado pelo próprio app; trocar a URL, usar outra porta,
+conectar por DNS ou um cliente injetado não libera esse modo. Um proxy na porta
+local ainda poderia encaminhar a outro servidor: confirme que a instância é
+realmente isolada. Sem ambas as flags, ou em release/profile/Web, o bypass não
+abre. Enquanto o modo estiver ativo, a troca do servidor é bloqueada. Para sair ou
+trocar o servidor, feche o app e reinicie sem as flags; isso não remove dados.
 
 ## 📥 Downloads e Instalação
 

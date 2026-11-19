@@ -2,10 +2,10 @@ name: Isolated Supabase encrypted transport integration
 on:
   push:
     branches: ['arena/**', 'main', 'master']
-    paths: ['supabase/**', 'lib/sync/crypto/**', 'test/sync/integration/**', '.github/workflows/supabase-local-transport.yml']
+    paths: ['supabase/**', 'lib/sync/crypto/**', 'lib/sync/supabase_sync_service.dart', 'lib/sync/sync_privacy_policy.dart', 'test/sync/integration/**', '.github/workflows/supabase-local-transport.yml']
   pull_request:
     branches: ['main', 'master']
-    paths: ['supabase/**', 'lib/sync/crypto/**', 'test/sync/integration/**', '.github/workflows/supabase-local-transport.yml']
+    paths: ['supabase/**', 'lib/sync/crypto/**', 'lib/sync/supabase_sync_service.dart', 'lib/sync/sync_privacy_policy.dart', 'test/sync/integration/**', '.github/workflows/supabase-local-transport.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -71,3 +71,8 @@ jobs:
             python3 tool/ci_diagnostics_summary.py test /tmp/local-transport-test.log
           fi
           exit "$status"
+      - name: Test app-managed local opt-in with fictional data
+        env:
+          FA_RUN_LOCAL_SUPABASE_E2E: '1'
+        run: |
+          flutter test --no-pub --reporter expanded --dart-define=FA_ENABLE_UNSAFE_LOCAL_TEST_SYNC=true --dart-define=FA_ACK_TEST_DATA_MAY_BE_LOST=true test/sync/integration/local_sync_opt_in_test.dart

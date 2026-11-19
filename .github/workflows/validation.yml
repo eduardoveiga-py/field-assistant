@@ -120,6 +120,12 @@ jobs:
           exit "$status"
       - name: Verify sync remains paused even if build flag is enabled
         run: flutter test --no-pub --dart-define=ENABLE_E2EE_SYNC=true test/sync/privacy_pause_test.dart
+      - name: Validate explicit local test opt-in and remote containment
+        run: |
+          flutter test --no-pub test/sync/local_test_sync_policy_test.dart
+          flutter test --no-pub --dart-define=FA_ENABLE_UNSAFE_LOCAL_TEST_SYNC=true test/sync/local_test_sync_policy_test.dart
+          flutter test --no-pub --dart-define=FA_ACK_TEST_DATA_MAY_BE_LOST=true test/sync/local_test_sync_policy_test.dart
+          flutter test --no-pub --dart-define=FA_ENABLE_UNSAFE_LOCAL_TEST_SYNC=true --dart-define=FA_ACK_TEST_DATA_MAY_BE_LOST=true test/sync/local_test_sync_policy_test.dart test/sync/privacy_pause_test.dart
       - name: Test containment changes
         shell: bash
         run: |

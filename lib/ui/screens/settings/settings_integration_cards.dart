@@ -304,6 +304,21 @@ extension _SettingsIntegrationCards on _SettingsScreenState {
               ],
             ),
             const Divider(),
+            if (SupabaseSyncService.localTestSyncActive) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text(
+                  'Modo de teste local ativado. Use apenas dados fictícios: a sincronização e as mídias podem perder ou sobrescrever dados. Não use com dados reais; este modo não foi homologado.',
+                  style: TextStyle(fontSize: 12),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
             if (!isSupabaseReady) ...[
               Container(
                 margin: const EdgeInsets.only(bottom: 10),
