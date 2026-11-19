@@ -22,7 +22,7 @@
 </div>
 
 > [!WARNING]
-> **Estado atual:** o código 2.0.0 está em desenvolvimento e não é uma release publicada. A sincronização em nuvem está desativada por padrão; o roteamento offline e o catálogo vetorial estão indisponíveis até existirem dados reais validados. O projeto Supabase existente não deve ser usado para testes: use apenas uma instância local isolada com dados fictícios. Consulte [avaliação e evidências](docs/engineering/impact-assessments/FA-REGIONAL-MAPS-STAGING-202611.md).
+> **Estado atual:** o código 2.0.0 está em desenvolvimento e não é uma release publicada. A sincronização em nuvem está bloqueada inclusive com a flag de desenvolvimento, até corrigir o protocolo de mídia; o roteamento offline e o catálogo vetorial estão indisponíveis até existirem dados reais validados. O projeto Supabase existente não deve ser usado para testes: use apenas uma instância local isolada com dados fictícios. Consulte [avaliação e evidências](docs/engineering/impact-assessments/FA-REGIONAL-MAPS-STAGING-202611.md).
 
 ## 📥 Downloads e Instalação
 
@@ -227,7 +227,7 @@ Enquanto caminha entre uma residência e outra, registre tudo sem precisar digit
 
 ### 🔐 13. Sincronização Multi-Dispositivo & Offline-First
 - As operações locais são priorizadas; funções que dependem de rede ou pacote de mapa não funcionam sem seus respectivos recursos.
-- A sincronização em nuvem permanece desativada por padrão. O caminho cifrado e a recuperação estão em validação e não devem ser considerados homologados.
+- A sincronização em nuvem permanece bloqueada até a correção do protocolo de mídia. O caminho cifrado e a recuperação estão em validação e não devem ser considerados homologados.
 
 ---
 
@@ -326,7 +326,7 @@ flowchart LR
 
 - 🔐 Há exportação de backup cifrado por senha; valide periodicamente a restauração em ambiente seguro.
 - 📴 Dados locais e cópias de segurança precisam ser protegidos no dispositivo. A presença de uma chave não comprova que todo o fluxo de sincronização esteja protegido.
-- A sincronização em nuvem fica pausada por padrão até conclusão dos testes de segurança e recuperação.
+- A sincronização em nuvem fica pausada até correção do protocolo de mídia e conclusão dos testes de segurança e recuperação.
 
 ---
 
