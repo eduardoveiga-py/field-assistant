@@ -115,6 +115,8 @@ jobs:
           PYCODE
           fi
           exit "$status"
+      - name: Verify sync remains paused even if build flag is enabled
+        run: flutter test --no-pub --dart-define=ENABLE_E2EE_SYNC=true test/sync/privacy_pause_test.dart
       - name: Test containment changes
         shell: bash
         run: |

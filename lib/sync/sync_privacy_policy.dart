@@ -20,7 +20,12 @@ class SyncPrivacyPolicy {
     defaultValue: false,
   );
 
-  static bool get isCloudSyncEnabled => _enableE2eeSyncCompileFlag;
+  // O ponteiro mutável de mídia não implementa CAS; a flag de build sozinha
+  // não pode abrir sync real até o protocolo de mídia ser corrigido e testado.
+  static bool get mediaProtocolVerified => false;
+
+  static bool get isCloudSyncEnabled =>
+      _enableE2eeSyncCompileFlag && mediaProtocolVerified;
 
   /// Na Web não há Keychain/Keystore nativo; sincronização persistente na Web
   /// permanece desabilitada por padrão até solução validada de passphrase por sessão.

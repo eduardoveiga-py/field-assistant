@@ -55,5 +55,8 @@ void main() {
     expect((await repo.getPersonById(person.id))!.name, 'Dado privado');
     expect(requests, 0);
     expect(SyncPrivacyPolicy.unencryptedMediaAllowed, isFalse);
+    expect(SyncPrivacyPolicy.mediaProtocolVerified, isFalse);
+    expect(SyncPrivacyPolicy.isCloudSyncEnabled, isFalse);
+    expect(SyncPrivacyPolicy.canRunRemoteSync(), isFalse);
   });
 }
