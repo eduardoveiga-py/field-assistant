@@ -83,22 +83,14 @@ class RecoveryKeyStore {
     return value == null ? null : SecretKey(_decode(value));
   });
 
-  /// Copia a chave de recuperação entre contas (ex: local_user para usuário autenticado)
+  /// A migração entre contas está bloqueada até existir confirmação do usuário
+  /// e um protocolo remoto verificável. Nenhuma chave é lida ou modificada.
   Future<void> copyOwnerKey({
     required String fromOwner,
     required String toOwner,
-  }) => _serialized(() async {
-    if (fromOwner == toOwner) return;
-    if (kIsWeb) {
-      final k = _webMemoryKeys[fromOwner];
-      if (k != null) _webMemoryKeys[toOwner] = k;
-      return;
-    }
-    final k = await _storage.read(key: _storageKey(fromOwner));
-    if (k != null) {
-      await _storage.write(key: _storageKey(toOwner), value: k);
-    }
-  });
+  }) async {
+    throw StateError('Cópia entre contas indisponível; nenhuma chave foi alterada.');
+  }
 
   /// Valida a chave e a identidade de um cofre já conhecido antes de guardar a chave.
   Future<void> restoreVerified({

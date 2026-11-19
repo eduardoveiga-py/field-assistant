@@ -103,3 +103,7 @@ CI principal [44545945005](https://github.com/eduardoveiga-py/field-assistant/ac
 O gate adicional foi testado com `--dart-define=ENABLE_E2EE_SYNC=true` no job de contenções [44547827816](https://github.com/eduardoveiga-py/field-assistant/actions/runs/44547827816), SHA `b394813`, que passou; não elimina o risco do fluxo de mídia, apenas impede seu uso normal. Um workflow de diagnóstico isolado foi criado para investigar a falha de integração Linux sem esperar todos os demais builds.
 
 O diagnóstico isolado [44549167308](https://github.com/eduardoveiga-py/field-assistant/actions/runs/44549167308), SHA `3192386`, reproduziu a falha de integração Linux: CMake não encontrou `gstreamer-1.0` exigido por `audioplayers_linux`. O job headless instalava menos dependências que o build Linux normal; as listas foram alinhadas, sem alteração no aplicativo. Nova execução necessária.
+
+### Preservação de chaves entre contas
+
+A API `RecoveryKeyStore.copyOwnerKey` não tem chamadores em `lib` nem testes existentes, mas copiava e sobrescrevia chave de outra conta sem confirmação nem conferência do cofre remoto, contrariando isolamento e o bloqueio já existente em `migrateLocalKeyToAccount`. Entre manter cópia insegura e bloqueá-la até existir migração autenticada/recuperável, escolhe-se falhar fechado sem ler ou gravar qualquer chave. Não se apagam chaves; teste instala duas chaves fictícias e verifica que ambas permanecem idênticas após tentativa. Não é solução definitiva para migração de dados de `local_user`.

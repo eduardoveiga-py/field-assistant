@@ -121,7 +121,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          flutter test --concurrency=1 --reporter expanded test/sync/crypto/e2ee_service_test.dart test/sync/crypto/supabase_crypto_transport_and_service_test.dart test/sync/account_isolation_test.dart test/territory/map_engine/offline_map_package_manager_test.dart test/territory/map_engine/package_download_recovery_test.dart test/ui/widgets/e2ee_setup_dialog_test.dart test/ui/map_rotation_and_e2ee_settings_test.dart > /tmp/containment-tests.txt 2>&1
+          flutter test --concurrency=1 --reporter expanded test/sync/crypto/e2ee_service_test.dart test/sync/crypto/recovery_key_store_test.dart test/sync/crypto/supabase_crypto_transport_and_service_test.dart test/sync/account_isolation_test.dart test/territory/map_engine/offline_map_package_manager_test.dart test/territory/map_engine/package_download_recovery_test.dart test/ui/widgets/e2ee_setup_dialog_test.dart test/ui/map_rotation_and_e2ee_settings_test.dart > /tmp/containment-tests.txt 2>&1
           status=$?
           cat /tmp/containment-tests.txt
           if [ "$status" -ne 0 ]; then

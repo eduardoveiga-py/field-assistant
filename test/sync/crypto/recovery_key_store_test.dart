@@ -53,6 +53,21 @@ void main() {
     );
   });
 
+  test('cópia entre contas falha e preserva as duas chaves', () async {
+    final store = RecoveryKeyStore();
+    final phraseA = RecoveryCrypto.createPhrase();
+    final phraseB = RecoveryCrypto.createPhrase();
+    await store.install(owner: 'conta-a', phrase: phraseA, confirmation: phraseA);
+    await store.install(owner: 'conta-b', phrase: phraseB, confirmation: phraseB);
+    final beforeA = await (await store.load('conta-a'))!.extractBytes();
+    final beforeB = await (await store.load('conta-b'))!.extractBytes();
+    await expectLater(store.copyOwnerKey(fromOwner: 'conta-a', toOwner: 'conta-b'), throwsStateError);
+    expect(await (await store.load('conta-a'))!.extractBytes(), beforeA);
+    expect(await (await store.load('conta-b'))!.extractBytes(), beforeB);
+    await expectLater(store.copyOwnerKey(fromOwner: 'conta-a', toOwner: 'conta-c'), throwsStateError);
+    expect(await store.load('conta-c'), isNull);
+  });
+
   test('instalações concorrentes não substituem a primeira', () async {
     final first = RecoveryCrypto.createPhrase();
     final second = RecoveryCrypto.createPhrase();
