@@ -2,7 +2,7 @@ name: Dart format patch diagnostics
 on:
   push:
     branches: ['arena/**']
-    paths: ['.github/workflows/format-snapshot.yml']
+    paths: ['.github/workflows/format-snapshot.yml', 'lib/territory/packages/offline_map_package_manager.dart', 'test/territory/map_engine/package_download_recovery_test.dart', 'test/territory/map_engine/real_pmtiles_integration_test.dart']
   workflow_dispatch:
 permissions:
   contents: read
