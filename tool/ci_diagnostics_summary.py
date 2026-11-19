@@ -18,7 +18,7 @@ else:
     failures = [i for i, line in enumerate(lines) if '[E]' in line]
     names = [lines[i] for i in failures]
     progress = [line for line in lines if re.match(r'^\d\d:\d\d ', line)]
-    selected = ['Failing test markers:'] + names + ['Last test progress:'] + progress[-12:] + ['Final test output:'] + lines[-15:]
+    selected = ['Failing test markers:'] + names + ['Last test progress:'] + progress[-12:] + ['Checkpoints:'] + [line for line in lines if 'CHECKPOINT' in line][-15:] + ['Final test output:'] + lines[-15:]
     if not failures:
         for marker in ('EXCEPTION CAUGHT', 'ERROR', 'Error:', 'Exception:', 'Timed out'):
             matches = [i for i, line in enumerate(lines) if marker in line]

@@ -901,6 +901,7 @@ void main() {
         addTearDown(tester.view.resetPhysicalSize);
         addTearDown(tester.view.resetDevicePixelRatio);
 
+        print('CHECKPOINT widget start');
         final db = AppDatabase.forTesting(NativeDatabase.memory());
         addTearDown(db.close);
 
@@ -930,10 +931,12 @@ void main() {
         );
         await tester.pumpAndSettle();
 
+        print('CHECKPOINT initial ready');
         // Switch to JW Mail tab
         await tester.tap(find.text('JW Mail'));
         await tester.pumpAndSettle();
 
+        print('CHECKPOINT mail ready');
         // Open compose/draft sheet
         await tester.tap(find.text('Novo Rascunho'));
         await tester.pumpAndSettle();
@@ -961,6 +964,7 @@ void main() {
         await tester.ensureVisible(sendBtn);
         await tester.pumpAndSettle();
 
+        print('CHECKPOINT compose ready');
         // Without configured credentials -> clear inline error + shortcut button
         await tester.tap(sendBtn);
         await tester.runAsync(
@@ -973,6 +977,7 @@ void main() {
         );
         expect(find.text('Configurar E-mail/SMTP'), findsOneWidget);
 
+        print('CHECKPOINT missing creds verified');
         // Configure credentials in DB + SecureStorage and retry send
         await tester.runAsync(() async {
           await db
@@ -1005,6 +1010,7 @@ void main() {
               );
         });
 
+        print('CHECKPOINT credentials written');
         Object? capturedSession;
         var sessionDone = false;
         relay.sessionFuture.then((s) {
@@ -1023,6 +1029,7 @@ void main() {
           await tester.pump(const Duration(milliseconds: 25));
         }
 
+        print('CHECKPOINT send waited');
         expect(
           sessionDone,
           isTrue,
@@ -1055,6 +1062,7 @@ void main() {
           contains('Content-Transfer-Encoding: base64'),
         );
 
+        print('CHECKPOINT send verified');
         await tester.pumpWidget(const SizedBox());
         await tester.pump(const Duration(milliseconds: 100));
       },
