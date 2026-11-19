@@ -29,6 +29,7 @@ class JwEmailMessage {
   final int? remoteUid;
   final String? folderId;
   final String? folderName;
+
   /// Account-scoped identifier for newer Exchange snapshots. Old snapshots
   /// have no reliable account attribution and remain explicitly unscoped.
   final String? mailboxScope;

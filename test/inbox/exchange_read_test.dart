@@ -107,6 +107,7 @@ class CatalogExchange implements ExchangeSession {
           : [],
     );
   }
+
   @override
   void close() {}
 }
@@ -262,48 +263,167 @@ void main() {
     expect(result.moreAvailable, isTrue);
   });
 
-  test('catálogo inclui pastas vazias, isola contas e preserva snapshots', () async {
-    const folders = [
-      eas.EasFolder(serverId: 'inbox', parentId: '0', displayName: 'Entrada', type: eas.EasFolderType.defaultInbox),
-      eas.EasFolder(serverId: 'same', parentId: '0', displayName: 'Enviados', type: eas.EasFolderType.defaultSentItems),
-      eas.EasFolder(serverId: 'drafts', parentId: '0', displayName: 'Rascunhos', type: eas.EasFolderType.defaultDrafts),
-    ];
-    Future<void> run(String account, List<eas.EasFolder> list, {bool failRead = false, bool message = false}) => ExchangeReadService(db).sync(session: CatalogExchange(list, failRead: failRead, message: message), host: 'mail.example.org', account: account, deviceId: 'd', allMailFolders: true).then((_) {});
-    await run('first@example.org', folders, message: true);
-    final first = await ExchangeFolderCatalog.watch(db, 'mail.example.org', 'first@example.org').first;
-    expect(first!.folders.map((f) => f.name), ['Entrada', 'Enviados', 'Rascunhos']);
-    final before = await db.select(db.inboxEntries).get();
-    expect(before.length, 3);
-    for (final entry in before) {
-      final email = JwEmailMessage.fromJson(Map<String, dynamic>.from(jsonDecode(entry.metadata)['email'] as Map));
-      expect(email.mailboxScope, first.scope);
-      expect(JwEmailMessage.fromJson(email.toJson()).mailboxScope, first.scope);
-    }
-    const secondFolders = [
-      eas.EasFolder(serverId: 'inbox', parentId: '0', displayName: 'Outra entrada', type: eas.EasFolderType.defaultInbox),
-      eas.EasFolder(serverId: 'same', parentId: '0', displayName: 'Outra pasta', type: eas.EasFolderType.userMail),
-    ];
-    await run('second@example.org', secondFolders);
-    final second = await ExchangeFolderCatalog.watch(db, 'mail.example.org', 'second@example.org').first;
-    expect(second!.scope, isNot(first.scope));
-    expect(second.folders.map((f) => f.name), ['Outra entrada', 'Outra pasta']);
-    expect((await ExchangeFolderCatalog.watch(db, 'mail.example.org', 'first@example.org').first)!.folders.map((f) => f.name), ['Entrada', 'Enviados', 'Rascunhos']);
-    await expectLater(run('first@example.org', [folders.first, folders.first]), throwsA(isA<ExchangeException>()));
-    expect((await ExchangeFolderCatalog.watch(db, 'mail.example.org', 'first@example.org').first)!.folders.length, 3);
-    expect((await db.select(db.inboxEntries).get()).map((x) => x.metadata), before.map((x) => x.metadata));
-    expect(JwEmailMessage.fromJson({'id': 'old'}).mailboxScope, isNull);
-  });
+  test(
+    'catálogo inclui pastas vazias, isola contas e preserva snapshots',
+    () async {
+      const folders = [
+        eas.EasFolder(
+          serverId: 'inbox',
+          parentId: '0',
+          displayName: 'Entrada',
+          type: eas.EasFolderType.defaultInbox,
+        ),
+        eas.EasFolder(
+          serverId: 'same',
+          parentId: '0',
+          displayName: 'Enviados',
+          type: eas.EasFolderType.defaultSentItems,
+        ),
+        eas.EasFolder(
+          serverId: 'drafts',
+          parentId: '0',
+          displayName: 'Rascunhos',
+          type: eas.EasFolderType.defaultDrafts,
+        ),
+      ];
+      Future<void> run(
+        String account,
+        List<eas.EasFolder> list, {
+        bool failRead = false,
+        bool message = false,
+      }) => ExchangeReadService(db)
+          .sync(
+            session: CatalogExchange(
+              list,
+              failRead: failRead,
+              message: message,
+            ),
+            host: 'mail.example.org',
+            account: account,
+            deviceId: 'd',
+            allMailFolders: true,
+          )
+          .then((_) {});
+      await run('first@example.org', folders, message: true);
+      final first = await ExchangeFolderCatalog.watch(
+        db,
+        'mail.example.org',
+        'first@example.org',
+      ).first;
+      expect(first!.folders.map((f) => f.name), [
+        'Entrada',
+        'Enviados',
+        'Rascunhos',
+      ]);
+      final before = await db.select(db.inboxEntries).get();
+      expect(before.length, 3);
+      for (final entry in before) {
+        final email = JwEmailMessage.fromJson(
+          Map<String, dynamic>.from(jsonDecode(entry.metadata)['email'] as Map),
+        );
+        expect(email.mailboxScope, first.scope);
+        expect(
+          JwEmailMessage.fromJson(email.toJson()).mailboxScope,
+          first.scope,
+        );
+      }
+      const secondFolders = [
+        eas.EasFolder(
+          serverId: 'inbox',
+          parentId: '0',
+          displayName: 'Outra entrada',
+          type: eas.EasFolderType.defaultInbox,
+        ),
+        eas.EasFolder(
+          serverId: 'same',
+          parentId: '0',
+          displayName: 'Outra pasta',
+          type: eas.EasFolderType.userMail,
+        ),
+      ];
+      await run('second@example.org', secondFolders);
+      final second = await ExchangeFolderCatalog.watch(
+        db,
+        'mail.example.org',
+        'second@example.org',
+      ).first;
+      expect(second!.scope, isNot(first.scope));
+      expect(second.folders.map((f) => f.name), [
+        'Outra entrada',
+        'Outra pasta',
+      ]);
+      expect(
+        (await ExchangeFolderCatalog.watch(
+          db,
+          'mail.example.org',
+          'first@example.org',
+        ).first)!.folders.map((f) => f.name),
+        ['Entrada', 'Enviados', 'Rascunhos'],
+      );
+      await expectLater(
+        run('first@example.org', [folders.first, folders.first]),
+        throwsA(isA<ExchangeException>()),
+      );
+      expect(
+        (await ExchangeFolderCatalog.watch(
+          db,
+          'mail.example.org',
+          'first@example.org',
+        ).first)!.folders.length,
+        3,
+      );
+      expect(
+        (await db.select(db.inboxEntries).get()).map((x) => x.metadata),
+        before.map((x) => x.metadata),
+      );
+      expect(JwEmailMessage.fromJson({'id': 'old'}).mailboxScope, isNull);
+    },
+  );
 
-  test('catálogo válido é salvo mesmo se leitura das mensagens falhar', () async {
-    const folders = [
-      eas.EasFolder(serverId: 'inbox', parentId: '0', displayName: 'Inbox', type: eas.EasFolderType.defaultInbox),
-      eas.EasFolder(serverId: 'sent', parentId: '0', displayName: 'Enviados', type: eas.EasFolderType.defaultSentItems),
-    ];
-    await expectLater(ExchangeReadService(db).sync(session: CatalogExchange(folders, failRead: true), host: 'example.org', account: 'a', deviceId: 'd', allMailFolders: true), throwsA(isA<ExchangeException>()));
-    expect((await ExchangeFolderCatalog.watch(db, 'example.org', 'a').first)!.folders.length, 2);
-    expect(await db.select(db.inboxEntries).get(), isEmpty);
-    expect((await db.select(db.appKvStore).get()).where((x) => x.key.startsWith('eas_sync_')), isEmpty);
-  });
+  test(
+    'catálogo válido é salvo mesmo se leitura das mensagens falhar',
+    () async {
+      const folders = [
+        eas.EasFolder(
+          serverId: 'inbox',
+          parentId: '0',
+          displayName: 'Inbox',
+          type: eas.EasFolderType.defaultInbox,
+        ),
+        eas.EasFolder(
+          serverId: 'sent',
+          parentId: '0',
+          displayName: 'Enviados',
+          type: eas.EasFolderType.defaultSentItems,
+        ),
+      ];
+      await expectLater(
+        ExchangeReadService(db).sync(
+          session: CatalogExchange(folders, failRead: true),
+          host: 'example.org',
+          account: 'a',
+          deviceId: 'd',
+          allMailFolders: true,
+        ),
+        throwsA(isA<ExchangeException>()),
+      );
+      expect(
+        (await ExchangeFolderCatalog.watch(
+          db,
+          'example.org',
+          'a',
+        ).first)!.folders.length,
+        2,
+      );
+      expect(await db.select(db.inboxEntries).get(), isEmpty);
+      expect(
+        (await db.select(db.appKvStore).get()).where(
+          (x) => x.key.startsWith('eas_sync_'),
+        ),
+        isEmpty,
+      );
+    },
+  );
 
   test('pastas recebem chaves independentes e prévias enfileiradas', () async {
     final session = MultiFolderExchange();

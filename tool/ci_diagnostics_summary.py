@@ -17,7 +17,16 @@ if mode == 'analyze':
 else:
     failures = [i for i, line in enumerate(lines) if '[E]' in line]
     names = [lines[i] for i in failures]
-    selected = ['Failing test markers:'] + names + ['Final test output:'] + lines[-6:]
+    progress = [line for line in lines if re.match(r'^\d\d:\d\d ', line)]
+    selected = ['Failing test markers:'] + names + ['Last test progress:'] + progress[-12:] + ['Final test output:'] + lines[-15:]
+    if not failures:
+        for marker in ('EXCEPTION CAUGHT', 'ERROR', 'Error:', 'Exception:', 'Timed out'):
+            matches = [i for i, line in enumerate(lines) if marker in line]
+            if matches:
+                i = matches[-1]
+                text = '\n'.join(lines[max(0, i-3):i+18])[:3400]
+                text = text.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+                print(f'::error title=Diagnostic context::{text}')
     # Actual assertions normally precede the [E] marker. Separate annotations
     # preserve context despite GitHub's per-message length limit.
     for i in failures[:8]:
