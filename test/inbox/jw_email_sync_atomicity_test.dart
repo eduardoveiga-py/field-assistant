@@ -153,12 +153,42 @@ void main() {
       });
 
       test('aceitação SMTP e falha local preservam rascunho e informam para não reenviar', () async {
-        final draft = JwEmailMessage(id: 'draft-fail', subject: 'Assunto', from: 'eu@jw.org', to: 'dest@jw.org', date: DateTime.utc(2026), bodyText: 'Texto original', isDraft: true);
+        final draft = JwEmailMessage(
+          id: 'draft-fail',
+          subject: 'Assunto',
+          from: 'eu@jw.org',
+          to: 'dest@jw.org',
+          date: DateTime.utc(2026),
+          bodyText: 'Texto original',
+          isDraft: true,
+        );
         await service.saveDraft(draft);
-        await db.customStatement("CREATE TRIGGER fail_sent_queue BEFORE INSERT ON sync_queue BEGIN SELECT RAISE(ABORT, 'secret'); END");
-        await expectLater(service.sendEmail(host: 'mail.jw.org', port: 587, username: 'eu@jw.org', password: 'secret', message: draft, draftId: draft.id), throwsA(isA<JwSmtpAcceptedLocalSaveException>().having((e) => e.message, 'no retry', contains('Não reenvie')).having((e) => e.message, 'no secret', isNot(contains('secret')))));
+        await db.customStatement(
+          "CREATE TRIGGER fail_sent_queue BEFORE INSERT ON sync_queue BEGIN SELECT RAISE(ABORT, 'secret'); END",
+        );
+        await expectLater(
+          service.sendEmail(
+            host: 'mail.jw.org',
+            port: 587,
+            username: 'eu@jw.org',
+            password: 'secret',
+            message: draft,
+            draftId: draft.id,
+          ),
+          throwsA(
+            isA<JwSmtpAcceptedLocalSaveException>()
+                .having((e) => e.message, 'no retry', contains('Não reenvie'))
+                .having(
+                  (e) => e.message,
+                  'no secret',
+                  isNot(contains('secret')),
+                ),
+          ),
+        );
         expect(smtp.sendCount, 1);
-        final entry = await (db.select(db.inboxEntries)..where((t) => t.id.equals('email_draft_draft-fail'))).getSingle();
+        final entry = await (db.select(
+          db.inboxEntries,
+        )..where((t) => t.id.equals('email_draft_draft-fail'))).getSingle();
         expect(entry.sourceType, 'email_draft');
         expect(entry.revision, 1);
         expect(entry.content, contains('Texto original'));

@@ -3027,14 +3027,15 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                         .saveDraft(draft);
                                     if (ctx.mounted) Navigator.pop(ctx);
                                     if (mounted) {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                            const SnackBar(
-                                              content: Text(
-                                                'Rascunho salvo neste dispositivo.',
-                                              ),
-                                            ),
-                                          );
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'Rascunho salvo neste dispositivo.',
+                                          ),
+                                        ),
+                                      );
                                     }
                                   },
                           ),
@@ -3253,16 +3254,15 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
 
                                       if (ctx.mounted) Navigator.pop(ctx);
                                       if (mounted) {
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              'Mensagem aceita pelo servidor SMTP e cópia salva neste dispositivo.',
-                                            ),
-                                            backgroundColor: Colors.green,
-                                          ),
-                                        );
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                  'Mensagem aceita pelo servidor SMTP e cópia salva neste dispositivo.',
+                                                ),
+                                                backgroundColor: Colors.green,
+                                              ),
+                                            );
                                       }
                                     } catch (e, st) {
                                       AppLogger.warning(

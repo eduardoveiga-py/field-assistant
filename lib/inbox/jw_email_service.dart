@@ -265,13 +265,17 @@ class JwEmailAuthException extends JwEmailException {
 /// The server may have accepted DATA, but its final reply was not received.
 class JwSmtpOutcomeUnknownException extends JwEmailException {
   const JwSmtpOutcomeUnknownException()
-    : super('Resultado do envio desconhecido: o servidor pode ter aceitado a mensagem. Confira a caixa de enviados no servidor antes de tentar novamente.');
+    : super(
+        'Resultado do envio desconhecido: o servidor pode ter aceitado a mensagem. Confira a caixa de enviados no servidor antes de tentar novamente.',
+      );
 }
 
 /// SMTP accepted DATA, but the local copy could not be committed.
 class JwSmtpAcceptedLocalSaveException extends JwEmailException {
   const JwSmtpAcceptedLocalSaveException()
-    : super('O servidor SMTP aceitou a mensagem, mas a cópia local não foi salva. Não reenvie sem verificar; preserve o texto e confira a caixa de enviados.');
+    : super(
+        'O servidor SMTP aceitou a mensagem, mas a cópia local não foi salva. Não reenvie sem verificar; preserve o texto e confira a caixa de enviados.',
+      );
 }
 
 /// Interface para permitir testes com sessões IMAP determinísticas.
@@ -977,7 +981,6 @@ class _SmtpResponse {
   final List<String> lines;
 
   const _SmtpResponse(this.code, this.lines);
-
 }
 
 /// Cliente SMTP puro Dart autenticado (RFC 5321 / 3207 STARTTLS / 4954 AUTH PLAIN & LOGIN).
@@ -1009,8 +1012,10 @@ class JwSmtpClient {
     if (trimmed.isEmpty || trimmed.contains('\r') || trimmed.contains('\n')) {
       return null;
     }
-    final angleMatch = RegExp(r'^([^<>@\r\n]*)<([^<>\s]+@[^<>\s]+)>$').firstMatch(trimmed);
-    if ((trimmed.contains('<') || trimmed.contains('>')) && angleMatch == null) {
+    final angleMatch = RegExp(r'^([^<>@\r\n]*)<([^<>\s]+@[^<>\s]+)>$')
+        .firstMatch(trimmed);
+    if ((trimmed.contains('<') || trimmed.contains('>')) &&
+        angleMatch == null) {
       return null;
     }
     final candidate = angleMatch != null ? angleMatch.group(2)! : trimmed;
@@ -1168,7 +1173,10 @@ class JwSmtpClient {
           ...ccRecipients,
           ...bccRecipients,
         ])
-          if (unique.add('${address.substring(0, address.lastIndexOf('@'))}@${address.substring(address.lastIndexOf('@') + 1).toLowerCase()}')) address,
+          if (unique.add(
+            '${address.substring(0, address.lastIndexOf('@'))}@${address.substring(address.lastIndexOf('@') + 1).toLowerCase()}',
+          ))
+            address,
       ];
       if (toRecipients.isEmpty) {
         throw const JwEmailException(
@@ -1808,58 +1816,58 @@ class JwEmailService {
 
     try {
       await db.transaction(() async {
-      final existingDraft = draftId == null
-          ? await (db.select(db.inboxEntries)
-                  ..where((t) => t.id.equals('email_draft_${sentMsg.id}')))
-                .getSingleOrNull()
-          : null;
-      final resolvedEntryId = draftId != null
-          ? targetId
-          : (existingDraft?.id ?? targetId);
+        final existingDraft = draftId == null
+            ? await (db.select(db.inboxEntries)
+                    ..where((t) => t.id.equals('email_draft_${sentMsg.id}')))
+                  .getSingleOrNull()
+            : null;
+        final resolvedEntryId = draftId != null
+            ? targetId
+            : (existingDraft?.id ?? targetId);
 
-      final existingSent = await (db.select(
-        db.inboxEntries,
-      )..where((t) => t.id.equals(resolvedEntryId))).getSingleOrNull();
-      final isUpdate = existingSent != null;
-      final nextRevision = isUpdate ? existingSent.revision + 1 : 1;
+        final existingSent = await (db.select(
+          db.inboxEntries,
+        )..where((t) => t.id.equals(resolvedEntryId))).getSingleOrNull();
+        final isUpdate = existingSent != null;
+        final nextRevision = isUpdate ? existingSent.revision + 1 : 1;
 
-      final companion = InboxEntriesCompanion.insert(
-        id: resolvedEntryId,
-        content: '${sentMsg.subject}\n\n${sentMsg.bodyText}',
-        sourceType: const drift.Value('email'),
-        suggestedCategory: const drift.Value('email_jw'),
-        attachments: drift.Value(jsonEncode(sentMsg.attachments)),
-        capturedAt: now,
-        metadata: drift.Value(jsonEncode(metadata)),
-        createdAt: isUpdate ? existingSent.createdAt : now,
-        updatedAt: now,
-        revision: drift.Value(nextRevision),
-      );
-
-      await db.into(db.inboxEntries).insertOnConflictUpdate(companion);
-      final persisted = await (db.select(
-        db.inboxEntries,
-      )..where((t) => t.id.equals(resolvedEntryId))).getSingle();
-
-      final payload = SyncTimestamp.normalizeMapDates(persisted.toJson());
-      if (isUpdate) {
-        payload['_base'] = SyncTimestamp.normalizeMapDates(
-          existingSent.toJson(),
+        final companion = InboxEntriesCompanion.insert(
+          id: resolvedEntryId,
+          content: '${sentMsg.subject}\n\n${sentMsg.bodyText}',
+          sourceType: const drift.Value('email'),
+          suggestedCategory: const drift.Value('email_jw'),
+          attachments: drift.Value(jsonEncode(sentMsg.attachments)),
+          capturedAt: now,
+          metadata: drift.Value(jsonEncode(metadata)),
+          createdAt: isUpdate ? existingSent.createdAt : now,
+          updatedAt: now,
+          revision: drift.Value(nextRevision),
         );
-      }
 
-      await db
-          .into(db.syncQueue)
-          .insert(
-            SyncQueueCompanion.insert(
-              id: const Uuid().v4(),
-              entityType: 'inbox_entries',
-              entityId: resolvedEntryId,
-              operation: isUpdate ? 'UPDATE' : 'INSERT',
-              payload: jsonEncode(payload),
-              createdAt: now,
-            ),
+        await db.into(db.inboxEntries).insertOnConflictUpdate(companion);
+        final persisted = await (db.select(
+          db.inboxEntries,
+        )..where((t) => t.id.equals(resolvedEntryId))).getSingle();
+
+        final payload = SyncTimestamp.normalizeMapDates(persisted.toJson());
+        if (isUpdate) {
+          payload['_base'] = SyncTimestamp.normalizeMapDates(
+            existingSent.toJson(),
           );
+        }
+
+        await db
+            .into(db.syncQueue)
+            .insert(
+              SyncQueueCompanion.insert(
+                id: const Uuid().v4(),
+                entityType: 'inbox_entries',
+                entityId: resolvedEntryId,
+                operation: isUpdate ? 'UPDATE' : 'INSERT',
+                payload: jsonEncode(payload),
+                createdAt: now,
+              ),
+            );
       });
     } catch (_) {
       throw const JwSmtpAcceptedLocalSaveException();

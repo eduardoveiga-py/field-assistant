@@ -27,7 +27,15 @@ import 'package:ministerio_pessoal/ui/widgets/map_location_picker_dialog.dart';
 class _UncertainSmtpClient extends JwSmtpClient {
   int calls = 0;
   @override
-  Future<void> sendMail({String? host, int? port, String? username, String? password, required JwEmailMessage message, String? securityMode, Duration timeout = const Duration(seconds: 15)}) async {
+  Future<void> sendMail({
+    String? host,
+    int? port,
+    String? username,
+    String? password,
+    required JwEmailMessage message,
+    String? securityMode,
+    Duration timeout = const Duration(seconds: 15),
+  }) async {
     calls++;
     throw const JwSmtpOutcomeUnknownException();
   }
@@ -389,44 +397,122 @@ void main() {
       );
     });
 
-    test('Rejects ambiguous or unsupported addresses without dropping recipients', () {
-      for (final value in [
-        'John <john@example.org> extra@example.org',
-        'John <john@example.org> <jane@example.org>',
-        'inva\u0000lid@example.org',
-        'ñ@example.org',
-        'a..b@example.org',
-      ]) {
-        expect(() => JwSmtpClient.parseRecipientsStrict(value), throwsA(isA<JwEmailException>()));
-      }
-      expect(JwSmtpClient.parseRecipientsStrict('John <John@example.org>; jane@example.org'), ['John@example.org', 'jane@example.org']);
-    });
+    test(
+      'Rejects ambiguous or unsupported addresses without dropping recipients',
+      () {
+        for (final value in [
+          'John <john@example.org> extra@example.org',
+          'John <john@example.org> <jane@example.org>',
+          'inva\u0000lid@example.org',
+          'ñ@example.org',
+          'a..b@example.org',
+        ]) {
+          expect(
+            () => JwSmtpClient.parseRecipientsStrict(value),
+            throwsA(isA<JwEmailException>()),
+          );
+        }
+        expect(
+          JwSmtpClient.parseRecipientsStrict(
+            'John <John@example.org>; jane@example.org',
+          ),
+          ['John@example.org', 'jane@example.org'],
+        );
+      },
+    );
 
-    test('Reports an unknown outcome when connection closes after DATA', () async {
-      final relay = await _startLoopbackSmtpServer(disconnectAfterData: true);
-      addTearDown(relay.server.close);
-      final message = JwEmailMessage(id: 'unknown', subject: 'Test', from: 'a@example.org', to: 'b@example.org', date: DateTime.utc(2026), bodyText: 'body');
-      const smtp = JwSmtpClient(allowPlaintextForTesting: true);
-      await expectLater(smtp.sendMail(host: '127.0.0.1', port: relay.server.port, username: 'a@example.org', password: 'test', message: message), throwsA(isA<JwSmtpOutcomeUnknownException>()));
-      expect((await relay.sessionFuture).receivedDataPayload, contains('Subject: Test'));
-    });
+    test(
+      'Reports an unknown outcome when connection closes after DATA',
+      () async {
+        final relay = await _startLoopbackSmtpServer(disconnectAfterData: true);
+        addTearDown(relay.server.close);
+        final message = JwEmailMessage(
+          id: 'unknown',
+          subject: 'Test',
+          from: 'a@example.org',
+          to: 'b@example.org',
+          date: DateTime.utc(2026),
+          bodyText: 'body',
+        );
+        const smtp = JwSmtpClient(allowPlaintextForTesting: true);
+        await expectLater(
+          smtp.sendMail(
+            host: '127.0.0.1',
+            port: relay.server.port,
+            username: 'a@example.org',
+            password: 'test',
+            message: message,
+          ),
+          throwsA(isA<JwSmtpOutcomeUnknownException>()),
+        );
+        expect(
+          (await relay.sessionFuture).receivedDataPayload,
+          contains('Subject: Test'),
+        );
+      },
+    );
 
-    test('Reports explicit final DATA rejection as failure, not unknown', () async {
-      final relay = await _startLoopbackSmtpServer(dataResultCode: 550);
-      addTearDown(relay.server.close);
-      final message = JwEmailMessage(id: 'reject', subject: 'Test', from: 'a@example.org', to: 'b@example.org', date: DateTime.utc(2026), bodyText: 'body');
-      const smtp = JwSmtpClient(allowPlaintextForTesting: true);
-      await expectLater(smtp.sendMail(host: '127.0.0.1', port: relay.server.port, username: 'a@example.org', password: 'test', message: message), throwsA(isA<JwEmailConnectionException>().having((e) => e.message, 'rejected', contains('550'))));
-      expect((await relay.sessionFuture).receivedDataPayload, contains('Subject: Test'));
-    });
+    test(
+      'Reports explicit final DATA rejection as failure, not unknown',
+      () async {
+        final relay = await _startLoopbackSmtpServer(dataResultCode: 550);
+        addTearDown(relay.server.close);
+        final message = JwEmailMessage(
+          id: 'reject',
+          subject: 'Test',
+          from: 'a@example.org',
+          to: 'b@example.org',
+          date: DateTime.utc(2026),
+          bodyText: 'body',
+        );
+        const smtp = JwSmtpClient(allowPlaintextForTesting: true);
+        await expectLater(
+          smtp.sendMail(
+            host: '127.0.0.1',
+            port: relay.server.port,
+            username: 'a@example.org',
+            password: 'test',
+            message: message,
+          ),
+          throwsA(
+            isA<JwEmailConnectionException>().having(
+              (e) => e.message,
+              'rejected',
+              contains('550'),
+            ),
+          ),
+        );
+        expect(
+          (await relay.sessionFuture).receivedDataPayload,
+          contains('Subject: Test'),
+        );
+      },
+    );
 
     test('Preserves local-part case in SMTP envelope deduplication', () async {
       final relay = await _startLoopbackSmtpServer();
       addTearDown(relay.server.close);
-      final message = JwEmailMessage(id: 'case', subject: 'Test', from: 'a@example.org', to: 'John@example.org, john@example.org', cc: 'John@EXAMPLE.ORG', date: DateTime.utc(2026), bodyText: 'body');
+      final message = JwEmailMessage(
+        id: 'case',
+        subject: 'Test',
+        from: 'a@example.org',
+        to: 'John@example.org, john@example.org',
+        cc: 'John@EXAMPLE.ORG',
+        date: DateTime.utc(2026),
+        bodyText: 'body',
+      );
       const smtp = JwSmtpClient(allowPlaintextForTesting: true);
-      await smtp.sendMail(host: '127.0.0.1', port: relay.server.port, username: 'a@example.org', password: 'test', message: message);
-      expect((await relay.sessionFuture).receivedRcptTo, ['<John@example.org>', '<john@example.org>']);
+      await smtp.sendMail(
+        host: '127.0.0.1',
+        port: relay.server.port,
+        username: 'a@example.org',
+        password: 'test',
+        message: message,
+      );
+      expect((await relay.sessionFuture).receivedRcptTo, [
+        '<John@example.org>',
+        '<john@example.org>',
+      ]);
     });
 
     test(
@@ -973,42 +1059,82 @@ void main() {
       },
     );
 
-    testWidgets('Uncertain SMTP outcome disables resend and leaves text available', (tester) async {
-      tester.view.physicalSize = const Size(1024, 900);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-      final db = AppDatabase.forTesting(NativeDatabase.memory());
-      addTearDown(db.close);
-      final bio = BiometricAuthService();
-      await tester.runAsync(() async {
-        await bio.setPin('1234');
-        await db.into(db.appKvStore).insert(AppKvStoreCompanion.insert(key: 'jw_imap_email', value: 'a@example.org'));
-        await const FlutterSecureStorage().write(key: 'jw_imap_password', value: 'test');
-      });
-      final smtp = _UncertainSmtpClient();
-      final service = JwEmailService(db: db, biometricAuth: bio, smtpClient: smtp);
-      await tester.pumpWidget(ProviderScope(overrides: [databaseProvider.overrideWithValue(db), biometricAuthServiceProvider.overrideWithValue(bio), jwEmailServiceProvider.overrideWithValue(service)], child: const MaterialApp(home: InboxScreen())));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('JW Mail'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Novo Rascunho'));
-      await tester.pumpAndSettle();
-      await tester.enterText(find.widgetWithText(TextField, 'Para (ex: corpo.anciaos@jw.org)'), 'b@example.org');
-      await tester.enterText(find.widgetWithText(TextField, 'Assunto *'), 'Assunto');
-      await tester.enterText(find.widgetWithText(TextField, 'Conteúdo da Mensagem *'), 'Texto a preservar');
-      final send = find.widgetWithText(FilledButton, 'Enviar Agora (SMTP)');
-      await tester.ensureVisible(send);
-      await tester.tap(send);
-      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
-      await tester.pumpAndSettle();
-      expect(smtp.calls, 1);
-      expect(find.textContaining('Resultado do envio desconhecido'), findsOneWidget);
-      expect(tester.widget<FilledButton>(send).onPressed, isNull);
-      expect(find.text('Texto a preservar'), findsOneWidget);
-      expect(find.text('Salvar Rascunho'), findsOneWidget);
-      await tester.pumpWidget(const SizedBox());
-    });
+    testWidgets(
+      'Uncertain SMTP outcome disables resend and leaves text available',
+      (tester) async {
+        tester.view.physicalSize = const Size(1024, 900);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final db = AppDatabase.forTesting(NativeDatabase.memory());
+        addTearDown(db.close);
+        final bio = BiometricAuthService();
+        await tester.runAsync(() async {
+          await bio.setPin('1234');
+          await db
+              .into(db.appKvStore)
+              .insert(
+                AppKvStoreCompanion.insert(
+                  key: 'jw_imap_email',
+                  value: 'a@example.org',
+                ),
+              );
+          await const FlutterSecureStorage().write(
+            key: 'jw_imap_password',
+            value: 'test',
+          );
+        });
+        final smtp = _UncertainSmtpClient();
+        final service = JwEmailService(
+          db: db,
+          biometricAuth: bio,
+          smtpClient: smtp,
+        );
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              databaseProvider.overrideWithValue(db),
+              biometricAuthServiceProvider.overrideWithValue(bio),
+              jwEmailServiceProvider.overrideWithValue(service),
+            ],
+            child: const MaterialApp(home: InboxScreen()),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('JW Mail'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Novo Rascunho'));
+        await tester.pumpAndSettle();
+        await tester.enterText(
+          find.widgetWithText(TextField, 'Para (ex: corpo.anciaos@jw.org)'),
+          'b@example.org',
+        );
+        await tester.enterText(
+          find.widgetWithText(TextField, 'Assunto *'),
+          'Assunto',
+        );
+        await tester.enterText(
+          find.widgetWithText(TextField, 'Conteúdo da Mensagem *'),
+          'Texto a preservar',
+        );
+        final send = find.widgetWithText(FilledButton, 'Enviar Agora (SMTP)');
+        await tester.ensureVisible(send);
+        await tester.tap(send);
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 50)),
+        );
+        await tester.pumpAndSettle();
+        expect(smtp.calls, 1);
+        expect(
+          find.textContaining('Resultado do envio desconhecido'),
+          findsOneWidget,
+        );
+        expect(tester.widget<FilledButton>(send).onPressed, isNull);
+        expect(find.text('Texto a preservar'), findsOneWidget);
+        expect(find.text('Salvar Rascunho'), findsOneWidget);
+        await tester.pumpWidget(const SizedBox());
+      },
+    );
 
     testWidgets(
       'SettingsScreen exposes SMTP fields and validates runtime Supabase dialog',
