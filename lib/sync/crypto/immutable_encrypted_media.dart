@@ -87,9 +87,10 @@ class ImmutableEncryptedMedia {
 
   static String _newVersionId() {
     final random = Random.secure();
-    return List.generate(16, (_) => random.nextInt(256))
-        .map((value) => value.toRadixString(16).padLeft(2, '0'))
-        .join();
+    return List.generate(
+      16,
+      (_) => random.nextInt(256),
+    ).map((value) => value.toRadixString(16).padLeft(2, '0')).join();
   }
 
   /// Writes a uniquely named version and verifies it by reading it back.
@@ -101,7 +102,8 @@ class ImmutableEncryptedMedia {
   }) async {
     _checkSession();
     _checkInput(bucket, mediaId);
-    if (plaintextBytes.length > EncryptedMedia.chunkSize * EncryptedMedia.maxChunks) {
+    if (plaintextBytes.length >
+        EncryptedMedia.chunkSize * EncryptedMedia.maxChunks) {
       throw ArgumentError('Mídia excede o limite de blocos.');
     }
     final version = _newVersionId();
@@ -117,20 +119,30 @@ class ImmutableEncryptedMedia {
       source: Stream<List<int>>.value(plaintextBytes),
       storeChunk: (index, envelope) async {
         _checkSession();
-        await client.storage.from(bucket).uploadBinary(
-          _path(mediaId, version, 'chunk_$index.enc'),
-          Uint8List.fromList(utf8.encode(jsonEncode(envelope))),
-          fileOptions: const FileOptions(contentType: 'application/octet-stream', upsert: false),
-        );
+        await client.storage
+            .from(bucket)
+            .uploadBinary(
+              _path(mediaId, version, 'chunk_$index.enc'),
+              Uint8List.fromList(utf8.encode(jsonEncode(envelope))),
+              fileOptions: const FileOptions(
+                contentType: 'application/octet-stream',
+                upsert: false,
+              ),
+            );
         _checkSession();
       },
     );
     _checkSession();
-    await client.storage.from(bucket).uploadBinary(
-      _path(mediaId, version, 'manifest.enc'),
-      Uint8List.fromList(utf8.encode(jsonEncode(manifest))),
-      fileOptions: const FileOptions(contentType: 'application/octet-stream', upsert: false),
-    );
+    await client.storage
+        .from(bucket)
+        .uploadBinary(
+          _path(mediaId, version, 'manifest.enc'),
+          Uint8List.fromList(utf8.encode(jsonEncode(manifest))),
+          fileOptions: const FileOptions(
+            contentType: 'application/octet-stream',
+            upsert: false,
+          ),
+        );
     _checkSession();
     // Never return a reference to an unreadable or partially uploaded version.
     await download(bucket: bucket, mediaId: mediaId, reference: reference);
@@ -147,9 +159,9 @@ class ImmutableEncryptedMedia {
     _checkSession();
     _checkInput(bucket, mediaId);
     final version = reference.versionId;
-    final raw = await client.storage.from(bucket).download(
-      _path(mediaId, version, 'manifest.enc'),
-    );
+    final raw = await client.storage
+        .from(bucket)
+        .download(_path(mediaId, version, 'manifest.enc'));
     _checkSession();
     final decoded = jsonDecode(utf8.decode(raw));
     if (decoded is! Map) throw const FormatException('Manifesto inválido.');
@@ -162,9 +174,9 @@ class ImmutableEncryptedMedia {
       manifestEnvelope: Map<String, dynamic>.from(decoded),
       fetchChunk: (index) async {
         _checkSession();
-        final chunk = await client.storage.from(bucket).download(
-          _path(mediaId, version, 'chunk_$index.enc'),
-        );
+        final chunk = await client.storage
+            .from(bucket)
+            .download(_path(mediaId, version, 'chunk_$index.enc'));
         _checkSession();
         final value = jsonDecode(utf8.decode(chunk));
         if (value is! Map) throw const FormatException('Bloco inválido.');

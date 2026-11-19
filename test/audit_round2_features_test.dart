@@ -645,338 +645,335 @@ void main() {
     });
   });
 
-  group(
-    'UI Interactive Flows (DownloadMaps, Inbox SMTP, Settings, Auth, Picker)',
-    () {
-      testWidgets(
-        'DownloadMapsScreen configures base URL and per-region custom URL',
-        (tester) async {
-          final tempDir = Directory.systemTemp.createTempSync('dl_maps_ui_');
-          addTearDown(() {
-            if (tempDir.existsSync()) {
-              try {
-                tempDir.deleteSync(recursive: true);
-              } catch (_) {}
-            }
-          });
-
-          final backend = MBTilesNative(customDir: tempDir);
-          final svc = MBTilesService.custom(backend: backend);
-          await tester.runAsync(() => svc.init());
-          MBTilesService.setMockInstance(svc);
-          addTearDown(() {
-            svc.dispose();
-            backend.dispose();
-            MBTilesService.setMockInstance(MBTilesService.custom());
-          });
-
-          await tester.pumpWidget(
-            const MaterialApp(home: DownloadMapsScreen()),
-          );
-          await tester.pumpAndSettle();
-
-          expect(find.text('Importar .mbtiles local'), findsOneWidget);
-          await tester.tap(find.text('Configurar URL Catálogo'));
-          await tester.pumpAndSettle();
-
-          expect(find.text('URL Base do Catálogo .mbtiles'), findsOneWidget);
-          await tester.enterText(
-            find.byType(TextField).last,
-            'https://mirror.jw.example/mbtiles',
-          );
-          await tester.tap(find.text('Salvar'));
-          await tester.pumpAndSettle();
-
-          expect(
-            svc.customBaseUrl,
-            equals('https://mirror.jw.example/mbtiles'),
-          );
-          expect(find.text('URL Base Personalizada'), findsOneWidget);
-
-          // Open per-region popup menu and configure region-specific custom URL
-          await tester.tap(find.byTooltip('Opções do pacote').first);
-          await tester.pumpAndSettle();
-          await tester.tap(find.text('URL personalizada'));
-          await tester.pumpAndSettle();
-
-          await tester.enterText(
-            find.byType(TextField).last,
-            'https://custom.cdn.example/solimoes_v2.mbtiles',
-          );
-          await tester.tap(find.text('Salvar'));
-          await tester.pumpAndSettle();
-
-          expect(
-            svc.getRegionCustomUrl('br_am_solimoes'),
-            equals('https://custom.cdn.example/solimoes_v2.mbtiles'),
-          );
-        },
-      );
-
-      testWidgets(
-        'InboxScreen compose sheet validates missing credentials and sends via SMTP when configured',
-        (tester) async {
-          tester.view.physicalSize = const Size(1024, 900);
-          tester.view.devicePixelRatio = 1.0;
-          addTearDown(tester.view.resetPhysicalSize);
-          addTearDown(tester.view.resetDevicePixelRatio);
-
-          final db = AppDatabase.forTesting(NativeDatabase.memory());
-          addTearDown(db.close);
-
-          final bio = BiometricAuthService();
-          await tester.runAsync(
-            () => bio.setPin('1234'),
-          ); // Unlocks session for test
-
-          final relay = await tester.runAsync(() => _startLoopbackSmtpServer());
-          addTearDown(relay!.server.close);
-
-          final emailSvc = JwEmailService(
-            db: db,
-            biometricAuth: bio,
-            smtpClient: const JwSmtpClient(allowPlaintextForTesting: true),
-          );
-
-          await tester.pumpWidget(
-            ProviderScope(
-              overrides: [
-                databaseProvider.overrideWithValue(db),
-                biometricAuthServiceProvider.overrideWithValue(bio),
-                jwEmailServiceProvider.overrideWithValue(emailSvc),
-              ],
-              child: const MaterialApp(home: InboxScreen()),
-            ),
-          );
-          await tester.pumpAndSettle();
-
-          // Switch to JW Mail tab
-          await tester.tap(find.text('JW Mail'));
-          await tester.pumpAndSettle();
-
-          // Open compose/draft sheet
-          await tester.tap(find.text('Novo Rascunho'));
-          await tester.pumpAndSettle();
-
-          await tester.enterText(
-            find.widgetWithText(TextField, 'Para (ex: corpo.anciaos@jw.org)'),
-            'secretario@jw.org',
-          );
-          await tester.enterText(
-            find.widgetWithText(TextField, 'Assunto *'),
-            'Relatório UI SMTP',
-          );
-          await tester.enterText(
-            find.widgetWithText(TextField, 'Conteúdo da Mensagem *'),
-            'Enviado direto da UI do InboxScreen.',
-          );
-
-          final sendBtn = find.text('Enviar Agora (SMTP)');
-          await tester.ensureVisible(sendBtn);
-          await tester.pumpAndSettle();
-
-          // Without configured credentials -> clear inline error + shortcut button
-          await tester.tap(sendBtn);
-          await tester.runAsync(
-            () => Future<void>.delayed(const Duration(milliseconds: 50)),
-          );
-          await tester.pumpAndSettle();
-          expect(
-            find.textContaining('Credenciais IMAP/SMTP não configuradas'),
-            findsOneWidget,
-          );
-          expect(find.text('Configurar E-mail/SMTP'), findsOneWidget);
-
-          // Configure credentials in DB + SecureStorage and retry send
-          await tester.runAsync(() async {
-            await db
-                .into(db.appKvStore)
-                .insertOnConflictUpdate(
-                  AppKvStoreCompanion.insert(
-                    key: 'jw_imap_email',
-                    value: 'publicador@jw.org',
-                  ),
-                );
-            await const FlutterSecureStorage().write(
-              key: 'jw_imap_password',
-              value: 'pw123',
-            );
-            await db
-                .into(db.appKvStore)
-                .insertOnConflictUpdate(
-                  AppKvStoreCompanion.insert(
-                    key: 'jw_smtp_host',
-                    value: '127.0.0.1',
-                  ),
-                );
-            await db
-                .into(db.appKvStore)
-                .insertOnConflictUpdate(
-                  AppKvStoreCompanion.insert(
-                    key: 'jw_smtp_port',
-                    value: relay.server.port.toString(),
-                  ),
-                );
-          });
-
-          Object? capturedSession;
-          var sessionDone = false;
-          relay.sessionFuture.then((s) {
-            capturedSession = s;
-            sessionDone = true;
-          });
-
-          await tester.ensureVisible(sendBtn);
-          await tester.pumpAndSettle();
-          await tester.tap(sendBtn);
-
-          for (int i = 0; i < 120 && !sessionDone; i++) {
-            await tester.runAsync(
-              () => Future<void>.delayed(const Duration(milliseconds: 25)),
-            );
-            await tester.pump(const Duration(milliseconds: 25));
+  group('UI Interactive Flows (DownloadMaps, Inbox SMTP, Settings, Auth, Picker)', () {
+    testWidgets(
+      'DownloadMapsScreen configures base URL and per-region custom URL',
+      (tester) async {
+        final tempDir = Directory.systemTemp.createTempSync('dl_maps_ui_');
+        addTearDown(() {
+          if (tempDir.existsSync()) {
+            try {
+              tempDir.deleteSync(recursive: true);
+            } catch (_) {}
           }
+        });
 
-          expect(
-            sessionDone,
-            isTrue,
-            reason: 'SMTP session did not complete in time',
-          );
-          final captured = capturedSession! as _CapturedSmtpSession;
-          await tester.pumpAndSettle();
-          expect(captured.receivedMailFrom, equals('<publicador@jw.org>'));
-          expect(captured.receivedRcptTo, equals(['<secretario@jw.org>']));
-          expect(captured.receivedDataPayload, isNotNull,
-              reason: 'SMTP connection ended before the message was accepted: ${captured.socketError}');
-          expect(captured.receivedDataPayload, contains('Content-Transfer-Encoding: base64'));
+        final backend = MBTilesNative(customDir: tempDir);
+        final svc = MBTilesService.custom(backend: backend);
+        await tester.runAsync(() => svc.init());
+        MBTilesService.setMockInstance(svc);
+        addTearDown(() {
+          svc.dispose();
+          backend.dispose();
+          MBTilesService.setMockInstance(MBTilesService.custom());
+        });
 
-          await tester.pumpWidget(const SizedBox());
-          await tester.pump(const Duration(milliseconds: 100));
-        },
-      );
+        await tester.pumpWidget(const MaterialApp(home: DownloadMapsScreen()));
+        await tester.pumpAndSettle();
 
-      testWidgets(
-        'SettingsScreen exposes SMTP fields and validates runtime Supabase dialog',
-        (tester) async {
-          tester.view.physicalSize = const Size(1024, 900);
-          tester.view.devicePixelRatio = 1.0;
-          addTearDown(tester.view.resetPhysicalSize);
-          addTearDown(tester.view.resetDevicePixelRatio);
+        expect(find.text('Importar .mbtiles local'), findsOneWidget);
+        await tester.tap(find.text('Configurar URL Catálogo'));
+        await tester.pumpAndSettle();
 
-          final db = AppDatabase.forTesting(NativeDatabase.memory());
-          addTearDown(db.close);
+        expect(find.text('URL Base do Catálogo .mbtiles'), findsOneWidget);
+        await tester.enterText(
+          find.byType(TextField).last,
+          'https://mirror.jw.example/mbtiles',
+        );
+        await tester.tap(find.text('Salvar'));
+        await tester.pumpAndSettle();
 
-          await tester.pumpWidget(
-            ProviderScope(
-              overrides: [databaseProvider.overrideWithValue(db)],
-              child: const MaterialApp(home: SettingsScreen()),
-            ),
-          );
-          await tester.pumpAndSettle();
+        expect(svc.customBaseUrl, equals('https://mirror.jw.example/mbtiles'));
+        expect(find.text('URL Base Personalizada'), findsOneWidget);
 
-          expect(find.text('Servidor SMTP (Saída)'), findsOneWidget);
-          expect(find.text('STARTTLS (587)'), findsOneWidget);
-          expect(find.text('SSL/TLS (465)'), findsOneWidget);
+        // Open per-region popup menu and configure region-specific custom URL
+        await tester.tap(find.byTooltip('Opções do pacote').first);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('URL personalizada'));
+        await tester.pumpAndSettle();
 
-          await tester.scrollUntilVisible(
-            find.text('Configurar Supabase (URL/Chave)'),
-            300,
-            scrollable: find.byType(Scrollable).first,
-          );
-          await tester.ensureVisible(
-            find.text('Configurar Supabase (URL/Chave)'),
-          );
-          await tester.pumpAndSettle();
-          await tester.tap(find.text('Configurar Supabase (URL/Chave)'));
-          await tester.pumpAndSettle();
+        await tester.enterText(
+          find.byType(TextField).last,
+          'https://custom.cdn.example/solimoes_v2.mbtiles',
+        );
+        await tester.tap(find.text('Salvar'));
+        await tester.pumpAndSettle();
 
-          expect(find.text('Configuração Runtime do Supabase'), findsOneWidget);
-          expect(
-            find.textContaining('A sincronização em nuvem permanece pausada.'),
-            findsOneWidget,
-          );
-          await tester.tap(find.text('Salvar e Conectar'));
-          await tester.pumpAndSettle();
-          expect(
-            find.textContaining('Informe a URL do projeto Supabase'),
-            findsOneWidget,
-          );
+        expect(
+          svc.getRegionCustomUrl('br_am_solimoes'),
+          equals('https://custom.cdn.example/solimoes_v2.mbtiles'),
+        );
+      },
+    );
 
-          await tester.tap(find.text('Cancelar'));
-          await tester.pumpAndSettle();
-          await tester.scrollUntilVisible(
-            find.text('Zerar Banco Local'),
-            -300,
-            scrollable: find.byType(Scrollable).first,
-          );
-          await tester.ensureVisible(find.text('Zerar Banco Local'));
-          await tester.pumpAndSettle();
-          await tester.tap(find.text('Zerar Banco Local'));
-          await tester.pumpAndSettle();
-          expect(
-            find.textContaining('não serão restaurados automaticamente'),
-            findsOneWidget,
-          );
-          await tester.tap(find.text('Cancelar'));
-          await tester.pumpAndSettle();
-          await tester.pumpWidget(const SizedBox());
-          await tester.pump(const Duration(milliseconds: 100));
-        },
-      );
+    testWidgets(
+      'InboxScreen compose sheet validates missing credentials and sends via SMTP when configured',
+      (tester) async {
+        tester.view.physicalSize = const Size(1024, 900);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
 
-      testWidgets(
-        'SupabaseAuthScreen displays friendly message when Supabase is uninitialized',
-        (tester) async {
-          await tester.pumpWidget(
-            MaterialApp(home: SupabaseAuthScreen(onAuthenticated: () {})),
-          );
-          await tester.enterText(
-            find.widgetWithText(TextField, 'E-mail *'),
-            'user@jw.org',
-          );
-          await tester.enterText(
-            find.widgetWithText(TextField, 'Senha *'),
-            '123456',
-          );
-          await tester.tap(find.text('Entrar'));
-          await tester.pumpAndSettle();
+        final db = AppDatabase.forTesting(NativeDatabase.memory());
+        addTearDown(db.close);
 
-          expect(
-            find.textContaining('Servidor de nuvem ainda não configurado'),
-            findsOneWidget,
-          );
-        },
-      );
+        final bio = BiometricAuthService();
+        await tester.runAsync(
+          () => bio.setPin('1234'),
+        ); // Unlocks session for test
 
-      testWidgets(
-        'MapLocationPickerDialog handles GPS denial cleanly with and without initial coords',
-        (tester) async {
-          GeolocationHelper.locationOverride = () async =>
-              const GeolocationResult(
-                status: GeolocationStatus.permissionDenied,
-              );
+        final relay = await tester.runAsync(() => _startLoopbackSmtpServer());
+        addTearDown(relay!.server.close);
 
-          await tester.pumpWidget(
-            const MaterialApp(
-              home: Scaffold(
-                body: MapLocationPickerDialog(
-                  initialLat: -3.15,
-                  initialLng: -67.90,
+        final emailSvc = JwEmailService(
+          db: db,
+          biometricAuth: bio,
+          smtpClient: const JwSmtpClient(allowPlaintextForTesting: true),
+        );
+
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              databaseProvider.overrideWithValue(db),
+              biometricAuthServiceProvider.overrideWithValue(bio),
+              jwEmailServiceProvider.overrideWithValue(emailSvc),
+            ],
+            child: const MaterialApp(home: InboxScreen()),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Switch to JW Mail tab
+        await tester.tap(find.text('JW Mail'));
+        await tester.pumpAndSettle();
+
+        // Open compose/draft sheet
+        await tester.tap(find.text('Novo Rascunho'));
+        await tester.pumpAndSettle();
+
+        await tester.enterText(
+          find.widgetWithText(TextField, 'Para (ex: corpo.anciaos@jw.org)'),
+          'secretario@jw.org',
+        );
+        await tester.enterText(
+          find.widgetWithText(TextField, 'Assunto *'),
+          'Relatório UI SMTP',
+        );
+        await tester.enterText(
+          find.widgetWithText(TextField, 'Conteúdo da Mensagem *'),
+          'Enviado direto da UI do InboxScreen.',
+        );
+
+        final sendBtn = find.text('Enviar Agora (SMTP)');
+        await tester.ensureVisible(sendBtn);
+        await tester.pumpAndSettle();
+
+        // Without configured credentials -> clear inline error + shortcut button
+        await tester.tap(sendBtn);
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 50)),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find.textContaining('Credenciais IMAP/SMTP não configuradas'),
+          findsOneWidget,
+        );
+        expect(find.text('Configurar E-mail/SMTP'), findsOneWidget);
+
+        // Configure credentials in DB + SecureStorage and retry send
+        await tester.runAsync(() async {
+          await db
+              .into(db.appKvStore)
+              .insertOnConflictUpdate(
+                AppKvStoreCompanion.insert(
+                  key: 'jw_imap_email',
+                  value: 'publicador@jw.org',
                 ),
+              );
+          await const FlutterSecureStorage().write(
+            key: 'jw_imap_password',
+            value: 'pw123',
+          );
+          await db
+              .into(db.appKvStore)
+              .insertOnConflictUpdate(
+                AppKvStoreCompanion.insert(
+                  key: 'jw_smtp_host',
+                  value: '127.0.0.1',
+                ),
+              );
+          await db
+              .into(db.appKvStore)
+              .insertOnConflictUpdate(
+                AppKvStoreCompanion.insert(
+                  key: 'jw_smtp_port',
+                  value: relay.server.port.toString(),
+                ),
+              );
+        });
+
+        Object? capturedSession;
+        var sessionDone = false;
+        relay.sessionFuture.then((s) {
+          capturedSession = s;
+          sessionDone = true;
+        });
+
+        await tester.ensureVisible(sendBtn);
+        await tester.pumpAndSettle();
+        await tester.tap(sendBtn);
+
+        for (int i = 0; i < 120 && !sessionDone; i++) {
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 25)),
+          );
+          await tester.pump(const Duration(milliseconds: 25));
+        }
+
+        expect(
+          sessionDone,
+          isTrue,
+          reason: 'SMTP session did not complete in time',
+        );
+        final captured = capturedSession! as _CapturedSmtpSession;
+        await tester.pumpAndSettle();
+        expect(captured.receivedMailFrom, equals('<publicador@jw.org>'));
+        expect(captured.receivedRcptTo, equals(['<secretario@jw.org>']));
+        expect(
+          captured.receivedDataPayload,
+          isNotNull,
+          reason:
+              'SMTP connection ended before the message was accepted: ${captured.socketError}',
+        );
+        expect(
+          captured.receivedDataPayload,
+          contains('Content-Transfer-Encoding: base64'),
+        );
+
+        await tester.pumpWidget(const SizedBox());
+        await tester.pump(const Duration(milliseconds: 100));
+      },
+    );
+
+    testWidgets(
+      'SettingsScreen exposes SMTP fields and validates runtime Supabase dialog',
+      (tester) async {
+        tester.view.physicalSize = const Size(1024, 900);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        final db = AppDatabase.forTesting(NativeDatabase.memory());
+        addTearDown(db.close);
+
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [databaseProvider.overrideWithValue(db)],
+            child: const MaterialApp(home: SettingsScreen()),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Servidor SMTP (Saída)'), findsOneWidget);
+        expect(find.text('STARTTLS (587)'), findsOneWidget);
+        expect(find.text('SSL/TLS (465)'), findsOneWidget);
+
+        await tester.scrollUntilVisible(
+          find.text('Configurar Supabase (URL/Chave)'),
+          300,
+          scrollable: find.byType(Scrollable).first,
+        );
+        await tester.ensureVisible(
+          find.text('Configurar Supabase (URL/Chave)'),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Configurar Supabase (URL/Chave)'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Configuração Runtime do Supabase'), findsOneWidget);
+        expect(
+          find.textContaining('A sincronização em nuvem permanece pausada.'),
+          findsOneWidget,
+        );
+        await tester.tap(find.text('Salvar e Conectar'));
+        await tester.pumpAndSettle();
+        expect(
+          find.textContaining('Informe a URL do projeto Supabase'),
+          findsOneWidget,
+        );
+
+        await tester.tap(find.text('Cancelar'));
+        await tester.pumpAndSettle();
+        await tester.scrollUntilVisible(
+          find.text('Zerar Banco Local'),
+          -300,
+          scrollable: find.byType(Scrollable).first,
+        );
+        await tester.ensureVisible(find.text('Zerar Banco Local'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Zerar Banco Local'));
+        await tester.pumpAndSettle();
+        expect(
+          find.textContaining('não serão restaurados automaticamente'),
+          findsOneWidget,
+        );
+        await tester.tap(find.text('Cancelar'));
+        await tester.pumpAndSettle();
+        await tester.pumpWidget(const SizedBox());
+        await tester.pump(const Duration(milliseconds: 100));
+      },
+    );
+
+    testWidgets(
+      'SupabaseAuthScreen displays friendly message when Supabase is uninitialized',
+      (tester) async {
+        await tester.pumpWidget(
+          MaterialApp(home: SupabaseAuthScreen(onAuthenticated: () {})),
+        );
+        await tester.enterText(
+          find.widgetWithText(TextField, 'E-mail *'),
+          'user@jw.org',
+        );
+        await tester.enterText(
+          find.widgetWithText(TextField, 'Senha *'),
+          '123456',
+        );
+        await tester.tap(find.text('Entrar'));
+        await tester.pumpAndSettle();
+
+        expect(
+          find.textContaining('Servidor de nuvem ainda não configurado'),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets(
+      'MapLocationPickerDialog handles GPS denial cleanly with and without initial coords',
+      (tester) async {
+        GeolocationHelper.locationOverride = () async =>
+            const GeolocationResult(status: GeolocationStatus.permissionDenied);
+
+        await tester.pumpWidget(
+          const MaterialApp(
+            home: Scaffold(
+              body: MapLocationPickerDialog(
+                initialLat: -3.15,
+                initialLng: -67.90,
               ),
             ),
-          );
-          await tester.pumpAndSettle();
+          ),
+        );
+        await tester.pumpAndSettle();
 
-          await tester.tap(find.byTooltip('Minha Posição GPS'));
-          await tester.pumpAndSettle();
+        await tester.tap(find.byTooltip('Minha Posição GPS'));
+        await tester.pumpAndSettle();
 
-          expect(find.textContaining('Mantendo o ponto atual'), findsOneWidget);
-          expect(find.textContaining('-3.150000, -67.900000'), findsOneWidget);
-        },
-      );
-    },
-  );
+        expect(find.textContaining('Mantendo o ponto atual'), findsOneWidget);
+        expect(find.textContaining('-3.150000, -67.900000'), findsOneWidget);
+      },
+    );
+  });
 
   group('Supabase Runtime Config & Web Tile CSP', () {
     test(

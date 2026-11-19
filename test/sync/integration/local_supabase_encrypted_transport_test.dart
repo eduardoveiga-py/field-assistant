@@ -170,56 +170,176 @@ void main() {
         );
 
         // Empty and multi-chunk versions round-trip independently.
-        final immutable = ImmutableEncryptedMedia(client: alice, owner: ownerA, key: key);
-        for (final bytes in [Uint8List(0), Uint8List.fromList(List<int>.generate(256 * 1024 + 19, (i) => i % 251))]) {
-          final ref = await immutable.stage(bucket: 'voice_notes', mediaId: 'edge-media', plaintextBytes: bytes);
-          expect(await immutable.download(bucket: 'voice_notes', mediaId: 'edge-media', reference: ref), bytes);
-          final badHash = ImmutableMediaReference(versionId: ref.versionId, sizeBytes: ref.sizeBytes, sha256: '0' * 64);
-          await expectLater(immutable.download(bucket: 'voice_notes', mediaId: 'edge-media', reference: badHash), throwsFormatException);
+        final immutable = ImmutableEncryptedMedia(
+          client: alice,
+          owner: ownerA,
+          key: key,
+        );
+        for (final bytes in [
+          Uint8List(0),
+          Uint8List.fromList(
+            List<int>.generate(256 * 1024 + 19, (i) => i % 251),
+          ),
+        ]) {
+          final ref = await immutable.stage(
+            bucket: 'voice_notes',
+            mediaId: 'edge-media',
+            plaintextBytes: bytes,
+          );
+          expect(
+            await immutable.download(
+              bucket: 'voice_notes',
+              mediaId: 'edge-media',
+              reference: ref,
+            ),
+            bytes,
+          );
+          final badHash = ImmutableMediaReference(
+            versionId: ref.versionId,
+            sizeBytes: ref.sizeBytes,
+            sha256: '0' * 64,
+          );
+          await expectLater(
+            immutable.download(
+              bucket: 'voice_notes',
+              mediaId: 'edge-media',
+              reference: badHash,
+            ),
+            throwsFormatException,
+          );
         }
-        expect(() => ImmutableMediaReference.fromJson({'format': 2, 'versionId': '../escape', 'sizeBytes': -1, 'sha256': '0' * 64}), throwsFormatException);
+        expect(
+          () => ImmutableMediaReference.fromJson({
+            'format': 2,
+            'versionId': '../escape',
+            'sizeBytes': -1,
+            'sha256': '0' * 64,
+          }),
+          throwsFormatException,
+        );
 
         // Two clients stage different immutable versions and race the CAS.
-        final stagedA = ImmutableEncryptedMedia(client: alice, owner: ownerA, key: key);
-        final stagedB = ImmutableEncryptedMedia(client: aliceDevice2, owner: ownerA, key: key2);
-        final payloadA = Uint8List.fromList(utf8.encode('fictional media version A'));
-        final payloadB = Uint8List.fromList(utf8.encode('fictional media version B'));
+        final stagedA = ImmutableEncryptedMedia(
+          client: alice,
+          owner: ownerA,
+          key: key,
+        );
+        final stagedB = ImmutableEncryptedMedia(
+          client: aliceDevice2,
+          owner: ownerA,
+          key: key2,
+        );
+        final payloadA = Uint8List.fromList(
+          utf8.encode('fictional media version A'),
+        );
+        final payloadB = Uint8List.fromList(
+          utf8.encode('fictional media version B'),
+        );
         final refs = await Future.wait([
-          stagedA.stage(bucket: 'voice_notes', mediaId: 'race-media', plaintextBytes: payloadA),
-          stagedB.stage(bucket: 'voice_notes', mediaId: 'race-media', plaintextBytes: payloadB),
+          stagedA.stage(
+            bucket: 'voice_notes',
+            mediaId: 'race-media',
+            plaintextBytes: payloadA,
+          ),
+          stagedB.stage(
+            bucket: 'voice_notes',
+            mediaId: 'race-media',
+            plaintextBytes: payloadB,
+          ),
         ]);
         expect(refs[0].versionId, isNot(refs[1].versionId));
         final writes = await Future.wait([
-          syncA.write(entityType: 'voice_notes', entityId: 'race-media', expectedRevision: 0, data: {'media': refs[0].toJson()}),
-          syncA2.write(entityType: 'voice_notes', entityId: 'race-media', expectedRevision: 0, data: {'media': refs[1].toJson()}),
+          syncA.write(
+            entityType: 'voice_notes',
+            entityId: 'race-media',
+            expectedRevision: 0,
+            data: {'media': refs[0].toJson()},
+          ),
+          syncA2.write(
+            entityType: 'voice_notes',
+            entityId: 'race-media',
+            expectedRevision: 0,
+            data: {'media': refs[1].toJson()},
+          ),
         ]);
         expect(writes.where((result) => result.success).length, 1);
         expect(writes.where((result) => !result.success).length, 1);
-        final committed = await syncA2.read(entityType: 'voice_notes', entityId: 'race-media');
+        final committed = await syncA2.read(
+          entityType: 'voice_notes',
+          entityId: 'race-media',
+        );
         final data = Map<String, dynamic>.from(committed!['data'] as Map);
-        final winner = ImmutableMediaReference.fromJson(Map<String, dynamic>.from(data['media'] as Map));
-        final winnerBytes = winner.versionId == refs[0].versionId ? payloadA : payloadB;
-        expect(await stagedB.download(bucket: 'voice_notes', mediaId: 'race-media', reference: winner), winnerBytes);
+        final winner = ImmutableMediaReference.fromJson(
+          Map<String, dynamic>.from(data['media'] as Map),
+        );
+        final winnerBytes = winner.versionId == refs[0].versionId
+            ? payloadA
+            : payloadB;
+        expect(
+          await stagedB.download(
+            bucket: 'voice_notes',
+            mediaId: 'race-media',
+            reference: winner,
+          ),
+          winnerBytes,
+        );
         // Neither the losing version nor the winning version is purged.
-        expect(await stagedA.download(bucket: 'voice_notes', mediaId: 'race-media', reference: refs[0]), payloadA);
-        expect(await stagedB.download(bucket: 'voice_notes', mediaId: 'race-media', reference: refs[1]), payloadB);
+        expect(
+          await stagedA.download(
+            bucket: 'voice_notes',
+            mediaId: 'race-media',
+            reference: refs[0],
+          ),
+          payloadA,
+        );
+        expect(
+          await stagedB.download(
+            bucket: 'voice_notes',
+            mediaId: 'race-media',
+            reference: refs[1],
+          ),
+          payloadB,
+        );
         await expectLater(
-          ImmutableEncryptedMedia(client: bob, owner: ownerA, key: key)
-              .download(bucket: 'voice_notes', mediaId: 'race-media', reference: winner),
+          ImmutableEncryptedMedia(
+            client: bob,
+            owner: ownerA,
+            key: key,
+          ).download(
+            bucket: 'voice_notes',
+            mediaId: 'race-media',
+            reference: winner,
+          ),
           throwsStateError,
         );
         // Copying valid ciphertext to a different version cannot authenticate.
         const forgedVersion = '00000000000000000000000000000000';
         final prefix = '$ownerA/e2ee/race-media';
         for (final name in ['manifest.enc', 'chunk_0.enc']) {
-          final copied = await alice.storage.from('voice_notes').download('$prefix/v2_${refs[0].versionId}/$name');
-          await alice.storage.from('voice_notes').uploadBinary(
-            '$prefix/v2_$forgedVersion/$name', copied,
-            fileOptions: const FileOptions(upsert: false),
-          );
+          final copied = await alice.storage
+              .from('voice_notes')
+              .download('$prefix/v2_${refs[0].versionId}/$name');
+          await alice.storage
+              .from('voice_notes')
+              .uploadBinary(
+                '$prefix/v2_$forgedVersion/$name',
+                copied,
+                fileOptions: const FileOptions(upsert: false),
+              );
         }
-        final forged = ImmutableMediaReference(versionId: forgedVersion, sizeBytes: refs[0].sizeBytes, sha256: refs[0].sha256);
-        await expectLater(stagedA.download(bucket: 'voice_notes', mediaId: 'race-media', reference: forged), throwsA(anything));
+        final forged = ImmutableMediaReference(
+          versionId: forgedVersion,
+          sizeBytes: refs[0].sizeBytes,
+          sha256: refs[0].sha256,
+        );
+        await expectLater(
+          stagedA.download(
+            bucket: 'voice_notes',
+            mediaId: 'race-media',
+            reference: forged,
+          ),
+          throwsA(anything),
+        );
 
         final media = EncryptedMediaTransfer(
           client: alice,
