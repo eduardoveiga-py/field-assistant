@@ -97,14 +97,28 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
-          channel: 'stable'
+          flutter-version: '3.47.8'
           cache: true
 
       - name: Install Dependencies
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
 
       - name: Verify Formatting Across Entire Repository (lib, test, integration_test)
-        run: dart format --output=none --set-exit-if-changed lib test integration_test
+        shell: bash
+        run: |
+          set +e
+          dart format --output=none --set-exit-if-changed lib test integration_test > /tmp/format.txt 2>&1
+          status=$?
+          cat /tmp/format.txt
+          if [ "$status" -ne 0 ]; then
+            python3 - <<'PYCODE'
+          from pathlib import Path
+          lines = Path('/tmp/format.txt').read_text().splitlines()
+          message = '\n'.join(lines)
+          print('::error::' + message.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A'))
+          PYCODE
+          fi
+          exit "$status"
 
       - name: Check Outdated Dependencies (Informative M11)
         run: flutter pub outdated --no-dev-dependencies || true
@@ -154,7 +168,7 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
-          channel: 'stable'
+          flutter-version: '3.47.8'
           cache: true
 
       - name: Enable Linux Desktop
@@ -165,7 +179,7 @@ jobs:
           fi
 
       - name: Install Dependencies
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
 
       - name: Run Headless Integration Test
         run: xvfb-run -a flutter test integration_test/app_stabilization_e2e_test.dart -d linux
@@ -187,11 +201,11 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
-          channel: 'stable'
+          flutter-version: '3.47.8'
           cache: true
 
       - name: Install Dependencies
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
 
       - name: Inject Optional Web Client ID & Build Defines
         env:
@@ -297,7 +311,7 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
-          channel: 'stable'
+          flutter-version: '3.47.8'
           cache: true
 
       - name: Setup Xcode
@@ -306,7 +320,7 @@ jobs:
           xcode-version: latest-stable
 
       - name: Install Dependencies
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
 
       - name: Inject Optional iOS Client ID & Build Defines
         env:
@@ -375,14 +389,14 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
-          channel: 'stable'
+          flutter-version: '3.47.8'
           cache: true
 
       - name: Enable Windows Desktop
         run: flutter config --enable-windows-desktop
 
       - name: Install Dependencies
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
 
       - name: Build Windows Executable
         shell: pwsh
@@ -439,7 +453,7 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
-          channel: 'stable'
+          flutter-version: '3.47.8'
           cache: true
 
       - name: Enable Linux Desktop
@@ -450,7 +464,7 @@ jobs:
           fi
 
       - name: Install Dependencies
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
 
       - name: Build Linux (Release)
         env:
@@ -489,7 +503,7 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
-          channel: 'stable'
+          flutter-version: '3.47.8'
           cache: true
 
       - name: Setup Xcode
@@ -505,7 +519,7 @@ jobs:
           fi
 
       - name: Install Dependencies
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
 
       - name: Build macOS (Release)
         env:

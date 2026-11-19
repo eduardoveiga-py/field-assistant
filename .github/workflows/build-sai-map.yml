@@ -2,7 +2,7 @@ name: Build experimental SAI offline map
 on:
   push:
     branches: ['arena/**']
-    paths: ['tool/map/**', '.github/workflows/build-sai-map.yml']
+    paths: ['tool/map/build_sai.sh', 'tool/map/render_sai_qgis.py', 'tool/map/verify_sai.py', 'tool/map/verify_full_extent.py']
   workflow_dispatch:
 permissions:
   contents: read

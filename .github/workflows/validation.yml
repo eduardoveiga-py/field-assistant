@@ -34,7 +34,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
-          channel: stable
+          flutter-version: '3.47.8'
           cache: true
       - name: Resolve locked dependencies
         shell: bash
@@ -89,16 +89,16 @@ jobs:
           fi
           exit "$status"
   containment_diagnostics:
-    name: Containment diagnostics (unlocked dependencies)
+    name: Containment diagnostics (locked dependencies)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
-          channel: stable
+          flutter-version: '3.47.8'
           cache: true
-      # Additional diagnostic only: does not replace the strict-lockfile gate.
-      - run: flutter pub get
+      # Additional focused diagnostics use the same strict lockfile.
+      - run: flutter pub get --enforce-lockfile
       - name: Analyze containment changes
         shell: bash
         run: |
@@ -142,9 +142,9 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
-          channel: stable
+          flutter-version: '3.47.8'
           cache: true
-      - run: flutter pub get
+      - run: flutter pub get --enforce-lockfile
       - name: Test and summarize failures
         shell: bash
         env:
@@ -170,10 +170,10 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
-          channel: stable
+          flutter-version: '3.47.8'
           cache: true
       - run: flutter config --enable-windows-desktop
-      - run: flutter pub get
+      - run: flutter pub get --enforce-lockfile
       - name: Compile Windows
         shell: pwsh
         run: |
@@ -190,9 +190,9 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
-          channel: stable
+          flutter-version: '3.47.8'
           cache: true
-      - run: flutter pub get
+      - run: flutter pub get --enforce-lockfile
       - name: Compile iOS without signing
         shell: bash
         run: |
