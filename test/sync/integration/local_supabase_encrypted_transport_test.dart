@@ -20,9 +20,11 @@ void main() {
       final anonKey = Platform.environment['FA_LOCAL_SUPABASE_ANON_KEY'];
       if (anonKey == null || anonKey.isEmpty)
         throw StateError('Local anonymous key missing');
-      final alice = SupabaseClient(localUrl, anonKey);
-      final aliceDevice2 = SupabaseClient(localUrl, anonKey);
-      final bob = SupabaseClient(localUrl, anonKey);
+      // Local signup has no browser redirect or PKCE verifier persistence.
+      const authOptions = AuthClientOptions(authFlowType: AuthFlowType.implicit);
+      final alice = SupabaseClient(localUrl, anonKey, authOptions: authOptions);
+      final aliceDevice2 = SupabaseClient(localUrl, anonKey, authOptions: authOptions);
+      final bob = SupabaseClient(localUrl, anonKey, authOptions: authOptions);
       const password = 'local-test-password-only-2026';
       final suffix = DateTime.now().microsecondsSinceEpoch;
       final emailA = 'fa-test-a-$suffix@example.com';
