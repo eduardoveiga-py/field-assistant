@@ -25,7 +25,11 @@ void main() {
     addTearDown(client.close);
     addTearDown(TileCacheWeb.clearCache);
     final cache = TileCacheWeb(httpClient: client);
-    for (final style in [MapLayerStyle.satellite, MapLayerStyle.topo, MapLayerStyle.dark]) {
+    for (final style in [
+      MapLayerStyle.satellite,
+      MapLayerStyle.topo,
+      MapLayerStyle.dark,
+    ]) {
       requests.clear();
       expect(await cache.getTile(7, 3, 4, style), isNull);
       expect(requests, hasLength(1));
@@ -33,24 +37,35 @@ void main() {
     }
     requests.clear();
     expect(await cache.getTile(7, 3, 4, MapLayerStyle.standard), [1, 2, 3]);
-    expect(requests.map((uri) => uri.host), ['tile.openstreetmap.org', 'a.tile.openstreetmap.fr']);
+    expect(requests.map((uri) => uri.host), [
+      'tile.openstreetmap.org',
+      'a.tile.openstreetmap.fr',
+    ]);
   });
 
-  testWidgets('missing vector source offers an explicit return to raster', (tester) async {
+  testWidgets('missing vector source offers an explicit return to raster', (
+    tester,
+  ) async {
     final adapter = MaplibreNativeAdapter();
     addTearDown(adapter.dispose);
     var raster = false;
-    await tester.pumpWidget(MaterialApp(home: StatefulBuilder(
-      builder: (context, setState) => Scaffold(body: raster
-          ? const Text('Raster ativo')
-          : MapLibreVectorMapView(
-              adapter: adapter,
-              initialLat: -3.1,
-              initialLng: -60,
-              initialZoom: 12,
-              onSwitchToRaster: () => setState(() => raster = true),
-            )),
-    )));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StatefulBuilder(
+          builder: (context, setState) => Scaffold(
+            body: raster
+                ? const Text('Raster ativo')
+                : MapLibreVectorMapView(
+                    adapter: adapter,
+                    initialLat: -3.1,
+                    initialLng: -60,
+                    initialZoom: 12,
+                    onSwitchToRaster: () => setState(() => raster = true),
+                  ),
+          ),
+        ),
+      ),
+    );
     expect(find.text('Voltar ao mapa raster'), findsOneWidget);
     expect(find.text('Raster ativo'), findsNothing);
     await tester.tap(find.text('Voltar ao mapa raster'));

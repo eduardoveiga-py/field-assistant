@@ -106,7 +106,10 @@ class _MapLibreVectorMapViewState extends State<MapLibreVectorMapView> {
   Future<void> _prepareStyle() async {
     final generation = ++_styleGeneration;
     final adapter = widget.adapter;
-    bool current() => mounted && generation == _styleGeneration && identical(adapter, widget.adapter);
+    bool current() =>
+        mounted &&
+        generation == _styleGeneration &&
+        identical(adapter, widget.adapter);
     try {
       if (!adapter.isInitialized) {
         await adapter.initialize();
