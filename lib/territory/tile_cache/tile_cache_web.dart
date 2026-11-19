@@ -114,7 +114,11 @@ class TileCacheWeb implements TileCacheBackend {
         AppLogger.debug('Falha ao buscar tile primário Web ($z/$x/$y): $e', st);
       }
 
-      // 2ª Tentativa: Fallback OSM France (alta disponibilidade)
+      // OSM France é equivalente apenas ao estilo padrão. Nunca armazenar
+      // ruas comuns como se fossem satélite, relevo ou modo noturno.
+      if (s != MapLayerStyle.standard) return null;
+
+      // 2ª tentativa para o estilo padrão: OSM France.
       final fallbackUri = Uri.parse(
         'https://a.tile.openstreetmap.fr/osmfr/$z/$x/$y.png',
       );

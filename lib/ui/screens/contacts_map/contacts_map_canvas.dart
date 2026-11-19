@@ -355,6 +355,14 @@ extension _ContactsMapCanvas on _ContactsMapScreenState {
                     _rotationNotifier.value =
                         vp.bearingDegrees * (math.pi / 180.0);
                   },
+                  onSwitchToRaster: widget.mapEngineAdapter == null
+                      ? () {
+                          setState(() {
+                            _enginePreference = MapEnginePreference.rasterFallback;
+                            _configureMapEngine(disposePrevious: true);
+                          });
+                        }
+                      : null,
                   onContactTapped: (contactId) {
                     for (final p in orderedContacts) {
                       if (p.id == contactId) {

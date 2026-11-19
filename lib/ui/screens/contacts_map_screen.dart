@@ -126,9 +126,10 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
     _activeVectorPackageId = selection.activePackageId;
     _activeVectorPackageFormat = selection.activePackageFormat;
 
-    _mapEngineAdapter.initialize().then((_) {
-      if (mounted) {
-        _mapEngineAdapter.moveCamera(
+    final initializingAdapter = _mapEngineAdapter;
+    initializingAdapter.initialize().then((_) {
+      if (mounted && identical(_mapEngineAdapter, initializingAdapter)) {
+        initializingAdapter.moveCamera(
           MapViewportState(
             latitude: _activeCenterLat ?? GeolocationHelper.defaultLat,
             longitude: _activeCenterLng ?? GeolocationHelper.defaultLng,

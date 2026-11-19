@@ -33,6 +33,7 @@ class MapLibreVectorMapView extends StatefulWidget {
   final ValueChanged<MapViewportState>? onCameraChanged;
   final ValueChanged<String>? onContactTapped;
   final ValueChanged<String>? onLandmarkTapped;
+  final VoidCallback? onSwitchToRaster;
 
   const MapLibreVectorMapView({
     super.key,
@@ -51,6 +52,7 @@ class MapLibreVectorMapView extends StatefulWidget {
     this.onCameraChanged,
     this.onContactTapped,
     this.onLandmarkTapped,
+    this.onSwitchToRaster,
   });
 
   /// Indica se o plugin `maplibre_gl` possui implementação nativa na plataforma atual.
@@ -69,12 +71,15 @@ class _MapLibreVectorMapViewState extends State<MapLibreVectorMapView> {
   String? _styleJson;
   bool _styleLoaded = false;
   Object? _initError;
+  int _styleGeneration = 0;
 
   @override
   void initState() {
     super.initState();
-    unawaited(_prepareStyle());
+    if (!_hasNoSource) unawaited(_prepareStyle());
   }
+
+  bool get _hasNoSource => kIsWeb || widget.packageId == null;
 
   @override
   void didUpdateWidget(covariant MapLibreVectorMapView oldWidget) {
@@ -86,7 +91,8 @@ class _MapLibreVectorMapViewState extends State<MapLibreVectorMapView> {
         oldWidget.adapter != widget.adapter;
     if (styleChanged) {
       _styleLoaded = false;
-      unawaited(_prepareStyle());
+      _styleGeneration++;
+      if (!_hasNoSource) unawaited(_prepareStyle());
       return;
     }
 
@@ -98,20 +104,27 @@ class _MapLibreVectorMapViewState extends State<MapLibreVectorMapView> {
   }
 
   Future<void> _prepareStyle() async {
+    final generation = ++_styleGeneration;
+    final adapter = widget.adapter;
+    bool current() => mounted && generation == _styleGeneration && identical(adapter, widget.adapter);
     try {
-      if (!widget.adapter.isInitialized) {
-        await widget.adapter.initialize();
+      if (!adapter.isInitialized) {
+        await adapter.initialize();
       }
-      await widget.adapter.updateContactsOverlay(widget.contacts);
-      await widget.adapter.updateLandmarksOverlay(widget.landmarks);
-      await widget.adapter.updateSectorsOverlay(widget.sectors);
+      if (!current()) return;
+      await adapter.updateContactsOverlay(widget.contacts);
+      if (!current()) return;
+      await adapter.updateLandmarksOverlay(widget.landmarks);
+      if (!current()) return;
+      await adapter.updateSectorsOverlay(widget.sectors);
+      if (!current()) return;
 
-      final styleJson = widget.adapter.generateStyleJsonString(
+      final styleJson = adapter.generateStyleJsonString(
         packageId: widget.packageId,
         packageFormat: widget.packageFormat,
         isDarkMode: widget.isDarkMode,
       );
-      if (!mounted) return;
+      if (!current()) return;
       setState(() {
         _styleJson = styleJson;
         _initError = null;
@@ -122,7 +135,7 @@ class _MapLibreVectorMapViewState extends State<MapLibreVectorMapView> {
         e,
         st,
       );
-      if (!mounted) return;
+      if (!current()) return;
       setState(() => _initError = e);
     }
   }
@@ -200,6 +213,31 @@ class _MapLibreVectorMapViewState extends State<MapLibreVectorMapView> {
 
   @override
   Widget build(BuildContext context) {
+    if (_hasNoSource) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                kIsWeb
+                    ? 'Mapa vetorial offline ainda não está disponível no navegador. Use o mapa raster enquanto o suporte é concluído.'
+                    : 'Nenhum pacote vetorial offline está disponível. Use o mapa raster ou instale um pacote compatível.',
+                textAlign: TextAlign.center,
+              ),
+              if (widget.onSwitchToRaster != null) ...[
+                const SizedBox(height: 12),
+                FilledButton(
+                  onPressed: widget.onSwitchToRaster,
+                  child: const Text('Voltar ao mapa raster'),
+                ),
+              ],
+            ],
+          ),
+        ),
+      );
+    }
     if (_initError != null) {
       return Center(
         child: Padding(

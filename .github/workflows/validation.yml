@@ -153,6 +153,27 @@ jobs:
               exit 1
             fi
           done
+  web_map_regression:
+    name: Browser map switch regression
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: '3.47.8'
+          cache: true
+      - run: flutter pub get --enforce-lockfile
+      - name: Run map regression in Chrome
+        shell: bash
+        run: |
+          set +e
+          flutter test --no-pub --platform chrome --reporter expanded test/territory/map_engine/web_map_switch_regression_test.dart > /tmp/map-web-test.txt 2>&1
+          status=$?
+          cat /tmp/map-web-test.txt
+          if [ "$status" -ne 0 ]; then
+            python3 tool/ci_diagnostics_summary.py test /tmp/map-web-test.txt
+          fi
+          exit "$status"
   tests:
     name: Flutter tests (${{ matrix.suite }})
     runs-on: ubuntu-latest
