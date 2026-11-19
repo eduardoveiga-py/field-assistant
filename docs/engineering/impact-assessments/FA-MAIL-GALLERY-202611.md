@@ -29,3 +29,5 @@ O usuário confirmou que uma conta Exchange real trouxe mensagens no iPhone, mas
 ## Validação e rollback
 
 Testes unitários de snapshots antigos/novos, SMTP loopback com receptores Cc/Cco, cabeçalho sem Cco e rejeição antes de rede; widget iPhone/iPad e toggles; analyzer/format/CI; não tocar servidor real ou credenciais do usuário. Avaliar CSP/HTML e navegação por anexo antes de rich mail. Reverter commits de UI/modelo sem remover banco, mídias ou credenciais; snapshots legados permanecem intactos. Estado geral: **BLOCKED**, sem nota, pois mapa, sync, segurança, galeria e correio completos ainda não passam gates. Sem release.
+
+Antes deste recorte, o aviso de sincronização do Inbox declarava que mensagens foram enviadas à nuvem apesar de a sync estar bloqueada e ser assíncrona. A interface agora informa apenas salvamento local, sem prometer entrega. O rótulo da ação é “Responder”; o bloqueio de envio por EAS permanece com explicação no compositor.

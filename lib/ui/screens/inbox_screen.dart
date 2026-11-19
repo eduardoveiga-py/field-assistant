@@ -177,7 +177,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                '${result.saved} prévia(s) Exchange salva(s) em ${result.foldersRead} pasta(s) e sincronizada(s) para a nuvem. '
+                '${result.saved} mensagem(ns) Exchange salva(s) neste dispositivo em ${result.foldersRead} pasta(s). '
                 '${result.moreAvailable ? 'Há mais mensagens; sincronize novamente. ' : ''}'
                 'Corpos podem ser parciais; anexos não foram importados.',
               ),
@@ -265,7 +265,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
           SnackBar(
             content: Text(
               count > 0
-                  ? '$count mensagem(ns) importada(s) e sincronizada(s) para a nuvem.'
+                  ? '$count mensagem(ns) importada(s) neste dispositivo.'
                   : 'Nenhuma mensagem nova na caixa de entrada.',
             ),
           ),
@@ -2718,7 +2718,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                     else
                       OutlinedButton.icon(
                         icon: const Icon(Icons.reply_rounded, size: 16),
-                        label: const Text('Responder SMTP'),
+                        label: const Text('Responder'),
                         onPressed: () {
                           Navigator.pop(ctx);
                           final replyTo =
