@@ -73,6 +73,33 @@ class RoutingEdge {
     this.streetName,
   });
 
+  Map<String, dynamic> toJson() => {
+    'fromId': fromId,
+    'toId': toId,
+    'distanceMeters': distanceMeters,
+    if (isWaterCrossingWithoutBridge) 'isWaterCrossingWithoutBridge': true,
+    if (isFerry) 'isFerry': true,
+    if (speedMps != null) 'speedMps': speedMps,
+    if (isOneWay) 'isOneWay': true,
+    'pedestrianAccessible': pedestrianAccessible,
+    'vehicleAccessible': vehicleAccessible,
+    if (streetName != null) 'streetName': streetName,
+  };
+
+  factory RoutingEdge.fromJson(Map<String, dynamic> json) => RoutingEdge(
+    fromId: json['fromId'] as String,
+    toId: json['toId'] as String,
+    distanceMeters: (json['distanceMeters'] as num).toDouble(),
+    isWaterCrossingWithoutBridge:
+        json['isWaterCrossingWithoutBridge'] as bool? ?? false,
+    isFerry: json['isFerry'] as bool? ?? false,
+    speedMps: (json['speedMps'] as num?)?.toDouble(),
+    isOneWay: json['isOneWay'] as bool? ?? false,
+    pedestrianAccessible: json['pedestrianAccessible'] as bool? ?? true,
+    vehicleAccessible: json['vehicleAccessible'] as bool? ?? true,
+    streetName: json['streetName'] as String?,
+  );
+
   /// Velocidade efetiva da aresta para o modo informado (m/s).
   double effectiveSpeedMps(RoutingMode mode) {
     if (isFerry) {
@@ -265,6 +292,41 @@ class OfflineRoutingEngine {
         streetName: streetName,
       ),
     );
+  }
+
+  /// Exporta o grafo completo em formato Map serializável.
+  Map<String, dynamic> toJson() => {
+    'nodes': _nodes.values.map((n) => n.toJson()).toList(),
+    'edges': _adjacency.values.expand((edges) => edges).map((e) => e.toJson()).toList(),
+  };
+
+  /// Carrega nós e arestas a partir de estrutura JSON serializada.
+  void loadFromJson(Map<String, dynamic> json) {
+    if (json['nodes'] is List) {
+      for (final raw in json['nodes'] as List) {
+        if (raw is Map<String, dynamic>) {
+          addNode(RoutingNode.fromJson(raw));
+        } else if (raw is Map) {
+          addNode(RoutingNode.fromJson(Map<String, dynamic>.from(raw)));
+        }
+      }
+    }
+    if (json['edges'] is List) {
+      for (final raw in json['edges'] as List) {
+        if (raw is Map<String, dynamic>) {
+          addEdge(RoutingEdge.fromJson(raw));
+        } else if (raw is Map) {
+          addEdge(RoutingEdge.fromJson(Map<String, dynamic>.from(raw)));
+        }
+      }
+    }
+  }
+
+  /// Construtor de fábrica para inicializar grafo a partir de JSON.
+  factory OfflineRoutingEngine.fromJson(Map<String, dynamic> json) {
+    final engine = OfflineRoutingEngine();
+    engine.loadFromJson(json);
+    return engine;
   }
 
   /// Executa o algoritmo A* para encontrar a rota ótima entre [startId] e [goalId].

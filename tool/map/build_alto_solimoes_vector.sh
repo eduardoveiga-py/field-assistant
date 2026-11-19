@@ -118,7 +118,7 @@ cat <<EOF > "$output/alto_solimoes_manifest.json"
 {
   "id": "alto_solimoes_sai_vector",
   "regionName": "Alto Solimões — Santo Antônio do Içá, Betânia & Lago Grande (Vetorial PMTiles)",
-  "downloadUrl": "https://github.com/field-assistant/field-assistant/releases/download/v2.0.0/alto_solimoes.pmtiles",
+  "downloadUrl": "https://github.com/eduardoveiga-py/field-assistant/releases/download/v2.0.0/alto_solimoes.pmtiles",
   "sizeBytes": $pkg_size,
   "sha256": "$pkg_hash",
   "bbox": {

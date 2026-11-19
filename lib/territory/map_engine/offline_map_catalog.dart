@@ -16,7 +16,7 @@ class OfflineMapCatalog {
         id: 'alto_solimoes_sai_vector',
         regionName: 'Alto Solimões — Santo Antônio do Içá, Betânia & Lago Grande (Vetorial PMTiles)',
         downloadUrl: Uri.parse(
-          'https://github.com/field-assistant/field-assistant/releases/download/v2.0.0/alto_solimoes.pmtiles',
+          'https://github.com/eduardoveiga-py/field-assistant/releases/download/v2.0.0/alto_solimoes.pmtiles',
         ),
         sizeBytes: 15728640, // 15 MB
         sha256:
