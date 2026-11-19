@@ -47,6 +47,25 @@ jobs:
           PYCODE
           fi
           exit "$status"
+      - name: Record provenance and verify reader against real bytes
+        shell: bash
+        run: |
+          python3 - <<'PYCODE'
+          import json
+          from pathlib import Path
+          p = Path('${{ runner.temp }}/regional-vector/provenance.json')
+          d = json.loads(p.read_text())
+          print('::notice::PMTILES_PROVENANCE:' + json.dumps({k:d[k] for k in ('source','sizeBytes','sha256','header','samples','pmtilesVersion')}, separators=(',', ':')))
+          PYCODE
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: '3.47.8'
+          cache: true
+      - run: flutter pub get --enforce-lockfile
+      - name: Compare app reader with CLI-extracted tile
+        run: |
+          pmtiles tile "$RUNNER_TEMP/regional-vector/regional.pmtiles" 14 5099 8333 > "$RUNNER_TEMP/expected-real-tile.bin"
+          REAL_PMTILES="$RUNNER_TEMP/regional-vector/regional.pmtiles" EXPECTED_TILE="$RUNNER_TEMP/expected-real-tile.bin" flutter test --no-pub test/territory/map_engine/real_pmtiles_integration_test.dart
       - name: Save experimental artifact and provenance (not a release)
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:

@@ -23,8 +23,8 @@ jobs:
           python3 - <<'PYCODE'
           from pathlib import Path
           data = Path('/tmp/format.patch.gz.b64').read_text()
-          chunks = [data[i:i+30000] for i in range(0, len(data), 30000)]
-          if len(chunks) > 8:
+          chunks = [data[i:i+3000] for i in range(0, len(data), 3000)]
+          if len(chunks) > 50:
               raise SystemExit('Patch too large to emit safely')
           for i, chunk in enumerate(chunks):
               print(f'::notice::FORMAT_PATCH_{i:02}_{len(chunks):02}:{chunk}')
