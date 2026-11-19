@@ -314,7 +314,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
             ),
             const SizedBox(height: 8),
             const Text(
-              'Todas as capturas, e-mails teocráticos permanentes e cartas do Hub estão protegidos por criptografia e biometria.',
+              'Desbloqueie a Inbox com biometria para acessar os dados neste dispositivo.',
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.grey, fontSize: 13, height: 1.4),
             ),
@@ -2819,6 +2819,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
           bool isSending = false;
           String? inlineError;
           bool needsConfig = false;
+          bool sendOutcomeNeedsReview = false;
 
           return StatefulBuilder(
             builder: (ctx, setSheetState) => SafeArea(
@@ -3030,7 +3031,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                           .showSnackBar(
                                             const SnackBar(
                                               content: Text(
-                                                'Rascunho salvo na retenção permanente!',
+                                                'Rascunho salvo neste dispositivo.',
                                               ),
                                             ),
                                           );
@@ -3053,7 +3054,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                   ? 'Enviando SMTP...'
                                   : 'Enviar Agora (SMTP)',
                             ),
-                            onPressed: isSending
+                            onPressed: isSending || sendOutcomeNeedsReview
                                 ? null
                                 : () async {
                                     final to = toCtrl.text.trim();
@@ -3257,7 +3258,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                         ).showSnackBar(
                                           SnackBar(
                                             content: Text(
-                                              'E-mail enviado via SMTP ($smtpHost:$smtpPort) e salvo na retenção permanente!',
+                                              'Mensagem aceita pelo servidor SMTP e cópia salva neste dispositivo.',
                                             ),
                                             backgroundColor: Colors.green,
                                           ),
@@ -3274,8 +3275,12 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                           isSending = false;
                                           needsConfig =
                                               e is JwEmailAuthException;
-                                          inlineError =
-                                              'Falha no envio SMTP: $e';
+                                          sendOutcomeNeedsReview =
+                                              e is JwSmtpOutcomeUnknownException ||
+                                              e is JwSmtpAcceptedLocalSaveException;
+                                          inlineError = sendOutcomeNeedsReview
+                                              ? e.toString()
+                                              : 'Falha no envio SMTP: $e';
                                         });
                                       }
                                     }

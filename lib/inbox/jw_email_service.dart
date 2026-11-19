@@ -262,6 +262,18 @@ class JwEmailAuthException extends JwEmailException {
   const JwEmailAuthException(super.message, [super.cause]);
 }
 
+/// The server may have accepted DATA, but its final reply was not received.
+class JwSmtpOutcomeUnknownException extends JwEmailException {
+  const JwSmtpOutcomeUnknownException()
+    : super('Resultado do envio desconhecido: o servidor pode ter aceitado a mensagem. Confira a caixa de enviados no servidor antes de tentar novamente.');
+}
+
+/// SMTP accepted DATA, but the local copy could not be committed.
+class JwSmtpAcceptedLocalSaveException extends JwEmailException {
+  const JwSmtpAcceptedLocalSaveException()
+    : super('O servidor SMTP aceitou a mensagem, mas a cópia local não foi salva. Não reenvie sem verificar; preserve o texto e confira a caixa de enviados.');
+}
+
 /// Interface para permitir testes com sessões IMAP determinísticas.
 abstract class JwImapSession {
   Future<void> connect(
@@ -966,7 +978,6 @@ class _SmtpResponse {
 
   const _SmtpResponse(this.code, this.lines);
 
-  String get summary => lines.join(' | ');
 }
 
 /// Cliente SMTP puro Dart autenticado (RFC 5321 / 3207 STARTTLS / 4954 AUTH PLAIN & LOGIN).
@@ -998,11 +1009,16 @@ class JwSmtpClient {
     if (trimmed.isEmpty || trimmed.contains('\r') || trimmed.contains('\n')) {
       return null;
     }
-    final angleMatch = RegExp(r'<([^<>\s]+@[^<>\s]+)>').firstMatch(trimmed);
-    final candidate = angleMatch != null
-        ? angleMatch.group(1)!.trim()
-        : trimmed;
-    final emailRegex = RegExp(r'^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$');
+    final angleMatch = RegExp(r'^([^<>@\r\n]*)<([^<>\s]+@[^<>\s]+)>$').firstMatch(trimmed);
+    if ((trimmed.contains('<') || trimmed.contains('>')) && angleMatch == null) {
+      return null;
+    }
+    final candidate = angleMatch != null ? angleMatch.group(2)! : trimmed;
+    // SMTPUTF8 and quoted local-parts are not implemented; reject instead of
+    // putting an unsupported address (or control bytes) into an SMTP command.
+    final emailRegex = RegExp(
+      r"^[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+$",
+    );
     if (!emailRegex.hasMatch(candidate)) {
       return null;
     }
@@ -1051,18 +1067,17 @@ class JwSmtpClient {
   ) async {
     final lines = <String>[];
     int? finalCode;
+    int? expectedCode;
     while (true) {
       final line = await reader.readLine(timeout: timeout);
-      if (line.length < 3) {
-        throw JwEmailConnectionException(
-          'Resposta SMTP inválida recebida: $line',
-        );
+      if (lines.length >= 100 ||
+          !RegExp(r'^[2-5][0-9]{2}(?:[ -].*)?$').hasMatch(line)) {
+        throw const JwEmailConnectionException('Resposta SMTP inválida.');
       }
-      final code = int.tryParse(line.substring(0, 3));
-      if (code == null) {
-        throw JwEmailConnectionException(
-          'Código SMTP inesperado recebido: $line',
-        );
+      final code = int.parse(line.substring(0, 3));
+      expectedCode ??= code;
+      if (code != expectedCode) {
+        throw const JwEmailConnectionException('Resposta SMTP inconsistente.');
       }
       lines.add(line.length > 4 ? line.substring(4).trim() : '');
       final isContinuation = line.length > 3 && line[3] == '-';
@@ -1153,7 +1168,7 @@ class JwSmtpClient {
           ...ccRecipients,
           ...bccRecipients,
         ])
-          if (unique.add(address.toLowerCase())) address,
+          if (unique.add('${address.substring(0, address.lastIndexOf('@'))}@${address.substring(address.lastIndexOf('@') + 1).toLowerCase()}')) address,
       ];
       if (toRecipients.isEmpty) {
         throw const JwEmailException(
@@ -1231,7 +1246,7 @@ class JwSmtpClient {
       final greeting = await _readResponse(reader!, timeout);
       if (greeting.code != 220) {
         throw JwEmailConnectionException(
-          'Servidor SMTP recusou a saudação inicial (${greeting.code}): ${greeting.summary}',
+          'Servidor SMTP recusou a saudação inicial (${greeting.code})',
         );
       }
 
@@ -1240,7 +1255,7 @@ class JwSmtpClient {
       var ehloResp = await _readResponse(reader!, timeout);
       if (ehloResp.code != 250) {
         throw JwEmailConnectionException(
-          'Servidor SMTP rejeitou EHLO (${ehloResp.code}): ${ehloResp.summary}',
+          'Servidor SMTP rejeitou EHLO (${ehloResp.code})',
         );
       }
 
@@ -1253,7 +1268,7 @@ class JwSmtpClient {
           final startTlsResp = await _readResponse(reader!, timeout);
           if (startTlsResp.code != 220) {
             throw JwEmailConnectionException(
-              'Falha ao iniciar STARTTLS (${startTlsResp.code}): ${startTlsResp.summary}',
+              'Falha ao iniciar STARTTLS (${startTlsResp.code})',
             );
           }
           final plainSocket = activeSocket as Socket;
@@ -1275,7 +1290,7 @@ class JwSmtpClient {
           ehloResp = await _readResponse(reader!, timeout);
           if (ehloResp.code != 250) {
             throw JwEmailConnectionException(
-              'Servidor SMTP rejeitou EHLO pós-TLS (${ehloResp.code}): ${ehloResp.summary}',
+              'Servidor SMTP rejeitou EHLO pós-TLS (${ehloResp.code})',
             );
           }
         } else if (!allowPlaintextForTesting) {
@@ -1304,12 +1319,12 @@ class JwSmtpClient {
           final secondResp = await _readResponse(reader!, timeout);
           if (secondResp.code != 235) {
             throw JwEmailAuthException(
-              'Falha de autenticação SMTP (${secondResp.code}): ${secondResp.summary}',
+              'Falha de autenticação SMTP (${secondResp.code})',
             );
           }
         } else if (authResp.code != 235) {
           throw JwEmailAuthException(
-            'Falha de autenticação SMTP (${authResp.code}): ${authResp.summary}',
+            'Falha de autenticação SMTP (${authResp.code})',
           );
         }
       } else {
@@ -1317,21 +1332,21 @@ class JwSmtpClient {
         final userPrompt = await _readResponse(reader!, timeout);
         if (userPrompt.code != 334) {
           throw JwEmailAuthException(
-            'Servidor SMTP rejeitou AUTH LOGIN (${userPrompt.code}): ${userPrompt.summary}',
+            'Servidor SMTP rejeitou AUTH LOGIN (${userPrompt.code})',
           );
         }
         await _sendCommand(activeSocket, base64.encode(utf8.encode(cleanUser)));
         final passPrompt = await _readResponse(reader!, timeout);
         if (passPrompt.code != 334) {
           throw JwEmailAuthException(
-            'Falha ao enviar usuário no AUTH LOGIN (${passPrompt.code}): ${passPrompt.summary}',
+            'Falha ao enviar usuário no AUTH LOGIN (${passPrompt.code})',
           );
         }
         await _sendCommand(activeSocket, base64.encode(utf8.encode(password)));
         final authResp = await _readResponse(reader!, timeout);
         if (authResp.code != 235) {
           throw JwEmailAuthException(
-            'Credenciais SMTP rejeitadas (${authResp.code}): ${authResp.summary}',
+            'Credenciais SMTP rejeitadas (${authResp.code})',
           );
         }
       }
@@ -1342,7 +1357,7 @@ class JwSmtpClient {
         final fromResp = await _readResponse(reader!, timeout);
         if (fromResp.code < 200 || fromResp.code >= 300) {
           throw JwEmailConnectionException(
-            'Servidor rejeitou remetente MAIL FROM (${fromResp.code}): ${fromResp.summary}',
+            'Servidor rejeitou remetente MAIL FROM (${fromResp.code})',
           );
         }
 
@@ -1351,7 +1366,7 @@ class JwSmtpClient {
           final rcptResp = await _readResponse(reader!, timeout);
           if (rcptResp.code < 200 || rcptResp.code >= 300) {
             throw JwEmailConnectionException(
-              'Servidor rejeitou destinatário $rcpt (${rcptResp.code}): ${rcptResp.summary}',
+              'Servidor rejeitou um destinatário (${rcptResp.code})',
             );
           }
         }
@@ -1360,7 +1375,7 @@ class JwSmtpClient {
         final dataReady = await _readResponse(reader!, timeout);
         if (dataReady.code != 354) {
           throw JwEmailConnectionException(
-            'Servidor rejeitou início de dados DATA (${dataReady.code}): ${dataReady.summary}',
+            'Servidor rejeitou início de dados DATA (${dataReady.code})',
           );
         }
 
@@ -1388,14 +1403,23 @@ class JwSmtpClient {
           ..write(bodyEncoded)
           ..write('.\r\n');
 
-        activeSocket.write(payload.toString());
-        await activeSocket.flush();
-
-        final accepted = await _readResponse(reader!, timeout);
-        if (accepted.code < 200 || accepted.code >= 300) {
+        // Once DATA starts, loss of the reply cannot tell us whether the relay
+        // accepted it. Never retry automatically or report a definite failure.
+        late final _SmtpResponse accepted;
+        try {
+          activeSocket.write(payload.toString());
+          await activeSocket.flush();
+          accepted = await _readResponse(reader!, timeout);
+        } catch (_) {
+          throw const JwSmtpOutcomeUnknownException();
+        }
+        if (accepted.code >= 400 && accepted.code < 600) {
           throw JwEmailConnectionException(
-            'Servidor não confirmou aceitação da mensagem (${accepted.code}): ${accepted.summary}',
+            'Servidor rejeitou os dados da mensagem (${accepted.code}).',
           );
+        }
+        if (accepted.code != 250) {
+          throw const JwSmtpOutcomeUnknownException();
         }
       }
 
@@ -1782,7 +1806,8 @@ class JwEmailService {
       'email': sentMsg.toJson(),
     };
 
-    await db.transaction(() async {
+    try {
+      await db.transaction(() async {
       final existingDraft = draftId == null
           ? await (db.select(db.inboxEntries)
                   ..where((t) => t.id.equals('email_draft_${sentMsg.id}')))
@@ -1835,7 +1860,10 @@ class JwEmailService {
               createdAt: now,
             ),
           );
-    });
+      });
+    } catch (_) {
+      throw const JwSmtpAcceptedLocalSaveException();
+    }
     return sentMsg;
   }
 
