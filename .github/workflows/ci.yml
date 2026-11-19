@@ -185,7 +185,16 @@ jobs:
         run: flutter pub get --enforce-lockfile
 
       - name: Run Headless Integration Test
-        run: xvfb-run -a flutter test integration_test/app_stabilization_e2e_test.dart -d linux
+        shell: bash
+        run: |
+          set +e
+          xvfb-run -a flutter test --no-pub --reporter expanded integration_test/app_stabilization_e2e_test.dart -d linux > /tmp/integration-tests.txt 2>&1
+          status=$?
+          cat /tmp/integration-tests.txt
+          if [ "$status" -ne 0 ]; then
+            python3 tool/ci_diagnostics_summary.py test /tmp/integration-tests.txt
+          fi
+          exit "$status"
 
   build_android_and_web:
     name: Build Web & Android APK
