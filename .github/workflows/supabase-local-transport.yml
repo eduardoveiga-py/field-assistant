@@ -1,0 +1,65 @@
+name: Isolated Supabase encrypted transport integration
+on:
+  push:
+    branches: ['arena/**', 'main', 'master']
+    paths: ['supabase/**', 'lib/sync/crypto/**', 'test/sync/integration/**', '.github/workflows/supabase-local-transport.yml']
+  pull_request:
+    branches: ['main', 'master']
+    paths: ['supabase/**', 'lib/sync/crypto/**', 'test/sync/integration/**', '.github/workflows/supabase-local-transport.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  local_transport:
+    name: Real local Auth, encrypted RPC and Storage
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: '3.47.8'
+          cache: true
+      - run: npm install --no-save --no-package-lock supabase@3.2.0
+      - name: Start an unlinked, ephemeral local stack
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! ./node_modules/.bin/supabase start > /tmp/local-supabase-start.log 2>&1; then
+            echo '::error::Unable to start isolated local Supabase stack; inspect runner diagnostics.'
+            exit 1
+          fi
+          ./node_modules/.bin/supabase status -o env > /tmp/local-supabase-status.env
+          python3 - <<'PYCODE'
+          import os
+          from pathlib import Path
+          import re
+          lines = Path('/tmp/local-supabase-status.env').read_text().splitlines()
+          values = {}
+          for line in lines:
+              m = re.fullmatch(r'([A-Z_]+)="([^"]*)"', line)
+              if m:
+                  values[m[1]] = m[2]
+          if values.get('API_URL') != 'http://127.0.0.1:54321' or not values.get('ANON_KEY'):
+              raise SystemExit('Local API endpoint or anonymous key was not as expected')
+          with open(os.environ['GITHUB_ENV'], 'a') as out:
+              out.write('FA_LOCAL_SUPABASE_ANON_KEY=' + values['ANON_KEY'] + '\n')
+          PYCODE
+          rm /tmp/local-supabase-status.env
+      - run: flutter pub get --enforce-lockfile
+      - name: Test real local transport with fictional accounts
+        shell: bash
+        env:
+          FA_RUN_LOCAL_SUPABASE_E2E: '1'
+        run: |
+          set +e
+          flutter test --no-pub --reporter expanded test/sync/integration/local_supabase_encrypted_transport_test.dart > /tmp/local-transport-test.log 2>&1
+          status=$?
+          cat /tmp/local-transport-test.log
+          if [ "$status" -ne 0 ]; then
+            python3 tool/ci_diagnostics_summary.py test /tmp/local-transport-test.log
+          fi
+          exit "$status"
