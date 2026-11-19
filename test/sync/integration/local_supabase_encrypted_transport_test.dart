@@ -21,9 +21,15 @@ void main() {
       if (anonKey == null || anonKey.isEmpty)
         throw StateError('Local anonymous key missing');
       // Local signup has no browser redirect or PKCE verifier persistence.
-      const authOptions = AuthClientOptions(authFlowType: AuthFlowType.implicit);
+      const authOptions = AuthClientOptions(
+        authFlowType: AuthFlowType.implicit,
+      );
       final alice = SupabaseClient(localUrl, anonKey, authOptions: authOptions);
-      final aliceDevice2 = SupabaseClient(localUrl, anonKey, authOptions: authOptions);
+      final aliceDevice2 = SupabaseClient(
+        localUrl,
+        anonKey,
+        authOptions: authOptions,
+      );
       final bob = SupabaseClient(localUrl, anonKey, authOptions: authOptions);
       const password = 'local-test-password-only-2026';
       final suffix = DateTime.now().microsecondsSinceEpoch;
