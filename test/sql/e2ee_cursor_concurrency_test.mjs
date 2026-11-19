@@ -98,31 +98,75 @@ try {
     WHERE owner_id = $1 AND route = $2`, [uid1, route('a')]), /sem cursor transacional/i);
   assert.equal((await pull(reader)).length, 3, 'migration preserves preexisting encrypted records');
   console.log('PASS: migration waits for in-flight legacy writes and preserves them');
+  await queryFile(admin, '20261120000000_e2ee_reconciliation_scan.sql');
   await assert.rejects(() => reader.query('SELECT * FROM public.encrypted_record_owner_cursors'), /permission denied/i);
   await assert.rejects(() => reader.query('SELECT * FROM public.encrypted_record_cursor_baseline'), /permission denied/i);
   await assert.rejects(() => reader.query('INSERT INTO public.encrypted_records(owner_id, route, revision, envelope) VALUES ($1, $2, 1, $3::jsonb)', [uid1, route('f'), envelope]), /permission denied/i);
   await assert.rejects(() => admin.query('INSERT INTO public.encrypted_records(owner_id, route, revision, envelope) VALUES ($1, $2, 1, $3::jsonb)', [uid1, route('f'), envelope]), /sem cursor transacional/i);
 
+  // Recover the old skipped record using the proposed full scan + delta
+  // contract. Hold a new write open while taking the watermark; after scanning
+  // past route a insert one key before that position and one after it.
+  const start = async (client) => Number((await client.query('SELECT public.encrypted_records_reconcile_start() AS watermark')).rows[0].watermark);
+  const scan = async (client, after = null, limit = 1) => (await client.query(
+    'SELECT route, revision, server_seq FROM public.encrypted_records_scan_page($1, $2)', [after, limit])).rows;
+  await a.query('BEGIN');
+  const pendingBeforeStart = await cas(a, route('5'));
+  const watermark = await start(reader);
+  assert.equal(watermark, baseline);
+  assert.ok(pendingBeforeStart.server_seq > watermark);
+  const scanned = [];
+  scanned.push(...await scan(reader));
+  scanned.push(...await scan(reader, scanned.at(-1).route));
+  assert.deepEqual(scanned.map((r) => r.route), [route('0'), route('a')]);
+  await a.query('COMMIT');
+  const insertedBefore = await cas(b, route('3'));
+  const insertedAfter = await cas(b, route('e'));
+  const changedAfterScan = await cas(b, route('a'), 1);
+  assert.ok(insertedBefore.server_seq > watermark && insertedAfter.server_seq > watermark && changedAfterScan.server_seq > watermark);
+  while (true) {
+    const page = await scan(reader, scanned.at(-1).route);
+    if (!page.length) break;
+    scanned.push(...page);
+  }
+  assert.ok(scanned.some((r) => r.route === route('a')), 'legacy skipped route is discovered');
+  assert.ok(!scanned.some((r) => r.route === route('3')), 'new key before scan cursor must be recovered by delta');
+  assert.ok(scanned.some((r) => r.route === route('e')), 'new key after scan cursor is scanned');
+  const delta = await pull(reader, watermark);
+  assert.deepEqual(new Set(delta.map((r) => r.route)), new Set([route('5'), route('3'), route('e'), route('a')]));
+  assert.equal((await scan(other)).length, 0, 'scan must not leak a different account');
+  assert.ok(await start(other) >= baseline);
+  await assert.rejects(() => scan(reader, 'not-a-route'), /Rota de reconciliação inválida/);
+  await assert.rejects(() => scan(reader, null, 0), /Limite de reconciliação inválido/);
+  await assert.rejects(() => scan(reader, null, 501), /Limite de reconciliação inválido/);
+  await assert.rejects(() => scan(reader, null, null), /Limite de reconciliação inválido/);
+  await monitor.query('SET ROLE anon');
+  await assert.rejects(() => start(monitor), /permission denied/i);
+  await assert.rejects(() => scan(monitor), /permission denied/i);
+  await monitor.query('RESET ROLE');
+  const baselineForConcurrency = await start(reader);
+  console.log('PASS: full scan plus delta recovers legacy omission and concurrent changes');
+
   // A has allocated a cursor but has not committed. B cannot allocate/commit a
   // newer cursor for the same account, and unrelated accounts remain free.
   await a.query('BEGIN');
   const fixedA = await cas(a, route('c'));
-  assert.ok(fixedA.server_seq > baseline);
+  assert.ok(fixedA.server_seq > baselineForConcurrency);
   await b.query('BEGIN');
   const pending = cas(b, route('d'));
   await waitBlocked(admin, b.processID, a.processID);
   const anotherAccount = await cas(other, route('e'));
   assert.equal(anotherAccount.success, true);
-  assert.deepEqual(await pull(reader, baseline), []);
+  assert.deepEqual(await pull(reader, baselineForConcurrency), []);
   await a.query('COMMIT');
   const fixedB = await pending;
   await b.query('COMMIT');
   assert.ok(fixedB.server_seq > fixedA.server_seq);
-  const fixedRows = await pull(reader, baseline);
+  const fixedRows = await pull(reader, baselineForConcurrency);
   assert.deepEqual(fixedRows.map((r) => r.route), [route('c'), route('d')]);
   assert.deepEqual((await pull(other)).map((r) => r.route), [route('e')]);
   assert.deepEqual((await pull(reader, fixedA.server_seq)).map((r) => r.route), [route('d')]);
-  const page1 = (await reader.query('SELECT route, server_seq FROM public.encrypted_records_pull_since($1, 1)', [baseline])).rows;
+  const page1 = (await reader.query('SELECT route, server_seq FROM public.encrypted_records_pull_since($1, 1)', [baselineForConcurrency])).rows;
   const page2 = (await reader.query('SELECT route, server_seq FROM public.encrypted_records_pull_since($1, 1)', [page1[0].server_seq])).rows;
   assert.deepEqual([page1[0].route, page2[0].route], [route('c'), route('d')]);
   console.log('PASS: same-owner writes serialize; different owner progresses; paginated pull sees both');
@@ -167,8 +211,8 @@ try {
   const next = await cas(a, route('2'));
   assert.ok(next.server_seq > winner.server_seq);
   await admin.query('UPDATE public.encrypted_record_owner_cursors SET last_seq = 9007199254740991 WHERE owner_id = $1', [uid1]);
-  await assert.rejects(() => cas(a, route('3')), /Cursor cifrado esgotado/);
-  assert.ok(!(await pull(reader)).some((r) => r.route === route('3')));
+  await assert.rejects(() => cas(a, route('9')), /Cursor cifrado esgotado/);
+  assert.ok(!(await pull(reader)).some((r) => r.route === route('9')));
   await admin.query('SET ROLE anon');
   await assert.rejects(() => admin.query('SELECT public.encrypted_record_cas($1, 0, $2::jsonb)', [route('4'), envelope]), /permission denied/i);
   await admin.query('RESET ROLE');
