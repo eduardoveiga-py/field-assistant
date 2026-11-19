@@ -357,7 +357,7 @@ extension _ContactsMapCanvas on _ContactsMapScreenState {
                   },
                   onSwitchToRaster: widget.mapEngineAdapter == null
                       ? () {
-                          setState(() {
+                          _updateState(() {
                             _enginePreference =
                                 MapEnginePreference.rasterFallback;
                             _configureMapEngine(disposePrevious: true);
