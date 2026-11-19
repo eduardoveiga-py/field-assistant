@@ -23,6 +23,7 @@ await db.exec(`
 
 await db.exec(readFileSync(new URL('../../supabase/migrations/20261116200000_production_e2ee_tables_and_rpcs.sql', import.meta.url), 'utf8'));
 await db.exec(readFileSync(new URL('../../supabase/migrations/20261117000000_e2ee_server_seq_pull_and_hardening.sql', import.meta.url), 'utf8'));
+await db.exec(readFileSync(new URL('../../supabase/migrations/20261119000000_e2ee_commit_order_cursor.sql', import.meta.url), 'utf8'));
 
 const user1 = '11111111-1111-1111-1111-111111111111';
 const user2 = '22222222-2222-2222-2222-222222222222';

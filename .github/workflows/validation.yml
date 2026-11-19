@@ -23,11 +23,13 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '22'
-      - run: npm install --no-save --no-package-lock @electric-sql/pglite@0.5.16
+      - run: npm install --no-save --no-package-lock @electric-sql/pglite@0.5.16 @embedded-postgres/linux-x64@17.6.0-beta.15 pg@8.23.1
       - run: node test/sql/sync_compare_and_swap_test.mjs
       - run: node test/sql/experimental_encrypted_records_test.mjs
       - run: node test/sql/experimental_recovery_vault_test.mjs
       - run: node test/sql/production_e2ee_test.mjs
+      - run: node test/sql/e2ee_cursor_concurrency_test.mjs
+      - run: node test/sql/revoke_legacy_sync_upsert_test.mjs
   diagnostics:
     name: Dart diagnostics (independent)
     runs-on: ubuntu-latest
