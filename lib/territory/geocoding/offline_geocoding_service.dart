@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 
 import '../../core/app_logger.dart';
 import '../../database/app_database.dart';
+import '../../search/offline_search_index.dart';
 import '../geocoding_service.dart';
 
 /// Tipo de entidade encontrada em busca local offline.
@@ -433,6 +434,39 @@ class OfflineGeocodingService {
   }) async {
     final clean = query.trim().toLowerCase();
     if (clean.isEmpty || db == null) return [];
+
+    // Tenta primeiro o índice unificado FTS5 com unicode61 remove_diacritics 2
+    try {
+      final ftsIndex = OfflineSearchIndex(db);
+      final ftsMatches = await ftsIndex.search(clean);
+      if (ftsMatches.isNotEmpty) {
+        return ftsMatches.map((r) {
+          final type = r.entityType == 'person'
+              ? LocalResultType.contact
+              : r.entityType == 'sector'
+              ? LocalResultType.sector
+              : LocalResultType.landmark;
+          return LocalSearchResult(
+            id: r.entityId,
+            type: type,
+            title: r.name,
+            subtitle: r.address.isNotEmpty ? r.address : r.category,
+            latitude: r.latitude,
+            longitude: r.longitude,
+            metadata: {
+              'category': r.category,
+              'notes': r.notes,
+              'rank': r.rank,
+            },
+          );
+        }).toList();
+      }
+    } catch (e, st) {
+      AppLogger.debug(
+        'Busca FTS5 falhou ou tabela ausente, utilizando scan SQLite padrão: $e',
+        st,
+      );
+    }
 
     final results = <LocalSearchResult>[];
 

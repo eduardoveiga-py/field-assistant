@@ -15,8 +15,9 @@ class AirplaneModeViolationException implements Exception {
     required this.blockedHost,
     this.method = 'UNKNOWN',
     String? reason,
-  }) : reason = reason ??
-            'External network request blocked while Airplane Mode is active.';
+  }) : reason =
+           reason ??
+           'External network request blocked while Airplane Mode is active.';
 
   @override
   String toString() =>
@@ -38,8 +39,8 @@ class AirplaneNetworkGate extends HttpOverrides {
     Set<String>? allowedHosts,
     this.airplaneModeActive = true,
   }) : allowedHosts = allowedHosts != null
-            ? allowedHosts.map((h) => h.toLowerCase().trim()).toSet()
-            : const {'127.0.0.1', 'localhost', '::1'};
+           ? allowedHosts.map((h) => h.toLowerCase().trim()).toSet()
+           : const {'127.0.0.1', 'localhost', '::1'};
 
   /// Verifica se um host é permitido pelo gate.
   bool isAllowed(String host) {
@@ -199,8 +200,7 @@ class _AirplaneGateHttpClient implements HttpClient {
     Uri url,
     String realm,
     HttpClientCredentials credentials,
-  ) =>
-      _inner.addCredentials(url, realm, credentials);
+  ) => _inner.addCredentials(url, realm, credentials);
 
   @override
   void addProxyCredentials(
@@ -208,32 +208,23 @@ class _AirplaneGateHttpClient implements HttpClient {
     int port,
     String realm,
     HttpClientCredentials credentials,
-  ) =>
-      _inner.addProxyCredentials(host, port, realm, credentials);
+  ) => _inner.addProxyCredentials(host, port, realm, credentials);
 
   @override
   set authenticate(
     Future<bool> Function(Uri url, String scheme, String? realm)? f,
-  ) =>
-      _inner.authenticate = f;
+  ) => _inner.authenticate = f;
 
   @override
   set authenticateProxy(
-    Future<bool> Function(
-      String host,
-      int port,
-      String scheme,
-      String? realm,
-    )?
+    Future<bool> Function(String host, int port, String scheme, String? realm)?
     f,
-  ) =>
-      _inner.authenticateProxy = f;
+  ) => _inner.authenticateProxy = f;
 
   @override
   set badCertificateCallback(
     bool Function(X509Certificate cert, String host, int port)? callback,
-  ) =>
-      _inner.badCertificateCallback = callback;
+  ) => _inner.badCertificateCallback = callback;
 
   @override
   set findProxy(String Function(Uri url)? f) => _inner.findProxy = f;
@@ -246,8 +237,7 @@ class _AirplaneGateHttpClient implements HttpClient {
       int? proxyPort,
     )?
     f,
-  ) =>
-      _inner.connectionFactory = f;
+  ) => _inner.connectionFactory = f;
 
   @override
   set keyLog(Function(String line)? callback) => _inner.keyLog = callback;

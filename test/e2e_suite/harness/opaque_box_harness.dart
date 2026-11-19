@@ -116,9 +116,8 @@ class OpaqueBoxHarness {
     final tempDir = Directory.systemTemp.createTempSync('e2e_opaque_box_');
 
     // 1. Inicializa o Network Gate fail-closed
-    final networkGate = AirplaneNetworkGate(
-      airplaneModeActive: airplaneMode,
-    )..install();
+    final networkGate = AirplaneNetworkGate(airplaneModeActive: airplaneMode)
+      ..install();
 
     // 2. Inicializa o TileServer local (se requisitado)
     TileServerTestLifecycle? tileServer;
@@ -220,9 +219,7 @@ class OpaqueBoxHarness {
       inboxManagerProvider.overrideWithValue(InboxManager(db: db)),
       taskManagerProvider.overrideWithValue(TaskManager(db: db)),
       projectManagerProvider.overrideWithValue(ProjectManager(db: db)),
-      knowledgeManagerProvider.overrideWithValue(
-        KnowledgeManager(db: db),
-      ),
+      knowledgeManagerProvider.overrideWithValue(KnowledgeManager(db: db)),
     ];
 
     final filteredDefaults = defaultOverrides.where(

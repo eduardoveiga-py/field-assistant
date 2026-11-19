@@ -37,10 +37,7 @@ class TileServerTestLifecycle {
         assetsDir ??
         Directory.systemTemp.createTempSync('tile_lifecycle_assets_');
 
-    final server = OfflineTileServer(
-      packagesDir: pkgDir,
-      assetsDir: astDir,
-    );
+    final server = OfflineTileServer(packagesDir: pkgDir, assetsDir: astDir);
 
     return TileServerTestLifecycle._(
       server: server,
@@ -134,10 +131,7 @@ class TileServerTestLifecycle {
   }
 
   /// Requisita um arquivo de fonte SDF (.pbf) (`/assets/fonts/{fontstack}/{range}.pbf`).
-  Future<http.Response> fetchFontGlyph(
-    String fontstack,
-    String range,
-  ) async {
+  Future<http.Response> fetchFontGlyph(String fontstack, String range) async {
     _ensureRunning();
     return http.get(Uri.parse('$baseUrl/assets/fonts/$fontstack/$range.pbf'));
   }

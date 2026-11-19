@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../../../core/app_theme.dart';
 import '../../../core/date_utils.dart';
 
@@ -55,8 +56,9 @@ class AppointmentsControlsBar extends StatelessWidget {
                   constraints.maxWidth < (700 * textScale.clamp(1.0, 2.5));
               final navRow = Row(
                 mainAxisSize: isNarrow ? MainAxisSize.max : MainAxisSize.min,
-                mainAxisAlignment:
-                    isNarrow ? MainAxisAlignment.center : MainAxisAlignment.start,
+                mainAxisAlignment: isNarrow
+                    ? MainAxisAlignment.center
+                    : MainAxisAlignment.start,
                 children: [
                   IconButton(
                     icon: const Icon(Icons.chevron_left),
@@ -166,10 +168,7 @@ class AppointmentsControlsBar extends StatelessWidget {
                     const SizedBox(height: 6),
                     SizedBox(
                       width: double.infinity,
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: segButton,
-                      ),
+                      child: FittedBox(fit: BoxFit.scaleDown, child: segButton),
                     ),
                   ],
                 );

@@ -168,7 +168,8 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
     }
   }
 
-  String _getMonthName(int month) => AppointmentsControlsBar.getMonthName(month);
+  String _getMonthName(int month) =>
+      AppointmentsControlsBar.getMonthName(month);
 
   @override
   Widget build(BuildContext context) {
@@ -374,13 +375,9 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                     _selectedDate.day.clamp(1, 28),
                   );
                 } else if (_viewMode == 'Semana') {
-                  _selectedDate = _selectedDate.add(
-                    const Duration(days: 7),
-                  );
+                  _selectedDate = _selectedDate.add(const Duration(days: 7));
                 } else {
-                  _selectedDate = _selectedDate.add(
-                    const Duration(days: 1),
-                  );
+                  _selectedDate = _selectedDate.add(const Duration(days: 1));
                 }
               });
             },
@@ -396,10 +393,8 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
             scheduledHours: scheduledHours,
             actualHours: actualHours,
             isDark: isDark,
-            onCopySchedule: () => _showMonthlyScheduleCopyWizard(
-              context,
-              allAppts,
-            ),
+            onCopySchedule: () =>
+                _showMonthlyScheduleCopyWizard(context, allAppts),
             onScheduleFieldMinistry: () =>
                 _showFieldMinistryScheduleModal(context),
           ),

@@ -181,7 +181,9 @@ class InMemoryEncryptedDb {
         isTrue,
         reason: 'PRAGMA cipher deve retornar a cifra ativa.',
       );
-      final cipherName = cipherRows.first.values.first?.toString().toLowerCase();
+      final cipherName = cipherRows.first.values.first
+          ?.toString()
+          .toLowerCase();
       expect(
         cipherName,
         contains('chacha20'),

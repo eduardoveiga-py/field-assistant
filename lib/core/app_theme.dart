@@ -7,6 +7,7 @@ class AppTheme {
   // Cores de alto contraste e legibilidade sob sol intenso
   static const Color primaryBlue = Color(0xFF1E3A8A); // Azul profundo elegante
   static const Color accentTeal = Color(0xFF0D9488);
+  static const Color primaryTeal = accentTeal;
   static const Color surfaceLight = Color(0xFFF8FAFC);
   static const Color cardLight = Colors.white;
   static const Color textDark = Color(0xFF0F172A);

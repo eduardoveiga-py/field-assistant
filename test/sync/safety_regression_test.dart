@@ -82,7 +82,8 @@ void main() {
           if (request.url.path.endsWith('/rpc/sync_upsert_if_unchanged')) {
             return jsonResponse(request, {});
           }
-          if (request.method == 'POST' && request.url.path.endsWith('/people')) {
+          if (request.method == 'POST' &&
+              request.url.path.endsWith('/people')) {
             directWrites++;
           }
           return jsonResponse(request, []);

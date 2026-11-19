@@ -39,11 +39,14 @@ void main() {
         globalGate.install();
       });
 
-      test('permits loopback HTTP requests (127.0.0.1 and localhost)', () async {
-        expect(gate.isAllowed('127.0.0.1'), isTrue);
-        expect(gate.isAllowed('localhost'), isTrue);
-        expect(gate.isAllowed('::1'), isTrue);
-      });
+      test(
+        'permits loopback HTTP requests (127.0.0.1 and localhost)',
+        () async {
+          expect(gate.isAllowed('127.0.0.1'), isTrue);
+          expect(gate.isAllowed('localhost'), isTrue);
+          expect(gate.isAllowed('::1'), isTrue);
+        },
+      );
 
       test('intercepts external HTTP request and throws AirplaneModeViolationException', () async {
         expect(gate.isAllowed('api.supabase.co'), isFalse);
@@ -57,7 +60,11 @@ void main() {
             isA<AirplaneModeViolationException>()
                 .having((e) => e.blockedHost, 'blockedHost', 'example.com')
                 .having((e) => e.method, 'method', 'GET')
-                .having((e) => e.uri.toString(), 'uri', contains('example.com')),
+                .having(
+                  (e) => e.uri.toString(),
+                  'uri',
+                  contains('example.com'),
+                ),
           ),
         );
       });
@@ -69,17 +76,14 @@ void main() {
       });
 
       test('runWithGate executes computation in hermetic network zone', () {
-        final result = AirplaneNetworkGate.runWithGate(
-          () {
-            final client = HttpClient();
-            expect(
-              () => client.getUrl(Uri.parse('https://external-api.org')),
-              throwsA(isA<AirplaneModeViolationException>()),
-            );
-            return 'blocked_safely';
-          },
-          airplaneMode: true,
-        );
+        final result = AirplaneNetworkGate.runWithGate(() {
+          final client = HttpClient();
+          expect(
+            () => client.getUrl(Uri.parse('https://external-api.org')),
+            throwsA(isA<AirplaneModeViolationException>()),
+          );
+          return 'blocked_safely';
+        }, airplaneMode: true);
         expect(result, equals('blocked_safely'));
       });
     });
@@ -88,43 +92,49 @@ void main() {
     // 2. InMemoryEncryptedDb Tests
     // -------------------------------------------------------------------------
     group('InMemoryEncryptedDb (Hermetic & ChaCha20 Verification)', () {
-      test('creates in-memory Drift database with foreign keys enabled', () async {
-        final db = InMemoryEncryptedDb.createInMemory();
-        expect(db, isNotNull);
+      test(
+        'creates in-memory Drift database with foreign keys enabled',
+        () async {
+          final db = InMemoryEncryptedDb.createInMemory();
+          expect(db, isNotNull);
 
-        // Testa inserção e consulta através do repositório
-        final repo = db.asRepository;
-        final created = await repo.createPerson(
-          name: 'Irmão Pioneiro Teste',
-          address: 'Rua Principal, 100',
-        );
-        expect(created.id, isNotEmpty);
+          // Testa inserção e consulta através do repositório
+          final repo = db.asRepository;
+          final created = await repo.createPerson(
+            name: 'Irmão Pioneiro Teste',
+            address: 'Rua Principal, 100',
+          );
+          expect(created.id, isNotEmpty);
 
-        final person = await repo.getPersonById(created.id);
-        expect(person, isNotNull);
-        expect(person!.name, equals('Irmão Pioneiro Teste'));
+          final person = await repo.getPersonById(created.id);
+          expect(person, isNotNull);
+          expect(person!.name, equals('Irmão Pioneiro Teste'));
 
-        await db.close();
-      });
+          await db.close();
+        },
+      );
 
       test('detects SQLite3MultipleCiphers native extension availability', () {
         final isAvailable = InMemoryEncryptedDb.isSqlite3McAvailable();
         expect(isAvailable, isTrue);
       });
 
-      test('creates disk-backed database and asserts ChaCha20 encryption at rest', () async {
-        final handle = await InMemoryEncryptedDb.createEncryptedFileDb();
-        addTearDown(handle.dispose);
+      test(
+        'creates disk-backed database and asserts ChaCha20 encryption at rest',
+        () async {
+          final handle = await InMemoryEncryptedDb.createEncryptedFileDb();
+          addTearDown(handle.dispose);
 
-        const sampleSecret = 'Registro Confidencial Betânia 2026';
-        await handle.repo.createPerson(
-          name: sampleSecret,
-          address: 'Comunidade Betânia - Rio Jandiatuba',
-        );
+          const sampleSecret = 'Registro Confidencial Betânia 2026';
+          await handle.repo.createPerson(
+            name: sampleSecret,
+            address: 'Comunidade Betânia - Rio Jandiatuba',
+          );
 
-        // Executa asserções fail-closed de criptografia em disco
-        await handle.assertChaCha20Encrypted(sampleSecretText: sampleSecret);
-      });
+          // Executa asserções fail-closed de criptografia em disco
+          await handle.assertChaCha20Encrypted(sampleSecretText: sampleSecret);
+        },
+      );
     });
 
     // -------------------------------------------------------------------------
@@ -144,7 +154,10 @@ void main() {
       test('binds to loopback on ephemeral port and serves /status', () async {
         expect(tileLifecycle.isRunning, isTrue);
         expect(tileLifecycle.port, greaterThan(0));
-        expect(tileLifecycle.baseUrl, equals('http://127.0.0.1:${tileLifecycle.port}'));
+        expect(
+          tileLifecycle.baseUrl,
+          equals('http://127.0.0.1:${tileLifecycle.port}'),
+        );
 
         final res = await tileLifecycle.fetchStatus();
         expect(res.statusCode, equals(200));
@@ -153,22 +166,42 @@ void main() {
         expect(json['port'], equals(tileLifecycle.port));
       });
 
-      test('serves registered PMTiles package header and vector tiles', () async {
-        final pmtilesBytes = SyntheticVectorFixtures.createAltoSolimoesPackage();
-        await tileLifecycle.registerPmtilesBytes('alto_solimoes', pmtilesBytes);
+      test(
+        'serves registered PMTiles package header and vector tiles',
+        () async {
+          final pmtilesBytes =
+              SyntheticVectorFixtures.createAltoSolimoesPackage();
+          await tileLifecycle.registerPmtilesBytes(
+            'alto_solimoes',
+            pmtilesBytes,
+          );
 
-        // Consulta cabeçalho PMTiles
-        final headerRes = await tileLifecycle.fetchPmtilesHeader('alto_solimoes');
-        expect(headerRes.statusCode, equals(200));
-        expect(headerRes.bodyBytes.length, greaterThanOrEqualTo(127));
-        expect(headerRes.bodyBytes.sublist(0, 7), equals([0x50, 0x4D, 0x54, 0x69, 0x6C, 0x65, 0x73]));
-        expect(headerRes.bodyBytes[7], equals(3));
+          // Consulta cabeçalho PMTiles
+          final headerRes = await tileLifecycle.fetchPmtilesHeader(
+            'alto_solimoes',
+          );
+          expect(headerRes.statusCode, equals(200));
+          expect(headerRes.bodyBytes.length, greaterThanOrEqualTo(127));
+          expect(
+            headerRes.bodyBytes.sublist(0, 7),
+            equals([0x50, 0x4D, 0x54, 0x69, 0x6C, 0x65, 0x73]),
+          );
+          expect(headerRes.bodyBytes[7], equals(3));
 
-        // Requisita tile de Santo Antônio do Içá (z=10, x=318, y=520)
-        final tileRes = await tileLifecycle.fetchTile('alto_solimoes', 10, 318, 520);
-        expect(tileRes.statusCode, equals(200));
-        expect(utf8.decode(tileRes.bodyBytes), contains('Santo Antônio do Içá'));
-      });
+          // Requisita tile de Santo Antônio do Içá (z=10, x=318, y=520)
+          final tileRes = await tileLifecycle.fetchTile(
+            'alto_solimoes',
+            10,
+            318,
+            520,
+          );
+          expect(tileRes.statusCode, equals(200));
+          expect(
+            utf8.decode(tileRes.bodyBytes),
+            contains('Santo Antônio do Içá'),
+          );
+        },
+      );
     });
 
     // -------------------------------------------------------------------------
@@ -192,17 +225,20 @@ void main() {
         );
       });
 
-      test('Haversine distance accurately measures distance between communities', () {
-        final dist = AmazonianCoordinates.haversineDistanceMeters(
-          AmazonianCoordinates.santoAntonioLat,
-          AmazonianCoordinates.santoAntonioLon,
-          AmazonianCoordinates.betaniaLat,
-          AmazonianCoordinates.betaniaLon,
-        );
-        // Distância Santo Antônio do Içá <-> Betânia é ~17.3 km
-        expect(dist, greaterThan(15000));
-        expect(dist, lessThan(20000));
-      });
+      test(
+        'Haversine distance accurately measures distance between communities',
+        () {
+          final dist = AmazonianCoordinates.haversineDistanceMeters(
+            AmazonianCoordinates.santoAntonioLat,
+            AmazonianCoordinates.santoAntonioLon,
+            AmazonianCoordinates.betaniaLat,
+            AmazonianCoordinates.betaniaLon,
+          );
+          // Distância Santo Antônio do Içá <-> Betânia é ~17.3 km
+          expect(dist, greaterThan(15000));
+          expect(dist, lessThan(20000));
+        },
+      );
 
       test('fluvial barrier accurately detects river crossing attempts', () {
         // Trajeto entre Betânia (norte) e Lago Grande (sul) cruza o Rio Solimões
@@ -224,39 +260,60 @@ void main() {
         expect(isNotCrossing, isFalse);
       });
 
-      test('synthesizes valid PMTiles v3 archive decodable by PmtilesReader', () async {
-        final archiveBytes = SyntheticVectorFixtures.createAltoSolimoesPackage();
-        final tempFile = File('${Directory.systemTemp.path}/test_sai.pmtiles');
-        await tempFile.writeAsBytes(archiveBytes, flush: true);
-        addTearDown(() async {
-          if (tempFile.existsSync()) await tempFile.delete();
-        });
+      test(
+        'synthesizes valid PMTiles v3 archive decodable by PmtilesReader',
+        () async {
+          final archiveBytes =
+              SyntheticVectorFixtures.createAltoSolimoesPackage();
+          final tempFile = File(
+            '${Directory.systemTemp.path}/test_sai.pmtiles',
+          );
+          await tempFile.writeAsBytes(archiveBytes, flush: true);
+          addTearDown(() async {
+            if (tempFile.existsSync()) await tempFile.delete();
+          });
 
-        final reader = PmtilesReader(tempFile);
-        final header = await reader.getHeader();
+          final reader = PmtilesReader(tempFile);
+          final header = await reader.getHeader();
 
-        expect(header.specVersion, equals(3));
-        expect(header.numAddressedTiles, equals(3));
-        expect(header.tileType, equals(PmtilesTileType.mvt));
-        expect(header.centerLat, closeTo(AmazonianCoordinates.santoAntonioLat, 0.001));
-        expect(header.centerLon, closeTo(AmazonianCoordinates.santoAntonioLon, 0.001));
+          expect(header.specVersion, equals(3));
+          expect(header.numAddressedTiles, equals(3));
+          expect(header.tileType, equals(PmtilesTileType.mvt));
+          expect(
+            header.centerLat,
+            closeTo(AmazonianCoordinates.santoAntonioLat, 0.001),
+          );
+          expect(
+            header.centerLon,
+            closeTo(AmazonianCoordinates.santoAntonioLon, 0.001),
+          );
 
-        // Busca o tile (z=10, x=318, y=520) através do reader
-        final tileData = await reader.getTile(10, 318, 520);
-        expect(tileData, isNotNull);
-        expect(utf8.decode(tileData!), contains('Santo Antônio do Içá'));
-      });
+          // Busca o tile (z=10, x=318, y=520) através do reader
+          final tileData = await reader.getTile(10, 318, 520);
+          expect(tileData, isNotNull);
+          expect(utf8.decode(tileData!), contains('Santo Antônio do Içá'));
+        },
+      );
 
-      test('synthesizes corrupted archives that trigger fail-closed validation', () async {
-        final tooShort = SyntheticVectorFixtures.createCorruptedArchive(tooShort: true);
-        expect(tooShort.length, lessThan(127));
+      test(
+        'synthesizes corrupted archives that trigger fail-closed validation',
+        () async {
+          final tooShort = SyntheticVectorFixtures.createCorruptedArchive(
+            tooShort: true,
+          );
+          expect(tooShort.length, lessThan(127));
 
-        final badMagic = SyntheticVectorFixtures.createCorruptedArchive(badMagic: true);
-        expect(badMagic.length, equals(127));
+          final badMagic = SyntheticVectorFixtures.createCorruptedArchive(
+            badMagic: true,
+          );
+          expect(badMagic.length, equals(127));
 
-        final badVersion = SyntheticVectorFixtures.createCorruptedArchive(customVersion: 4);
-        expect(badVersion[7], equals(4));
-      });
+          final badVersion = SyntheticVectorFixtures.createCorruptedArchive(
+            customVersion: 4,
+          );
+          expect(badVersion[7], equals(4));
+        },
+      );
     });
 
     // -------------------------------------------------------------------------
@@ -287,48 +344,53 @@ void main() {
         );
       });
 
-      testWidgets('buildApp pumps widget in responsive viewports (Phone & Tablet)', (tester) async {
-        late OpaqueBoxHarness harness;
-        await tester.runAsync(() async {
-          harness = await OpaqueBoxHarness.create(airplaneMode: true);
-        });
-        addTearDown(() async {
-          await tester.runAsync(harness.dispose);
-        });
+      testWidgets(
+        'buildApp pumps widget in responsive viewports (Phone & Tablet)',
+        (tester) async {
+          late OpaqueBoxHarness harness;
+          await tester.runAsync(() async {
+            harness = await OpaqueBoxHarness.create(airplaneMode: true);
+          });
+          addTearDown(() async {
+            await tester.runAsync(harness.dispose);
+          });
 
-        final testWidget = Builder(
-          builder: (context) {
-            final mediaQuery = MediaQuery.of(context);
-            final isWide = mediaQuery.size.width >= 900;
-            return Scaffold(
-              body: Center(
-                child: Text(
-                  isWide ? 'Layout Amplo (Tablet)' : 'Layout Compacto (Phone)',
-                  textDirection: TextDirection.ltr,
+          final testWidget = Builder(
+            builder: (context) {
+              final mediaQuery = MediaQuery.of(context);
+              final isWide = mediaQuery.size.width >= 900;
+              return Scaffold(
+                body: Center(
+                  child: Text(
+                    isWide
+                        ? 'Layout Amplo (Tablet)'
+                        : 'Layout Compacto (Phone)',
+                    textDirection: TextDirection.ltr,
+                  ),
                 ),
-              ),
-            );
-          },
-        );
+              );
+            },
+          );
 
-        // 1. Testa viewport Phone (390 x 844)
-        await tester.pumpHarnessScreen(
-          screen: testWidget,
-          harness: harness,
-          devicePreset: E2EDevicePreset.phone,
-        );
-        expect(find.text('Layout Compacto (Phone)'), findsOneWidget);
-        expect(tester.view.physicalSize, equals(const Size(390, 844)));
+          // 1. Testa viewport Phone (390 x 844)
+          await tester.pumpHarnessScreen(
+            screen: testWidget,
+            harness: harness,
+            devicePreset: E2EDevicePreset.phone,
+          );
+          expect(find.text('Layout Compacto (Phone)'), findsOneWidget);
+          expect(tester.view.physicalSize, equals(const Size(390, 844)));
 
-        // 2. Testa viewport Tablet em Paisagem (1024 x 768)
-        await tester.pumpHarnessScreen(
-          screen: testWidget,
-          harness: harness,
-          devicePreset: E2EDevicePreset.tablet,
-        );
-        expect(find.text('Layout Amplo (Tablet)'), findsOneWidget);
-        expect(tester.view.physicalSize, equals(const Size(1024, 768)));
-      });
+          // 2. Testa viewport Tablet em Paisagem (1024 x 768)
+          await tester.pumpHarnessScreen(
+            screen: testWidget,
+            harness: harness,
+            devicePreset: E2EDevicePreset.tablet,
+          );
+          expect(find.text('Layout Amplo (Tablet)'), findsOneWidget);
+          expect(tester.view.physicalSize, equals(const Size(1024, 768)));
+        },
+      );
     });
   });
 }

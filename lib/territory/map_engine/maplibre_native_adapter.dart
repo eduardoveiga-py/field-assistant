@@ -299,6 +299,12 @@ class MaplibreNativeAdapter implements MapEngineAdapter {
     final sources = <String, dynamic>{};
     final layers = <Map<String, dynamic>>[];
 
+    layers.add({
+      'id': 'background',
+      'type': 'background',
+      'paint': {'background-color': isDarkMode ? '#1a1a1a' : '#f8f4f0'},
+    });
+
     if (tileUrl != null) {
       sources['offline-source'] = {
         'type': 'vector',
@@ -307,11 +313,6 @@ class MaplibreNativeAdapter implements MapEngineAdapter {
         'maxzoom': 18,
       };
 
-      layers.add({
-        'id': 'background',
-        'type': 'background',
-        'paint': {'background-color': isDarkMode ? '#1a1a1a' : '#f8f4f0'},
-      });
       layers.add({
         'id': 'water',
         'type': 'fill',

@@ -96,7 +96,9 @@ extension _ContactsMapCanvas on _ContactsMapScreenState {
     final Map<String, DateTime> nextApptMap = {};
     final nowTime = DateTime.now();
     for (final a in allAppointments) {
-      if (a.deletedAt != null || a.status == 'cancelado' || a.personId == null) {
+      if (a.deletedAt != null ||
+          a.status == 'cancelado' ||
+          a.personId == null) {
         continue;
       }
       if (a.startTime.isAfter(nowTime)) {
@@ -822,7 +824,8 @@ extension _ContactsMapCanvas on _ContactsMapScreenState {
                                           () {
                                             final layer = pinLayers[p.id];
                                             if (layer !=
-                                                TerritoryPinLayer.forgottenZone) {
+                                                TerritoryPinLayer
+                                                    .forgottenZone) {
                                               return const SizedBox.shrink();
                                             }
 
@@ -1624,9 +1627,26 @@ extension _ContactsMapCanvas on _ContactsMapScreenState {
                         Row(
                           children: [
                             Expanded(
+                              child: OutlinedButton.icon(
+                                icon: const Icon(Icons.alt_route, size: 16),
+                                label: const Text('Rota Offline (A*)'),
+                                onPressed: () {
+                                  final p = _selectedPinPerson!;
+                                  final lat = p.latitude ?? -3.1022;
+                                  final lon = p.longitude ?? -67.9397;
+                                  _showOfflineRouteDialog(
+                                    destinationName: p.name,
+                                    destLat: lat,
+                                    destLon: lon,
+                                  );
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
                               child: ElevatedButton.icon(
                                 icon: const Icon(Icons.directions, size: 16),
-                                label: const Text('Abrir Rota no Mapa'),
+                                label: const Text('Rota Externa'),
                                 onPressed: () =>
                                     _openSingleRoute(_selectedPinPerson!),
                               ),
@@ -1634,7 +1654,7 @@ extension _ContactsMapCanvas on _ContactsMapScreenState {
                             const SizedBox(width: 8),
                             OutlinedButton.icon(
                               icon: const Icon(Icons.person, size: 16),
-                              label: const Text('Ver Perfil'),
+                              label: const Text('Perfil'),
                               onPressed: () {
                                 Navigator.push(
                                   context,

@@ -164,8 +164,8 @@ class AppointmentDetailPane extends StatelessWidget {
                     const SizedBox(height: 10),
                     LayoutBuilder(
                       builder: (context, constraints) {
-                        final textScale =
-                            MediaQuery.textScalerOf(context).scale(1);
+                        final textScale = MediaQuery.textScalerOf(context)
+                            .scale(1);
                         final isStacked =
                             constraints.maxWidth < 420 || textScale > 1.2;
 

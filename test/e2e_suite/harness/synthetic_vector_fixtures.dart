@@ -49,7 +49,8 @@ class AmazonianCoordinates {
     const double earthRadiusMeters = 6371000.0;
     final dLat = (lat2 - lat1) * math.pi / 180.0;
     final dLon = (lon2 - lon1) * math.pi / 180.0;
-    final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+    final a =
+        math.sin(dLat / 2) * math.sin(dLat / 2) +
         math.cos(lat1 * math.pi / 180.0) *
             math.cos(lat2 * math.pi / 180.0) *
             math.sin(dLon / 2) *
@@ -220,7 +221,9 @@ class SyntheticVectorFixtures {
     int centerZoom = 10,
   }) {
     if (tiles.isEmpty) {
-      throw ArgumentError('At least one tile is required to build a valid PMTiles archive.');
+      throw ArgumentError(
+        'At least one tile is required to build a valid PMTiles archive.',
+      );
     }
 
     // Mapeia para entradas PMTiles ordenadas por Hilbert tileId
@@ -347,12 +350,10 @@ class SyntheticVectorFixtures {
     int y = 0,
     Uint8List? tileData,
   }) {
-    final payload = tileData ??
-        Uint8List.fromList(utf8.encode('{"test_tile": [1, 2, 3]}'));
+    final payload =
+        tileData ?? Uint8List.fromList(utf8.encode('{"test_tile": [1, 2, 3]}'));
     return createPmtilesV3Archive(
-      tiles: [
-        SyntheticTileSpec(z: z, x: x, y: y, data: payload),
-      ],
+      tiles: [SyntheticTileSpec(z: z, x: x, y: y, data: payload)],
       minZoom: z,
       maxZoom: z,
     );
