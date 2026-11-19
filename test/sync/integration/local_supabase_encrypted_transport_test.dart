@@ -169,6 +169,16 @@ void main() {
           throwsStateError,
         );
 
+        // Empty and multi-chunk versions round-trip independently.
+        final immutable = ImmutableEncryptedMedia(client: alice, owner: ownerA, key: key);
+        for (final bytes in [Uint8List(0), Uint8List.fromList(List<int>.generate(256 * 1024 + 19, (i) => i % 251))]) {
+          final ref = await immutable.stage(bucket: 'voice_notes', mediaId: 'edge-media', plaintextBytes: bytes);
+          expect(await immutable.download(bucket: 'voice_notes', mediaId: 'edge-media', reference: ref), bytes);
+          final badHash = ImmutableMediaReference(versionId: ref.versionId, sizeBytes: ref.sizeBytes, sha256: '0' * 64);
+          await expectLater(immutable.download(bucket: 'voice_notes', mediaId: 'edge-media', reference: badHash), throwsFormatException);
+        }
+        expect(() => ImmutableMediaReference.fromJson({'format': 2, 'versionId': '../escape', 'sizeBytes': -1, 'sha256': '0' * 64}), throwsFormatException);
+
         // Two clients stage different immutable versions and race the CAS.
         final stagedA = ImmutableEncryptedMedia(client: alice, owner: ownerA, key: key);
         final stagedB = ImmutableEncryptedMedia(client: aliceDevice2, owner: ownerA, key: key2);
