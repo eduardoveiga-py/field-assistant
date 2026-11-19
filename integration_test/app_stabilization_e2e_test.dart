@@ -27,7 +27,6 @@ Future<String> _createTestVault(E2eeService service, String owner) async {
   return phrase;
 }
 
-
 class _CloudStub {
   final Map<String, Map<String, dynamic>> vaults = {};
   final Map<String, Map<String, EncryptedRemoteRecord>> recordsByOwner = {};

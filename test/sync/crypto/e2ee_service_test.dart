@@ -17,7 +17,6 @@ Future<String> _createTestVault(E2eeService service, String owner) async {
   return phrase;
 }
 
-
 class _MockVaultTransport implements RecoveryVaultTransport {
   Map<String, dynamic>? marker;
   bool failFetch = false;
@@ -28,6 +27,7 @@ class _MockVaultTransport implements RecoveryVaultTransport {
     if (failFetch) throw StateError('rede indisponível');
     return marker;
   }
+
   @override
   Future<bool> createIfAbsent(Map<String, dynamic> m) async {
     if (failCreate) throw StateError('rede indisponível');
@@ -148,60 +148,91 @@ void main() {
 
     test('conflito e falha remota não instalam nem copiam chave', () async {
       final localPhrase = RecoveryCrypto.createPhrase();
-      await keyStore.install(owner: E2eeService.localUserId,
-          phrase: localPhrase, confirmation: localPhrase);
-      final localBefore = await (await keyStore.load(E2eeService.localUserId))!.extractBytes();
+      await keyStore.install(
+        owner: E2eeService.localUserId,
+        phrase: localPhrase,
+        confirmation: localPhrase,
+      );
+      final localBefore = await (await keyStore.load(E2eeService.localUserId))!
+          .extractBytes();
       final phrase = RecoveryCrypto.createPhrase();
       transport.failCreate = true;
-      await expectLater(() => service.setupVaultWithPhrase(testOwner, phrase), throwsStateError);
+      await expectLater(
+        () => service.setupVaultWithPhrase(testOwner, phrase),
+        throwsStateError,
+      );
       transport.failCreate = false;
       transport.marker = await RecoveryVaultVerifier.create(
         root: await RecoveryCrypto.keyFromPhrase(RecoveryCrypto.createPhrase()),
         owner: testOwner,
       );
-      await expectLater(() => service.setupVaultWithPhrase(testOwner, phrase), throwsStateError);
+      await expectLater(
+        () => service.setupVaultWithPhrase(testOwner, phrase),
+        throwsStateError,
+      );
       expect(await keyStore.load(testOwner), isNull);
-      expect(await (await keyStore.load(E2eeService.localUserId))!.extractBytes(), localBefore);
+      expect(
+        await (await keyStore.load(E2eeService.localUserId))!.extractBytes(),
+        localBefore,
+      );
     });
 
-    test('falha ao reler cofre criado preserva frase para restauração', () async {
+    test(
+      'falha ao reler cofre criado preserva frase para restauração',
+      () async {
+        final phrase = RecoveryCrypto.createPhrase();
+        transport.failFetch = true;
+        await expectLater(
+          () => service.setupVaultWithPhrase(testOwner, phrase),
+          throwsStateError,
+        );
+        expect(await keyStore.load(testOwner), isNull);
+        expect(transport.marker, isNotNull);
+        transport.failFetch = false;
+        expect(await service.restoreVault(testOwner, phrase), isTrue);
+      },
+    );
+
+    test('resposta perdida permite restaurar com a frase já anotada', () async {
       final phrase = RecoveryCrypto.createPhrase();
-      transport.failFetch = true;
+      transport.failAfterCreate = true;
       await expectLater(
         () => service.setupVaultWithPhrase(testOwner, phrase),
         throwsStateError,
       );
       expect(await keyStore.load(testOwner), isNull);
       expect(transport.marker, isNotNull);
-      transport.failFetch = false;
-      expect(await service.restoreVault(testOwner, phrase), isTrue);
-    });
-
-    test('resposta perdida permite restaurar com a frase já anotada', () async {
-      final phrase = RecoveryCrypto.createPhrase();
-      transport.failAfterCreate = true;
-      await expectLater(() => service.setupVaultWithPhrase(testOwner, phrase), throwsStateError);
-      expect(await keyStore.load(testOwner), isNull);
-      expect(transport.marker, isNotNull);
       expect(await service.restoreVault(testOwner, phrase), isTrue);
       await service.verifyRemoteVaultForSync(testOwner);
       transport.failFetch = true;
-      await expectLater(() => service.verifyRemoteVaultForSync(testOwner), throwsStateError);
-    });
-
-    test('chave instalada diferente do marcador bloqueia verificação', () async {
-      final phrase = RecoveryCrypto.createPhrase();
-      await keyStore.install(owner: testOwner, phrase: phrase, confirmation: phrase);
-      transport.marker = await RecoveryVaultVerifier.create(
-        root: await RecoveryCrypto.keyFromPhrase(RecoveryCrypto.createPhrase()),
-        owner: testOwner,
-      );
       await expectLater(
         () => service.verifyRemoteVaultForSync(testOwner),
-        throwsA(isA<SecretBoxAuthenticationError>()),
+        throwsStateError,
       );
-      expect(await keyStore.load(testOwner), isNotNull);
     });
+
+    test(
+      'chave instalada diferente do marcador bloqueia verificação',
+      () async {
+        final phrase = RecoveryCrypto.createPhrase();
+        await keyStore.install(
+          owner: testOwner,
+          phrase: phrase,
+          confirmation: phrase,
+        );
+        transport.marker = await RecoveryVaultVerifier.create(
+          root: await RecoveryCrypto.keyFromPhrase(
+            RecoveryCrypto.createPhrase(),
+          ),
+          owner: testOwner,
+        );
+        await expectLater(
+          () => service.verifyRemoteVaultForSync(testOwner),
+          throwsA(isA<SecretBoxAuthenticationError>()),
+        );
+        expect(await keyStore.load(testOwner), isNotNull);
+      },
+    );
 
     test('getRecordSync e getCheckpoint retornam instâncias ativas quando chave existe', () async {
       await _createTestVault(service, testOwner);

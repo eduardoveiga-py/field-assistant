@@ -59,10 +59,7 @@ enum PackageDownloadStatus {
   corrupted;
 
   bool get isTerminal =>
-      this == installed ||
-      this == failed ||
-      this == error ||
-      this == corrupted;
+      this == installed || this == failed || this == error || this == corrupted;
 
   bool get isProcessing =>
       this == downloading || this == validating || this == installing;
@@ -122,19 +119,22 @@ class PackageDownloadException extends HttpException {
   PackageDownloadException(super.message, {super.uri, this.statusCode});
 
   @override
-  String toString() => 'PackageDownloadException: $message (status: $statusCode)';
+  String toString() =>
+      'PackageDownloadException: $message (status: $statusCode)';
 }
 
 class RangeNotSatisfiableException extends PackageDownloadException {
   final int requestedStart;
   final int remoteFileSize;
 
-  RangeNotSatisfiableException(this.requestedStart, this.remoteFileSize,
-      {super.uri})
-      : super(
-          'HTTP 416 Range Not Satisfiable: start $requestedStart exceeds file size $remoteFileSize',
-          statusCode: 416,
-        );
+  RangeNotSatisfiableException(
+    this.requestedStart,
+    this.remoteFileSize, {
+    super.uri,
+  }) : super(
+         'HTTP 416 Range Not Satisfiable: start $requestedStart exceeds file size $remoteFileSize',
+         statusCode: 416,
+       );
 }
 
 class CorruptedPackageException extends FormatException
@@ -146,11 +146,14 @@ class CorruptedPackageException extends FormatException
   @override
   final int? statusCode;
 
-  CorruptedPackageException(this.expectedSha256, this.actualSha256,
-      {this.uri, this.statusCode})
-      : super(
-          'Checksum SHA-256 inválido! Esperado: $expectedSha256, Obtido: $actualSha256. O arquivo pode estar corrompido ou adulterado.',
-        );
+  CorruptedPackageException(
+    this.expectedSha256,
+    this.actualSha256, {
+    this.uri,
+    this.statusCode,
+  }) : super(
+         'Checksum SHA-256 inválido! Esperado: $expectedSha256, Obtido: $actualSha256. O arquivo pode estar corrompido ou adulterado.',
+       );
 }
 
 class InvalidPackageFormatException extends FormatException
@@ -161,14 +164,14 @@ class InvalidPackageFormatException extends FormatException
   final int? statusCode;
 
   InvalidPackageFormatException(String reason, {this.uri, this.statusCode})
-      : super('Formato de pacote inválido: $reason');
+    : super('Formato de pacote inválido: $reason');
 }
 
 class DownloadCancelledException extends PackageDownloadException {
   final String packageId;
 
   DownloadCancelledException(this.packageId)
-      : super('Download do pacote $packageId cancelado pelo usuário.');
+    : super('Download do pacote $packageId cancelado pelo usuário.');
 }
 
 /// Gerenciador de Pacotes Cartográficos Vetoriais Offline (Feature F12).
@@ -195,9 +198,11 @@ class OfflineMapPackageManager {
     http.Client? httpClient,
     this.tileServer,
     List<OfflineMapPackageManifest>? catalog,
-  })  : _customStorageDir = storageDir,
-        _httpClient = httpClient ?? http.Client(),
-        _catalog = List.unmodifiable(catalog ?? OfflineMapCatalog.defaultCatalog) {
+  }) : _customStorageDir = storageDir,
+       _httpClient = httpClient ?? http.Client(),
+       _catalog = List.unmodifiable(
+         catalog ?? OfflineMapCatalog.defaultCatalog,
+       ) {
     _initCatalog();
   }
 
@@ -440,8 +445,9 @@ class OfflineMapPackageManager {
           sink?.add(chunk);
           received += chunk.length;
 
-          final currentProgress =
-              total > 0 ? (received / total).clamp(0.0, 1.0) : 0.0;
+          final currentProgress = total > 0
+              ? (received / total).clamp(0.0, 1.0)
+              : 0.0;
           onProgress?.call(currentProgress);
           _updateState(
             manifest.id,
@@ -472,10 +478,8 @@ class OfflineMapPackageManager {
       // Transição de estado: VALIDATING
       _updateState(
         manifest.id,
-        (s) => s.copyWith(
-          status: PackageDownloadStatus.validating,
-          progress: 1.0,
-        ),
+        (s) =>
+            s.copyWith(status: PackageDownloadStatus.validating, progress: 1.0),
       );
 
       // Validação 1: Tamanho do arquivo
@@ -582,7 +586,10 @@ class OfflineMapPackageManager {
   }
 
   /// Cancela um download ativo e expurga o arquivo .tmp
-  Future<void> cancelDownload(String packageId, {bool purgeTempFile = true}) async {
+  Future<void> cancelDownload(
+    String packageId, {
+    bool purgeTempFile = true,
+  }) async {
     final token = _activeTokens[packageId];
     token?.cancel();
 
@@ -649,8 +656,7 @@ class OfflineMapPackageManager {
     _statesController.add(Map.of(_states));
   }
 
-  void _registerWithTileServer(
-      String id, File file, OfflineMapFormat format) {
+  void _registerWithTileServer(String id, File file, OfflineMapFormat format) {
     final server = tileServer;
     if (server == null) return;
     if (format == OfflineMapFormat.pmtiles) {

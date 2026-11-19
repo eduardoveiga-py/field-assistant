@@ -14,12 +14,18 @@ void main() {
   group('AppVersion Contract & Semver Parser', () {
     test('1. Metadados e versão centralizada estão consistentes', () {
       final pubspec = File('pubspec.yaml').readAsStringSync();
-      final match = RegExp(r'^version:\s*([0-9]+\.[0-9]+\.[0-9]+)\+([0-9]+)', multiLine: true).firstMatch(pubspec);
+      final match = RegExp(
+        r'^version:\s*([0-9]+\.[0-9]+\.[0-9]+)\+([0-9]+)',
+        multiLine: true,
+      ).firstMatch(pubspec);
       expect(match, isNotNull);
       expect(AppVersion.version, match!.group(1));
       expect(AppVersion.buildNumber, int.parse(match.group(2)!));
       expect(AppVersion.displayVersion, 'v${AppVersion.version}');
-      expect(AppVersion.userAgent, contains('MinisterioPessoal/${AppVersion.version}'));
+      expect(
+        AppVersion.userAgent,
+        contains('MinisterioPessoal/${AppVersion.version}'),
+      );
       expect(
         AppVersion.liveContainerSourceUrl,
         startsWith('livecontainer://sources?url='),

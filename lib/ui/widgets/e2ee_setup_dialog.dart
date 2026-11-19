@@ -108,7 +108,8 @@ class _E2eeSetupDialogState extends ConsumerState<E2eeSetupDialog>
       AppLogger.error('Erro ao configurar novo cofre E2EE', e, st);
       if (mounted) {
         setState(() {
-          _errorMessage = 'Não foi possível confirmar o cofre. Guarde esta frase: se a criação remota tiver ocorrido, use-a para restaurar. $e';
+          _errorMessage =
+              'Não foi possível confirmar o cofre. Guarde esta frase: se a criação remota tiver ocorrido, use-a para restaurar. $e';
         });
       }
     } finally {

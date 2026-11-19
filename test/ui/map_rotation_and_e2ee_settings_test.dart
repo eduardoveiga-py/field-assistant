@@ -979,10 +979,7 @@ void main() {
         await tester.pumpAndSettle();
 
         // O card deve indicar chave local e permitir reconfigurar ou verificar status
-        expect(
-          find.text('Chave de recuperação instalada'),
-          findsOneWidget,
-        );
+        expect(find.text('Chave de recuperação instalada'), findsOneWidget);
         expect(
           find.widgetWithText(
             ElevatedButton,

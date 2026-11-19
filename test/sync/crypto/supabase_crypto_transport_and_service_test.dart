@@ -24,7 +24,6 @@ Future<String> _createTestVault(E2eeService service, String owner) async {
   return phrase;
 }
 
-
 class _FakeAuthClient extends GoTrueClient {
   final User? _fakeUser;
 

@@ -24,7 +24,6 @@ Future<String> _createTestVault(E2eeService service, String owner) async {
   return phrase;
 }
 
-
 class _InMemoryCloud {
   final Map<String, Map<String, dynamic>> vaultsByOwner = {};
   final Map<String, Map<String, EncryptedRemoteRecord>> recordsByOwner = {};
@@ -289,67 +288,80 @@ void main() {
       },
     );
 
-    test('cofre ausente bloqueia sync sem esvaziar fila nem escrever na nuvem', () async {
-      final cloud = _InMemoryCloud();
-      final db = AppDatabase.forTesting(NativeDatabase.memory());
-      final repo = AppRepository(db);
-      final service = E2eeService(
-        db: db,
-        keyStore: RecoveryKeyStore(),
-        vaultTransportOverride: cloud.vaultFor(accountA),
-        recordTransportOverride: cloud.recordsFor(accountA),
-      );
-      await _createTestVault(service, accountA);
-      cloud.vaultsByOwner.remove(accountA);
-      final client = SupabaseClient('https://mock.supabase.co', 'mock-key',
-          httpClient: MockClient((_) async => http.Response('[]', 200)));
-      final sync = SupabaseSyncService(
-        db: db,
-        repository: repo,
-        clientOverride: client,
-        e2eeServiceOverride: service,
-        allowEncryptedSyncForTesting: true,
-        authenticatedOwnerOverrideForTesting: accountA,
-      );
-      addTearDown(() async { sync.dispose(); client.dispose(); await db.close(); });
-      await repo.createPerson(name: 'Pessoa fictícia pendente');
-      final pendingBefore = await db.select(db.syncQueue).get();
-      expect(pendingBefore, isNotEmpty);
-      final result = await sync.sync();
-      expect(result.errors, isNotEmpty);
-      expect(cloud.recordsByOwner[accountA], isNull);
-      final pendingAfter = await db.select(db.syncQueue).get();
-      expect(pendingAfter.length, pendingBefore.length);
-    });
+    test(
+      'cofre ausente bloqueia sync sem esvaziar fila nem escrever na nuvem',
+      () async {
+        final cloud = _InMemoryCloud();
+        final db = AppDatabase.forTesting(NativeDatabase.memory());
+        final repo = AppRepository(db);
+        final service = E2eeService(
+          db: db,
+          keyStore: RecoveryKeyStore(),
+          vaultTransportOverride: cloud.vaultFor(accountA),
+          recordTransportOverride: cloud.recordsFor(accountA),
+        );
+        await _createTestVault(service, accountA);
+        cloud.vaultsByOwner.remove(accountA);
+        final client = SupabaseClient(
+          'https://mock.supabase.co',
+          'mock-key',
+          httpClient: MockClient((_) async => http.Response('[]', 200)),
+        );
+        final sync = SupabaseSyncService(
+          db: db,
+          repository: repo,
+          clientOverride: client,
+          e2eeServiceOverride: service,
+          allowEncryptedSyncForTesting: true,
+          authenticatedOwnerOverrideForTesting: accountA,
+        );
+        addTearDown(() async {
+          sync.dispose();
+          client.dispose();
+          await db.close();
+        });
+        await repo.createPerson(name: 'Pessoa fictícia pendente');
+        final pendingBefore = await db.select(db.syncQueue).get();
+        expect(pendingBefore, isNotEmpty);
+        final result = await sync.sync();
+        expect(result.errors, isNotEmpty);
+        expect(cloud.recordsByOwner[accountA], isNull);
+        final pendingAfter = await db.select(db.syncQueue).get();
+        expect(pendingAfter.length, pendingBefore.length);
+      },
+    );
 
-    test('migração local para conta permanece bloqueada e preserva a chave', () async {
-      final db = AppDatabase.forTesting(NativeDatabase.memory());
-      addTearDown(db.close);
-      final keyStore = RecoveryKeyStore();
-      final e2ee = E2eeService(db: db, keyStore: keyStore);
+    test(
+      'migração local para conta permanece bloqueada e preserva a chave',
+      () async {
+        final db = AppDatabase.forTesting(NativeDatabase.memory());
+        addTearDown(db.close);
+        final keyStore = RecoveryKeyStore();
+        final e2ee = E2eeService(db: db, keyStore: keyStore);
 
-      await _createTestVault(e2ee, E2eeService.localUserId);
-      expect(await e2ee.isKeyInstalled(E2eeService.localUserId), isTrue);
-      expect(await e2ee.isKeyInstalled(accountA), isFalse);
+        await _createTestVault(e2ee, E2eeService.localUserId);
+        expect(await e2ee.isKeyInstalled(E2eeService.localUserId), isTrue);
+        expect(await e2ee.isKeyInstalled(accountA), isFalse);
 
-      await expectLater(
-        () => e2ee.migrateLocalKeyToAccount(
-          targetOwnerId: accountA,
-          userConfirmed: false,
-        ),
-        throwsStateError,
-      );
-      expect(await e2ee.isKeyInstalled(accountA), isFalse);
+        await expectLater(
+          () => e2ee.migrateLocalKeyToAccount(
+            targetOwnerId: accountA,
+            userConfirmed: false,
+          ),
+          throwsStateError,
+        );
+        expect(await e2ee.isKeyInstalled(accountA), isFalse);
 
-      await expectLater(
-        () => e2ee.migrateLocalKeyToAccount(
-          targetOwnerId: accountA,
-          userConfirmed: true,
-        ),
-        throwsStateError,
-      );
-      expect(await e2ee.isKeyInstalled(accountA), isFalse);
-      expect(await e2ee.isKeyInstalled(E2eeService.localUserId), isTrue);
-    });
+        await expectLater(
+          () => e2ee.migrateLocalKeyToAccount(
+            targetOwnerId: accountA,
+            userConfirmed: true,
+          ),
+          throwsStateError,
+        );
+        expect(await e2ee.isKeyInstalled(accountA), isFalse);
+        expect(await e2ee.isKeyInstalled(E2eeService.localUserId), isTrue);
+      },
+    );
   });
 }

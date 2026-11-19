@@ -27,7 +27,6 @@ Future<String> _createTestVault(E2eeService service, String owner) async {
   return phrase;
 }
 
-
 class _WireSpyCloud {
   final Map<String, Map<String, dynamic>> vaults = {};
   final Map<String, EncryptedRemoteRecord> records = {};

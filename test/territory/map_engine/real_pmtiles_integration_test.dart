@@ -13,7 +13,8 @@ void main() {
     }
     final expected = await File(expectedPath).readAsBytes();
     expect(expected, isNotEmpty);
-    final actual = await PmtilesReader(File(archivePath)).getTile(14, 5099, 8333);
+    final actual = await PmtilesReader(File(archivePath))
+        .getTile(14, 5099, 8333);
     expect(actual, equals(expected));
   });
 }

@@ -706,7 +706,9 @@ void main() {
           const mediaId = 'voice_notes:audio_field_01';
 
           // 1. Criptografa payload autêntico via RecoveryCrypto.seal
-          final plainBytes = Uint8List.fromList(utf8.encode('SensivelRelatoDeCampo2026'));
+          final plainBytes = Uint8List.fromList(
+            utf8.encode('SensivelRelatoDeCampo2026'),
+          );
           final validEnvelope = await RecoveryCrypto.seal(
             key: secretKey,
             owner: owner,
@@ -946,7 +948,12 @@ void main() {
           downloadUrl: Uri.parse('https://example.com/transition.pmtiles'),
           sizeBytes: payload.length,
           sha256: sha,
-          bbox: const GeoBoundingBox(minLat: -3.5, minLon: -68.5, maxLat: -3.0, maxLon: -67.5),
+          bbox: const GeoBoundingBox(
+            minLat: -3.5,
+            minLon: -68.5,
+            maxLat: -3.0,
+            maxLon: -67.5,
+          ),
           minZoom: 8,
           maxZoom: 14,
           generatedAt: DateTime.now(),
@@ -956,8 +963,13 @@ void main() {
           format: OfflineMapFormat.pmtiles,
         );
 
-        final mockClient = MockClient((request) async => http.Response.bytes(payload, 200));
-        final manager = OfflineMapPackageManager(storageDir: tempDir, httpClient: mockClient);
+        final mockClient = MockClient(
+          (request) async => http.Response.bytes(payload, 200),
+        );
+        final manager = OfflineMapPackageManager(
+          storageDir: tempDir,
+          httpClient: mockClient,
+        );
         addTearDown(manager.dispose);
 
         final recordedStatuses = <PackageDownloadStatus>[];
@@ -976,11 +988,14 @@ void main() {
         expect(File(installedPkg.filePath).existsSync(), isTrue);
 
         // Asserts real production state transitions observed during installPackage
-        expect(recordedStatuses, containsAllInOrder([
-          PackageDownloadStatus.downloading,
-          PackageDownloadStatus.validating,
-          PackageDownloadStatus.installed,
-        ]));
+        expect(
+          recordedStatuses,
+          containsAllInOrder([
+            PackageDownloadStatus.downloading,
+            PackageDownloadStatus.validating,
+            PackageDownloadStatus.installed,
+          ]),
+        );
       });
 
       test('TC-F12-02: package download supports RFC 7233 HTTP Range request resumption from byte offset', () async {
@@ -993,7 +1008,12 @@ void main() {
           downloadUrl: Uri.parse('https://example.com/resume.pmtiles'),
           sizeBytes: fullPayload.length,
           sha256: sha,
-          bbox: const GeoBoundingBox(minLat: -3.5, minLon: -68.5, maxLat: -3.0, maxLon: -67.5),
+          bbox: const GeoBoundingBox(
+            minLat: -3.5,
+            minLon: -68.5,
+            maxLat: -3.0,
+            maxLon: -67.5,
+          ),
           minZoom: 8,
           maxZoom: 14,
           generatedAt: DateTime.now(),
@@ -1004,7 +1024,9 @@ void main() {
         );
 
         // Pre-populate staging .tmp file with first 64 bytes
-        final stagingFile = File(p.join(tempDir.path, '${manifest.id}.pmtiles.tmp'));
+        final stagingFile = File(
+          p.join(tempDir.path, '${manifest.id}.pmtiles.tmp'),
+        );
         stagingFile.writeAsBytesSync(fullPayload.sublist(0, 64));
 
         String? sentRangeHeader;
@@ -1013,16 +1035,25 @@ void main() {
           return http.Response.bytes(
             fullPayload.sublist(64),
             206,
-            headers: {'content-range': 'bytes 64-${fullPayload.length - 1}/${fullPayload.length}'},
+            headers: {
+              'content-range':
+                  'bytes 64-${fullPayload.length - 1}/${fullPayload.length}',
+            },
           );
         });
 
-        final manager = OfflineMapPackageManager(storageDir: tempDir, httpClient: mockClient);
+        final manager = OfflineMapPackageManager(
+          storageDir: tempDir,
+          httpClient: mockClient,
+        );
         addTearDown(manager.dispose);
 
         final installed = await manager.installPackage(manifest);
         expect(sentRangeHeader, equals('bytes=64-'));
-        expect(File(installed.filePath).lengthSync(), equals(fullPayload.length));
+        expect(
+          File(installed.filePath).lengthSync(),
+          equals(fullPayload.length),
+        );
         expect(stagingFile.existsSync(), isFalse);
       });
 
@@ -1036,7 +1067,12 @@ void main() {
           downloadUrl: Uri.parse('https://example.com/map.pmtiles'),
           sizeBytes: payload.length,
           sha256: correctHash,
-          bbox: const GeoBoundingBox(minLat: -3.5, minLon: -68.5, maxLat: -3.0, maxLon: -67.5),
+          bbox: const GeoBoundingBox(
+            minLat: -3.5,
+            minLon: -68.5,
+            maxLat: -3.0,
+            maxLon: -67.5,
+          ),
           minZoom: 8,
           maxZoom: 14,
           generatedAt: DateTime.now(),
@@ -1063,7 +1099,12 @@ void main() {
           downloadUrl: Uri.parse('https://example.com/atomic.pmtiles'),
           sizeBytes: payload.length,
           sha256: sha,
-          bbox: const GeoBoundingBox(minLat: -3.5, minLon: -68.5, maxLat: -3.0, maxLon: -67.5),
+          bbox: const GeoBoundingBox(
+            minLat: -3.5,
+            minLon: -68.5,
+            maxLat: -3.0,
+            maxLon: -67.5,
+          ),
           minZoom: 8,
           maxZoom: 14,
           generatedAt: DateTime.now(),
@@ -1073,8 +1114,13 @@ void main() {
           format: OfflineMapFormat.pmtiles,
         );
 
-        final mockClient = MockClient((request) async => http.Response.bytes(payload, 200));
-        final manager = OfflineMapPackageManager(storageDir: tempDir, httpClient: mockClient);
+        final mockClient = MockClient(
+          (request) async => http.Response.bytes(payload, 200),
+        );
+        final manager = OfflineMapPackageManager(
+          storageDir: tempDir,
+          httpClient: mockClient,
+        );
         addTearDown(manager.dispose);
 
         final finalFile = await manager.getPackageFile(manifest);
@@ -1096,7 +1142,12 @@ void main() {
           downloadUrl: Uri.parse('https://example.com/remove.pmtiles'),
           sizeBytes: payload.length,
           sha256: sha,
-          bbox: const GeoBoundingBox(minLat: -3.5, minLon: -68.5, maxLat: -3.0, maxLon: -67.5),
+          bbox: const GeoBoundingBox(
+            minLat: -3.5,
+            minLon: -68.5,
+            maxLat: -3.0,
+            maxLon: -67.5,
+          ),
           minZoom: 8,
           maxZoom: 14,
           generatedAt: DateTime.now(),
@@ -1106,8 +1157,13 @@ void main() {
           format: OfflineMapFormat.pmtiles,
         );
 
-        final mockClient = MockClient((request) async => http.Response.bytes(payload, 200));
-        final manager = OfflineMapPackageManager(storageDir: tempDir, httpClient: mockClient);
+        final mockClient = MockClient(
+          (request) async => http.Response.bytes(payload, 200),
+        );
+        final manager = OfflineMapPackageManager(
+          storageDir: tempDir,
+          httpClient: mockClient,
+        );
         addTearDown(manager.dispose);
 
         await manager.installPackage(manifest);
@@ -1117,7 +1173,10 @@ void main() {
         await manager.removePackage(manifest.id);
         expect(packageFile.existsSync(), isFalse);
         final currentState = manager.currentStates[manifest.id];
-        expect(currentState?.status ?? PackageDownloadStatus.available, equals(PackageDownloadStatus.available));
+        expect(
+          currentState?.status ?? PackageDownloadStatus.available,
+          equals(PackageDownloadStatus.available),
+        );
       });
     });
 
@@ -1308,24 +1367,33 @@ void main() {
           nextNodeId: 'SAI_SUL',
           mode: RoutingMode.walking,
         );
-        expect(walkPenalty, equals(60.0),
-            reason: 'Caminhante recebe penalidade de 60s em reversão');
+        expect(
+          walkPenalty,
+          equals(60.0),
+          reason: 'Caminhante recebe penalidade de 60s em reversão',
+        );
 
         final drivePenalty = OfflineRoutingEngine.calculateTurnaroundPenalty(
           previousNodeId: 'SAI_SUL',
           nextNodeId: 'SAI_SUL',
           mode: RoutingMode.driving,
         );
-        expect(drivePenalty, equals(120.0),
-            reason: 'Veículo recebe penalidade de 120s em manobra U-Turn');
+        expect(
+          drivePenalty,
+          equals(120.0),
+          reason: 'Veículo recebe penalidade de 120s em manobra U-Turn',
+        );
 
         final noPenalty = OfflineRoutingEngine.calculateTurnaroundPenalty(
           previousNodeId: 'SAI_CENTRO',
           nextNodeId: 'ESTRADA_BETANIA_1',
           mode: RoutingMode.walking,
         );
-        expect(noPenalty, equals(0.0),
-            reason: 'Avanço linear contínuo não possui penalidade');
+        expect(
+          noPenalty,
+          equals(0.0),
+          reason: 'Avanço linear contínuo não possui penalidade',
+        );
       });
     });
 
@@ -1371,32 +1439,37 @@ void main() {
           final now = DateTime.now();
           // 1. Popula 5 compromissos prévios no banco local para o calendário do iOS
           for (var i = 1; i <= 5; i++) {
-            await db.into(db.externalCalendarEvents).insert(
-              ExternalCalendarEventsCompanion.insert(
-                id: 'local_evt_$i',
-                provider: 'apple_eventkit',
-                calendarId: 'cal_ios_sai',
-                externalEventId: 'ext_apple_$i',
-                title: 'Visita Pastoral Setor $i',
-                startTime: now.add(Duration(days: i)),
-                endTime: now.add(Duration(days: i, hours: 1)),
-                createdAt: now,
-                updatedAt: now,
-              ),
-            );
+            await db
+                .into(db.externalCalendarEvents)
+                .insert(
+                  ExternalCalendarEventsCompanion.insert(
+                    id: 'local_evt_$i',
+                    provider: 'apple_eventkit',
+                    calendarId: 'cal_ios_sai',
+                    externalEventId: 'ext_apple_$i',
+                    title: 'Visita Pastoral Setor $i',
+                    startTime: now.add(Duration(days: i)),
+                    endTime: now.add(Duration(days: i, hours: 1)),
+                    createdAt: now,
+                    updatedAt: now,
+                  ),
+                );
           }
 
           // 2. Simula anomalia externa onde a API do iOS EventKit retorna 0 eventos
           final fakePlugin = FakeDeviceCalendarPlugin()..eventsResult = [];
-          final provider = AppleEventKitProvider(deviceCalendarPlugin: fakePlugin);
+          final provider = AppleEventKitProvider(
+            deviceCalendarPlugin: fakePlugin,
+          );
 
           // 3. Executa o sync real através de AppleEventKitProvider.syncEvents
           final syncResult = await provider.syncEvents(db: db);
           expect(syncResult.success, isTrue);
 
           // 4. Confirma que o escudo contra deleção em massa impediu a remoção dos registros
-          final preservedEvents = await (db.select(db.externalCalendarEvents)
-            ..where((t) => t.provider.equals('apple_eventkit'))).get();
+          final preservedEvents = await (db.select(
+            db.externalCalendarEvents,
+          )..where((t) => t.provider.equals('apple_eventkit'))).get();
 
           expect(preservedEvents.length, equals(5));
           expect(preservedEvents.every((e) => !e.isDeletedExternal), isTrue);
@@ -1458,47 +1531,73 @@ void main() {
     // =========================================================================
     // Group 16: F16 E2E Opaque-Box Suite & FAES 10/10
     // =========================================================================
-    group(
-      'Group 16: F16 E2E Opaque-Box Suite & FAES 10/10 (Master Order §9, §10)',
-      () {
-        test('TC-F16-01: 100% pass rate requirement across all test suites with zero failures', () async {
-          // Executa matriz dinâmica de verificação de sanidade dos 16 subsistemas
-          final subsystemHealth = <String, bool>{
-            'F1_appointments_screen': File('lib/ui/screens/appointments_screen.dart').existsSync(),
-            'F2_credential_sanitation': File('tool/apply_migrations.cjs').existsSync(),
-            'F3_supabase_config': File('supabase/config.toml').existsSync(),
-            'F4_lint_automation': File('analysis_options.yaml').existsSync(),
-            'F5_version_unification': AppVersion.version == '2.0.0',
-            'F6_toolchain_ios': File('ios/Runner.xcodeproj/project.pbxproj').existsSync(),
-            'F7_toolchain_android': File('android/app/build.gradle.kts').existsSync(),
-            'F8_security_sqlite3mc': InMemoryEncryptedDb.isSqlite3McAvailable(),
-            'F9_media_cas': EncryptedMediaTransfer.supportedBuckets.length == 4,
-            'F10_maplibre_assets': File('lib/territory/map_engine/offline_tile_server.dart').existsSync(),
-            'F11_pmtiles_basemap': File('lib/territory/map_engine/pmtiles_reader.dart').existsSync(),
-            'F12_package_manager': File('lib/territory/packages/offline_map_package_manager.dart').existsSync(),
-            'F13_fts5_ticuna': TicunaUnicodeHelper.canonicalVowels.length == 12,
-            'F14_routing_engine': OfflineRoutingEngine.createAltoSolimoesNetwork().nodes.isNotEmpty,
-            'F15_eventkit_provider': AppleEventKitProvider.computeEventFingerprint(
-              externalEventId: 'test_health',
-              calendarId: 'cal_health',
-              title: 'Health Check',
-              startTime: DateTime(2026, 1, 1),
-              endTime: DateTime(2026, 1, 1, 1),
-            ).length == 64,
-            'F16_network_isolation': AirplaneNetworkGate().isAllowed('127.0.0.1'),
-          };
+    group('Group 16: F16 E2E Opaque-Box Suite & FAES 10/10 (Master Order §9, §10)', () {
+      test('TC-F16-01: 100% pass rate requirement across all test suites with zero failures', () async {
+        // Executa matriz dinâmica de verificação de sanidade dos 16 subsistemas
+        final subsystemHealth = <String, bool>{
+          'F1_appointments_screen': File(
+            'lib/ui/screens/appointments_screen.dart',
+          ).existsSync(),
+          'F2_credential_sanitation': File('tool/apply_migrations.cjs')
+              .existsSync(),
+          'F3_supabase_config': File('supabase/config.toml').existsSync(),
+          'F4_lint_automation': File('analysis_options.yaml').existsSync(),
+          'F5_version_unification': AppVersion.version == '2.0.0',
+          'F6_toolchain_ios': File('ios/Runner.xcodeproj/project.pbxproj')
+              .existsSync(),
+          'F7_toolchain_android': File('android/app/build.gradle.kts')
+              .existsSync(),
+          'F8_security_sqlite3mc': InMemoryEncryptedDb.isSqlite3McAvailable(),
+          'F9_media_cas': EncryptedMediaTransfer.supportedBuckets.length == 4,
+          'F10_maplibre_assets': File(
+            'lib/territory/map_engine/offline_tile_server.dart',
+          ).existsSync(),
+          'F11_pmtiles_basemap': File(
+            'lib/territory/map_engine/pmtiles_reader.dart',
+          ).existsSync(),
+          'F12_package_manager': File(
+            'lib/territory/packages/offline_map_package_manager.dart',
+          ).existsSync(),
+          'F13_fts5_ticuna': TicunaUnicodeHelper.canonicalVowels.length == 12,
+          'F14_routing_engine':
+              OfflineRoutingEngine.createAltoSolimoesNetwork().nodes.isNotEmpty,
+          'F15_eventkit_provider':
+              AppleEventKitProvider.computeEventFingerprint(
+                externalEventId: 'test_health',
+                calendarId: 'cal_health',
+                title: 'Health Check',
+                startTime: DateTime(2026, 1, 1),
+                endTime: DateTime(2026, 1, 1, 1),
+              ).length ==
+              64,
+          'F16_network_isolation': AirplaneNetworkGate().isAllowed('127.0.0.1'),
+        };
 
-          final failureCount = subsystemHealth.values.where((healthy) => !healthy).length;
-          final passRate = (subsystemHealth.values.where((h) => h).length / subsystemHealth.length) * 100.0;
+        final failureCount = subsystemHealth.values
+            .where((healthy) => !healthy)
+            .length;
+        final passRate =
+            (subsystemHealth.values.where((h) => h).length /
+                subsystemHealth.length) *
+            100.0;
 
-          expect(failureCount, equals(0), reason: 'Zero subsistemas do Field Assistant podem apresentar falhas');
-          expect(passRate, equals(100.0), reason: 'Taxa de aprovação dos subsistemas deve ser 100%');
-        });
+        expect(
+          failureCount,
+          equals(0),
+          reason: 'Zero subsistemas do Field Assistant podem apresentar falhas',
+        );
+        expect(
+          passRate,
+          equals(100.0),
+          reason: 'Taxa de aprovação dos subsistemas deve ser 100%',
+        );
+      });
 
-        test('TC-F16-02: zero unhandled asynchronous exceptions across the test execution lifecycle', () async {
-          final caughtAsyncErrors = <Object>[];
+      test('TC-F16-02: zero unhandled asynchronous exceptions across the test execution lifecycle', () async {
+        final caughtAsyncErrors = <Object>[];
 
-          await runZonedGuarded(() async {
+        await runZonedGuarded(
+          () async {
             final harness = await OpaqueBoxHarness.create(
               airplaneMode: true,
               startTileServer: false,
@@ -1513,112 +1612,137 @@ void main() {
             } finally {
               await harness.dispose();
             }
-          }, (error, stack) {
+          },
+          (error, stack) {
             caughtAsyncErrors.add(error);
-          });
+          },
+        );
 
-          expect(caughtAsyncErrors, isEmpty, reason: 'Ciclo de vida assíncrono executou sem exceções não tratadas');
-        });
+        expect(
+          caughtAsyncErrors,
+          isEmpty,
+          reason: 'Ciclo de vida assíncrono executou sem exceções não tratadas',
+        );
+      });
 
-        test('TC-F16-03: AirplaneNetworkGate guarantees zero external network requests in airplane mode', () {
-          final gate = AirplaneNetworkGate(airplaneModeActive: true);
-          expect(gate.isAllowed('127.0.0.1'), isTrue);
-          expect(gate.isAllowed('localhost'), isTrue);
-          expect(gate.isAllowed('api.supabase.co'), isFalse);
-          expect(gate.isAllowed('tile.openstreetmap.org'), isFalse);
-        });
+      test('TC-F16-03: AirplaneNetworkGate guarantees zero external network requests in airplane mode', () {
+        final gate = AirplaneNetworkGate(airplaneModeActive: true);
+        expect(gate.isAllowed('127.0.0.1'), isTrue);
+        expect(gate.isAllowed('localhost'), isTrue);
+        expect(gate.isAllowed('api.supabase.co'), isFalse);
+        expect(gate.isAllowed('tile.openstreetmap.org'), isFalse);
+      });
 
-        test('TC-F16-04: FAES Quality Gate formula validates weighted score >= 9.7 and no dimension < 9.0', () {
-          final dimensionScores = <String, double>{
-            'functional': 10.0,
-            'data_integrity': 10.0,
-            'security': 10.0,
-            'offline_sync': 10.0,
-            'architecture': 9.8,
-            'ux_ios': 9.8,
-            'tests': 10.0,
-            'performance': 9.6,
-            'documentation': 9.8,
-            'release_ci': 9.8,
-          };
+      test('TC-F16-04: FAES Quality Gate formula validates weighted score >= 9.7 and no dimension < 9.0', () {
+        final dimensionScores = <String, double>{
+          'functional': 10.0,
+          'data_integrity': 10.0,
+          'security': 10.0,
+          'offline_sync': 10.0,
+          'architecture': 9.8,
+          'ux_ios': 9.8,
+          'tests': 10.0,
+          'performance': 9.6,
+          'documentation': 9.8,
+          'release_ci': 9.8,
+        };
 
-          final weights = <String, double>{
-            'functional': 0.15,
-            'data_integrity': 0.15,
-            'security': 0.15,
-            'offline_sync': 0.12,
-            'architecture': 0.10,
-            'ux_ios': 0.10,
-            'tests': 0.10,
-            'performance': 0.05,
-            'documentation': 0.04,
-            'release_ci': 0.04,
-          };
+        final weights = <String, double>{
+          'functional': 0.15,
+          'data_integrity': 0.15,
+          'security': 0.15,
+          'offline_sync': 0.12,
+          'architecture': 0.10,
+          'ux_ios': 0.10,
+          'tests': 0.10,
+          'performance': 0.05,
+          'documentation': 0.04,
+          'release_ci': 0.04,
+        };
 
-          var weightedSum = 0.0;
-          for (final entry in weights.entries) {
-            final score = dimensionScores[entry.key]!;
-            expect(score, greaterThanOrEqualTo(9.0));
-            weightedSum += score * entry.value;
-          }
+        var weightedSum = 0.0;
+        for (final entry in weights.entries) {
+          final score = dimensionScores[entry.key]!;
+          expect(score, greaterThanOrEqualTo(9.0));
+          weightedSum += score * entry.value;
+        }
 
-          expect(weightedSum, greaterThanOrEqualTo(9.7));
-        });
+        expect(weightedSum, greaterThanOrEqualTo(9.7));
+      });
 
-        test('TC-F16-05: release readiness verification confirms all 16 features from PROJECT.md are audited', () {
-          const canonicalFeatures = <int, String>{
-            1: 'Appointments Screen Layout Fix',
-            2: 'Credential Sanitation',
-            3: 'Supabase Config Normalization',
-            4: 'Lint Automation',
-            5: 'Version Unification',
-            6: 'Toolchain iOS 15.5+ Bump',
-            7: 'Toolchain Android & CI JDK 21',
-            8: 'Security & SQLite Fail-Closed Audit',
-            9: 'Media CAS & Sync Isolation Audit',
-            10: 'Local MapLibre Engine & Assets',
-            11: 'Alto Solimões Vector Basemap',
-            12: 'OfflineMapPackageManager',
-            13: 'FTS5 Geographic Search & Ticuna',
-            14: 'Offline Routing Engine (A*)',
-            15: 'iOS & iPadOS Platform Certification',
-            16: 'E2E Opaque-Box Suite & FAES 10/10',
-          };
+      test('TC-F16-05: release readiness verification confirms all 16 features from PROJECT.md are audited', () {
+        const canonicalFeatures = <int, String>{
+          1: 'Appointments Screen Layout Fix',
+          2: 'Credential Sanitation',
+          3: 'Supabase Config Normalization',
+          4: 'Lint Automation',
+          5: 'Version Unification',
+          6: 'Toolchain iOS 15.5+ Bump',
+          7: 'Toolchain Android & CI JDK 21',
+          8: 'Security & SQLite Fail-Closed Audit',
+          9: 'Media CAS & Sync Isolation Audit',
+          10: 'Local MapLibre Engine & Assets',
+          11: 'Alto Solimões Vector Basemap',
+          12: 'OfflineMapPackageManager',
+          13: 'FTS5 Geographic Search & Ticuna',
+          14: 'Offline Routing Engine (A*)',
+          15: 'iOS & iPadOS Platform Certification',
+          16: 'E2E Opaque-Box Suite & FAES 10/10',
+        };
 
-          expect(canonicalFeatures.length, equals(16));
-          for (var i = 1; i <= 16; i++) {
-            expect(canonicalFeatures.containsKey(i), isTrue);
-            expect(canonicalFeatures[i]!.isNotEmpty, isTrue);
-          }
+        expect(canonicalFeatures.length, equals(16));
+        for (var i = 1; i <= 16; i++) {
+          expect(canonicalFeatures.containsKey(i), isTrue);
+          expect(canonicalFeatures[i]!.isNotEmpty, isTrue);
+        }
 
-          // Valida a existência física dos componentes de produção de cada uma das 16 features
-          expect(File('lib/ui/screens/appointments_screen.dart').existsSync(), isTrue); // F1
-          expect(File('tool/apply_migrations.cjs').existsSync(), isTrue); // F2
-          expect(File('supabase/config.toml').existsSync(), isTrue); // F3
-          expect(File('analysis_options.yaml').existsSync(), isTrue); // F4
-          expect(AppVersion.version, equals('2.0.0')); // F5
-          expect(File('ios/Runner.xcodeproj/project.pbxproj').existsSync(), isTrue); // F6
-          expect(File('android/app/build.gradle.kts').existsSync(), isTrue); // F7
-          expect(InMemoryEncryptedDb.isSqlite3McAvailable(), isTrue); // F8
-          expect(EncryptedMediaTransfer.supportedBuckets.length, equals(4)); // F9
-          expect(File('lib/territory/map_engine/offline_tile_server.dart').existsSync(), isTrue); // F10
-          expect(File('lib/territory/map_engine/pmtiles_reader.dart').existsSync(), isTrue); // F11
-          expect(File('lib/territory/packages/offline_map_package_manager.dart').existsSync(), isTrue); // F12
-          expect(TicunaUnicodeHelper.canonicalVowels.length, equals(12)); // F13
-          expect(OfflineRoutingEngine.createAltoSolimoesNetwork().nodes.isNotEmpty, isTrue); // F14
-          expect(
-            AppleEventKitProvider.computeEventFingerprint(
-              externalEventId: 'test_ready',
-              calendarId: 'cal_ready',
-              title: 'Readiness Audit',
-              startTime: DateTime(2026, 1, 1),
-              endTime: DateTime(2026, 1, 1, 1),
-            ).length,
-            equals(64),
-          ); // F15
-          expect(AirplaneNetworkGate().isAllowed('127.0.0.1'), isTrue); // F16
-        });
-      },
-    );
+        // Valida a existência física dos componentes de produção de cada uma das 16 features
+        expect(
+          File('lib/ui/screens/appointments_screen.dart').existsSync(),
+          isTrue,
+        ); // F1
+        expect(File('tool/apply_migrations.cjs').existsSync(), isTrue); // F2
+        expect(File('supabase/config.toml').existsSync(), isTrue); // F3
+        expect(File('analysis_options.yaml').existsSync(), isTrue); // F4
+        expect(AppVersion.version, equals('2.0.0')); // F5
+        expect(
+          File('ios/Runner.xcodeproj/project.pbxproj').existsSync(),
+          isTrue,
+        ); // F6
+        expect(File('android/app/build.gradle.kts').existsSync(), isTrue); // F7
+        expect(InMemoryEncryptedDb.isSqlite3McAvailable(), isTrue); // F8
+        expect(EncryptedMediaTransfer.supportedBuckets.length, equals(4)); // F9
+        expect(
+          File('lib/territory/map_engine/offline_tile_server.dart')
+              .existsSync(),
+          isTrue,
+        ); // F10
+        expect(
+          File('lib/territory/map_engine/pmtiles_reader.dart').existsSync(),
+          isTrue,
+        ); // F11
+        expect(
+          File('lib/territory/packages/offline_map_package_manager.dart')
+              .existsSync(),
+          isTrue,
+        ); // F12
+        expect(TicunaUnicodeHelper.canonicalVowels.length, equals(12)); // F13
+        expect(
+          OfflineRoutingEngine.createAltoSolimoesNetwork().nodes.isNotEmpty,
+          isTrue,
+        ); // F14
+        expect(
+          AppleEventKitProvider.computeEventFingerprint(
+            externalEventId: 'test_ready',
+            calendarId: 'cal_ready',
+            title: 'Readiness Audit',
+            startTime: DateTime(2026, 1, 1),
+            endTime: DateTime(2026, 1, 1, 1),
+          ).length,
+          equals(64),
+        ); // F15
+        expect(AirplaneNetworkGate().isAllowed('127.0.0.1'), isTrue); // F16
+      });
+    });
   });
 }

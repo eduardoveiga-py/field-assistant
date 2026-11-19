@@ -31,30 +31,47 @@ void main() {
       return builder.takeBytes();
     }
 
-    test('syncWithDisk verifica hash mesmo com tamanho igual sem apagar arquivo', () async {
-      final payload = createValidPmtilesBytes('dados');
-      final manifest = OfflineMapPackageManifest(
-        id: 'disk_integrity',
-        regionName: 'Teste',
-        downloadUrl: Uri.parse('https://example.com/package.pmtiles'),
-        sizeBytes: payload.length,
-        sha256: crypto.sha256.convert(payload).toString(),
-        bbox: const GeoBoundingBox(minLat: -4, minLon: -68, maxLat: -3, maxLon: -67),
-        minZoom: 8,
-        maxZoom: 16,
-      );
-      final file = File('${tempDir.path}/${manifest.id}.pmtiles');
-      await file.writeAsBytes(payload);
-      final manager = OfflineMapPackageManager(storageDir: tempDir, catalog: [manifest]);
-      addTearDown(manager.dispose);
-      await manager.syncWithDisk();
-      expect(manager.currentStates[manifest.id]!.status, PackageDownloadStatus.installed);
-      payload[payload.length - 1] ^= 1;
-      await file.writeAsBytes(payload);
-      await manager.syncWithDisk();
-      expect(manager.currentStates[manifest.id]!.status, PackageDownloadStatus.corrupted);
-      expect(await file.readAsBytes(), payload);
-    });
+    test(
+      'syncWithDisk verifica hash mesmo com tamanho igual sem apagar arquivo',
+      () async {
+        final payload = createValidPmtilesBytes('dados');
+        final manifest = OfflineMapPackageManifest(
+          id: 'disk_integrity',
+          regionName: 'Teste',
+          downloadUrl: Uri.parse('https://example.com/package.pmtiles'),
+          sizeBytes: payload.length,
+          sha256: crypto.sha256.convert(payload).toString(),
+          bbox: const GeoBoundingBox(
+            minLat: -4,
+            minLon: -68,
+            maxLat: -3,
+            maxLon: -67,
+          ),
+          minZoom: 8,
+          maxZoom: 16,
+        );
+        final file = File('${tempDir.path}/${manifest.id}.pmtiles');
+        await file.writeAsBytes(payload);
+        final manager = OfflineMapPackageManager(
+          storageDir: tempDir,
+          catalog: [manifest],
+        );
+        addTearDown(manager.dispose);
+        await manager.syncWithDisk();
+        expect(
+          manager.currentStates[manifest.id]!.status,
+          PackageDownloadStatus.installed,
+        );
+        payload[payload.length - 1] ^= 1;
+        await file.writeAsBytes(payload);
+        await manager.syncWithDisk();
+        expect(
+          manager.currentStates[manifest.id]!.status,
+          PackageDownloadStatus.corrupted,
+        );
+        expect(await file.readAsBytes(), payload);
+      },
+    );
 
     test('TC-PKGMGR-01: Full download, SHA-256 validation, and atomic installation succeeds', () async {
       final payload = createValidPmtilesBytes('AltoSolimoesVectorData2026');

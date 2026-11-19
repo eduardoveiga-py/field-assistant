@@ -41,7 +41,6 @@ Future<String> _createTestVault(E2eeService service, String owner) async {
   return phrase;
 }
 
-
 class _AdvCloud {
   final Map<String, Map<String, dynamic>> vaults = {};
   final Map<String, EncryptedRemoteRecord> records = {};

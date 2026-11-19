@@ -171,33 +171,36 @@ void main() {
       expect(summary, contains('min'));
     });
 
-    test(
-      'TC-ROUTING-09: JSON serialization and deserialization preserves graph integrity and routing parity',
-      () {
-        final originalJson = engine.toJson();
-        expect(originalJson['nodes'], isA<List>());
-        expect(originalJson['edges'], isA<List>());
-        expect((originalJson['nodes'] as List).length, equals(engine.nodes.length));
+    test('TC-ROUTING-09: JSON serialization and deserialization preserves graph integrity and routing parity', () {
+      final originalJson = engine.toJson();
+      expect(originalJson['nodes'], isA<List>());
+      expect(originalJson['edges'], isA<List>());
+      expect(
+        (originalJson['nodes'] as List).length,
+        equals(engine.nodes.length),
+      );
 
-        final restoredEngine = OfflineRoutingEngine.fromJson(originalJson);
-        expect(restoredEngine.nodes.length, equals(engine.nodes.length));
+      final restoredEngine = OfflineRoutingEngine.fromJson(originalJson);
+      expect(restoredEngine.nodes.length, equals(engine.nodes.length));
 
-        final origResult = engine.findRoute(
-          startId: 'SAI_CENTRO',
-          goalId: 'BETANIA_CENTRO',
-          mode: RoutingMode.walking,
-        );
-        final restoredResult = restoredEngine.findRoute(
-          startId: 'SAI_CENTRO',
-          goalId: 'BETANIA_CENTRO',
-          mode: RoutingMode.walking,
-        );
+      final origResult = engine.findRoute(
+        startId: 'SAI_CENTRO',
+        goalId: 'BETANIA_CENTRO',
+        mode: RoutingMode.walking,
+      );
+      final restoredResult = restoredEngine.findRoute(
+        startId: 'SAI_CENTRO',
+        goalId: 'BETANIA_CENTRO',
+        mode: RoutingMode.walking,
+      );
 
-        expect(restoredResult.isSuccess, isTrue);
-        expect(restoredResult.pathNodeIds, equals(origResult.pathNodeIds));
-        expect(restoredResult.totalDistanceMeters, equals(origResult.totalDistanceMeters));
-        expect(restoredResult.steps.length, equals(origResult.steps.length));
-      },
-    );
+      expect(restoredResult.isSuccess, isTrue);
+      expect(restoredResult.pathNodeIds, equals(origResult.pathNodeIds));
+      expect(
+        restoredResult.totalDistanceMeters,
+        equals(origResult.totalDistanceMeters),
+      );
+      expect(restoredResult.steps.length, equals(origResult.steps.length));
+    });
   });
 }
