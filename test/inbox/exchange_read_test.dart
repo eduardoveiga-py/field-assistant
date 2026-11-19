@@ -1,12 +1,15 @@
 import 'dart:convert';
 
 import 'package:drift/native.dart';
+import 'package:drift/drift.dart' as drift;
 import 'package:eas_client/eas_client.dart' as eas;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:ministerio_pessoal/database/app_database.dart';
 import 'package:ministerio_pessoal/inbox/exchange_service.dart';
+import 'package:ministerio_pessoal/inbox/jw_email_service.dart';
+import 'package:ministerio_pessoal/core/biometric_auth_service.dart';
 import 'package:ministerio_pessoal/database/repository.dart';
 import 'package:ministerio_pessoal/sync/supabase_sync_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -179,6 +182,29 @@ void main() {
       expect(retry.keys, ['k2']);
     },
   );
+
+  test('Exchange body preserves literal text and hides only legacy injected prefix', () async {
+    const prefix = '[Prévia experimental do Exchange: corpo pode estar incompleto; anexos não são importados. Consulte a mensagem original.]\n\n';
+    final first = FakeExchange([
+      page('k1'),
+      page('k2', emails: [const eas.EasEmail(serverId: 'm', body: '${prefix}texto original')]),
+    ]);
+    await sync(first);
+    final entry = (await db.select(db.inboxEntries).get()).single;
+    final service = JwEmailService(db: db, biometricAuth: BiometricAuthService());
+    final fresh = (await service.watchRetainedEmails().first).single;
+    expect(fresh.bodyText, '${prefix}texto original');
+    final meta = jsonDecode(entry.metadata) as Map<String, dynamic>;
+    expect(meta['bodyPrefixAdded'], false);
+    meta.remove('bodyPrefixAdded');
+    (meta['email'] as Map<String, dynamic>)['bodyText'] = '$prefix${prefix}texto original';
+    final stored = jsonEncode(meta);
+    await (db.update(db.inboxEntries)..where((t) => t.id.equals(entry.id)))
+        .write(InboxEntriesCompanion(metadata: drift.Value(stored)));
+    final legacy = (await service.watchRetainedEmails().first).single;
+    expect(legacy.bodyText, '${prefix}texto original');
+    expect((await db.select(db.inboxEntries).get()).single.metadata, stored);
+  });
 
   test('chave expirada reinicia sem excluir mensagens locais', () async {
     final first = FakeExchange([

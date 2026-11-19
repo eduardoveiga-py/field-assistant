@@ -2781,6 +2781,8 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
     final initSubject = existingDraft?.subject ?? initialSubject ?? '';
     final initBody = existingDraft?.bodyText ?? '';
     final initTags = existingDraft?.tags.join(', ') ?? '';
+    final initCc = existingDraft?.cc ?? '';
+    final initBcc = existingDraft?.bcc ?? '';
 
     showModalBottomSheet(
       context: context,
@@ -2789,12 +2791,14 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (ctx) => ManagedTextControllers(
-        initialTexts: [initTo, initSubject, initBody, initTags],
+        initialTexts: [initTo, initSubject, initBody, initTags, initCc, initBcc],
         builder: (ctx, ctrls) {
           final toCtrl = ctrls[0];
           final subjectCtrl = ctrls[1];
           final contentCtrl = ctrls[2];
           final tagsCtrl = ctrls[3];
+          final ccCtrl = ctrls[4];
+          final bccCtrl = ctrls[5];
           bool isSending = false;
           String? inlineError;
           bool needsConfig = false;
@@ -2886,6 +2890,20 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                       ),
                       const SizedBox(height: 10),
                       TextField(
+                        controller: ccCtrl,
+                        enabled: !isSending,
+                        decoration: const InputDecoration(labelText: 'Cc', isDense: true),
+                        keyboardType: TextInputType.emailAddress,
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: bccCtrl,
+                        enabled: !isSending,
+                        decoration: const InputDecoration(labelText: 'Cco', isDense: true),
+                        keyboardType: TextInputType.emailAddress,
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
                         controller: subjectCtrl,
                         enabled: !isSending,
                         decoration: const InputDecoration(
@@ -2904,7 +2922,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                         ),
                       ),
                       const SizedBox(height: 12),
-                      RichMarkdownToolbar(controller: contentCtrl),
+                      const Text('Mensagem em texto simples', style: TextStyle(fontSize: 12)),
                       const SizedBox(height: 6),
                       TextField(
                         controller: contentCtrl,
@@ -2970,6 +2988,8 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                           ? userEmail
                                           : 'local@dispositivo',
                                       to: to,
+                                      cc: ccCtrl.text.trim(),
+                                      bcc: bccCtrl.text.trim(),
                                       date: DateTime.now(),
                                       bodyText: bodyText,
                                       isDraft: true,
@@ -3013,6 +3033,17 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                     final to = toCtrl.text.trim();
                                     final subject = subjectCtrl.text.trim();
                                     final bodyText = contentCtrl.text.trim();
+                                    try {
+                                      JwSmtpClient.parseRecipientsStrict(to);
+                                      JwSmtpClient.parseRecipientsStrict(ccCtrl.text);
+                                      JwSmtpClient.parseRecipientsStrict(bccCtrl.text);
+                                    } on JwEmailException catch (error) {
+                                      setSheetState(() {
+                                        inlineError = error.toString();
+                                        needsConfig = false;
+                                      });
+                                      return;
+                                    }
                                     if (to.isEmpty ||
                                         JwSmtpClient.parseRecipients(to)
                                             .isEmpty) {
@@ -3169,6 +3200,8 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                         subject: subject,
                                         from: username,
                                         to: to,
+                                        cc: ccCtrl.text.trim(),
+                                        bcc: bccCtrl.text.trim(),
                                         date: DateTime.now(),
                                         bodyText: bodyText,
                                         isDraft: false,

@@ -319,6 +319,18 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
       case AppFeature.territoryMaps:
         color = const Color(0xFF0284C7);
         break;
+      case AppFeature.inbox:
+        color = const Color(0xFFDB2777);
+        break;
+      case AppFeature.phones:
+        color = const Color(0xFF0F766E);
+        break;
+      case AppFeature.tasksProjects:
+        color = const Color(0xFF7C3AED);
+        break;
+      case AppFeature.knowledge:
+        color = const Color(0xFFB45309);
+        break;
       default:
         color = AppTheme.primaryBlue;
     }
@@ -420,6 +432,7 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
         AppFeature.notesResearch,
         AppFeature.ticuna,
         AppFeature.territoryMaps,
+        AppFeature.inbox,
       ];
 
       for (final f in railCandidates) {
@@ -517,16 +530,17 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
 
     // Layout para Mobile: Barra inferior com recursos principais + botão "Mais"
     // Features primárias na barra: até 5 primeiros itens ativos
-    // Por padrão: Hoje, Pessoas, Telefones, Agenda, Estudos
+    // Por padrão: Hoje, Pessoas, Agenda, Estudos, Inbox. Telefones continua em Mais.
     final primaryBarFeatures = <AppFeature>[];
     final moreFeatures = <AppFeature>[];
 
     final primaryCandidates = [
       AppFeature.today,
       AppFeature.people,
-      AppFeature.phones,
       AppFeature.agenda,
       AppFeature.studies,
+      AppFeature.inbox,
+      AppFeature.phones,
     ];
 
     for (final cand in primaryCandidates) {

@@ -92,6 +92,11 @@ void main() {
         findsOneWidget,
       );
 
+      expect(
+        find.descendant(of: find.byType(NavigationRail), matching: find.text('Inbox')),
+        findsOneWidget,
+      );
+
       // 3. Toca na aba Pessoas na NavigationRail
       final pessoasNav = find.descendant(
         of: find.byType(NavigationRail),
@@ -144,6 +149,11 @@ void main() {
       expect(find.byType(NavigationBar), findsOneWidget);
       expect(find.byType(NavigationRail), findsNothing);
       expect(find.byTooltip('Salvo Localmente'), findsOneWidget);
+
+      expect(
+        find.descendant(of: find.byType(NavigationBar), matching: find.text('Inbox')),
+        findsOneWidget,
+      );
 
       // Toca no destino Estudos na NavigationBar inferior
       final estudosNav = find.descendant(

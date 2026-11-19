@@ -32,6 +32,8 @@ class JwEmailMessage {
   final String subject;
   final String from;
   final String to;
+  final String cc;
+  final String bcc;
   final DateTime date;
   final String bodyText;
   final String? bodyHtml;
@@ -54,6 +56,8 @@ class JwEmailMessage {
     required this.subject,
     required this.from,
     required this.to,
+    this.cc = '',
+    this.bcc = '',
     required this.date,
     required this.bodyText,
     this.bodyHtml,
@@ -75,6 +79,8 @@ class JwEmailMessage {
     'subject': subject,
     'from': from,
     'to': to,
+    'cc': cc,
+    'bcc': bcc,
     'date': date.toIso8601String(),
     'bodyText': bodyText,
     'bodyHtml': bodyHtml,
@@ -96,6 +102,8 @@ class JwEmailMessage {
     subject: json['subject'] as String? ?? '(Sem Assunto)',
     from: json['from'] as String? ?? 'jw@jw.org',
     to: json['to'] as String? ?? '',
+    cc: json['cc'] as String? ?? '',
+    bcc: json['bcc'] as String? ?? '',
     date: json['date'] != null
         ? DateTime.tryParse(json['date'] as String) ?? DateTime.now()
         : DateTime.now(),
@@ -125,6 +133,8 @@ class JwEmailMessage {
     String? subject,
     String? from,
     String? to,
+    String? cc,
+    String? bcc,
     DateTime? date,
     String? bodyText,
     String? bodyHtml,
@@ -145,6 +155,8 @@ class JwEmailMessage {
       subject: subject ?? this.subject,
       from: from ?? this.from,
       to: to ?? this.to,
+      cc: cc ?? this.cc,
+      bcc: bcc ?? this.bcc,
       date: date ?? this.date,
       bodyText: bodyText ?? this.bodyText,
       bodyHtml: bodyHtml ?? this.bodyHtml,
@@ -1009,6 +1021,20 @@ class JwSmtpClient {
     return result;
   }
 
+  /// Reject invalid nonempty entries instead of silently dropping recipients.
+  static List<String> parseRecipientsStrict(String raw) {
+    final recipients = <String>[];
+    for (final part in raw.split(RegExp(r'[,;]'))) {
+      if (part.trim().isEmpty) continue;
+      final address = extractValidEmailAddress(part);
+      if (address == null) {
+        throw const JwEmailException('Há um destinatário inválido. Confira Para, Cc e Cco.');
+      }
+      recipients.add(address);
+    }
+    return recipients;
+  }
+
   /// Codifica cabeçalho UTF-8 em RFC 2047 Base64 quando contém caracteres não-ASCII.
   static String encodeHeaderValue(String value) {
     final sanitized = value.replaceAll(RegExp(r'[\r\n]+'), ' ').trim();
@@ -1111,10 +1137,19 @@ class JwSmtpClient {
       );
     }
 
+    List<String> toRecipients = const [];
+    List<String> ccRecipients = const [];
     List<String> recipients = const [];
     if (messageToSend != null) {
-      recipients = parseRecipients(messageToSend.to);
-      if (recipients.isEmpty) {
+      toRecipients = parseRecipientsStrict(messageToSend.to);
+      ccRecipients = parseRecipientsStrict(messageToSend.cc);
+      final bccRecipients = parseRecipientsStrict(messageToSend.bcc);
+      final unique = <String>{};
+      recipients = [
+        for (final address in [...toRecipients, ...ccRecipients, ...bccRecipients])
+          if (unique.add(address.toLowerCase())) address,
+      ];
+      if (toRecipients.isEmpty) {
         throw const JwEmailException(
           'Informe ao menos um destinatário de e-mail válido no campo "Para".',
         );
@@ -1331,7 +1366,8 @@ class JwSmtpClient {
         );
         final payload = StringBuffer()
           ..write('From: <$senderAddr>\r\n')
-          ..write('To: ${recipients.map((r) => '<$r>').join(', ')}\r\n')
+          ..write('To: ${toRecipients.map((r) => '<$r>').join(', ')}\r\n')
+          ..write(ccRecipients.isEmpty ? '' : 'Cc: ${ccRecipients.map((r) => '<$r>').join(', ')}\r\n')
           ..write('Subject: ${encodeHeaderValue(messageToSend.subject)}\r\n')
           ..write('Date: ${_formatRfc2822Date(nowUtc)}\r\n')
           ..write('Message-ID: $messageId\r\n')
@@ -1571,6 +1607,12 @@ class JwEmailService {
             if (meta.containsKey('email')) {
               final emailMap = Map<String, dynamic>.from(meta['email'] as Map);
               var msg = JwEmailMessage.fromJson(emailMap);
+              const legacyNotice = '[Prévia experimental do Exchange: corpo pode estar incompleto; anexos não são importados. Consulte a mensagem original.]\n\n';
+              if (meta['exchangePreview'] == true &&
+                  meta['bodyPrefixAdded'] != false &&
+                  msg.bodyText.startsWith(legacyNotice)) {
+                msg = msg.copyWith(bodyText: msg.bodyText.substring(legacyNotice.length));
+              }
               if (hubOnly && !msg.isHubCommunication) continue;
               if (tagFilter != null &&
                   tagFilter.isNotEmpty &&

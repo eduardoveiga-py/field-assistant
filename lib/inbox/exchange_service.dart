@@ -321,14 +321,14 @@ class ExchangeReadService {
                 from: item.from,
                 to: item.to,
                 date: item.dateReceived ?? now,
-                bodyText:
-                    '[Prévia experimental do Exchange: corpo pode estar incompleto; anexos não são importados. Consulte a mensagem original.]\n\n$body',
+                bodyText: body,
                 isRead: item.read,
                 isPermanentRetained: false,
               );
               final metadata = {
                 'email': message.toJson(),
                 'exchangePreview': true,
+                'bodyPrefixAdded': false,
                 'bodyMayBeIncomplete': item.body == null || item.bodyTruncated,
                 'attachmentCount': item.attachments.length,
               };

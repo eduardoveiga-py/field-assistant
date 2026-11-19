@@ -1,0 +1,31 @@
+# FA-MAIL-GALLERY — jornadas solicitadas e plano (2026-11-11)
+
+## Pedido e situação
+
+O usuário confirmou que uma conta Exchange real trouxe mensagens no iPhone, mas isso não prova envio, pastas completas, anexos, políticas ou sincronização entre dispositivos. Pediu: concluir mapa/roteamento e ativar E2EE, correio multi-conta (Exchange, Google, Hotmail), pastas, envio/resposta, anexos, contatos e autocomplete, Cco, exclusão, visual de e-mail, galeria com legenda/tags/zoom e entrada Inbox/colorir menu. Homologação física continua ao final e não há autorização para release.
+
+## Fluxos e fronteiras atuais
+
+- Mapa e E2EE: avaliação e bloqueadores em `FA-REGIONAL-MAPS-STAGING-202611.md`; protocolo de mídia antigo continua inseguro. Ativar a flag agora não cumpre E2EE; não enfraquecer o gate.
+- Correio: `InboxScreen` -> `ExchangeProtocolSession` -> FolderSync/Sync por pasta -> `InboxEntries` e outbox Drift. A sessão solicita corpo texto com limite 256 KiB; há snapshots parciais e referências de anexos, sem download. Pastas do tipo Drafts/Sent são aceitas, mas menu lista só pastas com mensagens retidas. `jw_mail_protocol=exchange` impede envio; botão Responder SMTP abre formulário que será bloqueado, pois EAS não é SMTP. IMAP/SMTP é conta separada e envia via socket/TLS, não é evidência que JW suporta SMTP. `watchRetainedEmails` usa metadata JSON e conserva dados; alguns snapshots Exchange anteriores têm o aviso inserido no próprio corpo.
+- SMTP: uma mensagem é texto puro Base64 e aceita apenas Para; editor mostra toolbar Markdown, mas o transporte envia os marcadores literalmente. Contatos e multi-conta não têm modelo próprio; credenciais no secure storage. Sem OAuth e mailbox/account identifiers adequados, não prometer Gmail/Hotmail. Exclusão remota não está implementada.
+- Interface: Inbox está no registro de feature e pode ser desativada sem perda; desktop omite de rail e mobile deixa em Mais. Imagens existentes são ligadas a pessoas/pesquisas e não constituem galeria independente. Uma galeria exige metadados e blobs, backup/export, local/Web/native, fila, isolamento de conta, migração e resolução de conflitos; não reaproveitar fotos de pessoas de forma que conflitem.
+
+## Etapas incrementais deste recorte
+
+1. Remover prefixo intrusivo gerado pelo aplicativo da visualização e dos novos snapshots sem alterar conteúdo original, identificadores, registros já salvos ou SyncKey. Manter informação central sobre limitações reais: remover todos os avisos antes de suportar corpo/anexo integral induziria perda de dados. Para snapshots antigos, remover uma única ocorrência exata somente quando metadata identifica Exchange e o formato legado; formato novo registra marcador explícito para nunca remover texto genuíno que coincida com o aviso.
+2. Acrescentar Cc/Cco em modelo e formulário SMTP, persistência em rascunho, validação integral antes de abrir conexão, destinatários no envelope SMTP e cabeçalho Cc; nunca incluir Bcc em dados MIME enviados aos demais. Não habilitar envio em EAS por suposição. Testar envelope, cabeçalhos, inválidos, rascunho e conteúdo na rede loopback fictícia. Continuam ausentes OAuth, HTML e anexos de envio. Remover toolbar Markdown no compositor de email texto puro (sem modificar rascunhos existentes) e indicar claramente o formato; visualização de texto recebido não deve modificar caracteres intencionais.
+3. Colocar Inbox diretamente na barra móvel e no rail desktop respeitando toggle, e manter Telefones acessível em Mais em telas menores; não mudar dados. Reutilizar ícones Material existentes, sem novo pacote. Testar navegação e toggle.
+4. Galeria, pastas vazias/atualizadas, HTML seguro, anexos, contatos, exclusão reversível, múltiplas contas, OAuth e protocolos completos não serão alegados como implementados apenas por este recorte. Necessitam desenho de segurança, validação de serviço autorizado e testes adicionais. Para fotos, preparar armazenamento e backup antes de exibir aba que prometa persistência/sync.
+
+## Pesquisa (consultada 2026-11-11)
+
+- MS-ASCMD tipos FolderSync: https://learn.microsoft.com/en-us/openspecs/exchange_server_protocols/ms-ascmd/8f3efbfb-9a60-4f6c-a031-f0c863b9d4b7 — Inbox 2, Drafts 3, Sent 5, pasta de correio criada 12.
+- MS-ASCMD SendMail e SmartReply: https://learn.microsoft.com/en-us/openspecs/exchange_server_protocols/ms-ascmd/172db9ec-350f-4bb1-94b1-0526f976ed5e e https://learn.microsoft.com/en-us/openspecs/exchange_server_protocols/ms-ascmd/419e4fc2-d0cb-419e-a94d-df4b8da0c98f — envio ActiveSync é comando MIME distinto de SMTP, e Reply identifica item. Alternativa rejeitada: reutilizar senha/host EAS como se fosse SMTP.
+- ItemOperations https://learn.microsoft.com/en-us/openspecs/exchange_server_protocols/ms-ascmd/9d4264fb-42f5-47fb-8133-5e68c52dd339 — anexos por referência e respostas verificáveis; falta implementação de armazenamento atômico e validação real.
+- Gmail https://developers.google.com/workspace/gmail/imap/imap-smtp — IMAP/SMTP OAuth 2.0; Microsoft https://learn.microsoft.com/en-us/exchange/client-developer/legacy-protocols/how-to-authenticate-an-imap-pop-smtp-application-by-using-oauth — OAuth2 para IMAP/SMTP. Necessitam registro, fluxo seguro e escopos; não inventar credenciais.
+- Ícones Material https://developers.google.com/fonts/docs/material_symbols — Apache 2.0; usar apenas ícones já presentes no Flutter, nenhum terceiro copiado. `third_party/eas_client` é MIT (licença preservada), mas alpha não garante suporte completo.
+
+## Validação e rollback
+
+Testes unitários de snapshots antigos/novos, SMTP loopback com receptores Cc/Cco, cabeçalho sem Cco e rejeição antes de rede; widget iPhone/iPad e toggles; analyzer/format/CI; não tocar servidor real ou credenciais do usuário. Avaliar CSP/HTML e navegação por anexo antes de rich mail. Reverter commits de UI/modelo sem remover banco, mídias ou credenciais; snapshots legados permanecem intactos. Estado geral: **BLOCKED**, sem nota, pois mapa, sync, segurança, galeria e correio completos ainda não passam gates. Sem release.

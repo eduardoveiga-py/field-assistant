@@ -289,12 +289,18 @@ void main() {
         subject: 'Relatório Mensal — João',
         from: 'publicador@jw.org',
         to: 'Secretário <secretario@jw.org>, corpo@jw.org',
+        cc: 'copia@jw.org',
+        bcc: 'reservado@jw.org',
         date: DateTime(2026, 11, 10, 14, 0),
         bodyText: 'Segue relatório de campo com acentuação UTF-8.',
         isDraft: true,
         tags: const ['relatorio'],
       );
       await emailService.saveDraft(draft);
+      final persistedDraft = await (db.select(db.inboxEntries)
+        ..where((t) => t.id.equals('email_draft_draft-100'))).getSingle();
+      final draftMetadata = jsonDecode(persistedDraft.metadata) as Map<String, dynamic>;
+      expect((draftMetadata['email'] as Map)['bcc'], 'reservado@jw.org');
 
       final sent = await emailService.sendEmail(
         host: '127.0.0.1',
@@ -311,8 +317,11 @@ void main() {
       expect(captured.receivedMailFrom, equals('<publicador@jw.org>'));
       expect(
         captured.receivedRcptTo,
-        equals(['<secretario@jw.org>', '<corpo@jw.org>']),
+        equals(['<secretario@jw.org>', '<corpo@jw.org>', '<copia@jw.org>', '<reservado@jw.org>']),
       );
+      expect(captured.receivedDataPayload, contains('Cc: <copia@jw.org>'));
+      expect(captured.receivedDataPayload, isNot(contains('reservado@jw.org')));
+      expect(captured.receivedDataPayload, isNot(contains('Bcc:')));
       expect(captured.commands.any((c) => c.startsWith('AUTH PLAIN ')), isTrue);
       expect(captured.receivedDataPayload, contains('Subject: =?UTF-8?B?'));
       expect(
@@ -327,6 +336,19 @@ void main() {
       expect(row.sourceType, equals('email'));
       final meta = jsonDecode(row.metadata) as Map<String, dynamic>;
       expect(meta['isDraft'], isFalse);
+    });
+
+    test('Rejects invalid Cco before opening an SMTP connection', () async {
+      const smtp = JwSmtpClient();
+      final message = JwEmailMessage(
+        id: 'bad', subject: 'Test', from: 'sender@example.org',
+        to: 'valid@example.org', bcc: 'broken-address',
+        date: DateTime.utc(2026), bodyText: 'body',
+      );
+      await expectLater(
+        smtp.sendMail(host: 'invalid.invalid', username: 'sender@example.org', password: 'test', message: message),
+        throwsA(isA<JwEmailException>().having((e) => e.toString(), 'validation', contains('destinatário inválido'))),
+      );
     });
 
     test(
