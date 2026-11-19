@@ -31,8 +31,8 @@ jobs:
         run: |
           set +e
           python3 tool/map/extract_regional_pmtiles.py \
-            --source https://build.protomaps.com/20261011.pmtiles \
-            --source-description 'Protomaps Basemap daily build 2026-10-11 (OSM and Natural Earth)' \
+            --source https://build.protomaps.com/20260811.pmtiles \
+            --source-description 'Protomaps Basemap daily build 2026-08-11 (OSM and Natural Earth)' \
             --license ODbL-1.0 \
             --attribution 'Protomaps © OpenStreetMap contributors; Natural Earth' \
             --bbox=-68.2,-3.4,-67.7,-3.0 --minzoom 0 --maxzoom 14 \

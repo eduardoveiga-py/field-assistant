@@ -7,19 +7,22 @@
 [![Flutter](https://img.shields.io/badge/Flutter-3.47+-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev)
 [![Dart](https://img.shields.io/badge/Dart-3.13+-0175C2?style=for-the-badge&logo=dart&logoColor=white)](https://dart.dev)
 [![Offline First](https://img.shields.io/badge/Arquitetura-Offline--First-success?style=for-the-badge&logo=sqlite&logoColor=white)](https://drift.simonbinder.eu/)
-[![Testes](https://img.shields.io/badge/Testes-1300+_Passando_(100%25)-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](https://github.com/eduardoveiga-py/field-assistant/actions)
+[![CI](https://img.shields.io/badge/Testes-verificar%20CI-blue?style=for-the-badge&logo=github)](https://github.com/eduardoveiga-py/field-assistant/actions)
 [![Plataformas](https://img.shields.io/badge/Plataformas-Android%20%7C%20iOS%20%7C%20Web%20%7C%20Windows%20%7C%20Linux%20%7C%20macOS-orange?style=for-the-badge)](https://github.com/eduardoveiga-py/field-assistant/releases)
 
 <p align="center">
   <b>Um aplicativo completo, ágil e focado na rotina ministerial para organizar contatos, revisitas, cursos bíblicos, compromissos, territórios e relatórios mensais.</b><br>
-  <i>Funciona 100% offline, sem anúncios, com privacidade absoluta e sincronização multi-dispositivo opcional.</i>
+  <i>Aplicativo offline-first. A sincronização cifrada e as funções de mapas avançadas ainda exigem homologação.</i>
 </p>
 
-[📥 Baixar Aplicativo](#-downloads-e-instalação) • [🔄 Atualizações & LiveContainer](#-atualizador-automático--livecontainer-arquitetura) • [✨ Recursos Principais](#-recursos-pensados-para-o-ministério) • [🚀 Guia Rápido de Uso](#-guia-rápido-de-uso) • [🔒 Privacidade e Segurança](#-privacidade-e-segurança-inviolável) • [📋 Detalhes dos Lançamentos](#-histórico-de-lançamentos-e-changelog)
+[📥 Baixar Aplicativo](#-downloads-e-instalação) • [🔄 Atualizações & LiveContainer](#-atualizador-automático--livecontainer-arquitetura) • [✨ Recursos Principais](#-recursos-pensados-para-o-ministério) • [🚀 Guia Rápido de Uso](#-guia-rápido-de-uso) • [🔒 Privacidade e Segurança](#-privacidade-e-segurança) • [📋 Detalhes dos Lançamentos](#-histórico-de-lançamentos-e-changelog)
 
 ---
 
 </div>
+
+> [!WARNING]
+> **Estado atual:** o código 2.0.0 está em desenvolvimento e não é uma release publicada. A sincronização em nuvem está desativada por padrão; o roteamento offline e o catálogo vetorial estão indisponíveis até existirem dados reais validados. O projeto Supabase existente não deve ser usado para testes: use apenas uma instância local isolada com dados fictícios. Consulte [avaliação e evidências](docs/engineering/impact-assessments/FA-REGIONAL-MAPS-STAGING-202611.md).
 
 ## 📥 Downloads e Instalação
 
@@ -38,8 +41,8 @@ Acesse a página de **[Releases Oficiais](https://github.com/eduardoveiga-py/fie
 
 Adicione o Ministério Pessoal diretamente como **Fonte (Source)** no **LiveContainer** ou **SideStore/AltStore** para receber e atualizar o app internamente:
 
-* **URL da Fonte:** `https://cdn.jsdelivr.net/gh/eduardoveiga-py/field-assistant@master/apps.json`
-* **Adicionar ao LiveContainer com 1 Toque:** [Toque aqui para abrir no LiveContainer](livecontainer://sources?url=https://cdn.jsdelivr.net/gh/eduardoveiga-py/field-assistant@master/apps.json)
+* **URL da Fonte:** `https://github.com/eduardoveiga-py/field-assistant/releases/latest/download/apps.json`
+* **Adicionar ao LiveContainer com 1 Toque:** [Toque aqui para abrir no LiveContainer](livecontainer://sources?url=https://github.com/eduardoveiga-py/field-assistant/releases/latest/download/apps.json)
 
 > [!TIP]
 > **Modo Offline Sem Conta**: Você não precisa criar conta nem efetuar login para usar o app! Ao abrir pela primeira vez, toque em **"Continuar em Modo Offline (Sem Conta)"** e o sistema funcionará imediatamente com banco de dados SQLite local no seu aparelho.
@@ -223,8 +226,8 @@ Enquanto caminha entre uma residência e outra, registre tudo sem precisar digit
 ---
 
 ### 🔐 13. Sincronização Multi-Dispositivo & Offline-First
-- Funciona 100% offline em qualquer lugar remoto.
-- Ao conectar sua conta no Supabase, o app sincroniza automaticamente todas as tabelas na Splash Screen com fila persistente e resolução de conflitos idempotente.
+- As operações locais são priorizadas; funções que dependem de rede ou pacote de mapa não funcionam sem seus respectivos recursos.
+- A sincronização em nuvem permanece desativada por padrão. O caminho cifrado e a recuperação estão em validação e não devem ser considerados homologados.
 
 ---
 
@@ -319,17 +322,17 @@ flowchart LR
 
 ---
 
-## 🔒 Privacidade e Segurança Inviolável
+## 🔒 Privacidade e Segurança
 
-- 🛡️ **Zero Telemetria / Sem Anúncios**: Seus contatos ministeriais e anotações pertencem apenas a você.
-- 🔐 **Backups Criptografados de Ponta a Ponta**:
-  - Criptografia militar **AES-256 GCM** com derivação de chave **PBKDF2** (100.000 iterações).
-  - Exporte seu arquivo de backup com senha pessoal e restaure em qualquer aparelho.
-- 📴 **100% Offline-First**: O banco de dados SQLite reside fisicamente na memória do seu próprio telefone.
+- 🔐 Há exportação de backup cifrado por senha; valide periodicamente a restauração em ambiente seguro.
+- 📴 Dados locais e cópias de segurança precisam ser protegidos no dispositivo. A presença de uma chave não comprova que todo o fluxo de sincronização esteja protegido.
+- A sincronização em nuvem fica pausada por padrão até conclusão dos testes de segurança e recuperação.
 
 ---
 
 ## 📋 Histórico de Lançamentos e Changelog
+
+> As notas abaixo são registros históricos, não evidência de que suas afirmações estejam verificadas no código atual. A seção 2.0.0 descreve trabalho em desenvolvimento, não um lançamento publicado.
 
 ### 🚀 Versão 1.3.3 (Build 10) — 11/11/2026: Operação Integral Sem Stubs, Endurecimento Supabase e Secrets Embutidos no CI
 - **Configuração Supabase & OAuth Embutida nos Binários**:
@@ -560,10 +563,10 @@ flowchart LR
 
 ### Instalação e Execução
 ```bash
-# 1. Clonar repositório e obter dependências
+# 1. Usar Flutter 3.47.8, clonar repositório e obter dependências
 git clone https://github.com/eduardoveiga-py/field-assistant.git
 cd field-assistant
-flutter pub get
+flutter pub get --enforce-lockfile
 
 # 2. Gerar código do banco Drift e Riverpod
 dart run build_runner build --delete-conflicting-outputs
@@ -624,19 +627,13 @@ Distribuído sob a **[Licença MIT](LICENSE)** — uso pessoal, comunitário, fo
 
 ## 🧪 Testes do Banco de Dados Supabase (pgTAP)
 
-As políticas de segurança RLS, as RPCs E2EE e os buckets de Storage são validados via **pgTAP** diretamente no Supabase:
+A suíte pgTAP cobre alguns contratos de RLS, RPC e Storage. Ela passou em Supabase local efêmero no CI, mas não comprova sincronização ponta a ponta do app.
 
 ```bash
-# Pré-requisito: Supabase CLI instalado e linkado ao projeto
-supabase login
-supabase link --project-ref SEU_PROJECT_REF
-
-# Executar suíte de testes (24 asserções de segurança)
-supabase test db
-
-# Ou contra banco local (docker):
-supabase start
-supabase test db
+# Pré-requisitos: Docker e Supabase CLI 3.2.0. Somente projeto local isolado!
+# Não executar link, db push, reset remoto nem copiar dados reais para testes.
+supabase db start
+supabase test db --local
 ```
 
 Os testes ficam em `supabase/tests/01_rls_e2ee_storage_security.sql` e validam:

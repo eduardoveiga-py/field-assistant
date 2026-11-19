@@ -22,7 +22,12 @@ from urllib.parse import urlsplit
 
 
 def run(*args):
-    return subprocess.run(args, check=True, stdout=subprocess.PIPE).stdout
+    result = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if result.returncode:
+        # Report bounded diagnostics; source URLs with secrets are rejected.
+        detail = (result.stderr + b'\n' + result.stdout)[-8192:].decode('utf-8', errors='replace')
+        raise RuntimeError(f'{Path(args[0]).name} {args[1]} falhou ({result.returncode}): {detail}')
+    return result.stdout
 
 
 def bbox_arg(value):
@@ -158,6 +163,6 @@ def main():
 if __name__ == '__main__':
     try:
         main()
-    except (ValueError, OSError, subprocess.CalledProcessError) as exc:
+    except (ValueError, OSError, RuntimeError) as exc:
         print(f'Falha na extração/validação: {exc}', file=sys.stderr)
         sys.exit(1)
