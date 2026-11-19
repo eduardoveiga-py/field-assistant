@@ -29,7 +29,15 @@ jobs:
         run: |
           set -euo pipefail
           if ! ./node_modules/.bin/supabase start > /tmp/local-supabase-start.log 2>&1; then
-            echo '::error::Unable to start isolated local Supabase stack; inspect runner diagnostics.'
+            python3 - <<'PYCODE'
+          from pathlib import Path
+          import re
+          lines = Path('/tmp/local-supabase-start.log').read_text(errors='replace').splitlines()[-30:]
+          for line in lines:
+              line = re.sub(r'(?i)(key|secret|password|token)([=: ]+)([^ ]+)', r'\1\2[redacted]', line)
+              line = re.sub(r'eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+', '[redacted-jwt]', line)
+              print('::error::' + line.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A'))
+          PYCODE
             exit 1
           fi
           ./node_modules/.bin/supabase status -o env > /tmp/local-supabase-status.env
