@@ -273,7 +273,8 @@ class OfflineMapPackageManager {
             manifest: manifest,
             status: PackageDownloadStatus.failed,
             localFile: backup,
-            errorMessage: 'Não foi possível restaurar a cópia anterior do pacote.',
+            errorMessage:
+                'Não foi possível restaurar a cópia anterior do pacote.',
           );
           continue;
         }
@@ -366,7 +367,9 @@ class OfflineMapPackageManager {
   }) async {
     manifest.validate();
     if (!_installingIds.add(manifest.id)) {
-      throw StateError('Já existe uma instalação em andamento para ${manifest.id}.');
+      throw StateError(
+        'Já existe uma instalação em andamento para ${manifest.id}.',
+      );
     }
     try {
       return await _downloadAndInstallLocked(
@@ -461,13 +464,17 @@ class OfflineMapPackageManager {
       final isPartial = response.statusCode == 206;
       if (isPartial) {
         final contentRange = response.headers['content-range'] ?? '';
-        final match = RegExp(r'^bytes (\d+)-(\d+)/(\d+)$', caseSensitive: false)
-            .firstMatch(contentRange);
+        final match = RegExp(
+          r'^bytes (\d+)-(\d+)/(\d+)$',
+          caseSensitive: false,
+        ).firstMatch(contentRange);
         final start = match == null ? null : int.tryParse(match[1]!);
         final end = match == null ? null : int.tryParse(match[2]!);
         final length = match == null ? null : int.tryParse(match[3]!);
-        if (existingBytes == 0 || start != existingBytes ||
-            end != manifest.sizeBytes - 1 || length != manifest.sizeBytes) {
+        if (existingBytes == 0 ||
+            start != existingBytes ||
+            end != manifest.sizeBytes - 1 ||
+            length != manifest.sizeBytes) {
           await response.stream.listen(null).cancel();
           throw InvalidPackageFormatException(
             'Content-Range inválido para a retomada do pacote.',
@@ -504,7 +511,9 @@ class OfflineMapPackageManager {
             responseSub?.cancel();
             if (!completer.isCompleted) {
               completer.completeError(
-                InvalidPackageFormatException('Download excedeu o tamanho do manifesto.'),
+                InvalidPackageFormatException(
+                  'Download excedeu o tamanho do manifesto.',
+                ),
               );
             }
             return;
@@ -621,7 +630,11 @@ class OfflineMapPackageManager {
         try {
           backupFile.deleteSync();
         } on FileSystemException catch (error, stack) {
-          AppLogger.warning('Não foi possível remover o backup anterior.', error, stack);
+          AppLogger.warning(
+            'Não foi possível remover o backup anterior.',
+            error,
+            stack,
+          );
         }
       }
 
@@ -650,7 +663,8 @@ class OfflineMapPackageManager {
           await sink.close();
         } catch (_) {}
       }
-      final preservePartial = e is DownloadInterruptedException ||
+      final preservePartial =
+          e is DownloadInterruptedException ||
           e is SocketException ||
           e is http.ClientException ||
           (e is DownloadCancelledException && !token._purgeOnCancel);
@@ -716,7 +730,9 @@ class OfflineMapPackageManager {
   /// Remove com segurança um pacote instalado e desregistra do servidor local.
   Future<void> removePackage(String packageId) async {
     if (_installingIds.contains(packageId)) {
-      throw StateError('Cancele e aguarde o download antes de remover o pacote.');
+      throw StateError(
+        'Cancele e aguarde o download antes de remover o pacote.',
+      );
     }
     final state = _states[packageId];
     if (state == null) return;
