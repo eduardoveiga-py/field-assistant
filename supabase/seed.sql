@@ -1,0 +1,2 @@
+-- Ambiente local isolado: nenhum dado pessoal ou usuário real é semeado.
+-- Os testes criam somente identidades fictícias em transações reversíveis.

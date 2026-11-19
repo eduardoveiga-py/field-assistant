@@ -1,0 +1,54 @@
+name: Isolated Supabase database validation
+on:
+  push:
+    branches: ['arena/**', 'main', 'master']
+    paths: ['supabase/**', '.github/workflows/supabase-local-validation.yml']
+  pull_request:
+    branches: ['main', 'master']
+    paths: ['supabase/**', '.github/workflows/supabase-local-validation.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  pgtap:
+    name: Local PostgreSQL RLS and vault contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Install pinned Supabase CLI
+        run: npm install --no-save --no-package-lock supabase@3.2.0
+      # Never link, push, or connect to a hosted project. No remote secrets.
+      - name: Start isolated local database and apply migrations
+        shell: bash
+        run: |
+          set +e
+          ./node_modules/.bin/supabase db start > /tmp/supabase-start.log 2>&1
+          status=$?
+          cat /tmp/supabase-start.log
+          if [ "$status" -ne 0 ]; then
+            python3 - <<'PYCODE'
+          from pathlib import Path
+          for line in Path('/tmp/supabase-start.log').read_text(errors='replace').splitlines()[-30:]:
+              print('::error::' + line.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A'))
+          PYCODE
+          fi
+          exit "$status"
+      - name: Run pgTAP against local database only
+        shell: bash
+        run: |
+          set +e
+          ./node_modules/.bin/supabase test db --local > /tmp/supabase-test.log 2>&1
+          status=$?
+          cat /tmp/supabase-test.log
+          if [ "$status" -ne 0 ]; then
+            python3 - <<'PYCODE'
+          from pathlib import Path
+          for line in Path('/tmp/supabase-test.log').read_text(errors='replace').splitlines()[-40:]:
+              print('::error::' + line.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A'))
+          PYCODE
+          fi
+          exit "$status"
