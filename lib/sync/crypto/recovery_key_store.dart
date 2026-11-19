@@ -89,7 +89,9 @@ class RecoveryKeyStore {
     required String fromOwner,
     required String toOwner,
   }) async {
-    throw StateError('Cópia entre contas indisponível; nenhuma chave foi alterada.');
+    throw StateError(
+      'Cópia entre contas indisponível; nenhuma chave foi alterada.',
+    );
   }
 
   /// Valida a chave e a identidade de um cofre já conhecido antes de guardar a chave.

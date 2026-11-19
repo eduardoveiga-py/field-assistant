@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:drift/drift.dart' show driftRuntimeOptions;
 import 'package:drift/native.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -20,6 +21,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   final enabled = Platform.environment['FA_RUN_LOCAL_SUPABASE_E2E'] == '1';
+  if (enabled) {
+    // The Flutter test binding normally intercepts all HTTP with a fake 400.
+    // This probe can only connect to the literal loopback URL below.
+    HttpOverrides.global = null;
+    driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
+  }
   test(
     'isolated Auth, vault, encrypted CAS, account isolation and Storage',
     () async {
@@ -205,7 +212,8 @@ void main() {
   test('isolated two-client Drift outbox and encrypted person pull', () async {
     const url = 'http://127.0.0.1:54321';
     final anon = Platform.environment['FA_LOCAL_SUPABASE_ANON_KEY'];
-    if (anon == null || anon.isEmpty) throw StateError('Local anonymous key missing');
+    if (anon == null || anon.isEmpty)
+      throw StateError('Local anonymous key missing');
     const auth = AuthClientOptions(authFlowType: AuthFlowType.implicit);
     final client1 = SupabaseClient(url, anon, authOptions: auth);
     final client2 = SupabaseClient(url, anon, authOptions: auth);
@@ -220,7 +228,10 @@ void main() {
     SupabaseSyncService? sync1;
     SupabaseSyncService? sync2;
     try {
-      final signed = await client1.auth.signUp(email: email, password: password);
+      final signed = await client1.auth.signUp(
+        email: email,
+        password: password,
+      );
       expect(signed.session, isNotNull);
       final owner = signed.user!.id;
       await client2.auth.signInWithPassword(email: email, password: password);
@@ -230,12 +241,18 @@ void main() {
       final e2ee2 = E2eeService(db: db2, client: client2);
       expect(await e2ee2.restoreVault(owner, phrase), isTrue);
       sync1 = SupabaseSyncService(
-        db: db1, repository: repo1, clientOverride: client1,
-        e2eeServiceOverride: e2ee1, allowEncryptedSyncForTesting: true,
+        db: db1,
+        repository: repo1,
+        clientOverride: client1,
+        e2eeServiceOverride: e2ee1,
+        allowEncryptedSyncForTesting: true,
       );
       sync2 = SupabaseSyncService(
-        db: db2, repository: repo2, clientOverride: client2,
-        e2eeServiceOverride: e2ee2, allowEncryptedSyncForTesting: true,
+        db: db2,
+        repository: repo2,
+        clientOverride: client2,
+        e2eeServiceOverride: e2ee2,
+        allowEncryptedSyncForTesting: true,
       );
       const secretName = 'Synthetic Local Private Person';
       final person = await repo1.createPerson(name: secretName);
@@ -258,5 +275,4 @@ void main() {
       client2.dispose();
     }
   }, skip: !enabled);
-
 }
