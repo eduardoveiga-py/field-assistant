@@ -171,19 +171,35 @@ void main() {
     expect(retry.fetched.expand((page) => page).toList(), [90]);
   });
 
-  test('cópia local de mensagem antiga sobrevive quando UID sai da caixa', () async {
-    final oldDate = DateTime.utc(2020, 1, 15);
-    expect(await service(FakeSession([1], messageDate: oldDate)).syncEmails(username: 'a@example.org', password: 'pw'), 1);
-    final before = (await db.select(db.inboxEntries).get()).single;
-    final metadata = jsonDecode(before.metadata) as Map<String, dynamic>;
-    expect(JwEmailMessage.fromJson(Map<String, dynamic>.from(metadata['email'] as Map)).date.toUtc(), oldDate);
-    expect(metadata['email']['rawEmlBase64'], isNotNull);
-    expect(await service(FakeSession([])).syncEmails(username: 'a@example.org', password: 'pw'), 0);
-    final after = (await db.select(db.inboxEntries).get()).single;
-    expect(after.id, before.id);
-    expect(after.metadata, before.metadata);
-    expect(after.deletedAt, isNull);
-  });
+  test(
+    'cópia local de mensagem antiga sobrevive quando UID sai da caixa',
+    () async {
+      final oldDate = DateTime.utc(2020, 1, 15);
+      expect(
+        await service(FakeSession([1], messageDate: oldDate))
+            .syncEmails(username: 'a@example.org', password: 'pw'),
+        1,
+      );
+      final before = (await db.select(db.inboxEntries).get()).single;
+      final metadata = jsonDecode(before.metadata) as Map<String, dynamic>;
+      expect(
+        JwEmailMessage.fromJson(
+          Map<String, dynamic>.from(metadata['email'] as Map),
+        ).date.toUtc(),
+        oldDate,
+      );
+      expect(metadata['email']['rawEmlBase64'], isNotNull);
+      expect(
+        await service(FakeSession([]))
+            .syncEmails(username: 'a@example.org', password: 'pw'),
+        0,
+      );
+      final after = (await db.select(db.inboxEntries).get()).single;
+      expect(after.id, before.id);
+      expect(after.metadata, before.metadata);
+      expect(after.deletedAt, isNull);
+    },
+  );
 
   test('UID antigo ausente é buscado mesmo após UIDs mais altos', () async {
     expect(
