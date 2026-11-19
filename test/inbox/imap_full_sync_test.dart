@@ -18,6 +18,7 @@ class FakeSession implements JwImapSession {
     this.incompletePage,
     this.connectError,
     this.selectError,
+    this.messageDate,
   });
   final List<int> uids;
   final int validity;
@@ -25,6 +26,7 @@ class FakeSession implements JwImapSession {
   final int? incompletePage;
   final Object? connectError;
   final Object? selectError;
+  final DateTime? messageDate;
   bool searched = false;
   final List<List<int>> fetched = [];
   bool closed = false;
@@ -67,7 +69,7 @@ class FakeSession implements JwImapSession {
             subject: 'Mensagem $id',
             from: 'a@example.org',
             to: 'b@example.org',
-            date: DateTime.utc(2026),
+            date: messageDate ?? DateTime.utc(2026),
             bodyText: 'Corpo $id',
             rawEmlBase64: base64Encode(utf8.encode('MIME $id')),
           ),
@@ -167,6 +169,20 @@ void main() {
       1,
     );
     expect(retry.fetched.expand((page) => page).toList(), [90]);
+  });
+
+  test('cópia local de mensagem antiga sobrevive quando UID sai da caixa', () async {
+    final oldDate = DateTime.utc(2020, 1, 15);
+    expect(await service(FakeSession([1], messageDate: oldDate)).syncEmails(username: 'a@example.org', password: 'pw'), 1);
+    final before = (await db.select(db.inboxEntries).get()).single;
+    final metadata = jsonDecode(before.metadata) as Map<String, dynamic>;
+    expect(JwEmailMessage.fromJson(Map<String, dynamic>.from(metadata['email'] as Map)).date.toUtc(), oldDate);
+    expect(metadata['email']['rawEmlBase64'], isNotNull);
+    expect(await service(FakeSession([])).syncEmails(username: 'a@example.org', password: 'pw'), 0);
+    final after = (await db.select(db.inboxEntries).get()).single;
+    expect(after.id, before.id);
+    expect(after.metadata, before.metadata);
+    expect(after.deletedAt, isNull);
   });
 
   test('UID antigo ausente é buscado mesmo após UIDs mais altos', () async {
