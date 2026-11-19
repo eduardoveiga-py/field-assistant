@@ -976,19 +976,45 @@ void main() {
         // The live folder/config watchers must get a pump between writes.
         // Batching unrelated writes in one runAsync can wait on fake-async
         // stream notifications and deadlock the widget test harness.
-        await tester.runAsync(() => db.into(db.appKvStore).insertOnConflictUpdate(
-          AppKvStoreCompanion.insert(key: 'jw_imap_email', value: 'publicador@jw.org'),
-        ));
+        await tester.runAsync(
+          () => db
+              .into(db.appKvStore)
+              .insertOnConflictUpdate(
+                AppKvStoreCompanion.insert(
+                  key: 'jw_imap_email',
+                  value: 'publicador@jw.org',
+                ),
+              ),
+        );
         await tester.pump();
-        await tester.runAsync(() => const FlutterSecureStorage().write(key: 'jw_imap_password', value: 'pw123'));
+        await tester.runAsync(
+          () => const FlutterSecureStorage().write(
+            key: 'jw_imap_password',
+            value: 'pw123',
+          ),
+        );
         await tester.pump();
-        await tester.runAsync(() => db.into(db.appKvStore).insertOnConflictUpdate(
-          AppKvStoreCompanion.insert(key: 'jw_smtp_host', value: '127.0.0.1'),
-        ));
+        await tester.runAsync(
+          () => db
+              .into(db.appKvStore)
+              .insertOnConflictUpdate(
+                AppKvStoreCompanion.insert(
+                  key: 'jw_smtp_host',
+                  value: '127.0.0.1',
+                ),
+              ),
+        );
         await tester.pump();
-        await tester.runAsync(() => db.into(db.appKvStore).insertOnConflictUpdate(
-          AppKvStoreCompanion.insert(key: 'jw_smtp_port', value: relay.server.port.toString()),
-        ));
+        await tester.runAsync(
+          () => db
+              .into(db.appKvStore)
+              .insertOnConflictUpdate(
+                AppKvStoreCompanion.insert(
+                  key: 'jw_smtp_port',
+                  value: relay.server.port.toString(),
+                ),
+              ),
+        );
         await tester.pump();
 
         Object? capturedSession;
