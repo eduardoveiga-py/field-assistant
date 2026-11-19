@@ -2,8 +2,10 @@
 
 Esta implementação é uma primeira etapa, não um cliente Exchange completo nem
 um backup da caixa. Usa o cliente Dart `eas_client` 0.1.0-alpha.3 vendorizado
-em commit fixo, com testes simulados. Não foi testada contra o servidor do
-usuário nem em iPhone/LiveContainer.
+em commit fixo, com testes simulados. O proprietário relatou que conseguiu
+receber mensagens do próprio servidor no iPhone; a versão exata, a cobertura
+das pastas, os anexos, o envio e as políticas do servidor não foram verificados
+independentemente. Essa observação não comprova sincronização integral.
 
 - Configuração separada de IMAP/SMTP; HTTPS e Basic (usuário/senha) somente.
   O usuário deve inserir o servidor oficial confiável. O cliente não segue
