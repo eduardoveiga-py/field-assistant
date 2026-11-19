@@ -888,9 +888,19 @@ void main() {
         final captured = capturedSession! as _CapturedSmtpSession;
         await tester.pumpAndSettle();
         expect(captured.receivedMailFrom, equals('<publicador@jw.org>'));
-        expect(captured.receivedRcptTo, equals(['<secretario@jw.org>', '<copia@jw.org>', '<reservado@jw.org>']));
+        expect(
+          captured.receivedRcptTo,
+          equals([
+            '<secretario@jw.org>',
+            '<copia@jw.org>',
+            '<reservado@jw.org>',
+          ]),
+        );
         expect(captured.receivedDataPayload, contains('Cc: <copia@jw.org>'));
-        expect(captured.receivedDataPayload, isNot(contains('reservado@jw.org')));
+        expect(
+          captured.receivedDataPayload,
+          isNot(contains('reservado@jw.org')),
+        );
         expect(
           captured.receivedDataPayload,
           isNotNull,

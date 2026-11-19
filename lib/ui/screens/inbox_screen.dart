@@ -2627,9 +2627,15 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                         style: const TextStyle(fontSize: 12),
                       ),
                       if (msg.cc.isNotEmpty)
-                        Text('Cc: ${msg.cc}', style: const TextStyle(fontSize: 12)),
+                        Text(
+                          'Cc: ${msg.cc}',
+                          style: const TextStyle(fontSize: 12),
+                        ),
                       if (msg.bcc.isNotEmpty)
-                        Text('Cco: ${msg.bcc}', style: const TextStyle(fontSize: 12)),
+                        Text(
+                          'Cco: ${msg.bcc}',
+                          style: const TextStyle(fontSize: 12),
+                        ),
                       Text(
                         'Data: ${msg.date.day}/${msg.date.month}/${msg.date.year} às ${msg.date.hour}:${msg.date.minute.toString().padLeft(2, '0')}',
                         style: const TextStyle(fontSize: 12),
