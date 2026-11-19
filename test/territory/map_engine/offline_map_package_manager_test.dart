@@ -7,7 +7,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:ministerio_pessoal/territory/map_engine/offline_map_package_manager.dart';
-import 'package:ministerio_pessoal/territory/map_engine_adapter.dart';
 
 void main() {
   group('OfflineMapPackageManager Tests', () {

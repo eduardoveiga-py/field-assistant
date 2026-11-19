@@ -96,13 +96,13 @@ class OfflineMapPackageManifest {
     required this.bbox,
     required this.minZoom,
     required this.maxZoom,
-    required this.generatedAt,
-    required this.version,
-    required this.license,
-    required this.attribution,
-    required this.format,
+    DateTime? generatedAt,
+    this.version = '1.0.0',
+    this.license = 'ODbL',
+    this.attribution = 'OpenStreetMap contributors',
+    this.format = OfflineMapFormat.pmtiles,
     this.minAppSchemaVersion = 1,
-  }) {
+  }) : generatedAt = generatedAt ?? DateTime(2026, 1, 1) {
     validate();
   }
 

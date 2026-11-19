@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart' as crypto;
 import 'package:cryptography/cryptography.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -15,167 +16,84 @@ import 'package:ministerio_pessoal/sync/crypto/encrypted_media.dart';
 import 'package:ministerio_pessoal/sync/crypto/encrypted_media_transfer.dart';
 import 'package:ministerio_pessoal/sync/crypto/recovery_crypto.dart';
 import 'package:ministerio_pessoal/territory/map_engine/pmtiles_reader.dart';
-import 'package:ministerio_pessoal/territory/map_engine_adapter.dart';
 import 'package:ministerio_pessoal/ticuna/ticuna_unicode_helper.dart';
 import 'package:ministerio_pessoal/ui/screens/appointments_screen.dart';
 import 'package:ministerio_pessoal/voice_notes/audio_session_bridge.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqlite3/sqlite3.dart' as sql;
 
+import 'dart:collection';
+import 'package:device_calendar/device_calendar.dart' as dev_cal;
+import 'package:drift/native.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:http/testing.dart';
+import 'package:ministerio_pessoal/appointments/apple_eventkit_provider.dart';
+import 'package:ministerio_pessoal/database/app_database.dart';
+import 'package:ministerio_pessoal/territory/packages/offline_map_package_manager.dart';
+import 'package:ministerio_pessoal/territory/routing/offline_routing_engine.dart';
+
+import '../harness/faes_quality_gate.dart';
 import '../harness/opaque_box_harness.dart';
 
-// =============================================================================
-// Helper Models for Pure Dart A* Graph Routing with Dead-End U-Turn Penalties
-// =============================================================================
-
-class RoutingNode {
-  final String id;
-  final double lat;
-  final double lon;
-
-  const RoutingNode(this.id, this.lat, this.lon);
+Uint8List createValidPmtilesHeader(String content) {
+  final header = Uint8List(127);
+  header.setRange(0, 7, 'PMTiles'.codeUnits);
+  header[7] = 3; // version 3
+  final contentBytes = utf8.encode(content);
+  final builder = BytesBuilder();
+  builder.add(header);
+  builder.add(contentBytes);
+  return builder.takeBytes();
 }
 
-class RoutingEdge {
-  final String fromId;
-  final String toId;
-  final double distanceMeters;
-  final bool isWaterCrossingWithoutBridge;
+class FakeDeviceCalendarPlugin implements dev_cal.DeviceCalendarPlugin {
+  bool hasPermissionsResult = true;
+  List<dev_cal.Calendar> calendarsResult = [];
+  List<dev_cal.Event> eventsResult = [];
+  String? createdEventIdResult = 'apple_created_1';
 
-  const RoutingEdge({
-    required this.fromId,
-    required this.toId,
-    required this.distanceMeters,
-    this.isWaterCrossingWithoutBridge = false,
-  });
-}
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 
-class BvaAStarRouter {
-  final Map<String, RoutingNode> nodes = {};
-  final Map<String, List<RoutingEdge>> adjacency = {};
-  final double turnaroundPenaltySeconds;
-
-  BvaAStarRouter({this.turnaroundPenaltySeconds = 60.0});
-
-  void addNode(RoutingNode node) {
-    nodes[node.id] = node;
-    adjacency.putIfAbsent(node.id, () => []);
+  @override
+  Future<dev_cal.Result<bool>> hasPermissions() async {
+    final res = dev_cal.Result<bool>();
+    res.data = hasPermissionsResult;
+    return res;
   }
 
-  void addBidirectionalEdge(
-    String idA,
-    String idB, {
-    bool isWaterCrossing = false,
-  }) {
-    if (!nodes.containsKey(idA) || !nodes.containsKey(idB)) return;
-    final nodeA = nodes[idA]!;
-    final nodeB = nodes[idB]!;
-    final dist = AmazonianCoordinates.haversineDistanceMeters(
-      nodeA.lat,
-      nodeA.lon,
-      nodeB.lat,
-      nodeB.lon,
-    );
-
-    final edgeAB = RoutingEdge(
-      fromId: idA,
-      toId: idB,
-      distanceMeters: dist,
-      isWaterCrossingWithoutBridge: isWaterCrossing,
-    );
-    final edgeBA = RoutingEdge(
-      fromId: idB,
-      toId: idA,
-      distanceMeters: dist,
-      isWaterCrossingWithoutBridge: isWaterCrossing,
-    );
-
-    adjacency[idA]!.add(edgeAB);
-    adjacency[idB]!.add(edgeBA);
+  @override
+  Future<dev_cal.Result<bool>> requestPermissions() async {
+    final res = dev_cal.Result<bool>();
+    res.data = hasPermissionsResult;
+    return res;
   }
 
-  ({List<String> path, double totalDistanceMeters})? findPath({
-    required String startId,
-    required String goalId,
-    bool allowWaterCrossingWithoutBridge = false,
-  }) {
-    if (!nodes.containsKey(startId) || !nodes.containsKey(goalId)) return null;
-
-    // Corner case BVA: origem == destino
-    if (startId == goalId) {
-      return (path: [startId], totalDistanceMeters: 0.0);
-    }
-
-    final openSet = <String>{startId};
-    final cameFrom = <String, String>{};
-    final gScore = <String, double>{startId: 0.0};
-    final fScore = <String, double>{
-      startId: _heuristic(nodes[startId]!, nodes[goalId]!),
-    };
-
-    while (openSet.isNotEmpty) {
-      String current = openSet.first;
-      double lowestF = fScore[current] ?? double.infinity;
-      for (final n in openSet) {
-        final score = fScore[n] ?? double.infinity;
-        if (score < lowestF) {
-          lowestF = score;
-          current = n;
-        }
-      }
-
-      if (current == goalId) {
-        final totalPath = <String>[current];
-        var curr = current;
-        while (cameFrom.containsKey(curr)) {
-          curr = cameFrom[curr]!;
-          totalPath.insert(0, curr);
-        }
-        return (path: totalPath, totalDistanceMeters: gScore[goalId]!);
-      }
-
-      openSet.remove(current);
-
-      for (final edge in adjacency[current] ?? <RoutingEdge>[]) {
-        if (edge.isWaterCrossingWithoutBridge &&
-            !allowWaterCrossingWithoutBridge) {
-          continue; // Impedância fluvial infinita
-        }
-
-        final tentativeG =
-            (gScore[current] ?? double.infinity) + edge.distanceMeters;
-        if (tentativeG < (gScore[edge.toId] ?? double.infinity)) {
-          cameFrom[edge.toId] = current;
-          gScore[edge.toId] = tentativeG;
-          final h = _heuristic(nodes[edge.toId]!, nodes[goalId]!);
-          fScore[edge.toId] = tentativeG + h;
-          openSet.add(edge.toId);
-        }
-      }
-    }
-
-    return null;
+  @override
+  Future<dev_cal.Result<UnmodifiableListView<dev_cal.Calendar>>>
+  retrieveCalendars() async {
+    final res = dev_cal.Result<UnmodifiableListView<dev_cal.Calendar>>();
+    res.data = UnmodifiableListView<dev_cal.Calendar>(calendarsResult);
+    return res;
   }
 
-  double calculateTurnaroundPenalty({
-    required String previousNodeId,
-    required String currentNodeId,
-    required String nextNodeId,
-  }) {
-    // 180° dead-end turnaround: voltando exatamente para o nó anterior
-    if (previousNodeId == nextNodeId && previousNodeId != currentNodeId) {
-      return turnaroundPenaltySeconds;
-    }
-    return 0.0;
+  @override
+  Future<dev_cal.Result<UnmodifiableListView<dev_cal.Event>>> retrieveEvents(
+    String? calendarId,
+    dev_cal.RetrieveEventsParams? retrieveEventsParams,
+  ) async {
+    final res = dev_cal.Result<UnmodifiableListView<dev_cal.Event>>();
+    res.data = UnmodifiableListView<dev_cal.Event>(eventsResult);
+    return res;
   }
 
-  double _heuristic(RoutingNode a, RoutingNode b) {
-    return AmazonianCoordinates.haversineDistanceMeters(
-      a.lat,
-      a.lon,
-      b.lat,
-      b.lon,
-    );
+  @override
+  Future<dev_cal.Result<String>?> createOrUpdateEvent(
+    dev_cal.Event? event,
+  ) async {
+    final res = dev_cal.Result<String>();
+    res.data = createdEventIdResult;
+    return res;
   }
 }
 
@@ -1154,74 +1072,31 @@ void main() {
     // Group 12: F12 OfflineMapPackageManager Boundaries
     // =========================================================================
     group('Group 12: F12 OfflineMapPackageManager Boundaries (Master Order §10, §11)', () {
-      test('TC-F12-B01: HTTP 416 Range Not Satisfiable handling when range start exceeds file size', () {
-        int evaluateRangeStatus({
-          required int start,
-          required int? end,
-          required int fileSize,
-        }) {
-          if (start >= fileSize || (end != null && start > end)) {
-            return 416; // Range Not Satisfiable
-          }
-          return 206; // Partial Content
+      late Directory tempDir;
+
+      setUp(() {
+        tempDir = Directory.systemTemp.createTempSync('e2e_tier2_pkg_bva_');
+      });
+
+      tearDown(() {
+        if (tempDir.existsSync()) {
+          tempDir.deleteSync(recursive: true);
         }
-
-        expect(
-          evaluateRangeStatus(start: 2000, end: null, fileSize: 1000),
-          equals(416),
-        );
-        expect(
-          evaluateRangeStatus(start: 500, end: 999, fileSize: 1000),
-          equals(206),
-        );
       });
 
-      test('TC-F12-B02: HTTP Range start > end rejection', () {
-        bool isValidRange(int start, int end) => start <= end;
-
-        expect(isValidRange(100, 200), isTrue);
-        expect(isValidRange(500, 200), isFalse); // start > end
-      });
-
-      test('TC-F12-B03: Download cancellation at 99% with byte cleanup: temporary file is purged', () {
-        final tempDir = Directory.systemTemp.createTempSync(
-          'e2e_download_cancel_',
-        );
-        addTearDown(() => tempDir.deleteSync(recursive: true));
-
-        final tmpFile = File(p.join(tempDir.path, 'map.pmtiles.tmp'));
-        tmpFile.writeAsBytesSync(Uint8List(1024 * 1024)); // 1 MB parcial
-
-        expect(tmpFile.existsSync(), isTrue);
-
-        // Simula cancelamento pelo usuário aos 99%
-        if (tmpFile.existsSync()) {
-          tmpFile.deleteSync();
-        }
-
-        expect(tmpFile.existsSync(), isFalse);
-      });
-
-      test('TC-F12-B04: Single-bit SHA-256 mismatch rollback aborts atomic installation', () {
-        final validBytes = Uint8List.fromList(
-          utf8.encode('OriginalPackageData'),
-        );
-        final expectedHash = crypto.sha256.convert(validBytes).toString();
+      test('TC-F12-B01: HTTP 416 Range Not Satisfiable handling when byte offset >= remote content size', () async {
+        final payload = createValidPmtilesHeader('SampleTileData');
+        final sha = crypto.sha256.convert(payload).toString();
 
         final manifest = OfflineMapPackageManifest(
-          id: 'alto_solimoes_sai',
-          regionName: 'Alto Solimões',
-          downloadUrl: Uri.parse('https://example.com/map.pmtiles'),
-          sizeBytes: validBytes.length,
-          sha256: expectedHash,
-          bbox: const GeoBoundingBox(
-            minLat: -3.4,
-            minLon: -68.2,
-            maxLat: -3.0,
-            maxLon: -67.7,
-          ),
-          minZoom: 0,
-          maxZoom: 14,
+          id: 'test_pkg_416',
+          regionName: 'Região 416',
+          downloadUrl: Uri.parse('https://example.com/map_416.pmtiles'),
+          sizeBytes: payload.length,
+          sha256: sha,
+          bbox: const GeoBoundingBox(minLat: -3.4, minLon: -68.2, maxLat: -3.0, maxLon: -67.7),
+          minZoom: 8,
+          maxZoom: 16,
           generatedAt: DateTime.now(),
           version: '1.0.0',
           license: 'ODbL',
@@ -1229,36 +1104,196 @@ void main() {
           format: OfflineMapFormat.pmtiles,
         );
 
-        final corruptedBytes = Uint8List.fromList(validBytes);
-        corruptedBytes[0] ^= 0x01; // Adultera 1 bit
+        // MockClient simulando HTTP 416 quando Range Header excede o tamanho
+        final mockClient = MockClient((request) async {
+          if (request.headers.containsKey('Range')) {
+            return http.Response('Requested Range Not Satisfiable', 416);
+          }
+          return http.Response.bytes(payload, 200);
+        });
 
-        expect(manifest.verifyBytesIntegrity(corruptedBytes), isFalse);
+        final manager = OfflineMapPackageManager(
+          storageDir: tempDir,
+          httpClient: mockClient,
+        );
+        addTearDown(manager.dispose);
+
+        // Simula arquivo .tmp pré-existente cujo tamanho atinge ou excede o arquivo remoto
+        final targetFile = await manager.getPackageFile(manifest);
+        final stagingFile = File('${targetFile.path}.tmp');
+        stagingFile.writeAsBytesSync(payload);
+
+        await expectLater(
+          () => manager.downloadAndInstall(manifest: manifest),
+          throwsA(isA<HttpException>().having((e) => e.message, 'message', contains('416'))),
+        );
+
+        // Confirma limpeza de arquivos temporários e transição de estado fail-closed
+        expect(stagingFile.existsSync(), isFalse);
+        expect(targetFile.existsSync(), isFalse);
+        expect(manager.currentStates[manifest.id]?.status, equals(PackageDownloadStatus.failed));
       });
 
-      test('TC-F12-B05: 0-byte download handling: manifest rejects 0-byte packages with FormatException', () {
-        expect(
-          () => OfflineMapPackageManifest(
-            id: 'zero_byte_pkg',
-            regionName: 'Zero Byte',
-            downloadUrl: Uri.parse('https://example.com/zero.pmtiles'),
-            sizeBytes: 0, // Tamanho não positivo
-            sha256: crypto.sha256.convert([]).toString(),
-            bbox: const GeoBoundingBox(
-              minLat: -3.4,
-              minLon: -68.2,
-              maxLat: -3.0,
-              maxLon: -67.7,
-            ),
-            minZoom: 0,
-            maxZoom: 14,
-            generatedAt: DateTime.now(),
-            version: '1.0.0',
-            license: 'ODbL',
-            attribution: 'OpenStreetMap',
-            format: OfflineMapFormat.pmtiles,
-          ),
-          throwsA(isA<FormatException>()),
+      test('TC-F12-B02: HTTP Range start > end rejection fail-closed by tile server parser', () async {
+        final tileServer = await TileServerTestLifecycle.createStarted(
+          packagesDir: Directory(p.join(tempDir.path, 'pkgs')),
+          assetsDir: Directory(p.join(tempDir.path, 'assets')),
         );
+        addTearDown(tileServer.dispose);
+
+        final pmtilesBytes = createValidPmtilesHeader('RangeVerificationPayload');
+        final pkgFile = File(p.join(tempDir.path, 'pkgs', 'range_pkg.pmtiles'));
+        pkgFile.parent.createSync(recursive: true);
+        pkgFile.writeAsBytesSync(pmtilesBytes);
+        tileServer.server.registerPmtilesPackage('range_pkg', pkgFile);
+
+        final uri = Uri.parse('${tileServer.baseUrl}/pmtiles/range_pkg');
+        final response = await http.get(uri, headers: {'Range': 'bytes=500-200'});
+
+        expect(response.statusCode, equals(416));
+        expect(response.headers['content-range'], equals('bytes */${pmtilesBytes.length}'));
+        expect(OfflineMapPackageManager.isValidRange(100, 200), isTrue);
+        expect(OfflineMapPackageManager.isValidRange(500, 200), isFalse);
+      });
+
+      test('TC-F12-B03: Download cancellation mid-download cleans up partial .tmp files', () async {
+        final payload = createValidPmtilesHeader('A' * 2048);
+        final sha = crypto.sha256.convert(payload).toString();
+
+        final manifest = OfflineMapPackageManifest(
+          id: 'test_pkg_abort',
+          regionName: 'Região Cancelada',
+          downloadUrl: Uri.parse('https://example.com/abort.pmtiles'),
+          sizeBytes: payload.length,
+          sha256: sha,
+          bbox: const GeoBoundingBox(minLat: -3.4, minLon: -68.2, maxLat: -3.0, maxLon: -67.7),
+          minZoom: 8,
+          maxZoom: 16,
+          generatedAt: DateTime.now(),
+          version: '1.0.0',
+          license: 'ODbL',
+          attribution: 'OpenStreetMap',
+          format: OfflineMapFormat.pmtiles,
+        );
+
+        final mockClient = MockClient.streaming((request, bodyStream) async {
+          final stream = Stream<List<int>>.periodic(
+            const Duration(milliseconds: 10),
+            (count) {
+              if (count >= 2) throw http.ClientException('Download cancelado pelo usuário');
+              return payload.sublist(count * 256, (count + 1) * 256);
+            },
+          );
+          return http.StreamedResponse(stream, 200, contentLength: payload.length);
+        });
+
+        final manager = OfflineMapPackageManager(
+          storageDir: tempDir,
+          httpClient: mockClient,
+        );
+        addTearDown(manager.dispose);
+
+        await expectLater(
+          () => manager.downloadAndInstall(manifest: manifest),
+          throwsA(isA<http.ClientException>()),
+        );
+
+        final targetFile = await manager.getPackageFile(manifest);
+        final stagingFile = File('${targetFile.path}.tmp');
+
+        expect(stagingFile.existsSync(), isFalse);
+        expect(targetFile.existsSync(), isFalse);
+        expect(manager.currentStates[manifest.id]?.status, equals(PackageDownloadStatus.failed));
+      });
+
+      test('TC-F12-B04: Single-bit SHA-256 mismatch rollback aborts atomic installation and purges payload', () async {
+        final validPayload = createValidPmtilesHeader('LegitimatePackageData');
+        final validSha = crypto.sha256.convert(validPayload).toString();
+
+        final corruptPayload = Uint8List.fromList(validPayload);
+        corruptPayload[20] ^= 0xFF; // Inverte 1 byte no payload
+
+        final manifest = OfflineMapPackageManifest(
+          id: 'test_pkg_mismatch',
+          regionName: 'Região Hash Mismatch',
+          downloadUrl: Uri.parse('https://example.com/mismatch.pmtiles'),
+          sizeBytes: corruptPayload.length,
+          sha256: validSha, // Checksum esperado é do arquivo original!
+          bbox: const GeoBoundingBox(minLat: -3.4, minLon: -68.2, maxLat: -3.0, maxLon: -67.7),
+          minZoom: 8,
+          maxZoom: 16,
+          generatedAt: DateTime.now(),
+          version: '1.0.0',
+          license: 'ODbL',
+          attribution: 'OpenStreetMap',
+          format: OfflineMapFormat.pmtiles,
+        );
+
+        final mockClient = MockClient((request) async {
+          return http.Response.bytes(corruptPayload, 200);
+        });
+
+        final manager = OfflineMapPackageManager(
+          storageDir: tempDir,
+          httpClient: mockClient,
+        );
+        addTearDown(manager.dispose);
+
+        await expectLater(
+          () => manager.downloadAndInstall(manifest: manifest),
+          throwsA(isA<FormatException>().having((e) => e.message, 'message', contains('Checksum SHA-256 inválido'))),
+        );
+
+        final targetFile = await manager.getPackageFile(manifest);
+        final stagingFile = File('${targetFile.path}.tmp');
+
+        expect(stagingFile.existsSync(), isFalse);
+        expect(targetFile.existsSync(), isFalse);
+        expect(manager.currentStates[manifest.id]?.status, equals(PackageDownloadStatus.corrupted));
+      });
+
+      test('TC-F12-B05: Corrupted directory header in downloaded PMTiles fails validation', () async {
+        final corruptedHeaderPayload = Uint8List(200);
+        corruptedHeaderPayload.setRange(0, 7, 'CORRUPT'.codeUnits);
+        final sha = crypto.sha256.convert(corruptedHeaderPayload).toString();
+
+        final manifest = OfflineMapPackageManifest(
+          id: 'test_pkg_corrupt_header',
+          regionName: 'Região Header Corrompido',
+          downloadUrl: Uri.parse('https://example.com/corrupt_header.pmtiles'),
+          sizeBytes: corruptedHeaderPayload.length,
+          sha256: sha,
+          bbox: const GeoBoundingBox(minLat: -3.4, minLon: -68.2, maxLat: -3.0, maxLon: -67.7),
+          minZoom: 8,
+          maxZoom: 16,
+          generatedAt: DateTime.now(),
+          version: '1.0.0',
+          license: 'ODbL',
+          attribution: 'OpenStreetMap',
+          format: OfflineMapFormat.pmtiles,
+        );
+
+        final mockClient = MockClient((request) async {
+          return http.Response.bytes(corruptedHeaderPayload, 200);
+        });
+
+        final manager = OfflineMapPackageManager(
+          storageDir: tempDir,
+          httpClient: mockClient,
+        );
+        addTearDown(manager.dispose);
+
+        await expectLater(
+          () => manager.downloadAndInstall(manifest: manifest),
+          throwsA(isA<FormatException>().having((e) => e.message, 'message', contains('Assinatura mágica PMTiles inválida'))),
+        );
+
+        final targetFile = await manager.getPackageFile(manifest);
+        final stagingFile = File('${targetFile.path}.tmp');
+
+        expect(stagingFile.existsSync(), isFalse);
+        expect(targetFile.existsSync(), isFalse);
+        expect(manager.currentStates[manifest.id]?.status, equals(PackageDownloadStatus.failed));
       });
     });
 
@@ -1364,64 +1399,87 @@ void main() {
     group(
       'Group 14: F14 Offline Routing Engine Boundaries (Master Order §15)',
       () {
-        late BvaAStarRouter router;
+        late OfflineRoutingEngine router;
 
         setUp(() {
-          router = BvaAStarRouter();
-          router.addNode(const RoutingNode('SAI_CENTRO', -3.1022, -67.9397));
-          router.addNode(const RoutingNode('SAI_SUL', -3.1150, -67.9450));
-          router.addNode(const RoutingNode('DEAD_END', -3.1180, -67.9480));
-          router.addNode(const RoutingNode('LAGO_GRANDE', -3.2500, -67.8500));
+          router = OfflineRoutingEngine();
+          router.addNode(const RoutingNode('SAI_CENTRO', -3.1022, -67.9397, name: 'Centro'));
+          router.addNode(const RoutingNode('SAI_SUL', -3.1150, -67.9450, name: 'Setor Sul'));
+          router.addNode(const RoutingNode('DEAD_END', -3.1180, -67.9480, name: 'Beco Sem Saída'));
+          router.addNode(const RoutingNode('LAGO_GRANDE', -3.2500, -67.8500, name: 'Lago Grande'));
           router.addNode(
-            const RoutingNode('ISOLATED_ISLAND', -3.5000, -68.0000),
+            const RoutingNode('ISOLATED_ISLAND', -3.5000, -68.0000, name: 'Ilha Isolada'),
           );
 
-          router.addBidirectionalEdge('SAI_CENTRO', 'SAI_SUL');
-          router.addBidirectionalEdge('SAI_SUL', 'DEAD_END');
+          router.addBidirectionalEdge('SAI_CENTRO', 'SAI_SUL', streetName: 'Rua Principal');
+          router.addBidirectionalEdge('SAI_SUL', 'DEAD_END', streetName: 'Beco');
           router.addBidirectionalEdge(
             'SAI_SUL',
             'LAGO_GRANDE',
             isWaterCrossing: true,
+            streetName: 'Rio Solimões (Sem Travessia Regular)',
           );
         });
 
         test('TC-F14-B01: Origin == destination distance 0m: trivial path returns exactly 0.0 meters', () {
-          final result = router.findPath(
+          final result = router.findRoute(
             startId: 'SAI_CENTRO',
             goalId: 'SAI_CENTRO',
           );
-          expect(result, isNotNull);
-          expect(result!.path, equals(['SAI_CENTRO']));
+          expect(result.isSuccess, isTrue);
+          expect(result.pathNodeIds, equals(['SAI_CENTRO']));
           expect(result.totalDistanceMeters, equals(0.0));
+          expect(result.estimatedDuration, equals(Duration.zero));
         });
 
-        test('TC-F14-B02: Disconnected island graph node unreachable path returns null', () {
-          final result = router.findPath(
+        test('TC-F14-B02: Disconnected island graph node unreachable path returns failure', () {
+          final result = router.findRoute(
             startId: 'SAI_CENTRO',
             goalId: 'ISOLATED_ISLAND',
           );
-          expect(result, isNull);
+          expect(result.isSuccess, isFalse);
+          expect(result.pathNodes, isEmpty);
+          expect(result.errorMessage, contains('Não foi possível encontrar rota viável'));
         });
 
-        test('TC-F14-B03: Routing across unbridged Solimões without ferry returns unreachable null', () {
-          final result = router.findPath(
+        test('TC-F14-B03: Routing across unbridged Solimões without ferry returns unreachable failure', () {
+          final result = router.findRoute(
             startId: 'SAI_CENTRO',
             goalId: 'LAGO_GRANDE',
             allowWaterCrossingWithoutBridge: false,
           );
-          expect(result, isNull);
+          expect(result.isSuccess, isFalse);
+          expect(result.errorMessage, contains('Não foi possível encontrar rota viável'));
+
+          // Quando autorizada a travessia aquática, a rota é estabelecida com sucesso
+          final resultAllowed = router.findRoute(
+            startId: 'SAI_CENTRO',
+            goalId: 'LAGO_GRANDE',
+            allowWaterCrossingWithoutBridge: true,
+          );
+          expect(resultAllowed.isSuccess, isTrue);
+          expect(resultAllowed.pathNodeIds, equals(['SAI_CENTRO', 'SAI_SUL', 'LAGO_GRANDE']));
         });
 
         test('TC-F14-B04: 180° dead-end U-turn penalty calculation applies 60-second penalty on reversal', () {
-          final penalty = router.calculateTurnaroundPenalty(
+          final penaltyWalking = OfflineRoutingEngine.calculateTurnaroundPenalty(
+            mode: RoutingMode.walking,
             previousNodeId: 'SAI_SUL',
             currentNodeId: 'DEAD_END',
-            nextNodeId:
-                'SAI_SUL', // Inversão de sentido para sair do beco sem saída
+            nextNodeId: 'SAI_SUL', // Inversão de sentido para sair do beco
           );
-          expect(penalty, equals(60.0));
+          expect(penaltyWalking, equals(60.0));
 
-          final noPenalty = router.calculateTurnaroundPenalty(
+          final penaltyDriving = OfflineRoutingEngine.calculateTurnaroundPenalty(
+            mode: RoutingMode.driving,
+            previousNodeId: 'SAI_SUL',
+            currentNodeId: 'DEAD_END',
+            nextNodeId: 'SAI_SUL',
+          );
+          expect(penaltyDriving, equals(120.0));
+
+          final noPenalty = OfflineRoutingEngine.calculateTurnaroundPenalty(
+            mode: RoutingMode.walking,
             previousNodeId: 'SAI_CENTRO',
             currentNodeId: 'SAI_SUL',
             nextNodeId: 'DEAD_END',
@@ -1429,12 +1487,13 @@ void main() {
           expect(noPenalty, equals(0.0));
         });
 
-        test('TC-F14-B05: Coordinate outside road network: non-existent node returns null cleanly', () {
-          final result = router.findPath(
+        test('TC-F14-B05: Coordinate outside road network: non-existent node returns failure cleanly', () {
+          final result = router.findRoute(
             startId: 'NON_EXISTENT_ORIGIN',
             goalId: 'SAI_CENTRO',
           );
-          expect(result, isNull);
+          expect(result.isSuccess, isFalse);
+          expect(result.errorMessage, contains('Ponto de partida "NON_EXISTENT_ORIGIN" não encontrado'));
         });
       },
     );
@@ -1445,21 +1504,51 @@ void main() {
     group(
       'Group 15: F15 iOS & iPadOS Platform Boundaries (Master Order §7, §8)',
       () {
-        test('TC-F15-B01: Calendar sync returning 0 remote events vs local 10 events triggers mass-deletion shield', () {
-          const storedLocalCount = 10;
-          const downloadedRemoteCount = 0;
+        test('TC-F15-B01: Calendar sync returning 0 remote events vs local 10 events triggers mass-deletion shield', () async {
+          debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+          addTearDown(() => debugDefaultTargetPlatformOverride = null);
 
-          bool shouldTriggerMassDeletionShield(int local, int remote) {
-            return remote == 0 && local > 0;
+          final db = AppDatabase.forTesting(NativeDatabase.memory());
+          addTearDown(db.close);
+
+          FlutterSecureStorage.setMockInitialValues({
+            'apple_eventkit_selected_id': 'cal_apple_test',
+          });
+
+          final fakePlugin = FakeDeviceCalendarPlugin();
+          final appleProvider = AppleEventKitProvider(deviceCalendarPlugin: fakePlugin);
+
+          final now = DateTime.now();
+          // Insere 10 compromissos ministeriais locais na janela de sincronização
+          for (int i = 1; i <= 10; i++) {
+            await db.into(db.externalCalendarEvents).insert(
+              ExternalCalendarEventsCompanion.insert(
+                id: 'apple_ext_stored_$i',
+                provider: 'apple_eventkit',
+                calendarId: 'cal_apple_test',
+                externalEventId: 'apple_ev_stored_$i',
+                title: 'Estudo Bíblico Família $i',
+                startTime: now.add(Duration(days: i)),
+                endTime: now.add(Duration(days: i, hours: 1)),
+                createdAt: now,
+                updatedAt: now,
+              ),
+            );
           }
 
-          expect(
-            shouldTriggerMassDeletionShield(
-              storedLocalCount,
-              downloadedRemoteCount,
-            ),
-            isTrue,
-          );
+          // Simula anomalia externa: consulta ao EventKit retorna lista vazia (0 eventos)
+          fakePlugin.eventsResult = [];
+
+          final syncResult = await appleProvider.syncEvents(db: db);
+          expect(syncResult.success, isTrue);
+
+          // Verifica se o escudo contra deleção em massa manteve os 10 compromissos intactos
+          final storedEvents = await (db.select(db.externalCalendarEvents)
+                ..where((t) => t.provider.equals('apple_eventkit')))
+              .get();
+
+          expect(storedEvents.length, equals(10));
+          expect(storedEvents.every((e) => !e.isDeletedExternal), isTrue);
         });
 
         test('TC-F15-B02: Audio session interruption event handling transitions correctly without crash', () {
@@ -1480,13 +1569,52 @@ void main() {
           expect(interruptionEnd.shouldPause, isFalse);
         });
 
-        test('TC-F15-B03: Screen width exactly at 900px breakpoint: 900px is wide, 899.9px is narrow', () {
-          bool isWideLayout(double width) => width >= 900.0;
+        testWidgets(
+          'TC-F15-B03: Responsive breakpoint boundary at 900px: 899.9px renders phone layout, 900.0px renders Master-Detail split',
+          (tester) async {
+            final harness = await OpaqueBoxHarness.create(
+              airplaneMode: true,
+              startTileServer: false,
+            );
+            addTearDown(harness.dispose);
 
-          expect(isWideLayout(900.0), isTrue);
-          expect(isWideLayout(899.9), isFalse);
-          expect(isWideLayout(1024.0), isTrue);
-        });
+            // Popula repositório com compromisso ministerial
+            final now = DateTime.now();
+            await harness.repo.createAppointment(
+              title: 'Revisita Rio Solimões',
+              startTime: now.add(const Duration(hours: 2)),
+              endTime: now.add(const Duration(hours: 3)),
+              durationMinutes: 60,
+            );
+
+            tester.view.devicePixelRatio = 1.0;
+            addTearDown(() {
+              tester.view.resetPhysicalSize();
+              tester.view.resetDevicePixelRatio();
+            });
+
+            // 1. Largura abaixo do breakpoint: 899.0px (Narrow / Phone Mode)
+            tester.view.physicalSize = const Size(899.0, 800.0);
+            await tester.pumpWidget(
+              harness.buildApp(child: const AppointmentsScreen()),
+            );
+            await tester.tap(find.text('Lista'));
+            await tester.pumpAndSettleSafely();
+
+            // Abaixo de 900px, o layout simples de lista não renderiza o divisor vertical
+            expect(find.byType(VerticalDivider), findsNothing);
+
+            // 2. Largura exatamente no breakpoint: 900.0px (Wide / iPad Master-Detail Mode)
+            tester.view.physicalSize = const Size(900.0, 800.0);
+            await tester.pumpAndSettleSafely();
+
+            // Em 900px ou superior, constraints.maxWidth >= 900 ativa o _buildSplitListView com VerticalDivider
+            expect(find.byType(VerticalDivider), findsOneWidget);
+
+            await tester.pumpWidget(const SizedBox());
+            await tester.pumpAndSettleSafely();
+          },
+        );
 
         testWidgets(
           'TC-F15-B04: Zero-width window constraint handling renders safely without engine crash',
@@ -1551,9 +1679,26 @@ void main() {
     group(
       'Group 16: F16 E2E Opaque-Box Suite Boundaries (Master Order §9, §10)',
       () {
-        test('TC-F16-B01: Simulated test failure detection: assertions detect inequalities accurately', () {
-          expect(10, equals(10));
-          expect(() => expect(10, equals(20)), throwsA(isA<TestFailure>()));
+        test('TC-F16-B01: Harness fail-closed error detection intercepts invalid score inputs and network violations', () {
+          // 1. Valida que o avaliador rejeita pontuações de dimensão inválidas (> 10.0 ou < 0.0) com ArgumentError
+          final invalidScores = <String, double>{
+            for (final dim in FaesQualityGateEvaluator.dimensions) dim.key: 10.0,
+          };
+          invalidScores['functional'] = 10.5; // Nota impossível
+
+          expect(
+            () => FaesQualityGateEvaluator.evaluate(scores: invalidScores),
+            throwsArgumentError,
+          );
+
+          // 2. Valida detecção ativa de violação de rede no AirplaneNetworkGate
+          expect(
+            () => HttpClient().getUrl(Uri.parse('https://external-leak-audit.org')),
+            throwsA(
+              isA<AirplaneModeViolationException>()
+                  .having((e) => e.blockedHost, 'blockedHost', 'external-leak-audit.org'),
+            ),
+          );
         });
 
         test('TC-F16-B02: FAES quality gate failing when one dimension < 9.0 even if weighted score is high', () {
@@ -1567,25 +1712,41 @@ void main() {
             'tests': 10.0,
             'performance': 10.0,
             'documentation': 10.0,
-            'release_ci': 8.9, // Dimensão abaixo de 9.0 viola o hard gate
+            'release_ci': 8.9, // Dimensão abaixo de 9.0 viola o hard gate!
           };
 
-          bool evaluateFaesGate(Map<String, double> scores) {
-            final anyBelow9 = scores.values.any((s) => s < 9.0);
-            if (anyBelow9) return false;
-            final avg = scores.values.reduce((a, b) => a + b) / scores.length;
-            return avg >= 9.7;
-          }
+          final result = FaesQualityGateEvaluator.evaluate(scores: dimensionScores);
 
-          expect(evaluateFaesGate(dimensionScores), isFalse);
+          expect(result.weightedScore, greaterThanOrEqualTo(9.70));
+          expect(result.isApproved, isFalse);
+          expect(result.verdict, equals(FaesGateVerdict.notApproved));
+          expect(result.violations.any((v) => v.contains('release_ci') || v.contains('Release/CI/CD')), isTrue);
         });
 
         test('TC-F16-B03: Weighted score rounding boundary 9.69 vs 9.70: threshold requires score >= 9.70', () {
-          bool isApproved(double weightedScore) => weightedScore >= 9.70;
+          final scoresAt969 = <String, double>{
+            for (final dim in FaesQualityGateEvaluator.dimensions) dim.key: 9.69,
+          };
+          final result969 = FaesQualityGateEvaluator.evaluate(scores: scoresAt969);
+          expect(result969.weightedScore, equals(9.69));
+          expect(result969.isApproved, isFalse);
+          expect(result969.verdict, equals(FaesGateVerdict.notApproved));
 
-          expect(isApproved(9.69), isFalse);
-          expect(isApproved(9.70), isTrue);
-          expect(isApproved(9.701), isTrue);
+          final scoresAt970 = <String, double>{
+            for (final dim in FaesQualityGateEvaluator.dimensions) dim.key: 9.70,
+          };
+          final result970 = FaesQualityGateEvaluator.evaluate(scores: scoresAt970);
+          expect(result970.weightedScore, equals(9.70));
+          expect(result970.isApproved, isTrue);
+          expect(result970.verdict, equals(FaesGateVerdict.approved));
+
+          // Verificação de P0 bloqueante mesmo com nota 10.0
+          final scoresAt10 = <String, double>{
+            for (final dim in FaesQualityGateEvaluator.dimensions) dim.key: 10.0,
+          };
+          final resultP0 = FaesQualityGateEvaluator.evaluate(scores: scoresAt10, unresolvedP0: 1);
+          expect(resultP0.isApproved, isFalse);
+          expect(resultP0.verdict, equals(FaesGateVerdict.notApproved));
         });
 
         testWidgets(

@@ -75,14 +75,17 @@ class RoutingEdge {
 
   /// Velocidade efetiva da aresta para o modo informado (m/s).
   double effectiveSpeedMps(RoutingMode mode) {
-    if (isFerry)
+    if (isFerry) {
       return 4.0; // Velocidade média de balsa fluvial amazônica (~14 km/h)
+    }
     if (mode == RoutingMode.walking) {
       // Caminhante anda a pé (~1.25 m/s = 4.5 km/h), independentemente do limite de velocidade de veículos da via
       return mode.defaultSpeedMps;
     }
     // Para condução automotiva (driving), usa a velocidade da via ou a padrão urbana
-    if (speedMps != null && speedMps! > 0) return speedMps!;
+    if (speedMps != null && speedMps! > 0) {
+      return speedMps!;
+    }
     return mode.defaultSpeedMps;
   }
 }
@@ -291,16 +294,7 @@ class OfflineRoutingEngine {
         pathNodes: [startNode],
         totalDistanceMeters: 0.0,
         estimatedDuration: Duration.zero,
-        steps: [
-          RoutingStep(
-            instruction:
-                'Você já está no destino: ${startNode.name ?? startNode.id}',
-            distanceMeters: 0.0,
-            estimatedDuration: Duration.zero,
-            fromNodeId: startId,
-            toNodeId: goalId,
-          ),
-        ],
+        steps: const [],
       );
     }
 
@@ -372,9 +366,12 @@ class OfflineRoutingEngine {
           final prevEdge = cameFromEdge[current]!;
           if (prevEdge.fromId == edge.toId) {
             // Reversão direta no mesmo eixo viário
-            final turnaroundPenalty = mode == RoutingMode.walking
-                ? 60.0
-                : 120.0;
+            final turnaroundPenalty = calculateTurnaroundPenalty(
+              mode: mode,
+              previousNodeId: prevEdge.fromId,
+              currentNodeId: current,
+              nextNodeId: edge.toId,
+            );
             edgeDurationSeconds += turnaroundPenalty;
           }
         }
@@ -482,6 +479,20 @@ class OfflineRoutingEngine {
       estimatedDuration: Duration(seconds: totalDurationSeconds.round()),
       steps: steps,
     );
+  }
+
+  /// Calcula a penalidade de turnaround (180° reversão no mesmo eixo) para o modo especificado.
+  static double calculateTurnaroundPenalty({
+    required RoutingMode mode,
+    required String previousNodeId,
+    String? currentNodeId,
+    required String nextNodeId,
+  }) {
+    if (previousNodeId == nextNodeId &&
+        (currentNodeId == null || previousNodeId != currentNodeId)) {
+      return mode == RoutingMode.walking ? 60.0 : 120.0;
+    }
+    return 0.0;
   }
 
   /// Calcula a distância ortodrômica em metros entre dois pontos geográficos pela fórmula de Haversine.
