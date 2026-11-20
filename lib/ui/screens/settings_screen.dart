@@ -5,6 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import 'package:eas_client/eas_client.dart' as eas;
+import '../../ticuna/ticuna_providers.dart';
 
 import '../../inbox/exchange_service.dart';
 import '../../inbox/email_account_model.dart';
@@ -1504,7 +1505,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           if (confirmed == true) {
                             final repo = ref.read(repositoryProvider);
                             await repo.clearAllLocalData();
-                            if (context.mounted) {
+                        final db = ref.read(databaseProvider);
+                              await db.into(db.appKvStore).insertOnConflictUpdate(AppKvStoreCompanion.insert(key: 'ticuna_skip_initial_seed', value: 'true', updatedAt: Value(DateTime.now())));
+                              await ref.read(ticunaAudioServiceProvider).clearAllAudioFiles();
+                              ref.read(ticunaRepositoryProvider).clearStreamsOnReset();
+                              ref.invalidate(ticunaRepositoryProvider); ref.invalidate(ticunaWordsStreamProvider); ref.invalidate(ticunaPhrasesStreamProvider);
+                              ref.invalidate(ticunaTagsStreamProvider); ref.invalidate(languagesStreamProvider); ref.invalidate(activeLanguageProvider);
+                              if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
                                   content: Text(
