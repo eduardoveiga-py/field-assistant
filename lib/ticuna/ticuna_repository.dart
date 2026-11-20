@@ -215,8 +215,15 @@ class TicunaRepository {
           .customSelect('SELECT COUNT(*) AS count FROM ticuna_words')
           .getSingle();
       if (wordsCount.read<int>('count') == 0) {
+var skipInitialSeed = false;
+try {
+final skipRow = await db.customSelect("SELECT value FROM app_kv_store WHERE key = 'ticuna_skip_initial_seed'").getSingleOrNull();
+skipInitialSeed = skipRow?.read<String?>('value') == 'true';
+} catch (_) {}
+if (!skipInitialSeed)
         await _seedInitialData();
       }
+      
       _initialized = true;
       _initializationFailed = false;
       _initializationError = null;
@@ -1521,4 +1528,11 @@ class TicunaRepository {
 
     return records;
   }
+
+void clearStreamsOnReset() {
+if (!_wordsController.isClosed) _wordsController.add([]);
+if (!_phrasesController.isClosed) _phrasesController.add([]);
+if (!_tagsController.isClosed) _tagsController.add([]);
+}
+  
 }
