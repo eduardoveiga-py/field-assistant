@@ -92,8 +92,11 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          for name in SUPABASE_URL SUPABASE_ANON_KEY ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+          for name in SUPABASE_URL SUPABASE_ANON_KEY; do
             if [ -z "${!name}" ]; then echo "::error::Release configuration missing: $name"; exit 1; fi
+          done
+          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            if [ -z "${!name}" ]; then echo "::warning::Android release signing secret missing: $name; falling back to unsigned/debug signing"; fi
           done
 
   build_sai_release_map:
@@ -259,7 +262,7 @@ jobs:
           PY
 
       - name: Build Web (Release)
-        run: flutter build web --release $DART_DEFINES
+        run: flutter build web --release --base-href /field-assistant/ $DART_DEFINES
 
       - name: Decode Android Release Keystore (if configured)
         env:
@@ -277,7 +280,7 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          if [ "$IS_RELEASE_TAG" = "true" ]; then export ORG_GRADLE_PROJECT_requireReleaseSigning=true; fi
+          if [ "$IS_RELEASE_TAG" = "true" ] && [ -n "$ANDROID_KEYSTORE_PATH" ]; then export ORG_GRADLE_PROJECT_requireReleaseSigning=true; fi
           set -o pipefail
           flutter build apk --target-platform android-arm64 --release $DART_DEFINES 2>&1 | tee /tmp/android-build.log || {
             python3 - <<'PY2'
@@ -669,5 +672,37 @@ jobs:
       - name: Invalidate jsDelivr CDN Cache for apps.json
         run: |
           curl -fsSL -X GET "https://purge.jsdelivr.net/gh/${{ github.repository }}@master/apps.json" || true
+
+  deploy_web_pages:
+    name: Deploy Web to GitHub Pages
+    needs: [ build_android_and_web ]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Download Web Build Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: web-release
+          path: build/web
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages Artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
 
 

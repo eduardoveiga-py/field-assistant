@@ -197,10 +197,7 @@ class SupabaseEncryptedRecordTransport
     final clampedLimit = limit > 500 ? 500 : limit;
     final response = await client.rpc(
       'encrypted_records_scan_page',
-      params: {
-        'p_after_route': afterRoute,
-        'p_limit': clampedLimit,
-      },
+      params: {'p_after_route': afterRoute, 'p_limit': clampedLimit},
     );
     if (response is! List) {
       throw const FormatException(

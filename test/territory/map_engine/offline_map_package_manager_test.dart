@@ -48,13 +48,13 @@ void main() {
       header[101] = 16; // maxZoom
 
       bd.setInt32(102, (-68.20 * 10000000).round(), Endian.little); // minLon
-      bd.setInt32(106, (-3.40 * 10000000).round(), Endian.little);  // minLat
+      bd.setInt32(106, (-3.40 * 10000000).round(), Endian.little); // minLat
       bd.setInt32(110, (-67.70 * 10000000).round(), Endian.little); // maxLon
-      bd.setInt32(114, (-3.00 * 10000000).round(), Endian.little);  // maxLat
+      bd.setInt32(114, (-3.00 * 10000000).round(), Endian.little); // maxLat
 
       header[118] = 10; // centerZoom
       bd.setInt32(119, (-68.00 * 10000000).round(), Endian.little); // centerLon
-      bd.setInt32(123, (-3.20 * 10000000).round(), Endian.little);  // centerLat
+      bd.setInt32(123, (-3.20 * 10000000).round(), Endian.little); // centerLat
 
       final builder = BytesBuilder();
       builder.add(header);
@@ -224,7 +224,9 @@ void main() {
           isA<InvalidPackageFormatException>().having(
             (e) => e.message,
             'message',
-            contains('Pacote PMTiles sintético ou corrompido: cabeçalho sem diretório ou tiles válidos.'),
+            contains(
+              'Pacote PMTiles sintético ou corrompido: cabeçalho sem diretório ou tiles válidos.',
+            ),
           ),
         ),
       );
@@ -261,7 +263,8 @@ void main() {
         utf8.encode('INVALID MAGIC 12\x00extra-header-data-1234'),
       );
       expect(
-        () => OfflineMapPackageManager.validateMbtilesHeader(invalidSqliteHeader),
+        () =>
+            OfflineMapPackageManager.validateMbtilesHeader(invalidSqliteHeader),
         throwsA(isA<InvalidPackageFormatException>()),
       );
 
@@ -322,7 +325,9 @@ void main() {
     });
 
     test('TC-PKGMGR-07: Resilient resumption: server HTTP 200 response truncates .tmp cleanly', () async {
-      final fullPayload = createValidPmtilesBytes('ServerResponded200InsteadOf206');
+      final fullPayload = createValidPmtilesBytes(
+        'ServerResponded200InsteadOf206',
+      );
       final fullSha = crypto.sha256.convert(fullPayload).toString();
 
       final manifest = OfflineMapPackageManifest(
@@ -368,7 +373,9 @@ void main() {
     });
 
     test('TC-PKGMGR-08: Mismatched HTTP 206 Content-Range restarts cleanly from byte 0', () async {
-      final fullPayload = createValidPmtilesBytes('ContentRangeMismatchHandling');
+      final fullPayload = createValidPmtilesBytes(
+        'ContentRangeMismatchHandling',
+      );
       final fullSha = crypto.sha256.convert(fullPayload).toString();
 
       final manifest = OfflineMapPackageManifest(
@@ -402,7 +409,8 @@ void main() {
           fullPayload,
           206,
           headers: {
-            'content-range': 'bytes 0-${fullPayload.length - 1}/${fullPayload.length}',
+            'content-range':
+                'bytes 0-${fullPayload.length - 1}/${fullPayload.length}',
           },
         );
       });
@@ -413,7 +421,9 @@ void main() {
       );
       addTearDown(managerMismatch.dispose);
 
-      final state = await managerMismatch.downloadAndInstall(manifest: manifest);
+      final state = await managerMismatch.downloadAndInstall(
+        manifest: manifest,
+      );
       expect(state.status, equals(PackageDownloadStatus.installed));
       expect(targetFile.existsSync(), isTrue);
       expect(targetFile.lengthSync(), equals(fullPayload.length));
@@ -451,9 +461,7 @@ void main() {
       if (finalFile.existsSync()) finalFile.deleteSync();
       backupFile.writeAsBytesSync(payload);
 
-      final manager = OfflineMapPackageManager(
-        storageDir: tempDir,
-      );
+      final manager = OfflineMapPackageManager(storageDir: tempDir);
       addTearDown(manager.dispose);
 
       await manager.syncWithDisk(manifests: [manifest]);
@@ -499,9 +507,7 @@ void main() {
       if (finalFile.existsSync()) finalFile.deleteSync();
       backupFile.writeAsBytesSync(corruptPayload);
 
-      final manager = OfflineMapPackageManager(
-        storageDir: tempDir,
-      );
+      final manager = OfflineMapPackageManager(storageDir: tempDir);
       addTearDown(manager.dispose);
 
       await manager.syncWithDisk(manifests: [manifest]);

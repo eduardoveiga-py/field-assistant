@@ -597,10 +597,9 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
     } else if (target is String) {
       name = target;
     }
-    final query =
-        (lat != null && lon != null && (lat != 0.0 || lon != 0.0))
-            ? '$lat,$lon'
-            : Uri.encodeComponent(name);
+    final query = (lat != null && lon != null && (lat != 0.0 || lon != 0.0))
+        ? '$lat,$lon'
+        : Uri.encodeComponent(name);
     final uri = Uri.parse(
       'https://www.google.com/maps/search/?api=1&query=$query',
     );
@@ -1051,7 +1050,9 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                               ? Icons.directions_boat
                               : Icons.turn_right,
                           size: 16,
-                          color: step.isFerryCrossing ? Colors.blue : Colors.grey,
+                          color: step.isFerryCrossing
+                              ? Colors.blue
+                              : Colors.grey,
                         ),
                         const SizedBox(width: 6),
                         Expanded(
@@ -1390,7 +1391,8 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
               ],
             ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: (_selectedPinPerson == null && _selectedPinLandmark == null)
+      floatingActionButton:
+          (_selectedPinPerson == null && _selectedPinLandmark == null)
           ? FloatingActionButton.extended(
               heroTag: 'fab_add_landmark',
               backgroundColor: AppTheme.accentTeal,

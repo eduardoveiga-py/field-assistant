@@ -188,7 +188,12 @@ void main() {
       expect(await repo.getPersonById(person.id), isNull);
       expect(await db.select(db.visits).get(), isEmpty);
       expect(await db.select(db.voiceNotes).get(), isEmpty);
-      expect(await db.select(db.calendarEventLinks).get(), isEmpty);
+      final activeLinks = await (db.select(
+        db.calendarEventLinks,
+      )..where((t) => t.deletedAt.isNull())).get();
+      expect(activeLinks, isEmpty);
+      final allLinks = await db.select(db.calendarEventLinks).get();
+      expect(allLinks.every((l) => l.deletedAt != null), isTrue);
       expect(
         (await db.select(db.phoneContacts).get()).single.convertedPersonId,
         isNull,

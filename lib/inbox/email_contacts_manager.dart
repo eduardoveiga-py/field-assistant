@@ -1,5 +1,7 @@
 import 'dart:convert';
+
 import 'package:drift/drift.dart' as drift;
+
 import '../database/app_database.dart';
 
 /// Modelo de contato salvo para e-mails teocráticos e externos (JWPUB, Exchange, Google, Hotmail)
@@ -17,20 +19,20 @@ class EmailContact {
   });
 
   Map<String, dynamic> toJson() => {
-        'email': email,
-        'name': name,
-        'source': source,
-        'updatedAt': updatedAt.toIso8601String(),
-      };
+    'email': email,
+    'name': name,
+    'source': source,
+    'updatedAt': updatedAt.toIso8601String(),
+  };
 
   factory EmailContact.fromJson(Map<String, dynamic> json) => EmailContact(
-        email: json['email'] as String? ?? '',
-        name: json['name'] as String? ?? '',
-        source: json['source'] as String? ?? 'auto_sender',
-        updatedAt: json['updatedAt'] != null
-            ? DateTime.tryParse(json['updatedAt'] as String) ?? DateTime.now()
-            : DateTime.now(),
-      );
+    email: json['email'] as String? ?? '',
+    name: json['name'] as String? ?? '',
+    source: json['source'] as String? ?? 'auto_sender',
+    updatedAt: json['updatedAt'] != null
+        ? DateTime.tryParse(json['updatedAt'] as String) ?? DateTime.now()
+        : DateTime.now(),
+  );
 
   String get displayName => name.trim().isNotEmpty ? '$name <$email>' : email;
 }
@@ -43,8 +45,9 @@ class EmailContactsManager {
   /// Extrai nome e e-mail de um cabeçalho bruto como `"João Silva <joao@exemplo.com>"` ou `"joao@exemplo.com"`
   static ({String name, String email}) parseAddress(String raw) {
     final trimmed = raw.trim();
-    final match = RegExp(r'^(.*?)\s*<([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})>$')
-        .firstMatch(trimmed);
+    final match = RegExp(
+      r'^(.*?)\s*<([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})>$',
+    ).firstMatch(trimmed);
     if (match != null) {
       final name = match.group(1)!.replaceAll('"', '').trim();
       final email = match.group(2)!.trim().toLowerCase();
@@ -54,7 +57,10 @@ class EmailContactsManager {
         .firstMatch(trimmed);
     if (emailMatch != null) {
       final email = emailMatch.group(0)!.trim().toLowerCase();
-      final name = trimmed.replaceAll(email, '').replaceAll(RegExp(r'[<>"()]'), '').trim();
+      final name = trimmed
+          .replaceAll(email, '')
+          .replaceAll(RegExp(r'[<>"()]'), '')
+          .trim();
       return (name: name, email: email);
     }
     return (name: '', email: trimmed.toLowerCase());
@@ -67,7 +73,9 @@ class EmailContactsManager {
     String? name,
     String source = 'manual',
   }) async {
-    final parsed = parseAddress(name != null && name.isNotEmpty ? '$name <$email>' : email);
+    final parsed = parseAddress(
+      name != null && name.isNotEmpty ? '$name <$email>' : email,
+    );
     if (parsed.email.isEmpty || !parsed.email.contains('@')) return;
 
     final existingList = await loadSavedContacts(db);
@@ -85,7 +93,9 @@ class EmailContactsManager {
     );
 
     final encoded = jsonEncode(map.values.map((c) => c.toJson()).toList());
-    await db.into(db.appKvStore).insertOnConflictUpdate(
+    await db
+        .into(db.appKvStore)
+        .insertOnConflictUpdate(
           AppKvStoreCompanion.insert(
             key: _kvStoreKey,
             value: encoded,
@@ -109,15 +119,17 @@ class EmailContactsManager {
 
   /// Carrega os contatos salvos no AppKvStore
   static Future<List<EmailContact>> loadSavedContacts(AppDatabase db) async {
-    final row = await (db.select(db.appKvStore)
-          ..where((t) => t.key.equals(_kvStoreKey)))
-        .getSingleOrNull();
+    final row = await (db.select(
+      db.appKvStore,
+    )..where((t) => t.key.equals(_kvStoreKey))).getSingleOrNull();
     if (row == null || row.value.isEmpty) return [];
     try {
       final decoded = jsonDecode(row.value);
       if (decoded is List) {
         return decoded
-            .map((e) => EmailContact.fromJson(Map<String, dynamic>.from(e as Map)))
+            .map(
+              (e) => EmailContact.fromJson(Map<String, dynamic>.from(e as Map)),
+            )
             .where((c) => c.email.isNotEmpty && c.email.contains('@'))
             .toList();
       }
@@ -132,7 +144,9 @@ class EmailContactsManager {
         .where((c) => c.email.toLowerCase() != email.trim().toLowerCase())
         .toList();
     final encoded = jsonEncode(filtered.map((c) => c.toJson()).toList());
-    await db.into(db.appKvStore).insertOnConflictUpdate(
+    await db
+        .into(db.appKvStore)
+        .insertOnConflictUpdate(
           AppKvStoreCompanion.insert(
             key: _kvStoreKey,
             value: encoded,
@@ -176,7 +190,8 @@ class EmailContactsManager {
     final q = query.trim().toLowerCase();
     if (q.isNotEmpty) {
       list = list.where((c) {
-        return c.name.toLowerCase().contains(q) || c.email.toLowerCase().contains(q);
+        return c.name.toLowerCase().contains(q) ||
+            c.email.toLowerCase().contains(q);
       }).toList();
     }
 

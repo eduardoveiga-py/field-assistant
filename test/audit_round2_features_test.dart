@@ -749,7 +749,7 @@ void main() {
           await tester.pumpAndSettle();
 
           await tester.enterText(
-            find.widgetWithText(TextField, 'Para (ex: corpo.anciaos@jw.org)'),
+            find.widgetWithText(TextField, 'Para *'),
             'secretario@jw.org',
           );
           await tester.enterText(
@@ -761,7 +761,7 @@ void main() {
             'Enviado direto da UI do InboxScreen.',
           );
 
-          final sendBtn = find.text('Enviar Agora (SMTP)');
+          final sendBtn = find.text('Enviar E-mail');
           await tester.ensureVisible(sendBtn);
           await tester.pumpAndSettle();
 
@@ -775,7 +775,7 @@ void main() {
             find.textContaining('Credenciais IMAP/SMTP não configuradas'),
             findsOneWidget,
           );
-          expect(find.text('Configurar E-mail/SMTP'), findsOneWidget);
+          expect(find.text('Configurações de E-mail'), findsOneWidget);
 
           // Configure credentials in DB + SecureStorage and retry send
           await tester.runAsync(() async {

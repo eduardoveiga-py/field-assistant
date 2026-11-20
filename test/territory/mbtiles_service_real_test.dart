@@ -411,10 +411,7 @@ void main() {
       final failedNames = await service.updateAll(httpClient: client404);
 
       // br_am_solimoes failed 404, local_custom_aldeia was skipped cleanly
-      expect(
-        failedNames,
-        equals(['Santo Antônio do Içá e entorno']),
-      );
+      expect(failedNames, equals(['Santo Antônio do Içá e entorno']));
 
       // Installed status & physical file must remain intact on disk
       final solimoesAfter = service.currentRegions.firstWhere(

@@ -326,8 +326,7 @@ void main() {
       expect(
         nativeAdapter.capabilities.supportsOfflineRouting,
         isFalse,
-        reason:
-            'MaplibreNativeAdapter does not embed a native routing engine (Valhalla/GraphHopper).',
+        reason: 'MaplibreNativeAdapter does not embed a native routing engine (Valhalla/GraphHopper).',
       );
       expect(
         rasterAdapter.capabilities.supportsOfflineRouting,

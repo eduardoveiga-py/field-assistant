@@ -1,4 +1,5 @@
 import 'dart:convert';
+
 import 'package:drift/drift.dart' as drift;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:uuid/uuid.dart';
@@ -51,20 +52,20 @@ class EmailAccount {
   });
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'email': email,
-        'providerType': providerType.name,
-        'incomingHost': incomingHost,
-        'incomingPort': incomingPort,
-        'incomingProtocol': incomingProtocol,
-        'outgoingHost': outgoingHost,
-        'outgoingPort': outgoingPort,
-        'outgoingSecurity': outgoingSecurity,
-        'username': username,
-        'isActive': isActive,
-        'createdAt': createdAt.toIso8601String(),
-      };
+    'id': id,
+    'name': name,
+    'email': email,
+    'providerType': providerType.name,
+    'incomingHost': incomingHost,
+    'incomingPort': incomingPort,
+    'incomingProtocol': incomingProtocol,
+    'outgoingHost': outgoingHost,
+    'outgoingPort': outgoingPort,
+    'outgoingSecurity': outgoingSecurity,
+    'username': username,
+    'isActive': isActive,
+    'createdAt': createdAt.toIso8601String(),
+  };
 
   factory EmailAccount.fromJson(Map<String, dynamic> json) {
     EmailProviderType prov = EmailProviderType.custom;
@@ -111,10 +112,14 @@ class EmailAccount {
           name: name.isNotEmpty ? name : 'JWPUB Oficial',
           email: email,
           providerType: EmailProviderType.jwpub,
-          incomingHost: customHost?.isNotEmpty == true ? customHost! : 'mail.jw.org',
+          incomingHost: customHost?.isNotEmpty == true
+              ? customHost!
+              : 'mail.jw.org',
           incomingPort: 993,
           incomingProtocol: 'imap',
-          outgoingHost: customHost?.isNotEmpty == true ? customHost! : 'mail.jw.org',
+          outgoingHost: customHost?.isNotEmpty == true
+              ? customHost!
+              : 'mail.jw.org',
           outgoingPort: 587,
           outgoingSecurity: 'starttls',
           username: username,
@@ -156,10 +161,14 @@ class EmailAccount {
           name: name.isNotEmpty ? name : 'Exchange Corporativo',
           email: email,
           providerType: EmailProviderType.exchange,
-          incomingHost: customHost?.isNotEmpty == true ? customHost! : 'outlook.office365.com',
+          incomingHost: customHost?.isNotEmpty == true
+              ? customHost!
+              : 'outlook.office365.com',
           incomingPort: 443,
           incomingProtocol: 'exchange',
-          outgoingHost: customHost?.isNotEmpty == true ? customHost! : 'outlook.office365.com',
+          outgoingHost: customHost?.isNotEmpty == true
+              ? customHost!
+              : 'outlook.office365.com',
           outgoingPort: 443,
           outgoingSecurity: 'ssl',
           username: username,
@@ -189,42 +198,50 @@ class EmailAccountsManager {
   static const String _accountsKvKey = 'multi_email_accounts_registry';
   static const FlutterSecureStorage _secureStorage = FlutterSecureStorage();
 
-  static String _passwordKey(String accountId) => 'email_acc_${accountId}_password';
+  static String _passwordKey(String accountId) =>
+      'email_acc_${accountId}_password';
 
   /// Carrega todas as contas de e-mail cadastradas
   static Future<List<EmailAccount>> loadAccounts(AppDatabase db) async {
-    final row = await (db.select(db.appKvStore)
-          ..where((t) => t.key.equals(_accountsKvKey)))
-        .getSingleOrNull();
+    final row = await (db.select(
+      db.appKvStore,
+    )..where((t) => t.key.equals(_accountsKvKey))).getSingleOrNull();
 
     final accounts = <EmailAccount>[];
     if (row != null && row.value.isNotEmpty) {
       try {
         final decoded = jsonDecode(row.value);
         if (decoded is List) {
-          accounts.addAll(decoded
-              .map((e) => EmailAccount.fromJson(Map<String, dynamic>.from(e as Map)))
-              .where((a) => a.email.isNotEmpty));
+          accounts.addAll(
+            decoded
+                .map(
+                  (e) => EmailAccount.fromJson(
+                    Map<String, dynamic>.from(e as Map),
+                  ),
+                )
+                .where((a) => a.email.isNotEmpty),
+          );
         }
       } catch (_) {}
     }
 
     // Se nenhuma conta estiver no multi-registro, sincroniza a conta primária legada se existir
     if (accounts.isEmpty) {
-      final legacyImapEmail = await (db.select(db.appKvStore)
-            ..where((t) => t.key.equals('jw_imap_email')))
-          .getSingleOrNull();
-      final legacyEasEmail = await (db.select(db.appKvStore)
-            ..where((t) => t.key.equals('jw_eas_email')))
-          .getSingleOrNull();
-      final protocol = await (db.select(db.appKvStore)
-            ..where((t) => t.key.equals('jw_mail_protocol')))
-          .getSingleOrNull();
+      final legacyImapEmail = await (db.select(
+        db.appKvStore,
+      )..where((t) => t.key.equals('jw_imap_email'))).getSingleOrNull();
+      final legacyEasEmail = await (db.select(
+        db.appKvStore,
+      )..where((t) => t.key.equals('jw_eas_email'))).getSingleOrNull();
+      final protocol = await (db.select(
+        db.appKvStore,
+      )..where((t) => t.key.equals('jw_mail_protocol'))).getSingleOrNull();
 
-      if (protocol?.value == 'exchange' && legacyEasEmail?.value.isNotEmpty == true) {
-        final host = await (db.select(db.appKvStore)
-              ..where((t) => t.key.equals('jw_eas_host')))
-            .getSingleOrNull();
+      if (protocol?.value == 'exchange' &&
+          legacyEasEmail?.value.isNotEmpty == true) {
+        final host = await (db.select(
+          db.appKvStore,
+        )..where((t) => t.key.equals('jw_eas_host'))).getSingleOrNull();
         final acc = EmailAccount.createPreset(
           providerType: EmailProviderType.exchange,
           name: 'Exchange Principal',
@@ -234,9 +251,9 @@ class EmailAccountsManager {
         );
         accounts.add(acc);
       } else if (legacyImapEmail?.value.isNotEmpty == true) {
-        final host = await (db.select(db.appKvStore)
-              ..where((t) => t.key.equals('jw_imap_host')))
-            .getSingleOrNull();
+        final host = await (db.select(
+          db.appKvStore,
+        )..where((t) => t.key.equals('jw_imap_host'))).getSingleOrNull();
         final acc = EmailAccount.createPreset(
           providerType: EmailProviderType.jwpub,
           name: 'JWPUB Principal',
@@ -262,7 +279,9 @@ class EmailAccountsManager {
     map[account.id] = account;
 
     final encoded = jsonEncode(map.values.map((a) => a.toJson()).toList());
-    await db.into(db.appKvStore).insertOnConflictUpdate(
+    await db
+        .into(db.appKvStore)
+        .insertOnConflictUpdate(
           AppKvStoreCompanion.insert(
             key: _accountsKvKey,
             value: encoded,
@@ -271,7 +290,10 @@ class EmailAccountsManager {
         );
 
     if (password != null && password.isNotEmpty) {
-      await _secureStorage.write(key: _passwordKey(account.id), value: password);
+      await _secureStorage.write(
+        key: _passwordKey(account.id),
+        value: password,
+      );
     }
   }
 
@@ -286,7 +308,9 @@ class EmailAccountsManager {
     final filtered = existing.where((a) => a.id != accountId).toList();
 
     final encoded = jsonEncode(filtered.map((a) => a.toJson()).toList());
-    await db.into(db.appKvStore).insertOnConflictUpdate(
+    await db
+        .into(db.appKvStore)
+        .insertOnConflictUpdate(
           AppKvStoreCompanion.insert(
             key: _accountsKvKey,
             value: encoded,

@@ -6,15 +6,22 @@ import 'package:ministerio_pessoal/ui/widgets/markdown_preview_text.dart';
 void main() {
   group('Professional Email Formatting & Markdown Cleanup Tests', () {
     test('cleanMarkdown strips ** bold markers without leaving raw asterisks', () {
-      const input = 'Prezado irmão, veja o **relatório mensal** anexo com **atenção especial**.';
+      const input =
+          'Prezado irmão, veja o **relatório mensal** anexo com **atenção especial**.';
       final cleaned = MarkdownPreviewText.cleanMarkdown(input);
 
       expect(cleaned, isNot(contains('**')));
-      expect(cleaned, equals('Prezado irmão, veja o relatório mensal anexo com atenção especial.'));
+      expect(
+        cleaned,
+        equals(
+          'Prezado irmão, veja o relatório mensal anexo com atenção especial.',
+        ),
+      );
     });
 
     test('cleanMarkdown strips headers, blockquotes and code markers cleanly', () {
-      const input = '# Relatório de Serviço\n> Mensagem importante\nConsulte o código `jw123` e [site](https://jw.org).';
+      const input =
+          '# Relatório de Serviço\n> Mensagem importante\nConsulte o código `jw123` e [site](https://jw.org).';
       final cleaned = MarkdownPreviewText.cleanMarkdown(input);
 
       expect(cleaned, isNot(contains('# ')));
@@ -39,20 +46,25 @@ void main() {
         }
       }
       // Pelo menos um span deve ter fontWeight bold
-      final hasBold = spans.any((s) => s is TextSpan && s.style?.fontWeight == FontWeight.bold);
+      final hasBold = spans.any(
+        (s) => s is TextSpan && s.style?.fontWeight == FontWeight.bold,
+      );
       expect(hasBold, isTrue);
     });
 
-    test('cleanMarkdown removes HTML tags without corrupting surrounding text', () {
-      const input = '<p>Olá mundo</p><br><div>Novo parágrafo</div>';
-      final cleaned = MarkdownPreviewText.cleanMarkdown(input);
+    test(
+      'cleanMarkdown removes HTML tags without corrupting surrounding text',
+      () {
+        const input = '<p>Olá mundo</p><br><div>Novo parágrafo</div>';
+        final cleaned = MarkdownPreviewText.cleanMarkdown(input);
 
-      expect(cleaned, isNot(contains('<p>')));
-      expect(cleaned, isNot(contains('</p>')));
-      expect(cleaned, isNot(contains('<br>')));
-      expect(cleaned, isNot(contains('<div>')));
-      expect(cleaned, contains('Olá mundo'));
-      expect(cleaned, contains('Novo parágrafo'));
-    });
+        expect(cleaned, isNot(contains('<p>')));
+        expect(cleaned, isNot(contains('</p>')));
+        expect(cleaned, isNot(contains('<br>')));
+        expect(cleaned, isNot(contains('<div>')));
+        expect(cleaned, contains('Olá mundo'));
+        expect(cleaned, contains('Novo parágrafo'));
+      },
+    );
   });
 }

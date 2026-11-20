@@ -11,6 +11,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:file_picker/file_picker.dart';
+
 import '../../core/app_logger.dart';
 import '../../core/app_theme.dart';
 import '../../database/app_database.dart';
@@ -140,9 +141,12 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
           if (!acc.isActive) continue;
           try {
             if (acc.incomingProtocol == 'exchange') {
-              final pass = await EmailAccountsManager.getAccountPassword(acc.id);
+              final pass = await EmailAccountsManager.getAccountPassword(
+                acc.id,
+              );
               const storage = FlutterSecureStorage();
-              final deviceId = (await storage.read(key: 'jw_eas_device_id')) ??
+              final deviceId =
+                  (await storage.read(key: 'jw_eas_device_id')) ??
                   const Uuid().v4();
               if (pass != null && pass.isNotEmpty) {
                 final session = ExchangeProtocolSession(
@@ -162,14 +166,18 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                 accountsSynced++;
               }
             } else {
-              final pass = await EmailAccountsManager.getAccountPassword(acc.id);
+              final pass = await EmailAccountsManager.getAccountPassword(
+                acc.id,
+              );
               if (pass != null && pass.isNotEmpty) {
-                final saved = await ref.read(jwEmailServiceProvider).syncEmails(
-                  host: acc.incomingHost,
-                  port: acc.incomingPort,
-                  username: acc.username,
-                  password: pass,
-                );
+                final saved = await ref
+                    .read(jwEmailServiceProvider)
+                    .syncEmails(
+                      host: acc.incomingHost,
+                      port: acc.incomingPort,
+                      username: acc.username,
+                      password: pass,
+                    );
                 totalSavedAcrossAccounts += saved;
                 accountsSynced++;
               }
@@ -2145,7 +2153,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                   }
                 } else if (currentFolder == 'Enviados') {
                   final fn = (email.folderName ?? '').toLowerCase();
-                  if (!fn.contains('enviad') && !fn.contains('sent')) return false;
+                  if (!fn.contains('enviad') && !fn.contains('sent')) {
+                    return false;
+                  }
                 } else if (currentFolder == 'Rascunhos') {
                   final fn = (email.folderName ?? '').toLowerCase();
                   if (!email.isDraft &&
@@ -2166,7 +2176,8 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                 if (_selectedEmailAccount != null &&
                     _selectedEmailAccount!.isNotEmpty) {
                   final acc = _selectedEmailAccount!.toLowerCase();
-                  final matchAccount = (email.accountEmail?.toLowerCase() == acc) ||
+                  final matchAccount =
+                      (email.accountEmail?.toLowerCase() == acc) ||
                       email.from.toLowerCase().contains(acc) ||
                       email.to.toLowerCase().contains(acc);
                   if (!matchAccount) return false;
@@ -2180,7 +2191,10 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                 children: [
                   // Barra de Seleção de Conta e Pastas estilo Outlook
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 4,
+                    ),
                     child: Row(
                       children: [
                         // Seletor de Conta (Todas as Caixas ou Conta Específica)
@@ -2188,7 +2202,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                           future: EmailAccountsManager.loadAccounts(db),
                           builder: (ctx, snapshot) {
                             final accounts = snapshot.data ?? [];
-                            if (accounts.isEmpty) return const SizedBox.shrink();
+                            if (accounts.isEmpty) {
+                              return const SizedBox.shrink();
+                            }
                             return PopupMenuButton<String>(
                               tooltip: 'Selecionar Caixa de E-mail',
                               initialValue: _selectedEmailAccount ?? '',
@@ -2198,7 +2214,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                   vertical: 6,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: AppTheme.primaryBlue.withValues(alpha: 0.12),
+                                  color: AppTheme.primaryBlue.withValues(
+                                    alpha: 0.12,
+                                  ),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Row(
@@ -2227,7 +2245,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                               ),
                               onSelected: (val) {
                                 setState(() {
-                                  _selectedEmailAccount = val.isEmpty ? null : val;
+                                  _selectedEmailAccount = val.isEmpty
+                                      ? null
+                                      : val;
                                 });
                               },
                               itemBuilder: (ctx) => [
@@ -2249,7 +2269,10 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                         // Contador de Mensagens
                         Text(
                           '${visible.length} mensagem(ns)',
-                          style: const TextStyle(fontSize: 12, color: Colors.grey),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey,
+                          ),
                         ),
                       ],
                     ),
@@ -2285,12 +2308,19 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                         }
                         return ChoiceChip(
                           avatar: Icon(icon, size: 16),
-                          label: Text(folder, style: const TextStyle(fontSize: 12)),
+                          label: Text(
+                            folder,
+                            style: const TextStyle(fontSize: 12),
+                          ),
                           selected: isSelected,
-                          selectedColor: AppTheme.primaryBlue.withValues(alpha: 0.2),
+                          selectedColor: AppTheme.primaryBlue.withValues(
+                            alpha: 0.2,
+                          ),
                           onSelected: (val) {
                             setState(() {
-                              _selectedEmailFolder = folder == 'Todas as pastas' ? null : folder;
+                              _selectedEmailFolder = folder == 'Todas as pastas'
+                                  ? null
+                                  : folder;
                             });
                           },
                         );
@@ -2328,9 +2358,13 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                               vertical: 10,
                             ),
                             itemCount: visible.length,
-                            separatorBuilder: (c, i) => const SizedBox(height: 10),
-                            itemBuilder: (c, i) =>
-                                _buildEmailCard(visible[i], isDark, isHub: false),
+                            separatorBuilder: (c, i) =>
+                                const SizedBox(height: 10),
+                            itemBuilder: (c, i) => _buildEmailCard(
+                              visible[i],
+                              isDark,
+                              isHub: false,
+                            ),
                           ),
                   ),
                 ],
@@ -2607,7 +2641,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                     } else if (val == 'to_research') {
                       _convertEmailToResearch(msg);
                     } else if (val == 'delete') {
-                      await ref.read(jwEmailServiceProvider).deleteEmail(msg.id);
+                      await ref
+                          .read(jwEmailServiceProvider)
+                          .deleteEmail(msg.id);
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('E-mail excluído.')),
@@ -2658,7 +2694,11 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                       value: 'delete',
                       child: Row(
                         children: [
-                          Icon(Icons.delete_outline, size: 18, color: Colors.redAccent),
+                          Icon(
+                            Icons.delete_outline,
+                            size: 18,
+                            color: Colors.redAccent,
+                          ),
                           SizedBox(width: 8),
                           Text('Excluir'),
                         ],
@@ -2860,8 +2900,8 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                             msg.isDraft
                                 ? 'Rascunho'
                                 : (msg.isPermanentRetained
-                                    ? 'Cópia local salva'
-                                    : 'E-mail sincronizado'),
+                                      ? 'Cópia local salva'
+                                      : 'E-mail sincronizado'),
                             style: const TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
@@ -2938,8 +2978,12 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                 color: AppTheme.primaryBlue,
                               ),
                               title: Text(name),
-                              subtitle: att['size'] != null && (att['size'] as num) > 0
-                                  ? Text('${((att['size'] as num) / 1024).toStringAsFixed(1)} KB')
+                              subtitle:
+                                  att['size'] != null &&
+                                      (att['size'] as num) > 0
+                                  ? Text(
+                                      '${((att['size'] as num) / 1024).toStringAsFixed(1)} KB',
+                                    )
                                   : null,
                               trailing: IconButton(
                                 icon: const Icon(Icons.open_in_new),
@@ -3147,8 +3191,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                               itemCount: filtered.length,
                               itemBuilder: (c, i) {
                                 final contact = filtered[i];
-                                final isChecked =
-                                    selectedEmails.contains(contact.email);
+                                final isChecked = selectedEmails.contains(
+                                  contact.email,
+                                );
                                 return CheckboxListTile(
                                   value: isChecked,
                                   onChanged: (val) {
@@ -3198,7 +3243,10 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                       children: [
                         Text(
                           '${selectedEmails.length} selecionado(s)',
-                          style: const TextStyle(fontSize: 13, color: Colors.grey),
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey,
+                          ),
                         ),
                         FilledButton(
                           onPressed: selectedEmails.isEmpty
@@ -3260,8 +3308,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
           final contentCtrl = ctrls[4];
           final tagsCtrl = ctrls[5];
           bool showCcBcc = initCc.isNotEmpty || initBcc.isNotEmpty;
-          final attachments =
-              List<Map<String, dynamic>>.from(existingDraft?.attachments ?? []);
+          final attachments = List<Map<String, dynamic>>.from(
+            existingDraft?.attachments ?? [],
+          );
           bool isSending = false;
           String? inlineError;
           bool needsConfig = false;
@@ -3272,9 +3321,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
 
               Future<void> pickAttachments() async {
                 try {
-                  final res = await FilePicker.pickFiles(
-                    type: FileType.any,
-                  );
+                  final res = await FilePicker.pickFiles(type: FileType.any);
                   if (res.isNotEmpty) {
                     for (final f in res) {
                       String base64Str = '';
@@ -3382,7 +3429,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                       );
                                     },
                                     icon: const Icon(Icons.settings, size: 16),
-                                    label: const Text('Configurações de E-mail'),
+                                    label: const Text(
+                                      'Configurações de E-mail',
+                                    ),
                                   ),
                                 ],
                               ],
@@ -3403,23 +3452,25 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                   isDense: true,
                                   prefixIcon: TextButton(
                                     style: TextButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                      ),
                                       visualDensity: VisualDensity.compact,
                                     ),
                                     onPressed: isSending
                                         ? null
                                         : () => _showContactPickerModal(
-                                              ctx,
-                                              onSelected: (emails) {
-                                                if (toCtrl.text.trim().isEmpty) {
-                                                  toCtrl.text = emails;
-                                                } else {
-                                                  toCtrl.text =
-                                                      '${toCtrl.text}, $emails';
-                                                }
-                                                setSheetState(() {});
-                                              },
-                                            ),
+                                            ctx,
+                                            onSelected: (emails) {
+                                              if (toCtrl.text.trim().isEmpty) {
+                                                toCtrl.text = emails;
+                                              } else {
+                                                toCtrl.text =
+                                                    '${toCtrl.text}, $emails';
+                                              }
+                                              setSheetState(() {});
+                                            },
+                                          ),
                                     child: const Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
@@ -3448,17 +3499,17 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                     onPressed: isSending
                                         ? null
                                         : () => _showContactPickerModal(
-                                              ctx,
-                                              onSelected: (emails) {
-                                                if (toCtrl.text.trim().isEmpty) {
-                                                  toCtrl.text = emails;
-                                                } else {
-                                                  toCtrl.text =
-                                                      '${toCtrl.text}, $emails';
-                                                }
-                                                setSheetState(() {});
-                                              },
-                                            ),
+                                            ctx,
+                                            onSelected: (emails) {
+                                              if (toCtrl.text.trim().isEmpty) {
+                                                toCtrl.text = emails;
+                                              } else {
+                                                toCtrl.text =
+                                                    '${toCtrl.text}, $emails';
+                                              }
+                                              setSheetState(() {});
+                                            },
+                                          ),
                                   ),
                                 ),
                                 keyboardType: TextInputType.emailAddress,
@@ -3468,9 +3519,8 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                               TextButton(
                                 onPressed: isSending
                                     ? null
-                                    : () => setSheetState(
-                                          () => showCcBcc = true,
-                                        ),
+                                    : () =>
+                                          setSheetState(() => showCcBcc = true),
                                 child: const Text('Cc / Cco'),
                               ),
                           ],
@@ -3487,23 +3537,25 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                               isDense: true,
                               prefixIcon: TextButton(
                                 style: TextButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                  ),
                                   visualDensity: VisualDensity.compact,
                                 ),
                                 onPressed: isSending
                                     ? null
                                     : () => _showContactPickerModal(
-                                          ctx,
-                                          onSelected: (emails) {
-                                            if (ccCtrl.text.trim().isEmpty) {
-                                              ccCtrl.text = emails;
-                                            } else {
-                                              ccCtrl.text =
-                                                  '${ccCtrl.text}, $emails';
-                                            }
-                                            setSheetState(() {});
-                                          },
-                                        ),
+                                        ctx,
+                                        onSelected: (emails) {
+                                          if (ccCtrl.text.trim().isEmpty) {
+                                            ccCtrl.text = emails;
+                                          } else {
+                                            ccCtrl.text =
+                                                '${ccCtrl.text}, $emails';
+                                          }
+                                          setSheetState(() {});
+                                        },
+                                      ),
                                 child: const Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
@@ -3532,17 +3584,17 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                 onPressed: isSending
                                     ? null
                                     : () => _showContactPickerModal(
-                                          ctx,
-                                          onSelected: (emails) {
-                                            if (ccCtrl.text.trim().isEmpty) {
-                                              ccCtrl.text = emails;
-                                            } else {
-                                              ccCtrl.text =
-                                                  '${ccCtrl.text}, $emails';
-                                            }
-                                            setSheetState(() {});
-                                          },
-                                        ),
+                                        ctx,
+                                        onSelected: (emails) {
+                                          if (ccCtrl.text.trim().isEmpty) {
+                                            ccCtrl.text = emails;
+                                          } else {
+                                            ccCtrl.text =
+                                                '${ccCtrl.text}, $emails';
+                                          }
+                                          setSheetState(() {});
+                                        },
+                                      ),
                               ),
                             ),
                             keyboardType: TextInputType.emailAddress,
@@ -3558,23 +3610,25 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                               isDense: true,
                               prefixIcon: TextButton(
                                 style: TextButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                  ),
                                   visualDensity: VisualDensity.compact,
                                 ),
                                 onPressed: isSending
                                     ? null
                                     : () => _showContactPickerModal(
-                                          ctx,
-                                          onSelected: (emails) {
-                                            if (bccCtrl.text.trim().isEmpty) {
-                                              bccCtrl.text = emails;
-                                            } else {
-                                              bccCtrl.text =
-                                                  '${bccCtrl.text}, $emails';
-                                            }
-                                            setSheetState(() {});
-                                          },
-                                        ),
+                                        ctx,
+                                        onSelected: (emails) {
+                                          if (bccCtrl.text.trim().isEmpty) {
+                                            bccCtrl.text = emails;
+                                          } else {
+                                            bccCtrl.text =
+                                                '${bccCtrl.text}, $emails';
+                                          }
+                                          setSheetState(() {});
+                                        },
+                                      ),
                                 child: const Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
@@ -3603,17 +3657,17 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                 onPressed: isSending
                                     ? null
                                     : () => _showContactPickerModal(
-                                          ctx,
-                                          onSelected: (emails) {
-                                            if (bccCtrl.text.trim().isEmpty) {
-                                              bccCtrl.text = emails;
-                                            } else {
-                                              bccCtrl.text =
-                                                  '${bccCtrl.text}, $emails';
-                                            }
-                                            setSheetState(() {});
-                                          },
-                                        ),
+                                        ctx,
+                                        onSelected: (emails) {
+                                          if (bccCtrl.text.trim().isEmpty) {
+                                            bccCtrl.text = emails;
+                                          } else {
+                                            bccCtrl.text =
+                                                '${bccCtrl.text}, $emails';
+                                          }
+                                          setSheetState(() {});
+                                        },
+                                      ),
                               ),
                             ),
                             keyboardType: TextInputType.emailAddress,
@@ -3629,7 +3683,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                             if (contacts.isEmpty) {
                               return const SizedBox.shrink();
                             }
-                            final token = _extractLastRecipientToken(toCtrl.text);
+                            final token = _extractLastRecipientToken(
+                              toCtrl.text,
+                            );
                             return Padding(
                               padding: const EdgeInsets.only(top: 6, bottom: 4),
                               child: Column(
@@ -3650,7 +3706,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                         style: TextStyle(
                                           fontSize: 11,
                                           fontWeight: FontWeight.w600,
-                                          color: Theme.of(ctx).brightness == Brightness.dark
+                                          color:
+                                              Theme.of(ctx).brightness ==
+                                                  Brightness.dark
                                               ? Colors.grey.shade400
                                               : Colors.grey.shade700,
                                         ),
@@ -3664,12 +3722,16 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                       children: [
                                         ...contacts.map((contact) {
                                           return Padding(
-                                            padding: const EdgeInsets.only(right: 6),
+                                            padding: const EdgeInsets.only(
+                                              right: 6,
+                                            ),
                                             child: ActionChip(
-                                              visualDensity: VisualDensity.compact,
+                                              visualDensity:
+                                                  VisualDensity.compact,
                                               avatar: CircleAvatar(
                                                 radius: 8,
-                                                backgroundColor: AppTheme.primaryBlue,
+                                                backgroundColor:
+                                                    AppTheme.primaryBlue,
                                                 child: Text(
                                                   (contact.name.isNotEmpty
                                                           ? contact.name
@@ -3685,12 +3747,17 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                                 contact.name.isNotEmpty
                                                     ? '${contact.name} (${contact.email})'
                                                     : contact.email,
-                                                style: const TextStyle(fontSize: 11),
+                                                style: const TextStyle(
+                                                  fontSize: 11,
+                                                ),
                                               ),
                                               onPressed: isSending
                                                   ? null
                                                   : () {
-                                                      _applyRecipientSuggestion(toCtrl, contact.email);
+                                                      _applyRecipientSuggestion(
+                                                        toCtrl,
+                                                        contact.email,
+                                                      );
                                                       setSheetState(() {});
                                                     },
                                             ),
@@ -3732,8 +3799,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                           maxLines: 5,
                           decoration: const InputDecoration(
                             labelText: 'Conteúdo da Mensagem *',
-                            hintText:
-                                'Escreva a mensagem ou nota que deseja enviar ou salvar permanentemente...',
+                            hintText: 'Escreva a mensagem ou nota que deseja enviar ou salvar permanentemente...',
                           ),
                         ),
                         const SizedBox(height: 12),
@@ -3770,10 +3836,8 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                             spacing: 6,
                             runSpacing: 4,
                             children: attachments.map((att) {
-                              final name =
-                                  att['name']?.toString() ?? 'arquivo';
-                              final size =
-                                  (att['size'] as int? ?? 0) / 1024;
+                              final name = att['name']?.toString() ?? 'arquivo';
+                              final size = (att['size'] as int? ?? 0) / 1024;
                               return InputChip(
                                 avatar: const Icon(Icons.attachment, size: 15),
                                 label: Text(
@@ -3812,17 +3876,20 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                       final subject = subjectCtrl.text.trim();
                                       if (subject.isEmpty) {
                                         setSheetState(() {
-                                          inlineError =
-                                              'Informe o assunto para salvar o rascunho.';
+                                          inlineError = 'Informe o assunto para salvar o rascunho.';
                                           needsConfig = false;
                                         });
                                         return;
                                       }
                                       final to = toCtrl.text.trim();
-                                      final ccList = JwSmtpClient
-                                          .parseRecipients(ccCtrl.text);
-                                      final bccList = JwSmtpClient
-                                          .parseRecipients(bccCtrl.text);
+                                      final ccList =
+                                          JwSmtpClient.parseRecipients(
+                                            ccCtrl.text,
+                                          );
+                                      final bccList =
+                                          JwSmtpClient.parseRecipients(
+                                            bccCtrl.text,
+                                          );
                                       final bodyText = contentCtrl.text.trim();
                                       final tags = tagsCtrl.text
                                           .split(',')
@@ -3832,16 +3899,20 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                           .where((t) => t.isNotEmpty)
                                           .toList();
 
-                                      final emailEntry = await (db.select(
-                                        db.appKvStore,
-                                      )..where(
-                                          (t) => t.key.equals('jw_imap_email'),
-                                        )).getSingleOrNull();
+                                      final emailEntry =
+                                          await (db.select(db.appKvStore)
+                                                ..where(
+                                                  (t) => t.key.equals(
+                                                    'jw_imap_email',
+                                                  ),
+                                                ))
+                                              .getSingleOrNull();
                                       final userEmail =
                                           emailEntry?.value.trim() ?? '';
 
                                       final draft = JwEmailMessage(
-                                        id: existingDraft?.id ??
+                                        id:
+                                            existingDraft?.id ??
                                             const Uuid().v4(),
                                         folderName: 'Rascunhos',
                                         subject: subject,
@@ -3862,15 +3933,14 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                           .saveDraft(draft);
                                       if (ctx.mounted) Navigator.pop(ctx);
                                       if (mounted) {
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          const SnackBar(
-                                            content: Text(
-                                              'Rascunho salvo na retenção permanente!',
-                                            ),
-                                          ),
-                                        );
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                  'Rascunho salvo na retenção permanente!',
+                                                ),
+                                              ),
+                                            );
                                       }
                                     },
                             ),
@@ -3894,24 +3964,26 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                       final to = toCtrl.text.trim();
                                       final subject = subjectCtrl.text.trim();
                                       final bodyText = contentCtrl.text.trim();
-                                      final ccList = JwSmtpClient
-                                          .parseRecipients(ccCtrl.text);
-                                      final bccList = JwSmtpClient
-                                          .parseRecipients(bccCtrl.text);
+                                      final ccList =
+                                          JwSmtpClient.parseRecipients(
+                                            ccCtrl.text,
+                                          );
+                                      final bccList =
+                                          JwSmtpClient.parseRecipients(
+                                            bccCtrl.text,
+                                          );
                                       if (to.isEmpty ||
                                           JwSmtpClient.parseRecipients(to)
                                               .isEmpty) {
                                         setSheetState(() {
-                                          inlineError =
-                                              'Informe pelo menos um destinatário de e-mail válido no campo "Para".';
+                                          inlineError = 'Informe pelo menos um destinatário de e-mail válido no campo "Para".';
                                           needsConfig = false;
                                         });
                                         return;
                                       }
                                       if (subject.isEmpty) {
                                         setSheetState(() {
-                                          inlineError =
-                                              'O assunto não pode ficar em branco.';
+                                          inlineError = 'O assunto não pode ficar em branco.';
                                           needsConfig = false;
                                         });
                                         return;
@@ -3924,44 +3996,53 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                       });
 
                                       try {
-                                        final protocol = await (db.select(
-                                          db.appKvStore,
-                                        )..where(
-                                            (t) => t.key.equals(
-                                              'jw_mail_protocol',
-                                            ),
-                                          )).getSingleOrNull();
+                                        final protocol =
+                                            await (db.select(db.appKvStore)
+                                                  ..where(
+                                                    (t) => t.key.equals(
+                                                      'jw_mail_protocol',
+                                                    ),
+                                                  ))
+                                                .getSingleOrNull();
 
                                         final tags = tagsCtrl.text
                                             .split(',')
                                             .map(
-                                              (t) => t.trim().replaceAll('#', ''),
+                                              (t) =>
+                                                  t.trim().replaceAll('#', ''),
                                             )
                                             .where((t) => t.isNotEmpty)
                                             .toList();
 
                                         if (protocol?.value == 'exchange') {
-                                          final hostEntry = await (db.select(
-                                            db.appKvStore,
-                                          )..where(
-                                              (t) => t.key.equals('eas_host'),
-                                            )).getSingleOrNull();
-                                          final emailEntry = await (db.select(
-                                            db.appKvStore,
-                                          )..where(
-                                              (t) => t.key.equals('eas_email'),
-                                            )).getSingleOrNull();
+                                          final hostEntry =
+                                              await (db.select(db.appKvStore)
+                                                    ..where(
+                                                      (t) => t.key.equals(
+                                                        'eas_host',
+                                                      ),
+                                                    ))
+                                                  .getSingleOrNull();
+                                          final emailEntry =
+                                              await (db.select(db.appKvStore)
+                                                    ..where(
+                                                      (t) => t.key.equals(
+                                                        'eas_email',
+                                                      ),
+                                                    ))
+                                                  .getSingleOrNull();
                                           const secureStorage =
                                               FlutterSecureStorage();
                                           final password = await secureStorage
                                               .read(key: 'eas_password');
-                                          final deviceId = await (db.select(
-                                            db.appKvStore,
-                                          )..where(
-                                              (t) => t.key.equals(
-                                                'eas_device_id',
-                                              ),
-                                            )).getSingleOrNull();
+                                          final deviceId =
+                                              await (db.select(db.appKvStore)
+                                                    ..where(
+                                                      (t) => t.key.equals(
+                                                        'eas_device_id',
+                                                      ),
+                                                    ))
+                                                  .getSingleOrNull();
 
                                           if (hostEntry == null ||
                                               emailEntry == null ||
@@ -3973,8 +4054,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                               setSheetState(() {
                                                 isSending = false;
                                                 needsConfig = true;
-                                                inlineError =
-                                                    'Credenciais do Exchange não configuradas. Acesse Configurações para validar seu acesso.';
+                                                inlineError = 'Credenciais do Exchange não configuradas. Acesse Configurações para validar seu acesso.';
                                               });
                                             }
                                             return;
@@ -3982,11 +4062,11 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
 
                                           final session =
                                               ExchangeProtocolSession(
-                                            host: hostEntry.value,
-                                            username: emailEntry.value,
-                                            password: password,
-                                            deviceId: deviceId.value,
-                                          );
+                                                host: hostEntry.value,
+                                                username: emailEntry.value,
+                                                password: password,
+                                                deviceId: deviceId.value,
+                                              );
 
                                           await session.sendMail(
                                             to: to,
@@ -3999,7 +4079,8 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
 
                                           final now = DateTime.now().toUtc();
                                           final sentMsg = JwEmailMessage(
-                                            id: existingDraft?.id ??
+                                            id:
+                                                existingDraft?.id ??
                                                 const Uuid().v4(),
                                             folderName: 'Enviados',
                                             subject: subject,
@@ -4031,12 +4112,13 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                                   id: entryId,
                                                   content:
                                                       '${sentMsg.subject}\n\n${sentMsg.bodyText}',
-                                                  sourceType:
-                                                      const drift.Value('email'),
+                                                  sourceType: const drift.Value(
+                                                    'email',
+                                                  ),
                                                   suggestedCategory:
                                                       const drift.Value(
-                                                    'email_jw',
-                                                  ),
+                                                        'email_jw',
+                                                      ),
                                                   attachments: drift.Value(
                                                     jsonEncode(
                                                       sentMsg.attachments,
@@ -4056,8 +4138,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                             ...ccList,
                                             ...bccList,
                                           ]) {
-                                            await EmailContactsManager
-                                                .saveContact(
+                                            await EmailContactsManager.saveContact(
                                               db,
                                               email: rcpt,
                                               source: 'sent_recipient',
@@ -4081,25 +4162,28 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                         }
 
                                         // Envio via SMTP
-                                        final emailEntry = await (db.select(
-                                          db.appKvStore,
-                                        )..where(
-                                            (t) =>
-                                                t.key.equals('jw_imap_email'),
-                                          )).getSingleOrNull();
+                                        final emailEntry =
+                                            await (db.select(db.appKvStore)
+                                                  ..where(
+                                                    (t) => t.key.equals(
+                                                      'jw_imap_email',
+                                                    ),
+                                                  ))
+                                                .getSingleOrNull();
                                         const secureStorage =
                                             FlutterSecureStorage();
                                         String? password = await secureStorage
                                             .read(key: 'jw_imap_password');
                                         if (password == null ||
                                             password.isEmpty) {
-                                          final legacyPass = await (db.select(
-                                            db.appKvStore,
-                                          )..where(
-                                              (t) => t.key.equals(
-                                                'jw_imap_password',
-                                              ),
-                                            )).getSingleOrNull();
+                                          final legacyPass =
+                                              await (db.select(db.appKvStore)
+                                                    ..where(
+                                                      (t) => t.key.equals(
+                                                        'jw_imap_password',
+                                                      ),
+                                                    ))
+                                                  .getSingleOrNull();
                                           password = legacyPass?.value;
                                         }
                                         final username =
@@ -4111,40 +4195,47 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                             setSheetState(() {
                                               isSending = false;
                                               needsConfig = true;
-                                              inlineError =
-                                                  'Credenciais IMAP/SMTP não configuradas. Configure seu e-mail e senha teocráticos em Configurações antes de enviar.';
+                                              inlineError = 'Credenciais IMAP/SMTP não configuradas. Configure seu e-mail e senha teocráticos em Configurações antes de enviar.';
                                             });
                                           }
                                           return;
                                         }
 
-                                        final smtpHostEntry = await (db.select(
-                                          db.appKvStore,
-                                        )..where(
-                                            (t) =>
-                                                t.key.equals('jw_smtp_host'),
-                                          )).getSingleOrNull();
-                                        final imapHostEntry = await (db.select(
-                                          db.appKvStore,
-                                        )..where(
-                                            (t) =>
-                                                t.key.equals('jw_imap_host'),
-                                          )).getSingleOrNull();
-                                        final smtpPortEntry = await (db.select(
-                                          db.appKvStore,
-                                        )..where(
-                                            (t) =>
-                                                t.key.equals('jw_smtp_port'),
-                                          )).getSingleOrNull();
-                                        final smtpSecEntry = await (db.select(
-                                          db.appKvStore,
-                                        )..where(
-                                            (t) => t.key.equals(
-                                              'jw_smtp_security',
-                                            ),
-                                          )).getSingleOrNull();
+                                        final smtpHostEntry =
+                                            await (db.select(db.appKvStore)
+                                                  ..where(
+                                                    (t) => t.key.equals(
+                                                      'jw_smtp_host',
+                                                    ),
+                                                  ))
+                                                .getSingleOrNull();
+                                        final imapHostEntry =
+                                            await (db.select(db.appKvStore)
+                                                  ..where(
+                                                    (t) => t.key.equals(
+                                                      'jw_imap_host',
+                                                    ),
+                                                  ))
+                                                .getSingleOrNull();
+                                        final smtpPortEntry =
+                                            await (db.select(db.appKvStore)
+                                                  ..where(
+                                                    (t) => t.key.equals(
+                                                      'jw_smtp_port',
+                                                    ),
+                                                  ))
+                                                .getSingleOrNull();
+                                        final smtpSecEntry =
+                                            await (db.select(db.appKvStore)
+                                                  ..where(
+                                                    (t) => t.key.equals(
+                                                      'jw_smtp_security',
+                                                    ),
+                                                  ))
+                                                .getSingleOrNull();
 
-                                        final smtpHost = (smtpHostEntry?.value
+                                        final smtpHost =
+                                            (smtpHostEntry?.value
                                                     .trim()
                                                     .isNotEmpty ==
                                                 true)
@@ -4155,20 +4246,22 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                                       true)
                                                   ? imapHostEntry!.value.trim()
                                                   : 'mail.jw.org');
-                                        final securityMode = (smtpSecEntry
-                                                    ?.value
+                                        final securityMode =
+                                            (smtpSecEntry?.value
                                                     .trim()
                                                     .isNotEmpty ==
                                                 true)
                                             ? smtpSecEntry!.value.trim()
                                             : 'starttls';
-                                        final smtpPort = int.tryParse(
+                                        final smtpPort =
+                                            int.tryParse(
                                               smtpPortEntry?.value ?? '',
                                             ) ??
                                             (securityMode == 'ssl' ? 465 : 587);
 
                                         final msgToSend = JwEmailMessage(
-                                          id: existingDraft?.id ??
+                                          id:
+                                              existingDraft?.id ??
                                               const Uuid().v4(),
                                           folderName: 'Enviados',
                                           subject: subject,
@@ -4200,8 +4293,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                           ...ccList,
                                           ...bccList,
                                         ]) {
-                                          await EmailContactsManager
-                                              .saveContact(
+                                          await EmailContactsManager.saveContact(
                                             db,
                                             email: rcpt,
                                             source: 'sent_recipient',
@@ -4323,9 +4415,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
             child: const Text('Cancelar'),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.red,
-            ),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => Navigator.pop(dlgCtx, true),
             child: const Text('Excluir'),
           ),
@@ -4348,9 +4438,16 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
     return parts.last.trim();
   }
 
-  static void _applyRecipientSuggestion(TextEditingController ctrl, String email) {
+  static void _applyRecipientSuggestion(
+    TextEditingController ctrl,
+    String email,
+  ) {
     final raw = ctrl.text;
-    final parts = raw.split(',').map((p) => p.trim()).where((p) => p.isNotEmpty).toList();
+    final parts = raw
+        .split(',')
+        .map((p) => p.trim())
+        .where((p) => p.isNotEmpty)
+        .toList();
     if (parts.isNotEmpty) {
       final last = parts.last;
       if (!last.contains('@') || !last.endsWith('.')) {
@@ -4370,10 +4467,7 @@ class _ProfessionalEmailBodyView extends StatelessWidget {
   final String text;
   final bool isDark;
 
-  const _ProfessionalEmailBodyView({
-    required this.text,
-    required this.isDark,
-  });
+  const _ProfessionalEmailBodyView({required this.text, required this.isDark});
 
   static String _cleanHtmlAndEntities(String raw) {
     var s = raw;
@@ -4415,57 +4509,73 @@ class _ProfessionalEmailBodyView extends StatelessWidget {
         }
       }
       if (m.group(2) != null) {
-        spans.add(TextSpan(
-          text: m.group(2)!,
-          style: baseStyle.copyWith(
-            fontWeight: FontWeight.bold,
-            fontStyle: FontStyle.italic,
+        spans.add(
+          TextSpan(
+            text: m.group(2)!,
+            style: baseStyle.copyWith(
+              fontWeight: FontWeight.bold,
+              fontStyle: FontStyle.italic,
+            ),
           ),
-        ));
+        );
       } else if (m.group(4) != null) {
-        spans.add(TextSpan(
-          text: m.group(4)!,
-          style: baseStyle.copyWith(fontWeight: FontWeight.bold),
-        ));
+        spans.add(
+          TextSpan(
+            text: m.group(4)!,
+            style: baseStyle.copyWith(fontWeight: FontWeight.bold),
+          ),
+        );
       } else if (m.group(6) != null) {
-        spans.add(TextSpan(
-          text: m.group(6)!,
-          style: baseStyle.copyWith(fontStyle: FontStyle.italic),
-        ));
+        spans.add(
+          TextSpan(
+            text: m.group(6)!,
+            style: baseStyle.copyWith(fontStyle: FontStyle.italic),
+          ),
+        );
       } else if (m.group(8) != null) {
-        spans.add(TextSpan(
-          text: m.group(8)!,
-          style: baseStyle.copyWith(
-            fontWeight: FontWeight.bold,
-            fontStyle: FontStyle.italic,
+        spans.add(
+          TextSpan(
+            text: m.group(8)!,
+            style: baseStyle.copyWith(
+              fontWeight: FontWeight.bold,
+              fontStyle: FontStyle.italic,
+            ),
           ),
-        ));
+        );
       } else if (m.group(10) != null) {
-        spans.add(TextSpan(
-          text: m.group(10)!,
-          style: baseStyle.copyWith(fontWeight: FontWeight.bold),
-        ));
+        spans.add(
+          TextSpan(
+            text: m.group(10)!,
+            style: baseStyle.copyWith(fontWeight: FontWeight.bold),
+          ),
+        );
       } else if (m.group(12) != null) {
-        spans.add(TextSpan(
-          text: m.group(12)!,
-          style: baseStyle.copyWith(fontStyle: FontStyle.italic),
-        ));
+        spans.add(
+          TextSpan(
+            text: m.group(12)!,
+            style: baseStyle.copyWith(fontStyle: FontStyle.italic),
+          ),
+        );
       } else if (m.group(14) != null) {
-        spans.add(TextSpan(
-          text: m.group(14)!,
-          style: baseStyle.copyWith(
-            fontFamily: 'monospace',
-            backgroundColor: baseStyle.color?.withValues(alpha: 0.08),
+        spans.add(
+          TextSpan(
+            text: m.group(14)!,
+            style: baseStyle.copyWith(
+              fontFamily: 'monospace',
+              backgroundColor: baseStyle.color?.withValues(alpha: 0.08),
+            ),
           ),
-        ));
+        );
       } else if (m.group(16) != null) {
-        spans.add(TextSpan(
-          text: m.group(16)!,
-          style: baseStyle.copyWith(
-            color: AppTheme.primaryBlue,
-            decoration: TextDecoration.underline,
+        spans.add(
+          TextSpan(
+            text: m.group(16)!,
+            style: baseStyle.copyWith(
+              color: AppTheme.primaryBlue,
+              decoration: TextDecoration.underline,
+            ),
           ),
-        ));
+        );
       }
       lastEnd = m.end;
     }
@@ -4492,7 +4602,10 @@ class _ProfessionalEmailBodyView extends StatelessWidget {
     if (cleanFull.isEmpty) {
       return Text(
         '(Mensagem sem conteúdo textual)',
-        style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey.shade500),
+        style: TextStyle(
+          fontStyle: FontStyle.italic,
+          color: Colors.grey.shade500,
+        ),
       );
     }
 
@@ -4521,7 +4634,9 @@ class _ProfessionalEmailBodyView extends StatelessWidget {
                 child: Text.rich(
                   TextSpan(
                     children: _parseSpans(
-                      p.replaceAll(RegExp(r'^>\s*', multiLine: true), '').trim(),
+                      p
+                          .replaceAll(RegExp(r'^>\s*', multiLine: true), '')
+                          .trim(),
                       baseStyle.copyWith(
                         fontStyle: FontStyle.italic,
                         color: isDark

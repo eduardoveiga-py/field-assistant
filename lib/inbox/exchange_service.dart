@@ -194,7 +194,8 @@ class ExchangeProtocolSession implements ExchangeSession {
       for (final att in attachments) {
         final name = (att['name'] ?? 'anexo').toString();
         final base64Content = (att['base64'] ?? '').toString();
-        final contentType = (att['contentType'] ?? 'application/octet-stream').toString();
+        final contentType = (att['contentType'] ?? 'application/octet-stream')
+            .toString();
         if (base64Content.isNotEmpty) {
           payload
             ..write('--$boundary\r\n')
@@ -397,24 +398,28 @@ class ExchangeReadService {
               final attachmentsList = item.attachments.map((att) {
                 final name = att.displayName.isNotEmpty
                     ? att.displayName
-                    : (att.fileReference.isNotEmpty ? att.fileReference : 'anexo');
+                    : (att.fileReference.isNotEmpty
+                          ? att.fileReference
+                          : 'anexo');
                 final ct = att.contentType?.toLowerCase() ?? '';
                 final type = ct.contains('pdf')
                     ? 'pdf'
                     : (ct.contains('image') ||
-                            ct.contains('png') ||
-                            ct.contains('jpeg') ||
-                            ct.contains('jpg')
-                        ? 'image'
-                        : (ct.contains('word') || ct.contains('doc')
-                            ? 'doc'
-                            : 'file'));
+                              ct.contains('png') ||
+                              ct.contains('jpeg') ||
+                              ct.contains('jpg')
+                          ? 'image'
+                          : (ct.contains('word') || ct.contains('doc')
+                                ? 'doc'
+                                : 'file'));
                 return {
                   'name': name,
                   'fileReference': att.fileReference,
                   'size': att.estimatedSize,
                   'contentType': att.contentType,
-                  'path': att.fileReference.isNotEmpty ? att.fileReference : name,
+                  'path': att.fileReference.isNotEmpty
+                      ? att.fileReference
+                      : name,
                   'type': type,
                   'isInline': att.isInline,
                 };

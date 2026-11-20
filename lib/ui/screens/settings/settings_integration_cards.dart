@@ -1135,7 +1135,10 @@ extension _SettingsIntegrationCards on _SettingsScreenState {
     final db = ref.read(repositoryProvider).db;
     return Card(
       child: ExpansionTile(
-        leading: const Icon(Icons.mark_email_read_outlined, color: AppTheme.primaryBlue),
+        leading: const Icon(
+          Icons.mark_email_read_outlined,
+          color: AppTheme.primaryBlue,
+        ),
         title: const Text(
           'Multi-contas de E-mail (Google, Hotmail, JWPUB)',
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
@@ -1194,12 +1197,28 @@ extension _SettingsIntegrationCards on _SettingsScreenState {
                             backgroundColor: iconColor.withValues(alpha: 0.15),
                             child: Icon(icon, color: iconColor, size: 20),
                           ),
-                          title: Text(acc.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                          subtitle: Text('${acc.email} (${acc.providerType.label})', style: const TextStyle(fontSize: 12)),
+                          title: Text(
+                            acc.name,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                          subtitle: Text(
+                            '${acc.email} (${acc.providerType.label})',
+                            style: const TextStyle(fontSize: 12),
+                          ),
                           trailing: IconButton(
-                            icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+                            icon: const Icon(
+                              Icons.delete_outline,
+                              color: Colors.redAccent,
+                              size: 20,
+                            ),
                             onPressed: () async {
-                              await EmailAccountsManager.deleteAccount(db, acc.id);
+                              await EmailAccountsManager.deleteAccount(
+                                db,
+                                acc.id,
+                              );
                               if (mounted) _updateState(() {});
                             },
                           ),
@@ -1241,7 +1260,9 @@ extension _SettingsIntegrationCards on _SettingsScreenState {
               children: [
                 DropdownButtonFormField<EmailProviderType>(
                   initialValue: selectedProvider,
-                  decoration: const InputDecoration(labelText: 'Provedor de E-mail'),
+                  decoration: const InputDecoration(
+                    labelText: 'Provedor de E-mail',
+                  ),
                   items: EmailProviderType.values.map((p) {
                     return DropdownMenuItem(value: p, child: Text(p.label));
                   }).toList(),
@@ -1258,13 +1279,17 @@ extension _SettingsIntegrationCards on _SettingsScreenState {
                 const SizedBox(height: 12),
                 TextField(
                   controller: nameCtrl,
-                  decoration: const InputDecoration(labelText: 'Nome da Conta (ex: Gmail Pessoal)'),
+                  decoration: const InputDecoration(
+                    labelText: 'Nome da Conta (ex: Gmail Pessoal)',
+                  ),
                 ),
                 const SizedBox(height: 10),
                 TextField(
                   controller: emailCtrl,
                   keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(labelText: 'Endereço de E-mail *'),
+                  decoration: const InputDecoration(
+                    labelText: 'Endereço de E-mail *',
+                  ),
                   onChanged: (val) {
                     if (userCtrl.text.isEmpty) {
                       userCtrl.text = val;
@@ -1274,19 +1299,26 @@ extension _SettingsIntegrationCards on _SettingsScreenState {
                 const SizedBox(height: 10),
                 TextField(
                   controller: userCtrl,
-                  decoration: const InputDecoration(labelText: 'Nome de Usuário / Login'),
+                  decoration: const InputDecoration(
+                    labelText: 'Nome de Usuário / Login',
+                  ),
                 ),
                 const SizedBox(height: 10),
                 TextField(
                   controller: passCtrl,
                   obscureText: true,
-                  decoration: const InputDecoration(labelText: 'Senha ou Senha de Aplicativo *'),
+                  decoration: const InputDecoration(
+                    labelText: 'Senha ou Senha de Aplicativo *',
+                  ),
                 ),
-                if (selectedProvider == EmailProviderType.custom || selectedProvider == EmailProviderType.exchange) ...[
+                if (selectedProvider == EmailProviderType.custom ||
+                    selectedProvider == EmailProviderType.exchange) ...[
                   const SizedBox(height: 10),
                   TextField(
                     controller: hostCtrl,
-                    decoration: const InputDecoration(labelText: 'Servidor / Host'),
+                    decoration: const InputDecoration(
+                      labelText: 'Servidor / Host',
+                    ),
                   ),
                 ],
               ],
@@ -1311,8 +1343,12 @@ extension _SettingsIntegrationCards on _SettingsScreenState {
                   providerType: selectedProvider,
                   name: nameCtrl.text.trim(),
                   email: email,
-                  username: userCtrl.text.trim().isNotEmpty ? userCtrl.text.trim() : email,
-                  customHost: hostCtrl.text.trim().isNotEmpty ? hostCtrl.text.trim() : null,
+                  username: userCtrl.text.trim().isNotEmpty
+                      ? userCtrl.text.trim()
+                      : email,
+                  customHost: hostCtrl.text.trim().isNotEmpty
+                      ? hostCtrl.text.trim()
+                      : null,
                 );
                 await EmailAccountsManager.saveAccount(db, acc, password: pass);
                 if (ctx.mounted) Navigator.pop(ctx);
@@ -1330,7 +1366,10 @@ extension _SettingsIntegrationCards on _SettingsScreenState {
     final db = ref.read(repositoryProvider).db;
     return Card(
       child: ExpansionTile(
-        leading: const Icon(Icons.contacts_outlined, color: AppTheme.accentTeal),
+        leading: const Icon(
+          Icons.contacts_outlined,
+          color: AppTheme.accentTeal,
+        ),
         title: const Text(
           'Registro de Contatos de E-mail',
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
@@ -1362,15 +1401,37 @@ extension _SettingsIntegrationCards on _SettingsScreenState {
                         return ListTile(
                           contentPadding: EdgeInsets.zero,
                           leading: CircleAvatar(
-                            backgroundColor: AppTheme.accentTeal.withValues(alpha: 0.15),
-                            child: const Icon(Icons.person, color: AppTheme.accentTeal, size: 20),
+                            backgroundColor: AppTheme.accentTeal.withValues(
+                              alpha: 0.15,
+                            ),
+                            child: const Icon(
+                              Icons.person,
+                              color: AppTheme.accentTeal,
+                              size: 20,
+                            ),
                           ),
-                          title: Text(c.name.isNotEmpty ? c.name : c.email, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                          subtitle: Text(c.email, style: const TextStyle(fontSize: 12)),
+                          title: Text(
+                            c.name.isNotEmpty ? c.name : c.email,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                          subtitle: Text(
+                            c.email,
+                            style: const TextStyle(fontSize: 12),
+                          ),
                           trailing: IconButton(
-                            icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+                            icon: const Icon(
+                              Icons.delete_outline,
+                              color: Colors.redAccent,
+                              size: 20,
+                            ),
                             onPressed: () async {
-                              await EmailContactsManager.deleteContact(db, c.email);
+                              await EmailContactsManager.deleteContact(
+                                db,
+                                c.email,
+                              );
                               if (mounted) _updateState(() {});
                             },
                           ),
@@ -1411,12 +1472,17 @@ extension _SettingsIntegrationCards on _SettingsScreenState {
             TextField(
               controller: emailCtrl,
               keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(labelText: 'Endereço de E-mail *'),
+              decoration: const InputDecoration(
+                labelText: 'Endereço de E-mail *',
+              ),
             ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
           FilledButton(
             onPressed: () async {
               final em = emailCtrl.text.trim();
@@ -1426,7 +1492,12 @@ extension _SettingsIntegrationCards on _SettingsScreenState {
                 );
                 return;
               }
-              await EmailContactsManager.saveContact(db, email: em, name: nameCtrl.text.trim(), source: 'manual');
+              await EmailContactsManager.saveContact(
+                db,
+                email: em,
+                name: nameCtrl.text.trim(),
+                source: 'manual',
+              );
               if (ctx.mounted) Navigator.pop(ctx);
               if (mounted) _updateState(() {});
             },

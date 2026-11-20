@@ -53,10 +53,12 @@ class _PictureBankScreenState extends ConsumerState<PictureBankScreen> {
   List<PictureEntry> get _filteredPictures {
     final query = _searchController.text.trim().toLowerCase();
     return _pictures.where((p) {
-      final matchesQuery = query.isEmpty ||
+      final matchesQuery =
+          query.isEmpty ||
           p.caption.toLowerCase().contains(query) ||
           p.tags.any((t) => t.toLowerCase().contains(query));
-      final matchesTag = _selectedTag == 'Todos' ||
+      final matchesTag =
+          _selectedTag == 'Todos' ||
           p.tags.any((t) => t.toLowerCase() == _selectedTag.toLowerCase());
       return matchesQuery && matchesTag;
     }).toList();
@@ -104,11 +106,17 @@ class _PictureBankScreenState extends ConsumerState<PictureBankScreen> {
                     children: [
                       const Row(
                         children: [
-                          Icon(Icons.add_photo_alternate, color: AppTheme.accentTeal),
+                          Icon(
+                            Icons.add_photo_alternate,
+                            color: AppTheme.accentTeal,
+                          ),
                           SizedBox(width: 8),
                           Text(
                             'Adicionar ao Banco de Gravuras',
-                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ],
                       ),
@@ -124,13 +132,17 @@ class _PictureBankScreenState extends ConsumerState<PictureBankScreen> {
                   Center(
                     child: Column(
                       children: [
-                        if (pickedImageData != null && pickedImageData!.isNotEmpty)
+                        if (pickedImageData != null &&
+                            pickedImageData!.isNotEmpty)
                           Container(
                             height: 180,
                             width: double.infinity,
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: AppTheme.accentTeal, width: 2),
+                              border: Border.all(
+                                color: AppTheme.accentTeal,
+                                width: 2,
+                              ),
                             ),
                             clipBehavior: Clip.antiAlias,
                             child: _buildPictureWidget(pickedImageData!),
@@ -142,16 +154,26 @@ class _PictureBankScreenState extends ConsumerState<PictureBankScreen> {
                             decoration: BoxDecoration(
                               color: Colors.grey.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.grey.shade400, style: BorderStyle.solid),
+                              border: Border.all(
+                                color: Colors.grey.shade400,
+                                style: BorderStyle.solid,
+                              ),
                             ),
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                const Icon(Icons.image_outlined, size: 40, color: Colors.grey),
+                                const Icon(
+                                  Icons.image_outlined,
+                                  size: 40,
+                                  color: Colors.grey,
+                                ),
                                 const SizedBox(height: 6),
                                 const Text(
                                   'Nenhuma imagem selecionada',
-                                  style: TextStyle(color: Colors.grey, fontSize: 13),
+                                  style: TextStyle(
+                                    color: Colors.grey,
+                                    fontSize: 13,
+                                  ),
                                 ),
                               ],
                             ),
@@ -165,7 +187,9 @@ class _PictureBankScreenState extends ConsumerState<PictureBankScreen> {
                                   ? const SizedBox(
                                       width: 14,
                                       height: 14,
-                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
                                     )
                                   : const Icon(Icons.folder_open, size: 18),
                               label: const Text('Escolher Imagem'),
@@ -181,10 +205,12 @@ class _PictureBankScreenState extends ConsumerState<PictureBankScreen> {
                                           final file = res.first;
                                           if (kIsWeb) {
                                             try {
-                                              final bytes = await file.readAsBytes();
+                                              final bytes = await file
+                                                  .readAsBytes();
                                               final b64 = base64Encode(bytes);
                                               setSheetState(() {
-                                                pickedImageData = 'data:image/png;base64,$b64';
+                                                pickedImageData =
+                                                    'data:image/png;base64,$b64';
                                               });
                                             } catch (_) {}
                                           } else if (file.path != null) {
@@ -194,7 +220,9 @@ class _PictureBankScreenState extends ConsumerState<PictureBankScreen> {
                                           }
                                         }
                                       } catch (e) {
-                                        debugPrint('Erro ao selecionar foto: $e');
+                                        debugPrint(
+                                          'Erro ao selecionar foto: $e',
+                                        );
                                       } finally {
                                         setSheetState(() => isPicking = false);
                                       }
@@ -261,7 +289,9 @@ class _PictureBankScreenState extends ConsumerState<PictureBankScreen> {
                           if (caption.isEmpty) {
                             ScaffoldMessenger.of(ctx).showSnackBar(
                               const SnackBar(
-                                content: Text('Informe uma legenda para a gravura.'),
+                                content: Text(
+                                  'Informe uma legenda para a gravura.',
+                                ),
                                 backgroundColor: AppTheme.alertRed,
                               ),
                             );
@@ -270,7 +300,9 @@ class _PictureBankScreenState extends ConsumerState<PictureBankScreen> {
                           if (image.isEmpty) {
                             ScaffoldMessenger.of(ctx).showSnackBar(
                               const SnackBar(
-                                content: Text('Selecione uma imagem ou informe a URL.'),
+                                content: Text(
+                                  'Selecione uma imagem ou informe a URL.',
+                                ),
                                 backgroundColor: AppTheme.alertRed,
                               ),
                             );
@@ -300,7 +332,9 @@ class _PictureBankScreenState extends ConsumerState<PictureBankScreen> {
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
-                                content: Text('Gravura salva no banco com sucesso!'),
+                                content: Text(
+                                  'Gravura salva no banco com sucesso!',
+                                ),
                                 backgroundColor: AppTheme.successGreen,
                               ),
                             );
@@ -385,7 +419,9 @@ class _PictureBankScreenState extends ConsumerState<PictureBankScreen> {
                       )
                     : null,
                 isDense: true,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
               onChanged: (_) => setState(() {}),
             ),
@@ -421,84 +457,100 @@ class _PictureBankScreenState extends ConsumerState<PictureBankScreen> {
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : filtered.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.photo_library_outlined, size: 64, color: Colors.grey.shade400),
-                            const SizedBox(height: 12),
-                            Text(
-                              'Nenhuma gravura encontrada',
-                              style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
-                            ),
-                          ],
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.photo_library_outlined,
+                          size: 64,
+                          color: Colors.grey.shade400,
                         ),
-                      )
-                    : GridView.builder(
-                        padding: const EdgeInsets.only(left: 14, right: 14, top: 8, bottom: 80),
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: crossAxisCount,
-                          crossAxisSpacing: 12,
-                          mainAxisSpacing: 12,
-                          childAspectRatio: 0.82,
+                        const SizedBox(height: 12),
+                        Text(
+                          'Nenhuma gravura encontrada',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey.shade600,
+                          ),
                         ),
-                        itemCount: filtered.length,
-                        itemBuilder: (ctx, idx) {
-                          final pic = filtered[idx];
-                          return Card(
-                            elevation: 2,
-                            clipBehavior: Clip.antiAlias,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                            child: InkWell(
-                              onTap: () => _openPictureViewer(pic),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  // Imagem Miniatura
-                                  Expanded(
-                                    child: Container(
-                                      width: double.infinity,
-                                      color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
-                                      child: _buildPictureWidget(pic.imageData),
-                                    ),
-                                  ),
-                                  // Legenda e Tags
-                                  Padding(
-                                    padding: const EdgeInsets.all(10),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          pic.caption,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 13,
-                                          ),
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        if (pic.tags.isNotEmpty) ...[
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            pic.tags.map((t) => '#$t').join(' '),
-                                            style: const TextStyle(
-                                              fontSize: 11,
-                                              color: AppTheme.accentTeal,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ],
-                                      ],
-                                    ),
-                                  ),
-                                ],
+                      ],
+                    ),
+                  )
+                : GridView.builder(
+                    padding: const EdgeInsets.only(
+                      left: 14,
+                      right: 14,
+                      top: 8,
+                      bottom: 80,
+                    ),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: crossAxisCount,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                      childAspectRatio: 0.82,
+                    ),
+                    itemCount: filtered.length,
+                    itemBuilder: (ctx, idx) {
+                      final pic = filtered[idx];
+                      return Card(
+                        elevation: 2,
+                        clipBehavior: Clip.antiAlias,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: InkWell(
+                          onTap: () => _openPictureViewer(pic),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Imagem Miniatura
+                              Expanded(
+                                child: Container(
+                                  width: double.infinity,
+                                  color: isDark
+                                      ? const Color(0xFF1E293B)
+                                      : const Color(0xFFF1F5F9),
+                                  child: _buildPictureWidget(pic.imageData),
+                                ),
                               ),
-                            ),
-                          );
-                        },
-                      ),
+                              // Legenda e Tags
+                              Padding(
+                                padding: const EdgeInsets.all(10),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      pic.caption,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    if (pic.tags.isNotEmpty) ...[
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        pic.tags.map((t) => '#$t').join(' '),
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          color: AppTheme.accentTeal,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
           ),
         ],
       ),
@@ -516,9 +568,8 @@ class _PictureBankScreenState extends ConsumerState<PictureBankScreen> {
       return Image.network(
         data,
         fit: BoxFit.cover,
-        errorBuilder: (c, e, s) => const Center(
-          child: Icon(Icons.broken_image, color: Colors.grey),
-        ),
+        errorBuilder: (c, e, s) =>
+            const Center(child: Icon(Icons.broken_image, color: Colors.grey)),
       );
     } else if (data.startsWith('assets/')) {
       return Container(
@@ -560,7 +611,8 @@ class PictureDetailViewerScreen extends StatefulWidget {
   });
 
   @override
-  State<PictureDetailViewerScreen> createState() => _PictureDetailViewerScreenState();
+  State<PictureDetailViewerScreen> createState() =>
+      _PictureDetailViewerScreenState();
 }
 
 class _PictureDetailViewerScreenState extends State<PictureDetailViewerScreen> {
@@ -578,11 +630,13 @@ class _PictureDetailViewerScreenState extends State<PictureDetailViewerScreen> {
   }
 
   void _zoomIn() {
-    _controller.value = _controller.value.clone()..scaleByDouble(1.5, 1.5, 1.0, 1.0);
+    _controller.value = _controller.value.clone()
+      ..scaleByDouble(1.5, 1.5, 1.0, 1.0);
   }
 
   void _zoomOut() {
-    _controller.value = _controller.value.clone()..scaleByDouble(0.67, 0.67, 1.0, 1.0);
+    _controller.value = _controller.value.clone()
+      ..scaleByDouble(0.67, 0.67, 1.0, 1.0);
   }
 
   @override
@@ -668,21 +722,28 @@ class _PictureDetailViewerScreenState extends State<PictureDetailViewerScreen> {
                       onPressed: _resetZoom,
                     ),
                     IconButton(
-                      icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                      icon: const Icon(
+                        Icons.delete_outline,
+                        color: Colors.redAccent,
+                      ),
                       tooltip: 'Excluir Gravura',
                       onPressed: () async {
                         final confirm = await showDialog<bool>(
                           context: context,
                           builder: (ctx) => AlertDialog(
                             title: const Text('Excluir gravura?'),
-                            content: const Text('Tem certeza que deseja remover esta gravura do banco?'),
+                            content: const Text(
+                              'Tem certeza que deseja remover esta gravura do banco?',
+                            ),
                             actions: [
                               TextButton(
                                 onPressed: () => Navigator.pop(ctx, false),
                                 child: const Text('Cancelar'),
                               ),
                               FilledButton(
-                                style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: Colors.red,
+                                ),
                                 onPressed: () => Navigator.pop(ctx, true),
                                 child: const Text('Excluir'),
                               ),
@@ -738,7 +799,10 @@ class _PictureDetailViewerScreenState extends State<PictureDetailViewerScreen> {
                         spacing: 8,
                         children: widget.picture.tags.map((t) {
                           return Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
                             decoration: BoxDecoration(
                               color: AppTheme.accentTeal.withValues(alpha: 0.3),
                               borderRadius: BorderRadius.circular(8),

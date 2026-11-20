@@ -12,10 +12,10 @@ import 'package:ministerio_pessoal/core/i18n/app_locale_strings.dart';
 void main() {
   group('AppVersion Contract & Semver Parser', () {
     test('1. Metadados e versão centralizada estão consistentes', () {
-      expect(AppVersion.version, equals('1.3.6'));
-      expect(AppVersion.buildNumber, equals(13));
-      expect(AppVersion.displayVersion, equals('v1.3.6'));
-      expect(AppVersion.userAgent, contains('MinisterioPessoal/1.3.6'));
+      expect(AppVersion.version, equals('2.0.0'));
+      expect(AppVersion.buildNumber, equals(14));
+      expect(AppVersion.displayVersion, equals('v2.0.0'));
+      expect(AppVersion.userAgent, contains('MinisterioPessoal/2.0.0'));
       expect(
         AppVersion.liveContainerSourceUrl,
         startsWith('livecontainer://sources?url='),
@@ -45,8 +45,12 @@ void main() {
       expect(AppVersion.compare('1.3.3', '2.0.0'), lessThan(0));
 
       // isNewerThanCurrent
-      expect(AppVersion.isNewerThanCurrent('1.3.7'), isTrue);
-      expect(AppVersion.isNewerThanCurrent('2.0.0'), isTrue);
+      expect(AppVersion.isNewerThanCurrent('2.0.1'), isTrue);
+      expect(AppVersion.isNewerThanCurrent('2.1.0'), isTrue);
+      expect(AppVersion.isNewerThanCurrent('3.0.0'), isTrue);
+      expect(AppVersion.isNewerThanCurrent('2.0.0'), isFalse);
+      expect(AppVersion.isNewerThanCurrent('1.3.7'), isFalse);
+      expect(AppVersion.isNewerThanCurrent('1.3.6'), isFalse);
       expect(AppVersion.isNewerThanCurrent('1.3.3'), isFalse);
       expect(AppVersion.isNewerThanCurrent('1.3.2'), isFalse);
       expect(AppVersion.isNewerThanCurrent('1.3.1'), isFalse);

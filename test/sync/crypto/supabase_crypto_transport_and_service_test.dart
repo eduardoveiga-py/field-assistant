@@ -289,148 +289,133 @@ void main() {
       );
     });
 
-    test(
-      'reconcileStart calls RPC, parses integer/number/string watermark, and rejects invalid shapes',
-      () async {
-        var mode = 'int';
-        final client = _AuthedSupabaseClient(
-          userId: owner,
-          httpClient: MockClient((req) async {
-            expect(
-              req.url.path,
-              contains('/rpc/encrypted_records_reconcile_start'),
-            );
-            if (mode == 'int') return _jsonResp(req, 42);
-            if (mode == 'num') return _jsonResp(req, 42.0);
-            if (mode == 'str') return _jsonResp(req, '42');
-            if (mode == 'zero') return _jsonResp(req, 0);
+    test('reconcileStart calls RPC, parses integer/number/string watermark, and rejects invalid shapes', () async {
+      var mode = 'int';
+      final client = _AuthedSupabaseClient(
+        userId: owner,
+        httpClient: MockClient((req) async {
+          expect(
+            req.url.path,
+            contains('/rpc/encrypted_records_reconcile_start'),
+          );
+          if (mode == 'int') return _jsonResp(req, 42);
+          if (mode == 'num') return _jsonResp(req, 42.0);
+          if (mode == 'str') return _jsonResp(req, '42');
+          if (mode == 'zero') return _jsonResp(req, 0);
+          return _jsonResp(req, {'unexpected': true});
+        }),
+      );
+
+      final transport = SupabaseEncryptedRecordTransport(
+        client: client,
+        owner: owner,
+      );
+
+      mode = 'int';
+      expect(await transport.reconcileStart(), equals(42));
+
+      mode = 'num';
+      expect(await transport.reconcileStart(), equals(42));
+
+      mode = 'str';
+      expect(await transport.reconcileStart(), equals(42));
+
+      mode = 'zero';
+      expect(await transport.reconcileStart(), equals(0));
+
+      mode = 'invalid';
+      await expectLater(
+        () => transport.reconcileStart(),
+        throwsFormatException,
+      );
+    });
+
+    test('scanPage parses list, enforces hex route validation, clamps/validates limit, and rejects malformed responses', () async {
+      var mode = 'valid';
+      final validRoute1 = 'a'.padRight(64, '0');
+      final validRoute2 = 'b'.padRight(64, '0');
+      Map<String, dynamic> lastParams = {};
+
+      final client = _AuthedSupabaseClient(
+        userId: owner,
+        httpClient: MockClient((req) async {
+          expect(req.url.path, contains('/rpc/encrypted_records_scan_page'));
+          lastParams = jsonDecode(req.body) as Map<String, dynamic>;
+          if (mode == 'not_list') {
             return _jsonResp(req, {'unexpected': true});
-          }),
-        );
+          }
+          if (mode == 'bad_item') {
+            return _jsonResp(req, ['not-a-map']);
+          }
+          return _jsonResp(req, [
+            {
+              'route': validRoute1,
+              'revision': 1,
+              'server_seq': 10,
+              'envelope': {'v': 1},
+            },
+            {
+              'route': validRoute2,
+              'revision': 2,
+              'server_seq': 11,
+              'envelope': {'v': 1},
+            },
+          ]);
+        }),
+      );
 
-        final transport = SupabaseEncryptedRecordTransport(
-          client: client,
-          owner: owner,
-        );
+      final transport = SupabaseEncryptedRecordTransport(
+        client: client,
+        owner: owner,
+      );
 
-        mode = 'int';
-        expect(await transport.reconcileStart(), equals(42));
+      // Invalid route format checks
+      await expectLater(
+        () => transport.scanPage(afterRoute: 'not-hex'),
+        throwsArgumentError,
+      );
+      await expectLater(
+        () => transport.scanPage(afterRoute: 'a' * 63),
+        throwsArgumentError,
+      );
+      await expectLater(
+        () => transport.scanPage(afterRoute: 'g' * 64),
+        throwsArgumentError,
+      );
 
-        mode = 'num';
-        expect(await transport.reconcileStart(), equals(42));
+      // Invalid limit <= 0 checks
+      await expectLater(
+        () => transport.scanPage(limit: 0),
+        throwsArgumentError,
+      );
+      await expectLater(
+        () => transport.scanPage(limit: -5),
+        throwsArgumentError,
+      );
 
-        mode = 'str';
-        expect(await transport.reconcileStart(), equals(42));
+      // Valid first page (afterRoute == null)
+      final page1 = await transport.scanPage(limit: 50);
+      expect(page1.length, equals(2));
+      expect(page1.first.route, equals(validRoute1));
+      expect(lastParams['p_after_route'], isNull);
+      expect(lastParams['p_limit'], equals(50));
 
-        mode = 'zero';
-        expect(await transport.reconcileStart(), equals(0));
+      // Valid subsequent page with route and limit clamping (> 500 clamped to 500)
+      final page2 = await transport.scanPage(
+        afterRoute: validRoute1,
+        limit: 1000,
+      );
+      expect(page2.length, equals(2));
+      expect(lastParams['p_after_route'], equals(validRoute1));
+      expect(lastParams['p_limit'], equals(500));
 
-        mode = 'invalid';
-        await expectLater(
-          () => transport.reconcileStart(),
-          throwsFormatException,
-        );
-      },
-    );
+      // Format exceptions on malformed responses
+      mode = 'not_list';
+      await expectLater(() => transport.scanPage(), throwsFormatException);
 
-    test(
-      'scanPage parses list, enforces hex route validation, clamps/validates limit, and rejects malformed responses',
-      () async {
-        var mode = 'valid';
-        final validRoute1 = 'a'.padRight(64, '0');
-        final validRoute2 = 'b'.padRight(64, '0');
-        Map<String, dynamic> lastParams = {};
-
-        final client = _AuthedSupabaseClient(
-          userId: owner,
-          httpClient: MockClient((req) async {
-            expect(
-              req.url.path,
-              contains('/rpc/encrypted_records_scan_page'),
-            );
-            lastParams = jsonDecode(req.body) as Map<String, dynamic>;
-            if (mode == 'not_list') {
-              return _jsonResp(req, {'unexpected': true});
-            }
-            if (mode == 'bad_item') {
-              return _jsonResp(req, ['not-a-map']);
-            }
-            return _jsonResp(req, [
-              {
-                'route': validRoute1,
-                'revision': 1,
-                'server_seq': 10,
-                'envelope': {'v': 1},
-              },
-              {
-                'route': validRoute2,
-                'revision': 2,
-                'server_seq': 11,
-                'envelope': {'v': 1},
-              },
-            ]);
-          }),
-        );
-
-        final transport = SupabaseEncryptedRecordTransport(
-          client: client,
-          owner: owner,
-        );
-
-        // Invalid route format checks
-        await expectLater(
-          () => transport.scanPage(afterRoute: 'not-hex'),
-          throwsArgumentError,
-        );
-        await expectLater(
-          () => transport.scanPage(afterRoute: 'a' * 63),
-          throwsArgumentError,
-        );
-        await expectLater(
-          () => transport.scanPage(afterRoute: 'g' * 64),
-          throwsArgumentError,
-        );
-
-        // Invalid limit <= 0 checks
-        await expectLater(
-          () => transport.scanPage(limit: 0),
-          throwsArgumentError,
-        );
-        await expectLater(
-          () => transport.scanPage(limit: -5),
-          throwsArgumentError,
-        );
-
-        // Valid first page (afterRoute == null)
-        final page1 = await transport.scanPage(limit: 50);
-        expect(page1.length, equals(2));
-        expect(page1.first.route, equals(validRoute1));
-        expect(lastParams['p_after_route'], isNull);
-        expect(lastParams['p_limit'], equals(50));
-
-        // Valid subsequent page with route and limit clamping (> 500 clamped to 500)
-        final page2 = await transport.scanPage(
-          afterRoute: validRoute1,
-          limit: 1000,
-        );
-        expect(page2.length, equals(2));
-        expect(lastParams['p_after_route'], equals(validRoute1));
-        expect(lastParams['p_limit'], equals(500));
-
-        // Format exceptions on malformed responses
-        mode = 'not_list';
-        await expectLater(
-          () => transport.scanPage(),
-          throwsFormatException,
-        );
-
-        mode = 'bad_item';
-        await expectLater(
-          () => transport.scanPage(),
-          throwsFormatException,
-        );
-      },
-    );
+      mode = 'bad_item';
+      await expectLater(() => transport.scanPage(), throwsFormatException);
+    });
 
     test('fails closed when authenticated user does not match owner', () async {
       final client = _AuthedSupabaseClient(
@@ -455,14 +440,8 @@ void main() {
         () => transport.pullSince(sinceSeq: 0),
         throwsStateError,
       );
-      await expectLater(
-        () => transport.reconcileStart(),
-        throwsStateError,
-      );
-      await expectLater(
-        () => transport.scanPage(),
-        throwsStateError,
-      );
+      await expectLater(() => transport.reconcileStart(), throwsStateError);
+      await expectLater(() => transport.scanPage(), throwsStateError);
     });
   });
 

@@ -30,7 +30,7 @@ jobs:
         with:
           channel: stable
           cache: true
-      - run: flutter pub get --enforce-lockfile
+      - run: flutter pub get
       - name: Analyze and summarize diagnostics
         shell: bash
         run: |

@@ -30,9 +30,17 @@ class FaesEvaluationResult {
 class FaesQualityGateEvaluator {
   static const List<FaesDimension> dimensions = [
     FaesDimension('functional', 'Functional correctness & user journey', 0.15),
-    FaesDimension('data_integrity', 'Data integrity, migrations & recoverability', 0.15),
+    FaesDimension(
+      'data_integrity',
+      'Data integrity, migrations & recoverability',
+      0.15,
+    ),
     FaesDimension('security', 'Security, privacy & account isolation', 0.15),
-    FaesDimension('offline_sync', 'Offline-first & synchronization correctness', 0.12),
+    FaesDimension(
+      'offline_sync',
+      'Offline-first & synchronization correctness',
+      0.12,
+    ),
     FaesDimension('architecture', 'Architecture & maintainability', 0.10),
     FaesDimension('ux_ios', 'UX, accessibility & iOS/iPadOS quality', 0.10),
     FaesDimension('tests', 'Automated tests & regression evidence', 0.10),
@@ -69,7 +77,9 @@ class FaesQualityGateEvaluator {
         throw ArgumentError('Dimensão obrigatória ausente: ${dim.key}');
       }
       if (score < 0.0 || score > 10.0) {
-        throw ArgumentError('Pontuação fora da faixa 0-10 para ${dim.key}: $score');
+        throw ArgumentError(
+          'Pontuação fora da faixa 0-10 para ${dim.key}: $score',
+        );
       }
 
       if (score < minimumDimensionScore) {
@@ -90,16 +100,22 @@ class FaesQualityGateEvaluator {
     }
 
     if (unresolvedP0 > 0) {
-      violations.add('Hard gate violado: $unresolvedP0 issue(s) P0 crítico(s) não resolvido(s).');
+      violations.add(
+        'Hard gate violado: $unresolvedP0 issue(s) P0 crítico(s) não resolvido(s).',
+      );
     }
     if (unresolvedP1 > 0) {
-      violations.add('Hard gate violado: $unresolvedP1 issue(s) P1 de alta severidade não resolvido(s).');
+      violations.add(
+        'Hard gate violado: $unresolvedP1 issue(s) P1 de alta severidade não resolvido(s).',
+      );
     }
 
     final approved = violations.isEmpty;
     return FaesEvaluationResult(
       weightedScore: finalScore,
-      verdict: approved ? FaesGateVerdict.approved : FaesGateVerdict.notApproved,
+      verdict: approved
+          ? FaesGateVerdict.approved
+          : FaesGateVerdict.notApproved,
       isApproved: approved,
       violations: violations,
       dimensionScores: Map.unmodifiable(scores),

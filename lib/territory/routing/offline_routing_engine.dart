@@ -299,7 +299,10 @@ class OfflineRoutingEngine {
   /// Exporta o grafo completo em formato Map serializável.
   Map<String, dynamic> toJson() => {
     'nodes': _nodes.values.map((n) => n.toJson()).toList(),
-    'edges': _adjacency.values.expand((edges) => edges).map((e) => e.toJson()).toList(),
+    'edges': _adjacency.values
+        .expand((edges) => edges)
+        .map((e) => e.toJson())
+        .toList(),
   };
 
   /// Carrega nós e arestas a partir de estrutura JSON serializada.

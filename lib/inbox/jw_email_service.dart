@@ -106,9 +106,11 @@ class JwEmailMessage {
     subject: json['subject'] as String? ?? '(Sem Assunto)',
     from: json['from'] as String? ?? 'jw@jw.org',
     to: json['to'] as String? ?? '',
-    cc: (json['cc'] as List<dynamic>?)?.map((e) => e.toString()).toList() ??
+    cc:
+        (json['cc'] as List<dynamic>?)?.map((e) => e.toString()).toList() ??
         const [],
-    bcc: (json['bcc'] as List<dynamic>?)?.map((e) => e.toString()).toList() ??
+    bcc:
+        (json['bcc'] as List<dynamic>?)?.map((e) => e.toString()).toList() ??
         const [],
     accountEmail: json['accountEmail'] as String?,
     date: json['date'] != null
@@ -1359,9 +1361,13 @@ class JwSmtpClient {
           ..write('From: <$senderAddr>\r\n')
           ..write('To: ${toRecipients.map((r) => '<$r>').join(', ')}\r\n');
         if (messageToSend.cc.isNotEmpty) {
-          final ccRecipients = messageToSend.cc.expand((c) => parseRecipients(c)).toList();
+          final ccRecipients = messageToSend.cc
+              .expand((c) => parseRecipients(c))
+              .toList();
           if (ccRecipients.isNotEmpty) {
-            payload.write('Cc: ${ccRecipients.map((r) => '<$r>').join(', ')}\r\n');
+            payload.write(
+              'Cc: ${ccRecipients.map((r) => '<$r>').join(', ')}\r\n',
+            );
           }
         }
         payload
@@ -1378,7 +1384,8 @@ class JwSmtpClient {
             ..write(bodyEncoded)
             ..write('.\r\n');
         } else {
-          final boundary = '===_FA_${const Uuid().v4().replaceAll("-", "")}_===';
+          final boundary =
+              '===_FA_${const Uuid().v4().replaceAll("-", "")}_===';
           payload
             ..write('Content-Type: multipart/mixed; boundary="$boundary"\r\n')
             ..write('\r\n')
@@ -1392,13 +1399,18 @@ class JwSmtpClient {
           for (final att in messageToSend.attachments) {
             final name = (att['name'] ?? 'anexo').toString();
             final base64Content = (att['base64'] ?? '').toString();
-            final contentType = (att['contentType'] ?? 'application/octet-stream').toString();
+            final contentType =
+                (att['contentType'] ?? 'application/octet-stream').toString();
             if (base64Content.isNotEmpty) {
               payload
                 ..write('--$boundary\r\n')
-                ..write('Content-Type: $contentType; name="${encodeHeaderValue(name)}"\r\n')
+                ..write(
+                  'Content-Type: $contentType; name="${encodeHeaderValue(name)}"\r\n',
+                )
                 ..write('Content-Transfer-Encoding: base64\r\n')
-                ..write('Content-Disposition: attachment; filename="${encodeHeaderValue(name)}"\r\n')
+                ..write(
+                  'Content-Disposition: attachment; filename="${encodeHeaderValue(name)}"\r\n',
+                )
                 ..write('\r\n')
                 ..write(_wrapBase64Lines(base64Content))
                 ..write('\r\n');
@@ -1940,21 +1952,28 @@ class JwEmailService {
   Future<void> deleteEmail(String emailId) async {
     final entryId = emailId.startsWith('email_') ? emailId : 'email_$emailId';
     final now = DateTime.now().toUtc();
-    await (db.update(db.inboxEntries)..where((t) => t.id.equals(entryId))).write(
+    await (db.update(
+      db.inboxEntries,
+    )..where((t) => t.id.equals(entryId))).write(
       InboxEntriesCompanion(
         deletedAt: drift.Value(now),
         updatedAt: drift.Value(now),
       ),
     );
-    await db.into(db.syncQueue).insert(
-      SyncQueueCompanion.insert(
-        id: const Uuid().v4(),
-        entityType: 'inbox_entries',
-        entityId: entryId,
-        operation: 'UPDATE',
-        payload: jsonEncode({'id': entryId, 'deleted_at': now.toIso8601String()}),
-        createdAt: now,
-      ),
-    );
+    await db
+        .into(db.syncQueue)
+        .insert(
+          SyncQueueCompanion.insert(
+            id: const Uuid().v4(),
+            entityType: 'inbox_entries',
+            entityId: entryId,
+            operation: 'UPDATE',
+            payload: jsonEncode({
+              'id': entryId,
+              'deleted_at': now.toIso8601String(),
+            }),
+            createdAt: now,
+          ),
+        );
   }
 }

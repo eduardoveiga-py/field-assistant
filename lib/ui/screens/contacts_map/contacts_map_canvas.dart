@@ -980,328 +980,331 @@ extension _ContactsMapCanvas on _ContactsMapScreenState {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                  // Rotação manual com bússola e retorno suave ao norte
-                  GestureDetector(
-                    onHorizontalDragUpdate: (details) {
-                      _rotationAnimController.stop();
-                      _rotationNotifier.value +=
-                          (details.primaryDelta ?? 0.0) * 0.02;
-                    },
-                    child: ValueListenableBuilder<double>(
-                      valueListenable: _rotationNotifier,
-                      builder: (context, rotation, _) {
-                        return Semantics(
-                          button: true,
-                          label:
-                              'Bússola: alinhar mapa ao norte (rotação atual ${(rotation * 180 / math.pi).round()} graus)',
-                          child: FloatingActionButton.small(
-                            heroTag: 'map_compass',
-                            backgroundColor: Colors.white,
-                            foregroundColor: Colors.red.shade700,
-                            tooltip:
-                                'Rotação do mapa (${(rotation * 180 / math.pi).round()}°). Toque para voltar suavemente ao norte ou arraste para girar.',
-                            onPressed: _animateResetRotationToNorth,
-                            child: Transform.rotate(
-                              angle: rotation,
-                              child: const Icon(
-                                Icons.navigation_rounded,
-                                size: 20,
-                                color: Colors.red,
+                    // Rotação manual com bússola e retorno suave ao norte
+                    GestureDetector(
+                      onHorizontalDragUpdate: (details) {
+                        _rotationAnimController.stop();
+                        _rotationNotifier.value +=
+                            (details.primaryDelta ?? 0.0) * 0.02;
+                      },
+                      child: ValueListenableBuilder<double>(
+                        valueListenable: _rotationNotifier,
+                        builder: (context, rotation, _) {
+                          return Semantics(
+                            button: true,
+                            label:
+                                'Bússola: alinhar mapa ao norte (rotação atual ${(rotation * 180 / math.pi).round()} graus)',
+                            child: FloatingActionButton.small(
+                              heroTag: 'map_compass',
+                              backgroundColor: Colors.white,
+                              foregroundColor: Colors.red.shade700,
+                              tooltip:
+                                  'Rotação do mapa (${(rotation * 180 / math.pi).round()}°). Toque para voltar suavemente ao norte ou arraste para girar.',
+                              onPressed: _animateResetRotationToNorth,
+                              child: Transform.rotate(
+                                angle: rotation,
+                                child: const Icon(
+                                  Icons.navigation_rounded,
+                                  size: 20,
+                                  color: Colors.red,
+                                ),
                               ),
                             ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    // Botões de ajuste manual de rumo
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox(
+                          width: 28,
+                          height: 28,
+                          child: FloatingActionButton.small(
+                            heroTag: 'map_rotate_left',
+                            backgroundColor: Colors.white,
+                            foregroundColor: Colors.black87,
+                            elevation: 2,
+                            tooltip: 'Girar 45° à esquerda',
+                            onPressed: () => _rotateBy(-math.pi / 4),
+                            child: const Icon(Icons.rotate_left, size: 16),
                           ),
-                        );
-                      },
+                        ),
+                        const SizedBox(width: 4),
+                        SizedBox(
+                          width: 28,
+                          height: 28,
+                          child: FloatingActionButton.small(
+                            heroTag: 'map_rotate_right',
+                            backgroundColor: Colors.white,
+                            foregroundColor: Colors.black87,
+                            elevation: 2,
+                            tooltip: 'Girar 45° à direita',
+                            onPressed: () => _rotateBy(math.pi / 4),
+                            child: const Icon(Icons.rotate_right, size: 16),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: 6),
-                  // Botões de ajuste manual de rumo
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SizedBox(
-                        width: 28,
-                        height: 28,
+                    const SizedBox(height: 6),
+
+                    // Botão Camadas do Mapa (Estilos Organic Maps e Motor MapLibre)
+                    Semantics(
+                      button: true,
+                      label: 'Abrir opções de camadas e motor do mapa',
+                      hint: 'Abre opções de estilo de mapa e alternância de motor',
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(
+                          minWidth: 48,
+                          minHeight: 48,
+                        ),
                         child: FloatingActionButton.small(
-                          heroTag: 'map_rotate_left',
+                          heroTag: 'map_layer_styles',
+                          backgroundColor: Colors.white,
+                          foregroundColor: AppTheme.accentTeal,
+                          tooltip: 'Camadas e Estilos de Mapa',
+                          onPressed: () => _showMapLayerStylesModal(context),
+                          child: const Icon(Icons.layers_rounded, size: 20),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+
+                    // Botão Tela Cheia (Fullscreen toggle para iPads/tablets e mobile)
+                    Semantics(
+                      button: true,
+                      label: isFullscreen
+                          ? 'Sair do modo tela cheia do mapa'
+                          : 'Ativar modo tela cheia do mapa',
+                      hint: isFullscreen
+                          ? 'Retorna a exibição normal com app bar'
+                          : 'Expande o mapa por toda a tela',
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(
+                          minWidth: 48,
+                          minHeight: 48,
+                        ),
+                        child: FloatingActionButton.small(
+                          heroTag: 'map_fullscreen',
                           backgroundColor: Colors.white,
                           foregroundColor: Colors.black87,
-                          elevation: 2,
-                          tooltip: 'Girar 45° à esquerda',
-                          onPressed: () => _rotateBy(-math.pi / 4),
-                          child: const Icon(Icons.rotate_left, size: 16),
+                          tooltip: isFullscreen
+                              ? 'Sair da Tela Cheia'
+                              : 'Modo Tela Cheia',
+                          onPressed: () {
+                            ref.read(isMapFullscreenProvider.notifier).toggle();
+                          },
+                          child: Icon(
+                            isFullscreen
+                                ? Icons.fullscreen_exit
+                                : Icons.fullscreen,
+                          ),
                         ),
                       ),
-                      const SizedBox(width: 4),
-                      SizedBox(
-                        width: 28,
-                        height: 28,
+                    ),
+                    const SizedBox(height: 6),
+
+                    // Botão Minha Localização GPS
+                    Semantics(
+                      button: true,
+                      label: 'Centralizar mapa na minha localização GPS',
+                      hint: 'Move a visualização para as coordenadas do dispositivo',
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(
+                          minWidth: 48,
+                          minHeight: 48,
+                        ),
                         child: FloatingActionButton.small(
-                          heroTag: 'map_rotate_right',
-                          backgroundColor: Colors.white,
-                          foregroundColor: Colors.black87,
-                          elevation: 2,
-                          tooltip: 'Girar 45° à direita',
-                          onPressed: () => _rotateBy(math.pi / 4),
-                          child: const Icon(Icons.rotate_right, size: 16),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-
-                  // Botão Camadas do Mapa (Estilos Organic Maps e Motor MapLibre)
-                  Semantics(
-                    button: true,
-                    label: 'Abrir opções de camadas e motor do mapa',
-                    hint:
-                        'Abre opções de estilo de mapa e alternância de motor',
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(
-                        minWidth: 48,
-                        minHeight: 48,
-                      ),
-                      child: FloatingActionButton.small(
-                        heroTag: 'map_layer_styles',
-                        backgroundColor: Colors.white,
-                        foregroundColor: AppTheme.accentTeal,
-                        tooltip: 'Camadas e Estilos de Mapa',
-                        onPressed: () => _showMapLayerStylesModal(context),
-                        child: const Icon(Icons.layers_rounded, size: 20),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-
-                  // Botão Tela Cheia (Fullscreen toggle para iPads/tablets e mobile)
-                  Semantics(
-                    button: true,
-                    label: isFullscreen
-                        ? 'Sair do modo tela cheia do mapa'
-                        : 'Ativar modo tela cheia do mapa',
-                    hint: isFullscreen
-                        ? 'Retorna a exibição normal com app bar'
-                        : 'Expande o mapa por toda a tela',
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(
-                        minWidth: 48,
-                        minHeight: 48,
-                      ),
-                      child: FloatingActionButton.small(
-                        heroTag: 'map_fullscreen',
-                        backgroundColor: Colors.white,
-                        foregroundColor: Colors.black87,
-                        tooltip: isFullscreen
-                            ? 'Sair da Tela Cheia'
-                            : 'Modo Tela Cheia',
-                        onPressed: () {
-                          ref.read(isMapFullscreenProvider.notifier).toggle();
-                        },
-                        child: Icon(
-                          isFullscreen
-                              ? Icons.fullscreen_exit
-                              : Icons.fullscreen,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-
-                  // Botão Minha Localização GPS
-                  Semantics(
-                    button: true,
-                    label: 'Centralizar mapa na minha localização GPS',
-                    hint: 'Move a visualização para as coordenadas do dispositivo',
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(
-                        minWidth: 48,
-                        minHeight: 48,
-                      ),
-                      child: FloatingActionButton.small(
-                        heroTag: 'map_gps_locate',
-                        backgroundColor: _isLocatingUser
-                            ? AppTheme.accentTeal
-                            : Colors.white,
-                        foregroundColor: _isLocatingUser
-                            ? Colors.white
-                            : Colors.blue.shade700,
-                        tooltip: 'Minha Localização GPS',
-                        onPressed: () async {
-                          if (_isLocatingUser) return;
-                          final messenger = ScaffoldMessenger.of(context);
-                          final warningColor = Colors.orange.shade800;
-                          _updateState(() => _isLocatingUser = true);
-                          final result =
-                              await GeolocationHelper.getCurrentLocationWithStatus();
-                          if (!mounted) return;
-                          final loc = result.coordinates;
-                          if (result.isSuccess && loc != null) {
-                            _updateState(() {
-                              _userGpsLocation = loc;
-                              _isLocatingUser = false;
-                            });
-                            _centerOnCoords(
-                              loc.latitude,
-                              loc.longitude,
-                              viewportW,
-                              viewportH,
-                              viewerW: viewerW,
-                              viewerH: viewerH,
-                              gridHalfSize: gridHalfSize,
-                            );
-                          } else {
-                            _updateState(() => _isLocatingUser = false);
-                            messenger
-                              ..hideCurrentSnackBar()
-                              ..showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    '${result.userMessage} O mapa permaneceu na posição anterior.',
-                                  ),
-                                  backgroundColor: warningColor,
-                                  duration: const Duration(seconds: 5),
-                                  action: SnackBarAction(
-                                    label: 'Ajustes',
-                                    textColor: Colors.white,
-                                    onPressed: () => GeolocationHelper.openAppSettings(),
-                                  ),
-                                ),
+                          heroTag: 'map_gps_locate',
+                          backgroundColor: _isLocatingUser
+                              ? AppTheme.accentTeal
+                              : Colors.white,
+                          foregroundColor: _isLocatingUser
+                              ? Colors.white
+                              : Colors.blue.shade700,
+                          tooltip: 'Minha Localização GPS',
+                          onPressed: () async {
+                            if (_isLocatingUser) return;
+                            final messenger = ScaffoldMessenger.of(context);
+                            final warningColor = Colors.orange.shade800;
+                            _updateState(() => _isLocatingUser = true);
+                            final result =
+                                await GeolocationHelper.getCurrentLocationWithStatus();
+                            if (!mounted) return;
+                            final loc = result.coordinates;
+                            if (result.isSuccess && loc != null) {
+                              _updateState(() {
+                                _userGpsLocation = loc;
+                                _isLocatingUser = false;
+                              });
+                              _centerOnCoords(
+                                loc.latitude,
+                                loc.longitude,
+                                viewportW,
+                                viewportH,
+                                viewerW: viewerW,
+                                viewerH: viewerH,
+                                gridHalfSize: gridHalfSize,
                               );
-                          }
-                        },
-                        child: _isLocatingUser
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Icon(Icons.my_location, size: 18),
+                            } else {
+                              _updateState(() => _isLocatingUser = false);
+                              messenger
+                                ..hideCurrentSnackBar()
+                                ..showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      '${result.userMessage} O mapa permaneceu na posição anterior.',
+                                    ),
+                                    backgroundColor: warningColor,
+                                    duration: const Duration(seconds: 5),
+                                    action: SnackBarAction(
+                                      label: 'Ajustes',
+                                      textColor: Colors.white,
+                                      onPressed: () =>
+                                          GeolocationHelper.openAppSettings(),
+                                    ),
+                                  ),
+                                );
+                            }
+                          },
+                          child: _isLocatingUser
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(Icons.my_location, size: 18),
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 6),
+                    const SizedBox(height: 6),
 
-                  Semantics(
-                    button: true,
-                    label: 'Aproximar zoom do mapa',
-                    hint: 'Aumenta a aproximação do mapa',
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(
-                        minWidth: 48,
-                        minHeight: 48,
-                      ),
-                      child: FloatingActionButton.small(
-                        heroTag: 'map_zoom_in',
-                        backgroundColor: Colors.white,
-                        foregroundColor: Colors.black87,
-                        tooltip: 'Aproximar Zoom',
-                        onPressed: () {
-                          if (_zoom < 19) {
-                            _changeZoom(
-                              _zoom + 1,
-                              constraints,
-                              originPx,
-                              originPy,
-                              viewerW: viewerW,
-                              viewerH: viewerH,
-                              gridHalfSize: gridHalfSize,
-                            );
-                          }
-                        },
-                        child: const Icon(Icons.add),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Semantics(
-                    liveRegion: true,
-                    label: 'Nível de zoom atual: $_zoom',
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.black87,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        'Z: $_zoom',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
+                    Semantics(
+                      button: true,
+                      label: 'Aproximar zoom do mapa',
+                      hint: 'Aumenta a aproximação do mapa',
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(
+                          minWidth: 48,
+                          minHeight: 48,
+                        ),
+                        child: FloatingActionButton.small(
+                          heroTag: 'map_zoom_in',
+                          backgroundColor: Colors.white,
+                          foregroundColor: Colors.black87,
+                          tooltip: 'Aproximar Zoom',
+                          onPressed: () {
+                            if (_zoom < 19) {
+                              _changeZoom(
+                                _zoom + 1,
+                                constraints,
+                                originPx,
+                                originPy,
+                                viewerW: viewerW,
+                                viewerH: viewerH,
+                                gridHalfSize: gridHalfSize,
+                              );
+                            }
+                          },
+                          child: const Icon(Icons.add),
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 6),
-                  Semantics(
-                    button: true,
-                    label: 'Afastar zoom do mapa',
-                    hint: 'Diminui a aproximação do mapa',
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(
-                        minWidth: 48,
-                        minHeight: 48,
-                      ),
-                      child: FloatingActionButton.small(
-                        heroTag: 'map_zoom_out',
-                        backgroundColor: Colors.white,
-                        foregroundColor: Colors.black87,
-                        tooltip: 'Afastar Zoom',
-                        onPressed: () {
-                          if (_zoom > 6) {
-                            _changeZoom(
-                              _zoom - 1,
-                              constraints,
-                              originPx,
-                              originPy,
-                              viewerW: viewerW,
-                              viewerH: viewerH,
-                              gridHalfSize: gridHalfSize,
-                            );
-                          }
-                        },
-                        child: const Icon(Icons.remove),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Semantics(
-                    button: true,
-                    label: 'Recentralizar mapa nos contatos',
-                    hint: 'Centraliza em Santo Antônio do Içá',
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(
-                        minWidth: 48,
-                        minHeight: 48,
-                      ),
-                      child: FloatingActionButton.small(
-                        heroTag: 'map_recenter',
-                        backgroundColor: AppTheme.primaryBlue,
-                        foregroundColor: Colors.white,
-                        tooltip: 'Ir para Santo Antônio do Içá (mapa offline: camada Padrão, zoom 8 a 16)',
-                        onPressed: () => _centerOnCoords(
-                          GeolocationHelper.defaultLat,
-                          GeolocationHelper.defaultLng,
-                          viewportW,
-                          viewportH,
-                          viewerW: viewerW,
-                          viewerH: viewerH,
-                          gridHalfSize: gridHalfSize,
+                    const SizedBox(height: 6),
+                    Semantics(
+                      liveRegion: true,
+                      label: 'Nível de zoom atual: $_zoom',
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
                         ),
-                        child: const Icon(Icons.filter_center_focus, size: 18),
+                        decoration: BoxDecoration(
+                          color: Colors.black87,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          'Z: $_zoom',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 6),
+                    Semantics(
+                      button: true,
+                      label: 'Afastar zoom do mapa',
+                      hint: 'Diminui a aproximação do mapa',
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(
+                          minWidth: 48,
+                          minHeight: 48,
+                        ),
+                        child: FloatingActionButton.small(
+                          heroTag: 'map_zoom_out',
+                          backgroundColor: Colors.white,
+                          foregroundColor: Colors.black87,
+                          tooltip: 'Afastar Zoom',
+                          onPressed: () {
+                            if (_zoom > 6) {
+                              _changeZoom(
+                                _zoom - 1,
+                                constraints,
+                                originPx,
+                                originPy,
+                                viewerW: viewerW,
+                                viewerH: viewerH,
+                                gridHalfSize: gridHalfSize,
+                              );
+                            }
+                          },
+                          child: const Icon(Icons.remove),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Semantics(
+                      button: true,
+                      label: 'Recentralizar mapa nos contatos',
+                      hint: 'Centraliza em Santo Antônio do Içá',
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(
+                          minWidth: 48,
+                          minHeight: 48,
+                        ),
+                        child: FloatingActionButton.small(
+                          heroTag: 'map_recenter',
+                          backgroundColor: AppTheme.primaryBlue,
+                          foregroundColor: Colors.white,
+                          tooltip: 'Ir para Santo Antônio do Içá (mapa offline: camada Padrão, zoom 8 a 16)',
+                          onPressed: () => _centerOnCoords(
+                            GeolocationHelper.defaultLat,
+                            GeolocationHelper.defaultLng,
+                            viewportW,
+                            viewportH,
+                            viewerW: viewerW,
+                            viewerH: viewerH,
+                            gridHalfSize: gridHalfSize,
+                          ),
+                          child: const Icon(
+                            Icons.filter_center_focus,
+                            size: 18,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
 
             // Barra de Escala Métrica Dinâmica e Selo de Atribuição OSM
             Positioned(
@@ -1638,7 +1641,10 @@ extension _ContactsMapCanvas on _ContactsMapScreenState {
                           children: [
                             Expanded(
                               child: Tooltip(
-                                message: _mapEngineAdapter.capabilities.supportsOfflineRouting &&
+                                message:
+                                    _mapEngineAdapter
+                                            .capabilities
+                                            .supportsOfflineRouting &&
                                         _hasVerifiedRegionalRoutingGraph
                                     ? 'Calcular rota offline regional (A*)'
                                     : 'Roteamento offline indisponível nesta região',

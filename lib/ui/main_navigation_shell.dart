@@ -258,8 +258,9 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
                         .withValues(alpha: 0.16),
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
-                      color: (isDark ? const Color(0xFF94A3B8) : Colors.blueGrey)
-                          .withValues(alpha: 0.35),
+                      color:
+                          (isDark ? const Color(0xFF94A3B8) : Colors.blueGrey)
+                              .withValues(alpha: 0.35),
                       width: 1.2,
                     ),
                   ),
@@ -364,9 +365,7 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
       case AppFeature.inbox:
         return isSelected ? Icons.mail : Icons.mail_outline;
       case AppFeature.pictureBank:
-        return isSelected
-            ? Icons.photo_library
-            : Icons.photo_library_outlined;
+        return isSelected ? Icons.photo_library : Icons.photo_library_outlined;
       case AppFeature.tasksProjects:
         return isSelected ? Icons.task_alt : Icons.task_alt_outlined;
       case AppFeature.knowledge:
@@ -557,8 +556,9 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
       }
 
       final isDark = Theme.of(context).brightness == Brightness.dark;
-      final settingsColor =
-          isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+      final settingsColor = isDark
+          ? const Color(0xFF94A3B8)
+          : const Color(0xFF64748B);
 
       // Adiciona Ajustes no final do Rail
       railDestinations.add(
@@ -694,8 +694,9 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
     }
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final moreColor =
-        isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+    final moreColor = isDark
+        ? const Color(0xFF94A3B8)
+        : const Color(0xFF64748B);
 
     // Botão Mais
     barDestinations.add(

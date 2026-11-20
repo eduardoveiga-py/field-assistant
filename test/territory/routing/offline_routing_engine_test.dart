@@ -213,132 +213,138 @@ void main() {
       expect(summary, contains('min'));
     });
 
-    test(
-      'TC-ROUTING-09: JSON serialization and deserialization preserves graph integrity and routing parity',
-      () {
-        final originalJson = engine.toJson();
-        expect(originalJson['nodes'], isA<List>());
-        expect(originalJson['edges'], isA<List>());
-        expect((originalJson['nodes'] as List).length, equals(engine.nodes.length));
+    test('TC-ROUTING-09: JSON serialization and deserialization preserves graph integrity and routing parity', () {
+      final originalJson = engine.toJson();
+      expect(originalJson['nodes'], isA<List>());
+      expect(originalJson['edges'], isA<List>());
+      expect(
+        (originalJson['nodes'] as List).length,
+        equals(engine.nodes.length),
+      );
 
-        final restoredEngine = OfflineRoutingEngine.fromJson(originalJson);
-        expect(restoredEngine.nodes.length, equals(engine.nodes.length));
+      final restoredEngine = OfflineRoutingEngine.fromJson(originalJson);
+      expect(restoredEngine.nodes.length, equals(engine.nodes.length));
 
-        final origResult = engine.findRoute(
-          startId: 'SAI_CENTRO',
-          goalId: 'BETANIA_CENTRO',
-          mode: RoutingMode.walking,
-        );
-        final restoredResult = restoredEngine.findRoute(
-          startId: 'SAI_CENTRO',
-          goalId: 'BETANIA_CENTRO',
-          mode: RoutingMode.walking,
-        );
+      final origResult = engine.findRoute(
+        startId: 'SAI_CENTRO',
+        goalId: 'BETANIA_CENTRO',
+        mode: RoutingMode.walking,
+      );
+      final restoredResult = restoredEngine.findRoute(
+        startId: 'SAI_CENTRO',
+        goalId: 'BETANIA_CENTRO',
+        mode: RoutingMode.walking,
+      );
 
-        expect(restoredResult.isSuccess, isTrue);
-        expect(restoredResult.pathNodeIds, equals(origResult.pathNodeIds));
-        expect(restoredResult.totalDistanceMeters, equals(origResult.totalDistanceMeters));
-        expect(restoredResult.steps.length, equals(origResult.steps.length));
-      },
-    );
+      expect(restoredResult.isSuccess, isTrue);
+      expect(restoredResult.pathNodeIds, equals(origResult.pathNodeIds));
+      expect(
+        restoredResult.totalDistanceMeters,
+        equals(origResult.totalDistanceMeters),
+      );
+      expect(restoredResult.steps.length, equals(origResult.steps.length));
+    });
 
-    test(
-      'TC-ROUTING-10: findNearestNode snaps nearby coordinates and returns null for distant points',
-      () {
-        // Coordenada próxima a SAI_CENTRO (-3.1022, -67.9397) dentro de ~50 metros
-        final nearSai = engine.findNearestNode(-3.1025, -67.9400, maxDistanceMeters: 5000.0);
-        expect(nearSai, isNotNull);
-        expect(nearSai!.id, equals('SAI_CENTRO'));
+    test('TC-ROUTING-10: findNearestNode snaps nearby coordinates and returns null for distant points', () {
+      // Coordenada próxima a SAI_CENTRO (-3.1022, -67.9397) dentro de ~50 metros
+      final nearSai = engine.findNearestNode(
+        -3.1025,
+        -67.9400,
+        maxDistanceMeters: 5000.0,
+      );
+      expect(nearSai, isNotNull);
+      expect(nearSai!.id, equals('SAI_CENTRO'));
 
-        // Coordenada distante (São Paulo, SP: -23.5505, -46.6333, ~2700 km de distância)
-        final distantSp = engine.findNearestNode(-23.5505, -46.6333, maxDistanceMeters: 5000.0);
-        expect(distantSp, isNull);
+      // Coordenada distante (São Paulo, SP: -23.5505, -46.6333, ~2700 km de distância)
+      final distantSp = engine.findNearestNode(
+        -23.5505,
+        -46.6333,
+        maxDistanceMeters: 5000.0,
+      );
+      expect(distantSp, isNull);
 
-        // Coordenada com raio máximo restritivo menor que a distância real
-        final strict = engine.findNearestNode(-3.1025, -67.9400, maxDistanceMeters: 5.0);
-        expect(strict, isNull);
-      },
-    );
-
-    test('TC-ROUTING-11: findNearestNode returns null when graph has zero nodes', () {
-      final emptyEngine = OfflineRoutingEngine();
-      expect(emptyEngine.findNearestNode(-3.1022, -67.9397), isNull);
+      // Coordenada com raio máximo restritivo menor que a distância real
+      final strict = engine.findNearestNode(
+        -3.1025,
+        -67.9400,
+        maxDistanceMeters: 5.0,
+      );
+      expect(strict, isNull);
     });
 
     test(
-      'TC-ROUTING-12: findRouteBetweenCoordinates returns explicit failure when graph is empty',
+      'TC-ROUTING-11: findNearestNode returns null when graph has zero nodes',
       () {
         final emptyEngine = OfflineRoutingEngine();
-        final result = emptyEngine.findRouteBetweenCoordinates(
-          startLat: -3.1022,
-          startLon: -67.9397,
-          goalLat: -3.1700,
-          goalLon: -68.0800,
-        );
-
-        expect(result.isSuccess, isFalse);
-        expect(result.errorMessage, equals('Nenhum grafo de rotas regional carregado.'));
+        expect(emptyEngine.findNearestNode(-3.1022, -67.9397), isNull);
       },
     );
 
-    test(
-      'TC-ROUTING-13: findRouteBetweenCoordinates returns explicit failure when start is distant',
-      () {
-        // Origem em São Paulo, destino no Alto Solimões
-        final result = engine.findRouteBetweenCoordinates(
-          startLat: -23.5505,
-          startLon: -46.6333,
-          goalLat: -3.1700,
-          goalLon: -68.0800,
-        );
+    test('TC-ROUTING-12: findRouteBetweenCoordinates returns explicit failure when graph is empty', () {
+      final emptyEngine = OfflineRoutingEngine();
+      final result = emptyEngine.findRouteBetweenCoordinates(
+        startLat: -3.1022,
+        startLon: -67.9397,
+        goalLat: -3.1700,
+        goalLon: -68.0800,
+      );
 
-        expect(result.isSuccess, isFalse);
-        expect(
-          result.errorMessage,
-          equals('Ponto de origem fora da área de cobertura do grafo regional.'),
-        );
-      },
-    );
+      expect(result.isSuccess, isFalse);
+      expect(
+        result.errorMessage,
+        equals('Nenhum grafo de rotas regional carregado.'),
+      );
+    });
 
-    test(
-      'TC-ROUTING-14: findRouteBetweenCoordinates returns explicit failure when goal is distant',
-      () {
-        // Origem no Alto Solimões, destino em Manaus / São Paulo
-        final result = engine.findRouteBetweenCoordinates(
-          startLat: -3.1022,
-          startLon: -67.9397,
-          goalLat: -23.5505,
-          goalLon: -46.6333,
-        );
+    test('TC-ROUTING-13: findRouteBetweenCoordinates returns explicit failure when start is distant', () {
+      // Origem em São Paulo, destino no Alto Solimões
+      final result = engine.findRouteBetweenCoordinates(
+        startLat: -23.5505,
+        startLon: -46.6333,
+        goalLat: -3.1700,
+        goalLon: -68.0800,
+      );
 
-        expect(result.isSuccess, isFalse);
-        expect(
-          result.errorMessage,
-          equals('Ponto de destino fora da área de cobertura do grafo regional.'),
-        );
-      },
-    );
+      expect(result.isSuccess, isFalse);
+      expect(
+        result.errorMessage,
+        equals('Ponto de origem fora da área de cobertura do grafo regional.'),
+      );
+    });
 
-    test(
-      'TC-ROUTING-15: findRouteBetweenCoordinates succeeds when both endpoints are within snap distance',
-      () {
-        // Origem a ~30m de SAI Centro, Destino a ~40m de Betânia Centro
-        final result = engine.findRouteBetweenCoordinates(
-          startLat: -3.1025,
-          startLon: -67.9400,
-          goalLat: -3.1703,
-          goalLon: -68.0804,
-          maxSnapDistanceMeters: 500.0,
-          mode: RoutingMode.walking,
-        );
+    test('TC-ROUTING-14: findRouteBetweenCoordinates returns explicit failure when goal is distant', () {
+      // Origem no Alto Solimões, destino em Manaus / São Paulo
+      final result = engine.findRouteBetweenCoordinates(
+        startLat: -3.1022,
+        startLon: -67.9397,
+        goalLat: -23.5505,
+        goalLon: -46.6333,
+      );
 
-        expect(result.isSuccess, isTrue);
-        expect(result.pathNodeIds.first, equals('SAI_CENTRO'));
-        expect(result.pathNodeIds.last, equals('BETANIA_CENTRO'));
-        expect(result.totalDistanceMeters, greaterThan(15000));
-        expect(result.steps.isNotEmpty, isTrue);
-      },
-    );
+      expect(result.isSuccess, isFalse);
+      expect(
+        result.errorMessage,
+        equals('Ponto de destino fora da área de cobertura do grafo regional.'),
+      );
+    });
+
+    test('TC-ROUTING-15: findRouteBetweenCoordinates succeeds when both endpoints are within snap distance', () {
+      // Origem a ~30m de SAI Centro, Destino a ~40m de Betânia Centro
+      final result = engine.findRouteBetweenCoordinates(
+        startLat: -3.1025,
+        startLon: -67.9400,
+        goalLat: -3.1703,
+        goalLon: -68.0804,
+        maxSnapDistanceMeters: 500.0,
+        mode: RoutingMode.walking,
+      );
+
+      expect(result.isSuccess, isTrue);
+      expect(result.pathNodeIds.first, equals('SAI_CENTRO'));
+      expect(result.pathNodeIds.last, equals('BETANIA_CENTRO'));
+      expect(result.totalDistanceMeters, greaterThan(15000));
+      expect(result.steps.isNotEmpty, isTrue);
+    });
   });
 
   group('ContactsMapScreen Offline Routing Containment Widget Tests', () {
@@ -363,17 +369,19 @@ void main() {
         final db = AppDatabase.forTesting(NativeDatabase.memory());
 
         final now = DateTime.now();
-        await db.into(db.people).insert(
-          PeopleCompanion.insert(
-            id: 'contact_sp',
-            name: 'Contato em São Paulo',
-            firstContactAt: now,
-            createdAt: now,
-            updatedAt: now,
-            latitude: const Value(-23.5505),
-            longitude: const Value(-46.6333),
-          ),
-        );
+        await db
+            .into(db.people)
+            .insert(
+              PeopleCompanion.insert(
+                id: 'contact_sp',
+                name: 'Contato em São Paulo',
+                firstContactAt: now,
+                createdAt: now,
+                updatedAt: now,
+                latitude: const Value(-23.5505),
+                longitude: const Value(-46.6333),
+              ),
+            );
 
         await tester.pumpWidget(
           ProviderScope(
@@ -396,7 +404,9 @@ void main() {
         // Verify that the honest fail-closed dialog appears
         expect(find.text('Roteamento Offline'), findsOneWidget);
         expect(
-          find.textContaining('O roteamento offline não está disponível para esta região'),
+          find.textContaining(
+            'O roteamento offline não está disponível para esta região',
+          ),
           findsOneWidget,
         );
         expect(find.text('Abrir no Mapa Externo'), findsOneWidget);

@@ -1,4 +1,5 @@
 import 'dart:convert';
+
 import 'package:drift/drift.dart' as drift;
 import 'package:uuid/uuid.dart';
 
@@ -9,7 +10,8 @@ class PictureEntry {
   final String id;
   final String caption;
   final List<String> tags;
-  final String imageData; // Caminho de arquivo local, URL ou Base64 (data:image/...)
+  final String
+  imageData; // Caminho de arquivo local, URL ou Base64 (data:image/...)
   final String? category;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -25,29 +27,30 @@ class PictureEntry {
   });
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'caption': caption,
-        'tags': tags,
-        'imageData': imageData,
-        'category': category,
-        'createdAt': createdAt.toIso8601String(),
-        'updatedAt': updatedAt.toIso8601String(),
-      };
+    'id': id,
+    'caption': caption,
+    'tags': tags,
+    'imageData': imageData,
+    'category': category,
+    'createdAt': createdAt.toIso8601String(),
+    'updatedAt': updatedAt.toIso8601String(),
+  };
 
   factory PictureEntry.fromJson(Map<String, dynamic> json) => PictureEntry(
-        id: json['id'] as String? ?? const Uuid().v4(),
-        caption: json['caption'] as String? ?? '(Sem legenda)',
-        tags: (json['tags'] as List<dynamic>?)?.map((e) => e.toString()).toList() ??
-            const [],
-        imageData: json['imageData'] as String? ?? '',
-        category: json['category'] as String?,
-        createdAt: json['createdAt'] != null
-            ? DateTime.tryParse(json['createdAt'] as String) ?? DateTime.now()
-            : DateTime.now(),
-        updatedAt: json['updatedAt'] != null
-            ? DateTime.tryParse(json['updatedAt'] as String) ?? DateTime.now()
-            : DateTime.now(),
-      );
+    id: json['id'] as String? ?? const Uuid().v4(),
+    caption: json['caption'] as String? ?? '(Sem legenda)',
+    tags:
+        (json['tags'] as List<dynamic>?)?.map((e) => e.toString()).toList() ??
+        const [],
+    imageData: json['imageData'] as String? ?? '',
+    category: json['category'] as String?,
+    createdAt: json['createdAt'] != null
+        ? DateTime.tryParse(json['createdAt'] as String) ?? DateTime.now()
+        : DateTime.now(),
+    updatedAt: json['updatedAt'] != null
+        ? DateTime.tryParse(json['updatedAt'] as String) ?? DateTime.now()
+        : DateTime.now(),
+  );
 
   PictureEntry copyWith({
     String? id,
@@ -76,9 +79,9 @@ class PictureBankManager {
 
   /// Carrega todas as gravuras armazenadas
   static Future<List<PictureEntry>> loadPictures(AppDatabase db) async {
-    final row = await (db.select(db.appKvStore)
-          ..where((t) => t.key.equals(_kvKey)))
-        .getSingleOrNull();
+    final row = await (db.select(
+      db.appKvStore,
+    )..where((t) => t.key.equals(_kvKey))).getSingleOrNull();
 
     if (row == null || row.value.isEmpty) {
       // Se vazio, insere itens de demonstração bíblica teocrática
@@ -91,7 +94,9 @@ class PictureBankManager {
       final decoded = jsonDecode(row.value);
       if (decoded is List) {
         final list = decoded
-            .map((e) => PictureEntry.fromJson(Map<String, dynamic>.from(e as Map)))
+            .map(
+              (e) => PictureEntry.fromJson(Map<String, dynamic>.from(e as Map)),
+            )
             .toList();
         list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
         return list;
@@ -103,7 +108,9 @@ class PictureBankManager {
   /// Salva todas as gravuras em lote
   static Future<void> saveAll(AppDatabase db, List<PictureEntry> list) async {
     final encoded = jsonEncode(list.map((p) => p.toJson()).toList());
-    await db.into(db.appKvStore).insertOnConflictUpdate(
+    await db
+        .into(db.appKvStore)
+        .insertOnConflictUpdate(
           AppKvStoreCompanion.insert(
             key: _kvKey,
             value: encoded,
