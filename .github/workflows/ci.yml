@@ -116,7 +116,7 @@ jobs:
           python3 tool/map/verify_full_extent.py "$RUNNER_TEMP/sai/output/sai-experimental.mbtiles"
           mv "$RUNNER_TEMP/sai/output/sai-experimental.mbtiles" "$RUNNER_TEMP/sai/output/br_am_solimoes.mbtiles"
           (cd "$RUNNER_TEMP/sai/output" && sha256sum br_am_solimoes.mbtiles > SHA256SUMS.txt)
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: sai-release-map
           path: ${{ runner.temp }}/sai/output/
@@ -305,19 +305,19 @@ jobs:
           cd build/web && zip -r ../../dist/web-release.zip . && cd ../..
 
       - name: Upload Web Build Artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: web-release
           path: build/web
 
       - name: Upload Android APK Artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: android-arm64-release
           path: dist/app-arm64-v8a-release.apk
 
       - name: Upload Release Dist
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-dist
           path: dist/
@@ -395,7 +395,7 @@ jobs:
           cd dist-ios && zip -r app-release-unsigned.ipa Payload && rm -rf Payload && cd ..
 
       - name: Upload iOS IPA Artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ios-release
           path: dist-ios/app-release-unsigned.ipa
@@ -454,7 +454,7 @@ jobs:
           Compress-Archive -Path "build\windows\x64\runner\Release\*" -DestinationPath "dist-windows\field-assistant-windows-x64.zip"
 
       - name: Upload Windows Artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: windows-release
           path: dist-windows/field-assistant-windows-x64.zip
@@ -509,7 +509,7 @@ jobs:
           tar -czvf dist-linux/field-assistant-linux-x64.tar.gz -C build/linux/x64/release/bundle .
 
       - name: Upload Linux Artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: linux-release
           path: dist-linux/field-assistant-linux-x64.tar.gz
@@ -566,7 +566,7 @@ jobs:
           cd ../../../../..
 
       - name: Upload macOS Artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: macos-release
           path: dist-macos/field-assistant-macos.zip

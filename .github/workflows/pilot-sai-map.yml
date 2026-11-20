@@ -37,7 +37,7 @@ jobs:
           Não use como única fonte para navegação. Teste no app em modo avião.
           Os pontos de contatos ficam no banco do aplicativo, não neste mapa.
           TXT
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: sai-sede-piloto-experimental
           path: ${{ runner.temp }}/pilot/output/
