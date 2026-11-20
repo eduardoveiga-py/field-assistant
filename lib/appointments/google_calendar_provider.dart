@@ -39,6 +39,10 @@ class GoogleCalendarProvider implements CalendarProvider {
     'GOOGLE_WEB_CLIENT_ID',
     defaultValue: '',
   );
+  static const String defaultIosClientId = String.fromEnvironment(
+      'GOOGLE_IOS_CLIENT_ID',
+    defaultValue: '',
+  );
   static const String _calendarScope =
       'https://www.googleapis.com/auth/calendar.events';
   static const String _calendarReadonlyScope =
@@ -108,9 +112,10 @@ class GoogleCalendarProvider implements CalendarProvider {
         _webUserEmail ??= await _secureStorage.read(key: _keyConnectedEmail);
       } else {
         await _googleSignIn.initialize(
-          clientId: defaultWebClientId.trim().isNotEmpty
-              ? defaultWebClientId
-              : null,
+          clientId: defaultTargetPlatform == TargetPlatform.iOS &&
+              defaultIosClientId.trim().isNotEmpty
+          ? defaultIosClientId.trim()
+          : null,
         );
       }
     } catch (e) {
