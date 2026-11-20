@@ -4015,6 +4015,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                             .toList();
 
                                         if (protocol?.value == 'exchange') {
+                                         final accounts = await EmailAccountsManager.loadAccounts(db); final exchangeAccounts = accounts.where((a) => a.isActive && a.incomingProtocol == 'exchange').toList(); final exchangeAcc = exchangeAccounts.isNotEmpty ? exchangeAccounts.first : null; const secureStore = FlutterSecureStorage(); final accPass = exchangeAcc != null ? await secureStore.read(key: 'email_acc_${exchangeAcc.id}_password') : null; final accDeviceId = await secureStore.read(key: 'jw_eas_device_id'); 
                                           final hostEntry =
                                               await (db.select(db.appKvStore)
                                                     ..where(
@@ -4044,12 +4045,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                                     ))
                                                   .getSingleOrNull();
 
-                                          if (hostEntry == null ||
-                                              emailEntry == null ||
-                                              password == null ||
-                                              password.isEmpty ||
-                                              deviceId == null ||
-                                              deviceId.value.isEmpty) {
+                                          final resolvedHost = (exchangeAcc?.incomingHost.isNotEmpty ?? false) ? exchangeAcc!.incomingHost : hostEntry?.value; final resolvedEmail = (exchangeAcc?.email.isNotEmpty ?? false) ? exchangeAcc!.email : emailEntry?.value; final resolvedPassword = (accPass != null && accPass.isNotEmpty) ? accPass : password; final resolvedDeviceId = (accDeviceId != null && accDeviceId.isNotEmpty) ? accDeviceId : (deviceId?.value.isNotEmpty == true ? deviceId!.value : (exchangeAcc != null ? const Uuid().v4() : null)); if (resolvedHost == null || resolvedHost.isEmpty || resolvedEmail == null || resolvedEmail.isEmpty || resolvedPassword == null || resolvedPassword.isEmpty || resolvedDeviceId == null || resolvedDeviceId.isEmpty) {
                                             if (ctx.mounted) {
                                               setSheetState(() {
                                                 isSending = false;
@@ -4062,10 +4058,10 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
 
                                           final session =
                                               ExchangeProtocolSession(
-                                                host: hostEntry.value,
-                                                username: emailEntry.value,
-                                                password: password,
-                                                deviceId: deviceId.value,
+                                                host: resolvedHost,
+                                                username: resolvedEmail,
+                                                password: resolvedPassword,
+                                                deviceId: resolvedDeviceId,
                                               );
 
                                           await session.sendMail(
@@ -4084,7 +4080,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                                 const Uuid().v4(),
                                             folderName: 'Enviados',
                                             subject: subject,
-                                            from: emailEntry.value,
+                                            from: resolvedEmail,
                                             to: to,
                                             cc: ccList,
                                             bcc: bccList,
