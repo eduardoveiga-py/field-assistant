@@ -17,7 +17,7 @@ class SyncPrivacyPolicy {
   /// e dispositivos reais.
   static const bool _enableE2eeSyncCompileFlag = bool.fromEnvironment(
     'ENABLE_E2EE_SYNC',
-    defaultValue: false,
+    defaultValue: true,
   );
 
   static bool get isCloudSyncEnabled => _enableE2eeSyncCompileFlag;
