@@ -129,7 +129,7 @@ class MBTilesService {
       id: 'br_am_solimoes',
       country: 'Brasil',
       state: 'Amazonas',
-      name: 'Santo Antônio do Içá e entorno (experimental)',
+      name: 'Santo Antônio do Içá e entorno',
       description: 'Retângulo de SAI e entorno; não cobre todo o Alto Solimões. Aldeias, rios e caminhos podem estar incompletos. Não usar para navegação.',
       minZoom: 8,
       maxZoom: 16,

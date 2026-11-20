@@ -47,11 +47,21 @@ abstract class PaginatedEncryptedRecordTransport
   });
 }
 
+/// Extensão para reconciliação histórica E2EE via watermark e scan por colação binária C (FA-SEC-09).
+abstract class ReconcilableEncryptedRecordTransport
+    implements PaginatedEncryptedRecordTransport {
+  Future<int> reconcileStart();
+  Future<List<EncryptedRemoteRecord>> scanPage({
+    String? afterRoute,
+    int limit = 100,
+  });
+}
+
 /// Adaptador de produção para transporte de registros cifrados (`encrypted_records`).
 /// Não envia dados em claro nem recorre silenciosamente a tabelas experimentais.
 /// Uma conta diferente da conta para a qual o adaptador foi criado falha fechada.
 class SupabaseEncryptedRecordTransport
-    implements PaginatedEncryptedRecordTransport {
+    implements ReconcilableEncryptedRecordTransport {
   final SupabaseClient client;
   final String owner;
 
@@ -148,6 +158,61 @@ class SupabaseEncryptedRecordTransport
           _parseRow(item)
         else
           throw const FormatException('Item de pull cifrado inválido.'),
+    ];
+  }
+
+  static final RegExp _hexRoutePattern = RegExp(r'^[0-9a-f]{64}$');
+
+  @override
+  Future<int> reconcileStart() async {
+    _checkOwner();
+    final response = await client.rpc('encrypted_records_reconcile_start');
+    if (response is int) return response;
+    if (response is num) return response.toInt();
+    if (response is String) {
+      final parsed = int.tryParse(response);
+      if (parsed != null) return parsed;
+    }
+    throw const FormatException(
+      'Resposta de reconciliação de watermark inválida.',
+    );
+  }
+
+  @override
+  Future<List<EncryptedRemoteRecord>> scanPage({
+    String? afterRoute,
+    int limit = 100,
+  }) async {
+    _checkOwner();
+    if (afterRoute != null && !_hexRoutePattern.hasMatch(afterRoute)) {
+      throw ArgumentError.value(
+        afterRoute,
+        'afterRoute',
+        'Rota hexadecimal inválida.',
+      );
+    }
+    if (limit <= 0) {
+      throw ArgumentError.value(limit, 'limit', 'Limite deve ser positivo.');
+    }
+    final clampedLimit = limit > 500 ? 500 : limit;
+    final response = await client.rpc(
+      'encrypted_records_scan_page',
+      params: {
+        'p_after_route': afterRoute,
+        'p_limit': clampedLimit,
+      },
+    );
+    if (response is! List) {
+      throw const FormatException(
+        'Resposta de scan de registros cifrados inválida.',
+      );
+    }
+    return [
+      for (final item in response)
+        if (item is Map)
+          _parseRow(item)
+        else
+          throw const FormatException('Item de scan cifrado inválido.'),
     ];
   }
 }

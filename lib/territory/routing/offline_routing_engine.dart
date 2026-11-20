@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
+
 /// Modo de deslocamento para o motor de roteamento offline A*.
 enum RoutingMode {
   /// Caminhada a pé (velocidade padrão de 1.25 m/s = 4.5 km/h).
@@ -577,8 +579,81 @@ class OfflineRoutingEngine {
     return earthRadiusMeters * c;
   }
 
-  /// Fábrica canônica com a malha regional do Alto Solimões pré-configurada
-  /// (Santo Antônio do Içá, Betânia, porto fluvial, balsa e Lago Grande).
+  /// Localiza o nó mais próximo a uma coordenada geográfica, respeitando um raio máximo de aproximação.
+  /// Retorna `null` se `_nodes.isEmpty` ou se nenhum nó estiver dentro de [maxDistanceMeters].
+  RoutingNode? findNearestNode(
+    double latitude,
+    double longitude, {
+    double maxDistanceMeters = 5000.0,
+  }) {
+    if (_nodes.isEmpty) return null;
+    RoutingNode? nearest;
+    double minDistance = double.infinity;
+    for (final node in _nodes.values) {
+      final dist = haversineDistanceMeters(
+        latitude,
+        longitude,
+        node.latitude,
+        node.longitude,
+      );
+      if (dist < minDistance) {
+        minDistance = dist;
+        nearest = node;
+      }
+    }
+    if (minDistance <= maxDistanceMeters) {
+      return nearest;
+    }
+    return null;
+  }
+
+  /// Calcula a rota ótima entre coordenadas geográficas arbitrárias com aproximação delimitada (snapping).
+  ///
+  /// Falha com segurança caso o grafo esteja vazio ou caso os pontos de origem ou destino
+  /// estejam fora do raio de cobertura [maxSnapDistanceMeters] dos nós da malha regional.
+  RoutingResult findRouteBetweenCoordinates({
+    required double startLat,
+    required double startLon,
+    required double goalLat,
+    required double goalLon,
+    double maxSnapDistanceMeters = 5000.0,
+    RoutingMode mode = RoutingMode.walking,
+  }) {
+    if (_nodes.isEmpty) {
+      return RoutingResult.failure('Nenhum grafo de rotas regional carregado.');
+    }
+
+    final startNode = findNearestNode(
+      startLat,
+      startLon,
+      maxDistanceMeters: maxSnapDistanceMeters,
+    );
+    if (startNode == null) {
+      return RoutingResult.failure(
+        'Ponto de origem fora da área de cobertura do grafo regional.',
+      );
+    }
+
+    final goalNode = findNearestNode(
+      goalLat,
+      goalLon,
+      maxDistanceMeters: maxSnapDistanceMeters,
+    );
+    if (goalNode == null) {
+      return RoutingResult.failure(
+        'Ponto de destino fora da área de cobertura do grafo regional.',
+      );
+    }
+
+    return findRoute(startId: startNode.id, goalId: goalNode.id, mode: mode);
+  }
+
+  /// Rede sintética demonstrativa do Alto Solimões pré-configurada para testes automatizados.
+  ///
+  /// ATENÇÃO: Esta malha contém dados sintéticos/demonstrativos estritamente destinados a testes
+  /// de unidade e não deve ser exposta na interface de produção nem apresentada a usuários finais
+  /// como uma rota real navegável.
+  @visibleForTesting
   factory OfflineRoutingEngine.createAltoSolimoesNetwork() {
     final engine = OfflineRoutingEngine();
 

@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../appointments/schedule_release_coordinator.dart';
 import '../../core/app_logger.dart';
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
@@ -21,6 +22,7 @@ import '../widgets/recent_seed_badge.dart';
 import '../widgets/screen_hero_accent_band.dart';
 import '../widgets/add_person_dialog.dart';
 import '../widgets/managed_text_controllers.dart';
+import '../widgets/person_deletion_dialog.dart';
 
 export '../widgets/add_person_dialog.dart';
 
@@ -1150,6 +1152,156 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
                                         tooltip: 'Alterar situação com 1 toque',
                                         initialValue: person.status,
                                         onSelected: (newStatus) async {
+                                          if (newStatus ==
+                                              'revisita_encerrada') {
+                                            final coordinator = ref.read(
+                                              scheduleReleaseCoordinatorProvider,
+                                            );
+                                            final futureAppts = await coordinator
+                                                .getFutureAppointmentsForRevisit(
+                                                  person.id,
+                                                );
+                                            if (!context.mounted) return;
+                                            final confirm = await showDialog<bool>(
+                                              context: context,
+                                              builder: (c) => AlertDialog(
+                                                title: const Row(
+                                                  children: [
+                                                    Icon(
+                                                      Icons.person_off_outlined,
+                                                      color:
+                                                          AppTheme.alertAmber,
+                                                    ),
+                                                    SizedBox(width: 8),
+                                                    Expanded(
+                                                      child: Text(
+                                                        'Encerrar Revisita',
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                                content: Column(
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      'Deseja encerrar o acompanhamento de revisita com ${person.name}?',
+                                                      style: const TextStyle(
+                                                        fontSize: 13,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(height: 12),
+                                                    if (futureAppts
+                                                        .isNotEmpty) ...[
+                                                      Container(
+                                                        padding:
+                                                            const EdgeInsets.all(
+                                                              10,
+                                                            ),
+                                                        decoration: BoxDecoration(
+                                                          color: AppTheme
+                                                              .primaryBlue
+                                                              .withValues(
+                                                                alpha: 0.08,
+                                                              ),
+                                                          borderRadius:
+                                                              BorderRadius.circular(
+                                                                8,
+                                                              ),
+                                                          border: Border.all(
+                                                            color: AppTheme
+                                                                .primaryBlue
+                                                                .withValues(
+                                                                  alpha: 0.3,
+                                                                ),
+                                                          ),
+                                                        ),
+                                                        child: Column(
+                                                          crossAxisAlignment:
+                                                              CrossAxisAlignment
+                                                                  .start,
+                                                          children: [
+                                                            Text(
+                                                              'Agenda: ${futureAppts.length} compromisso(s) futuro(s) serão cancelados e liberados.',
+                                                              style: const TextStyle(
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .bold,
+                                                                fontSize: 12,
+                                                              ),
+                                                            ),
+                                                            const SizedBox(
+                                                              height: 4,
+                                                            ),
+                                                            ...futureAppts.map(
+                                                              (a) => Text(
+                                                                '• ${a.title} (${AppDateUtils.formatDateTime(a.startTime)})',
+                                                                style:
+                                                                    const TextStyle(
+                                                                      fontSize:
+                                                                          11,
+                                                                    ),
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                      const SizedBox(
+                                                        height: 10,
+                                                      ),
+                                                    ],
+                                                    const Text(
+                                                      'O contato e o histórico de visitas passadas serão preservados.',
+                                                      style: TextStyle(
+                                                        fontSize: 11,
+                                                        color:
+                                                            AppTheme.textMuted,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                                actions: [
+                                                  TextButton(
+                                                    onPressed: () =>
+                                                        Navigator.pop(c, false),
+                                                    child: const Text(
+                                                      'Cancelar',
+                                                    ),
+                                                  ),
+                                                  ElevatedButton(
+                                                    onPressed: () =>
+                                                        Navigator.pop(c, true),
+                                                    child: const Text(
+                                                      'Encerrar Revisita',
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            );
+                                            if (confirm != true) return;
+                                            final res = await coordinator
+                                                .endRevisitWithScheduleRelease(
+                                                  person: person,
+                                                  endReason: 'Encerrada na lista de Pessoas',
+                                                  releaseFutureAppointments:
+                                                      true,
+                                                );
+                                            if (context.mounted) {
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
+                                                SnackBar(
+                                                  content: Text(
+                                                    'Revisita encerrada. ${res.message}',
+                                                  ),
+                                                ),
+                                              );
+                                            }
+                                            return;
+                                          }
+
                                           final repo = ref.read(
                                             repositoryProvider,
                                           );
@@ -1517,6 +1669,27 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
                                           ),
                                         ),
                                       ],
+                                      Semantics(
+                                        button: true,
+                                        label: 'Excluir contato ${person.name}',
+                                        child: IconButton(
+                                          constraints: const BoxConstraints(
+                                            minWidth: 48,
+                                            minHeight: 48,
+                                          ),
+                                          icon: const Icon(
+                                            Icons.delete_outline,
+                                            color: AppTheme.alertRed,
+                                            size: 20,
+                                          ),
+                                          tooltip: 'Excluir Contato',
+                                          onPressed: () =>
+                                              PersonDeletionDialog.show(
+                                                context,
+                                                person: person,
+                                              ),
+                                        ),
+                                      ),
                                       IconButton(
                                         constraints: const BoxConstraints(
                                           minWidth: 48,

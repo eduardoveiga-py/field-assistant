@@ -22,6 +22,7 @@ import '../core/biometric_auth_service.dart';
 import '../core/sync_timestamp.dart';
 import '../database/app_database.dart';
 import '../reports/web_downloader.dart';
+import 'email_contacts_manager.dart';
 
 /// Modelo de mensagem de e-mail teocrático (JW.org Mail e Comunicações Restritas do Hub)
 class JwEmailMessage {
@@ -32,6 +33,9 @@ class JwEmailMessage {
   final String subject;
   final String from;
   final String to;
+  final List<String> cc;
+  final List<String> bcc;
+  final String? accountEmail;
   final DateTime date;
   final String bodyText;
   final String? bodyHtml;
@@ -54,6 +58,9 @@ class JwEmailMessage {
     required this.subject,
     required this.from,
     required this.to,
+    this.cc = const [],
+    this.bcc = const [],
+    this.accountEmail,
     required this.date,
     required this.bodyText,
     this.bodyHtml,
@@ -75,6 +82,9 @@ class JwEmailMessage {
     'subject': subject,
     'from': from,
     'to': to,
+    'cc': cc,
+    'bcc': bcc,
+    'accountEmail': accountEmail,
     'date': date.toIso8601String(),
     'bodyText': bodyText,
     'bodyHtml': bodyHtml,
@@ -96,6 +106,11 @@ class JwEmailMessage {
     subject: json['subject'] as String? ?? '(Sem Assunto)',
     from: json['from'] as String? ?? 'jw@jw.org',
     to: json['to'] as String? ?? '',
+    cc: (json['cc'] as List<dynamic>?)?.map((e) => e.toString()).toList() ??
+        const [],
+    bcc: (json['bcc'] as List<dynamic>?)?.map((e) => e.toString()).toList() ??
+        const [],
+    accountEmail: json['accountEmail'] as String?,
     date: json['date'] != null
         ? DateTime.tryParse(json['date'] as String) ?? DateTime.now()
         : DateTime.now(),
@@ -125,6 +140,9 @@ class JwEmailMessage {
     String? subject,
     String? from,
     String? to,
+    List<String>? cc,
+    List<String>? bcc,
+    String? accountEmail,
     DateTime? date,
     String? bodyText,
     String? bodyHtml,
@@ -145,6 +163,9 @@ class JwEmailMessage {
       subject: subject ?? this.subject,
       from: from ?? this.from,
       to: to ?? this.to,
+      cc: cc ?? this.cc,
+      bcc: bcc ?? this.bcc,
+      accountEmail: accountEmail ?? this.accountEmail,
       date: date ?? this.date,
       bodyText: bodyText ?? this.bodyText,
       bodyHtml: bodyHtml ?? this.bodyHtml,
@@ -1111,10 +1132,14 @@ class JwSmtpClient {
       );
     }
 
-    List<String> recipients = const [];
+    List<String> recipients = [];
     if (messageToSend != null) {
-      recipients = parseRecipients(messageToSend.to);
-      if (recipients.isEmpty) {
+      recipients = <String>{
+        ...parseRecipients(messageToSend.to),
+        ...messageToSend.cc.expand((c) => parseRecipients(c)),
+        ...messageToSend.bcc.expand((b) => parseRecipients(b)),
+      }.toList();
+      if (parseRecipients(messageToSend.to).isEmpty) {
         throw const JwEmailException(
           'Informe ao menos um destinatário de e-mail válido no campo "Para".',
         );
@@ -1329,18 +1354,60 @@ class JwSmtpClient {
         final bodyEncoded = _wrapBase64Lines(
           base64.encode(utf8.encode(messageToSend.bodyText)),
         );
+        final toRecipients = parseRecipients(messageToSend.to);
         final payload = StringBuffer()
           ..write('From: <$senderAddr>\r\n')
-          ..write('To: ${recipients.map((r) => '<$r>').join(', ')}\r\n')
+          ..write('To: ${toRecipients.map((r) => '<$r>').join(', ')}\r\n');
+        if (messageToSend.cc.isNotEmpty) {
+          final ccRecipients = messageToSend.cc.expand((c) => parseRecipients(c)).toList();
+          if (ccRecipients.isNotEmpty) {
+            payload.write('Cc: ${ccRecipients.map((r) => '<$r>').join(', ')}\r\n');
+          }
+        }
+        payload
           ..write('Subject: ${encodeHeaderValue(messageToSend.subject)}\r\n')
           ..write('Date: ${_formatRfc2822Date(nowUtc)}\r\n')
           ..write('Message-ID: $messageId\r\n')
-          ..write('MIME-Version: 1.0\r\n')
-          ..write('Content-Type: text/plain; charset=UTF-8\r\n')
-          ..write('Content-Transfer-Encoding: base64\r\n')
-          ..write('\r\n')
-          ..write(bodyEncoded)
-          ..write('.\r\n');
+          ..write('MIME-Version: 1.0\r\n');
+
+        if (messageToSend.attachments.isEmpty) {
+          payload
+            ..write('Content-Type: text/plain; charset=UTF-8\r\n')
+            ..write('Content-Transfer-Encoding: base64\r\n')
+            ..write('\r\n')
+            ..write(bodyEncoded)
+            ..write('.\r\n');
+        } else {
+          final boundary = '===_FA_${const Uuid().v4().replaceAll("-", "")}_===';
+          payload
+            ..write('Content-Type: multipart/mixed; boundary="$boundary"\r\n')
+            ..write('\r\n')
+            ..write('--$boundary\r\n')
+            ..write('Content-Type: text/plain; charset=UTF-8\r\n')
+            ..write('Content-Transfer-Encoding: base64\r\n')
+            ..write('\r\n')
+            ..write(bodyEncoded)
+            ..write('\r\n');
+
+          for (final att in messageToSend.attachments) {
+            final name = (att['name'] ?? 'anexo').toString();
+            final base64Content = (att['base64'] ?? '').toString();
+            final contentType = (att['contentType'] ?? 'application/octet-stream').toString();
+            if (base64Content.isNotEmpty) {
+              payload
+                ..write('--$boundary\r\n')
+                ..write('Content-Type: $contentType; name="${encodeHeaderValue(name)}"\r\n')
+                ..write('Content-Transfer-Encoding: base64\r\n')
+                ..write('Content-Disposition: attachment; filename="${encodeHeaderValue(name)}"\r\n')
+                ..write('\r\n')
+                ..write(_wrapBase64Lines(base64Content))
+                ..write('\r\n');
+            }
+          }
+          payload
+            ..write('--$boundary--\r\n')
+            ..write('.\r\n');
+        }
 
         activeSocket.write(payload.toString());
         await activeSocket.flush();
@@ -1528,6 +1595,7 @@ class JwEmailService {
                   createdAt: now,
                 ),
               );
+          await EmailContactsManager.recordSender(db, msg.from);
           savedCount++;
         }
       });
@@ -1866,5 +1934,27 @@ class JwEmailService {
     FileDownloader.download(filename, content);
 
     return content;
+  }
+
+  /// Exclui uma mensagem de e-mail (soft-delete seguro preservando integridade local e de sincronização)
+  Future<void> deleteEmail(String emailId) async {
+    final entryId = emailId.startsWith('email_') ? emailId : 'email_$emailId';
+    final now = DateTime.now().toUtc();
+    await (db.update(db.inboxEntries)..where((t) => t.id.equals(entryId))).write(
+      InboxEntriesCompanion(
+        deletedAt: drift.Value(now),
+        updatedAt: drift.Value(now),
+      ),
+    );
+    await db.into(db.syncQueue).insert(
+      SyncQueueCompanion.insert(
+        id: const Uuid().v4(),
+        entityType: 'inbox_entries',
+        entityId: entryId,
+        operation: 'UPDATE',
+        payload: jsonEncode({'id': entryId, 'deleted_at': now.toIso8601String()}),
+        createdAt: now,
+      ),
+    );
   }
 }

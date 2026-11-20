@@ -413,7 +413,7 @@ void main() {
       // br_am_solimoes failed 404, local_custom_aldeia was skipped cleanly
       expect(
         failedNames,
-        equals(['Santo Antônio do Içá e entorno (experimental)']),
+        equals(['Santo Antônio do Içá e entorno']),
       );
 
       // Installed status & physical file must remain intact on disk

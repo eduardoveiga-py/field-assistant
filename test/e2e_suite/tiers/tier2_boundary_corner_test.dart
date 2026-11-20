@@ -39,9 +39,41 @@ Uint8List createValidPmtilesHeader(String content) {
   final header = Uint8List(127);
   header.setRange(0, 7, 'PMTiles'.codeUnits);
   header[7] = 3; // version 3
+  final bd = ByteData.sublistView(header);
+
+  const rootDirOffset = 127;
+  const rootDirLength = 32;
+  bd.setUint32(8, rootDirOffset, Endian.little);
+  bd.setUint32(16, rootDirLength, Endian.little);
+
   final contentBytes = utf8.encode(content);
+  const tileDataOffset = rootDirOffset + rootDirLength;
+  final tileDataLength = contentBytes.isNotEmpty ? contentBytes.length : 64;
+  bd.setUint32(56, tileDataOffset, Endian.little);
+  bd.setUint32(64, tileDataLength, Endian.little);
+
+  bd.setUint32(72, 1, Endian.little); // numAddressedTiles
+  bd.setUint32(80, 1, Endian.little); // numTileEntries
+
+  header[96] = 1; // clustered
+  header[97] = 1; // internalCompression (none)
+  header[98] = 1; // tileCompression (none)
+  header[99] = 1; // tileType (mvt)
+  header[100] = 8; // minZoom
+  header[101] = 16; // maxZoom
+
+  bd.setInt32(102, (-68.20 * 10000000).round(), Endian.little); // minLon
+  bd.setInt32(106, (-3.40 * 10000000).round(), Endian.little);  // minLat
+  bd.setInt32(110, (-67.70 * 10000000).round(), Endian.little); // maxLon
+  bd.setInt32(114, (-3.00 * 10000000).round(), Endian.little);  // maxLat
+
+  header[118] = 10; // centerZoom
+  bd.setInt32(119, (-68.00 * 10000000).round(), Endian.little); // centerLon
+  bd.setInt32(123, (-3.20 * 10000000).round(), Endian.little);  // centerLat
+
   final builder = BytesBuilder();
   builder.add(header);
+  builder.add(Uint8List(rootDirLength));
   builder.add(contentBytes);
   return builder.takeBytes();
 }
@@ -1211,7 +1243,7 @@ void main() {
         final validSha = crypto.sha256.convert(validPayload).toString();
 
         final corruptPayload = Uint8List.fromList(validPayload);
-        corruptPayload[20] ^= 0xFF; // Inverte 1 byte no payload
+        corruptPayload[corruptPayload.length - 1] ^= 0xFF; // Inverte 1 byte no payload
 
         final manifest = OfflineMapPackageManifest(
           id: 'test_pkg_mismatch',

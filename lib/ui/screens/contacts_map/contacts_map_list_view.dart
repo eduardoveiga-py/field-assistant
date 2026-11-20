@@ -111,6 +111,16 @@ extension _ContactsMapListView on _ContactsMapScreenState {
                         onPressed: () => _openSingleRoute(person),
                       ),
                       IconButton(
+                        icon: const Icon(
+                          Icons.delete_outline,
+                          color: AppTheme.alertRed,
+                          size: 20,
+                        ),
+                        tooltip: 'Excluir Contato',
+                        onPressed: () =>
+                            PersonDeletionDialog.show(context, person: person),
+                      ),
+                      IconButton(
                         icon: const Icon(Icons.arrow_forward_ios, size: 14),
                         onPressed: () {
                           Navigator.push(

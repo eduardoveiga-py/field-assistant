@@ -12,6 +12,7 @@ import '../core/sync_timestamp.dart';
 
 import '../database/app_database.dart';
 import 'jw_email_service.dart';
+import 'email_contacts_manager.dart';
 
 /// Exchange MVP: only read incoming changes. Never sends commands that mutate
 /// the mailbox and never claims to apply or acknowledge device policies.
@@ -40,18 +41,30 @@ abstract class ExchangeSession {
   Future<String> inboxId();
   Future<List<eas.EasFolder>> mailFolders();
   Future<eas.SyncResult> readPage(String folder, String key);
+  Future<void> sendMail({
+    required String to,
+    required String subject,
+    required String body,
+    String? from,
+    List<String> cc = const [],
+    List<String> bcc = const [],
+    List<Map<String, dynamic>> attachments = const [],
+  });
   void close();
 }
 
 class ExchangeProtocolSession implements ExchangeSession {
   final eas.EasHttpClient _client;
+  final String _username;
+
   ExchangeProtocolSession({
     required String host,
     required String username,
     required String password,
     required String deviceId,
     http.Client? httpClient,
-  }) : _client = eas.EasHttpClient(
+  }) : _username = username,
+       _client = eas.EasHttpClient(
          server: _validateHost(host),
          credentials: eas.BasicCredentials(
            username: username,
@@ -68,7 +81,7 @@ class ExchangeProtocolSession implements ExchangeSession {
   static String _validateHost(String value) {
     if (kIsWeb) {
       throw const ExchangeException(
-        'Exchange experimental não está disponível no navegador.',
+        'Exchange não está disponível diretamente no navegador Web.',
       );
     }
     final host = value.trim().toLowerCase();
@@ -124,7 +137,7 @@ class ExchangeProtocolSession implements ExchangeSession {
     bodyTruncationSize: 262144,
   ).execute(_client);
 
-  /// Leitura experimental por intervalo; não instala nem salva anexos no app.
+  /// Leitura de anexos por intervalo via comando FetchAttachment do Exchange.
   Future<eas.ItemOperationsResult> readAttachmentRange(
     String reference,
     int start,
@@ -134,6 +147,74 @@ class ExchangeProtocolSession implements ExchangeSession {
     rangeStart: start,
     rangeEnd: end,
   ).execute(_client);
+
+  /// Envio de e-mails via comando Exchange ActiveSync (SendMail)
+  @override
+  Future<void> sendMail({
+    required String to,
+    required String subject,
+    required String body,
+    String? from,
+    List<String> cc = const [],
+    List<String> bcc = const [],
+    List<Map<String, dynamic>> attachments = const [],
+  }) async {
+    final clientId = const Uuid().v4();
+    final nowUtc = DateTime.now().toUtc();
+    final sender = from ?? _username;
+
+    final payload = StringBuffer()
+      ..write('From: <$sender>\r\n')
+      ..write('To: $to\r\n');
+    if (cc.isNotEmpty) {
+      payload.write('Cc: ${cc.join(", ")}\r\n');
+    }
+    payload
+      ..write('Subject: $subject\r\n')
+      ..write('Date: ${nowUtc.toIso8601String()}\r\n')
+      ..write('MIME-Version: 1.0\r\n');
+
+    if (attachments.isEmpty) {
+      payload
+        ..write('Content-Type: text/plain; charset=UTF-8\r\n')
+        ..write('\r\n')
+        ..write(body);
+    } else {
+      final boundary = '===_EAS_${const Uuid().v4().replaceAll("-", "")}_===';
+      payload
+        ..write('Content-Type: multipart/mixed; boundary="$boundary"\r\n')
+        ..write('\r\n')
+        ..write('--$boundary\r\n')
+        ..write('Content-Type: text/plain; charset=UTF-8\r\n')
+        ..write('Content-Transfer-Encoding: 8bit\r\n')
+        ..write('\r\n')
+        ..write(body)
+        ..write('\r\n');
+
+      for (final att in attachments) {
+        final name = (att['name'] ?? 'anexo').toString();
+        final base64Content = (att['base64'] ?? '').toString();
+        final contentType = (att['contentType'] ?? 'application/octet-stream').toString();
+        if (base64Content.isNotEmpty) {
+          payload
+            ..write('--$boundary\r\n')
+            ..write('Content-Type: $contentType; name="$name"\r\n')
+            ..write('Content-Transfer-Encoding: base64\r\n')
+            ..write('Content-Disposition: attachment; filename="$name"\r\n')
+            ..write('\r\n')
+            ..write(base64Content)
+            ..write('\r\n');
+        }
+      }
+      payload.write('--$boundary--\r\n');
+    }
+
+    await eas.SendMailCommand(
+      clientId: clientId,
+      mimeContent: payload.toString(),
+      saveInSentItems: true,
+    ).execute(_client);
+  }
 
   @override
   void close() => _client.dispose();
@@ -313,6 +394,32 @@ class ExchangeReadService {
               )..where((t) => t.id.equals(id))).getSingleOrNull();
               if (exists != null) continue;
               final body = item.body ?? '';
+              final attachmentsList = item.attachments.map((att) {
+                final name = att.displayName.isNotEmpty
+                    ? att.displayName
+                    : (att.fileReference.isNotEmpty ? att.fileReference : 'anexo');
+                final ct = att.contentType?.toLowerCase() ?? '';
+                final type = ct.contains('pdf')
+                    ? 'pdf'
+                    : (ct.contains('image') ||
+                            ct.contains('png') ||
+                            ct.contains('jpeg') ||
+                            ct.contains('jpg')
+                        ? 'image'
+                        : (ct.contains('word') || ct.contains('doc')
+                            ? 'doc'
+                            : 'file'));
+                return {
+                  'name': name,
+                  'fileReference': att.fileReference,
+                  'size': att.estimatedSize,
+                  'contentType': att.contentType,
+                  'path': att.fileReference.isNotEmpty ? att.fileReference : name,
+                  'type': type,
+                  'isInline': att.isInline,
+                };
+              }).toList();
+
               final message = JwEmailMessage(
                 folderId: folder,
                 folderName: mailFolder.displayName,
@@ -321,14 +428,16 @@ class ExchangeReadService {
                 from: item.from,
                 to: item.to,
                 date: item.dateReceived ?? now,
-                bodyText:
-                    '[Prévia experimental do Exchange: corpo pode estar incompleto; anexos não são importados. Consulte a mensagem original.]\n\n$body',
+                bodyText: body,
+                attachments: attachmentsList,
                 isRead: item.read,
                 isPermanentRetained: false,
               );
+              await EmailContactsManager.recordSender(db, item.from);
               final metadata = {
                 'email': message.toJson(),
                 'exchangePreview': true,
+                'exchangeMail': true,
                 'bodyMayBeIncomplete': item.body == null || item.bodyTruncated,
                 'attachmentCount': item.attachments.length,
               };

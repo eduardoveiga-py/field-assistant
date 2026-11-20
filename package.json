@@ -1,5 +1,6 @@
 {
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.17",
     "pg": "^8.23.1"
   }
 }

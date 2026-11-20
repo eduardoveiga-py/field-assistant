@@ -39,6 +39,17 @@ class FakeExchange implements ExchangeSession {
   void close() {
     closed = true;
   }
+
+  @override
+  Future<void> sendMail({
+    required String to,
+    required String subject,
+    required String body,
+    String? from,
+    List<String> cc = const [],
+    List<String> bcc = const [],
+    List<Map<String, dynamic>> attachments = const [],
+  }) async {}
 }
 
 class MultiFolderExchange implements ExchangeSession {
@@ -81,6 +92,17 @@ class MultiFolderExchange implements ExchangeSession {
 
   @override
   void close() {}
+
+  @override
+  Future<void> sendMail({
+    required String to,
+    required String subject,
+    required String body,
+    String? from,
+    List<String> cc = const [],
+    List<String> bcc = const [],
+    List<Map<String, dynamic>> attachments = const [],
+  }) async {}
 }
 
 eas.SyncResult page(

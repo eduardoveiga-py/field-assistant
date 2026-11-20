@@ -58,3 +58,5 @@ Future<GeoCoordinates?> getBrowserCoordinates() async {
   final res = await getPlatformCoordinates();
   return res.coordinates;
 }
+
+Future<bool> openPlatformLocationSettings() async => false;

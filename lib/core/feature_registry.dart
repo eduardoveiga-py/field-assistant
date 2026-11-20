@@ -99,7 +99,7 @@ enum AppFeature {
     id: 'inbox',
     title: 'Inbox & E-mail',
     description:
-        'Captura universal, e-mail JW e sincronização experimental Exchange',
+        'Captura universal, e-mail JW, multi-contas e sincronização Exchange',
     icon: Icons.inbox_outlined,
     category: FeatureCategory.organization,
     isEssential: false,
@@ -117,6 +117,14 @@ enum AppFeature {
     title: 'Base de Conhecimento',
     description: 'Notas estruturadas, perguntas bíblicas, documentos e recursos pessoais',
     icon: Icons.menu_book_outlined,
+    category: FeatureCategory.tools,
+    isEssential: false,
+  ),
+  pictureBank(
+    id: 'picture_bank',
+    title: 'Banco de Gravuras',
+    description: 'Galeria visual com filtros por tags e zoom interativo contínuo para o ministério',
+    icon: Icons.photo_library_outlined,
     category: FeatureCategory.tools,
     isEssential: false,
   );

@@ -82,6 +82,7 @@ class TodayScreen extends ConsumerWidget {
       case AppFeature.inbox:
       case AppFeature.tasksProjects:
       case AppFeature.knowledge:
+      case AppFeature.pictureBank:
         return 0;
     }
   }

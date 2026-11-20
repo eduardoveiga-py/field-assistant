@@ -36,6 +36,7 @@ import '../../territory/map_engine/maplibre_native_adapter.dart';
 import '../../territory/geocoding/offline_geocoding_service.dart';
 import '../../territory/routing/offline_routing_engine.dart';
 import 'contacts_map/offline_search_modal.dart';
+import '../widgets/person_deletion_dialog.dart';
 
 part 'contacts_map/territory_modals.dart';
 part 'contacts_map/contacts_map_canvas.dart';
@@ -46,6 +47,7 @@ class ContactsMapScreen extends ConsumerStatefulWidget {
   final Future<ReverseGeocodingResult?> Function(String)? geocodeAddress;
   final MapEngineAdapter? mapEngineAdapter;
   final MapEnginePreference initialEnginePreference;
+  final OfflineRoutingEngine? verifiedRegionalRoutingEngine;
 
   const ContactsMapScreen({
     super.key,
@@ -53,6 +55,7 @@ class ContactsMapScreen extends ConsumerStatefulWidget {
     this.geocodeAddress,
     this.mapEngineAdapter,
     this.initialEnginePreference = MapEnginePreference.auto,
+    this.verifiedRegionalRoutingEngine,
   });
 
   @override
@@ -113,6 +116,11 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
   late MapEnginePreference _enginePreference;
   String? _activeVectorPackageId;
   OfflineMapFormat _activeVectorPackageFormat = OfflineMapFormat.pmtiles;
+  OfflineRoutingEngine? _verifiedRegionalRoutingEngine;
+
+  bool get _hasVerifiedRegionalRoutingGraph =>
+      _verifiedRegionalRoutingEngine != null &&
+      _verifiedRegionalRoutingEngine!.nodes.isNotEmpty;
 
   void _configureMapEngine({required bool disposePrevious}) {
     final selection = MapEngineSelector.resolve(
@@ -164,6 +172,7 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
   @override
   void initState() {
     super.initState();
+    _verifiedRegionalRoutingEngine = widget.verifiedRegionalRoutingEngine;
     _enginePreference = widget.initialEnginePreference;
     _configureMapEngine(disposePrevious: false);
     MBTilesService.instance.tilesRevision.addListener(
@@ -207,6 +216,10 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
   @override
   void didUpdateWidget(covariant ContactsMapScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.verifiedRegionalRoutingEngine !=
+        widget.verifiedRegionalRoutingEngine) {
+      _verifiedRegionalRoutingEngine = widget.verifiedRegionalRoutingEngine;
+    }
     if (oldWidget.highlightPersonId != widget.highlightPersonId) {
       _highlightPersonId = widget.highlightPersonId;
       _hasCenteredHighlightPerson = false;
@@ -569,13 +582,25 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
     }
   }
 
-  Future<void> _openSingleRoute(PersonEntry person) async {
+  Future<void> _openSingleRoute(
+    dynamic target, [
+    double? destLat,
+    double? destLon,
+  ]) async {
+    double? lat = destLat;
+    double? lon = destLon;
+    String name = '';
+    if (target is PersonEntry) {
+      lat = target.latitude;
+      lon = target.longitude;
+      name = target.address ?? target.name;
+    } else if (target is String) {
+      name = target;
+    }
     final query =
-        (person.latitude != null &&
-            person.longitude != null &&
-            (person.latitude != 0.0 || person.longitude != 0.0))
-        ? '${person.latitude},${person.longitude}'
-        : Uri.encodeComponent(person.address ?? person.name);
+        (lat != null && lon != null && (lat != 0.0 || lon != 0.0))
+            ? '$lat,$lon'
+            : Uri.encodeComponent(name);
     final uri = Uri.parse(
       'https://www.google.com/maps/search/?api=1&query=$query',
     );
@@ -875,48 +900,88 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
     required double destLat,
     required double destLon,
   }) {
-    final engine = OfflineRoutingEngine.createAltoSolimoesNetwork();
+    final supportsOfflineRouting =
+        _mapEngineAdapter.capabilities.supportsOfflineRouting;
+    final hasVerifiedGraph = _hasVerifiedRegionalRoutingGraph;
+
+    if (!supportsOfflineRouting || !hasVerifiedGraph) {
+      showDialog(
+        context: context,
+        builder: (dialogCtx) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.alt_route, color: AppTheme.primaryTeal),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Roteamento Offline',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'O roteamento offline não está disponível para esta região. '
+                'Nenhum grafo viário regional verificado foi carregado neste dispositivo.',
+                style: TextStyle(fontSize: 14),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Destino: $destinationName',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Coordenadas: ${destLat.toStringAsFixed(4)}, ${destLon.toStringAsFixed(4)}',
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Deseja abrir o trajeto no aplicativo de mapas externo?',
+                style: TextStyle(fontSize: 13),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              child: const Text('Fechar'),
+            ),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.open_in_new, size: 16),
+              label: const Text('Abrir no Mapa Externo'),
+              onPressed: () {
+                Navigator.pop(dialogCtx);
+                _openSingleRoute(destinationName, destLat, destLon);
+              },
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    final engine = _verifiedRegionalRoutingEngine!;
     final originLat = _activeCenterLat ?? -3.1022;
     final originLon = _activeCenterLng ?? -67.9397;
 
-    String nearestStartId = 'SAI_CENTRO';
-    double minStartDist = double.infinity;
-    String nearestGoalId = 'BETANIA_CENTRO';
-    double minGoalDist = double.infinity;
-
-    for (final node in engine.nodes.values) {
-      final dStart = OfflineRoutingEngine.haversineDistanceMeters(
-        originLat,
-        originLon,
-        node.latitude,
-        node.longitude,
-      );
-      if (dStart < minStartDist) {
-        minStartDist = dStart;
-        nearestStartId = node.id;
-      }
-
-      final dGoal = OfflineRoutingEngine.haversineDistanceMeters(
-        destLat,
-        destLon,
-        node.latitude,
-        node.longitude,
-      );
-      if (dGoal < minGoalDist) {
-        minGoalDist = dGoal;
-        nearestGoalId = node.id;
-      }
-    }
-
-    final walkRoute = engine.findRoute(
-      startId: nearestStartId,
-      goalId: nearestGoalId,
+    final walkRoute = engine.findRouteBetweenCoordinates(
+      startLat: originLat,
+      startLon: originLon,
+      goalLat: destLat,
+      goalLon: destLon,
       mode: RoutingMode.walking,
     );
 
-    final driveRoute = engine.findRoute(
-      startId: nearestStartId,
-      goalId: nearestGoalId,
+    final driveRoute = engine.findRouteBetweenCoordinates(
+      startLat: originLat,
+      startLon: originLon,
+      goalLat: destLat,
+      goalLon: destLon,
       mode: RoutingMode.driving,
     );
 
@@ -968,36 +1033,38 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                     style: const TextStyle(color: Colors.red),
                   ),
                 ),
-              const Divider(),
-              const Text(
-                'Etapas do trajeto offline:',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 6),
-              ...((walkRoute.isSuccess ? walkRoute.steps : driveRoute.steps).map(
-                (step) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(
-                        step.isFerryCrossing
-                            ? Icons.directions_boat
-                            : Icons.turn_right,
-                        size: 16,
-                        color: step.isFerryCrossing ? Colors.blue : Colors.grey,
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          '${step.instruction} (${step.distanceMeters.round()} m)',
-                          style: const TextStyle(fontSize: 13),
-                        ),
-                      ),
-                    ],
-                  ),
+              if (walkRoute.isSuccess || driveRoute.isSuccess) ...[
+                const Divider(),
+                const Text(
+                  'Etapas do trajeto offline:',
+                  style: TextStyle(fontWeight: FontWeight.bold),
                 ),
-              )),
+                const SizedBox(height: 6),
+                ...((walkRoute.isSuccess ? walkRoute.steps : driveRoute.steps).map(
+                  (step) => Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          step.isFerryCrossing
+                              ? Icons.directions_boat
+                              : Icons.turn_right,
+                          size: 16,
+                          color: step.isFerryCrossing ? Colors.blue : Colors.grey,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            '${step.instruction} (${step.distanceMeters.round()} m)',
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )),
+              ],
             ],
           ),
         ),
@@ -1005,6 +1072,14 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Fechar'),
+          ),
+          ElevatedButton.icon(
+            icon: const Icon(Icons.open_in_new, size: 16),
+            label: const Text('Abrir no Mapa Externo'),
+            onPressed: () {
+              Navigator.pop(context);
+              _openSingleRoute(destinationName, destLat, destLon);
+            },
           ),
         ],
       ),
@@ -1314,13 +1389,17 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                 ),
               ],
             ),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: AppTheme.accentTeal,
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.add_location),
-        label: const Text('+ Ponto de Referência'),
-        onPressed: () => _showAddLandmarkModal(context),
-      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButton: (_selectedPinPerson == null && _selectedPinLandmark == null)
+          ? FloatingActionButton.extended(
+              heroTag: 'fab_add_landmark',
+              backgroundColor: AppTheme.accentTeal,
+              foregroundColor: Colors.white,
+              icon: const Icon(Icons.add_location),
+              label: const Text('+ Ponto de Referência'),
+              onPressed: () => _showAddLandmarkModal(context),
+            )
+          : null,
       body: peopleAsync.when(
         data: (people) {
           final neighborhoods = <String>{'Todos'};

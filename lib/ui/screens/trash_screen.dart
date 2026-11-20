@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
 import '../providers.dart';
+import '../widgets/person_deletion_dialog.dart';
 
 class TrashScreen extends ConsumerStatefulWidget {
   const TrashScreen({super.key});
@@ -148,13 +149,34 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
                         ),
                         tooltip: 'Excluir Definitivamente',
                         onPressed: () async {
+                          if (type == 'people') {
+                            final person = await repo.getPersonById(
+                              id,
+                              includeDeleted: true,
+                            );
+                            if (person != null && context.mounted) {
+                              final deleted = await PersonDeletionDialog.show(
+                                context,
+                                person: person,
+                                isAlreadyInTrash: true,
+                              );
+                              if (deleted == true) {
+                                _reloadDeletedItems();
+                              }
+                              return;
+                            }
+                          }
+
+                          final message = type == 'phone_contacts'
+                              ? 'Excluir definitivamente o contato telefônico "$title"? Se este contato tiver sido promovido para o cadastro de Pessoas, o registro de Pessoa correspondente não será afetado.'
+                              : 'Excluir "$title" do banco local e enfileirar a exclusão na nuvem? Arquivos locais, cópias de segurança, objetos no Storage e dados em outros dispositivos podem permanecer. A exclusão na nuvem depende da sincronização.';
+
+                          if (!context.mounted) return;
                           final confirm = await showDialog<bool>(
                             context: context,
                             builder: (c) => AlertDialog(
                               title: const Text('Exclusão Definitiva'),
-                              content: Text(
-                                'Excluir "$title" do banco local e enfileirar a exclusão na nuvem? Arquivos locais, cópias de segurança, objetos no Storage e dados em outros dispositivos podem permanecer. A exclusão na nuvem depende da sincronização.',
-                              ),
+                              content: Text(message),
                               actions: [
                                 TextButton(
                                   onPressed: () => Navigator.pop(c, false),
@@ -209,6 +231,8 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
         return Icons.calendar_today;
       case 'activity_records':
         return Icons.timer;
+      case 'phone_contacts':
+        return Icons.phone;
       default:
         return Icons.article;
     }

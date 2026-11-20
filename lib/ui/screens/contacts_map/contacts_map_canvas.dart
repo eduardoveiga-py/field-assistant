@@ -310,7 +310,8 @@ extension _ContactsMapCanvas on _ContactsMapScreenState {
         return Stack(
           children: [
             if (_mapEngineAdapter is MaplibreNativeAdapter &&
-                MapLibreVectorMapView.isSupportedOnCurrentPlatform)
+                MapLibreVectorMapView.isSupportedOnCurrentPlatform &&
+                _activeVectorPackageId != null)
               Positioned.fill(
                 child: MapLibreVectorMapView(
                   adapter: _mapEngineAdapter as MaplibreNativeAdapter,
@@ -974,8 +975,11 @@ extension _ContactsMapCanvas on _ContactsMapScreenState {
             Positioned(
               top: 12,
               right: 12,
-              child: Column(
-                children: [
+              bottom: 90,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
                   // Rotação manual com bússola e retorno suave ao norte
                   GestureDetector(
                     onHorizontalDragUpdate: (details) {
@@ -1155,7 +1159,12 @@ extension _ContactsMapCanvas on _ContactsMapScreenState {
                                     '${result.userMessage} O mapa permaneceu na posição anterior.',
                                   ),
                                   backgroundColor: warningColor,
-                                  duration: const Duration(seconds: 4),
+                                  duration: const Duration(seconds: 5),
+                                  action: SnackBarAction(
+                                    label: 'Ajustes',
+                                    textColor: Colors.white,
+                                    onPressed: () => GeolocationHelper.openAppSettings(),
+                                  ),
                                 ),
                               );
                           }
@@ -1292,6 +1301,7 @@ extension _ContactsMapCanvas on _ContactsMapScreenState {
                 ],
               ),
             ),
+          ),
 
             // Barra de Escala Métrica Dinâmica e Selo de Atribuição OSM
             Positioned(
@@ -1627,19 +1637,25 @@ extension _ContactsMapCanvas on _ContactsMapScreenState {
                         Row(
                           children: [
                             Expanded(
-                              child: OutlinedButton.icon(
-                                icon: const Icon(Icons.alt_route, size: 16),
-                                label: const Text('Rota Offline (A*)'),
-                                onPressed: () {
-                                  final p = _selectedPinPerson!;
-                                  final lat = p.latitude ?? -3.1022;
-                                  final lon = p.longitude ?? -67.9397;
-                                  _showOfflineRouteDialog(
-                                    destinationName: p.name,
-                                    destLat: lat,
-                                    destLon: lon,
-                                  );
-                                },
+                              child: Tooltip(
+                                message: _mapEngineAdapter.capabilities.supportsOfflineRouting &&
+                                        _hasVerifiedRegionalRoutingGraph
+                                    ? 'Calcular rota offline regional (A*)'
+                                    : 'Roteamento offline indisponível nesta região',
+                                child: OutlinedButton.icon(
+                                  icon: const Icon(Icons.alt_route, size: 16),
+                                  label: const Text('Rota Offline (A*)'),
+                                  onPressed: () {
+                                    final p = _selectedPinPerson!;
+                                    final lat = p.latitude ?? -3.1022;
+                                    final lon = p.longitude ?? -67.9397;
+                                    _showOfflineRouteDialog(
+                                      destinationName: p.name,
+                                      destLat: lat,
+                                      destLon: lon,
+                                    );
+                                  },
+                                ),
                               ),
                             ),
                             const SizedBox(width: 8),

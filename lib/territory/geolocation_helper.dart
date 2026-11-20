@@ -32,6 +32,9 @@ class GeolocationHelper {
     return res.coordinates;
   }
 
+  /// Abre os Ajustes/Configurações do dispositivo para gerenciamento de permissão de GPS
+  static Future<bool> openAppSettings() => openPlatformLocationSettings();
+
   /// Calcula a distância geográfica precisa em km pelo método Haversine
   static double calculateHaversineDistanceKm(
     double lat1,

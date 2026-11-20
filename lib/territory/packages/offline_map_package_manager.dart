@@ -239,14 +239,56 @@ class OfflineMapPackageManager {
   }
 
   /// Sincroniza o catálogo em memória com os arquivos fisicamente existentes em disco.
-  Future<void> syncWithDisk() async {
+  /// Se um pacote principal estiver ausente mas seu arquivo de backup (.bak) existir,
+  /// valida o cabeçalho e restaura o backup automaticamente.
+  Future<void> syncWithDisk({List<OfflineMapPackageMetadata>? manifests}) async {
     final dir = await getStorageDirectory();
 
-    for (final manifest in OfflineMapCatalog.defaultCatalog) {
+    final packagesToCheck = <OfflineMapPackageMetadata>{
+      ...OfflineMapCatalog.defaultCatalog,
+      ..._states.values.map((s) => s.manifest),
+      ...?manifests,
+    };
+
+    for (final manifest in packagesToCheck) {
       final ext = manifest.format == OfflineMapFormat.pmtiles
           ? 'pmtiles'
           : 'mbtiles';
       final file = File('${dir.path}/${manifest.id}.$ext');
+      final backupFile = File('${file.path}.bak');
+
+      // Se o arquivo principal não existir, tenta restaurar backup .bak sobrevivente
+      if (!file.existsSync() && backupFile.existsSync()) {
+        try {
+          if (manifest.format == OfflineMapFormat.pmtiles) {
+            if (backupFile.lengthSync() >= 127) {
+              final raf = backupFile.openSync(mode: FileMode.read);
+              final headerBytes = raf.readSync(127);
+              raf.closeSync();
+              validatePmtilesHeader(headerBytes);
+            } else {
+              throw InvalidPackageFormatException(
+                'Pacote PMTiles sintético ou corrompido: cabeçalho sem diretório ou tiles válidos.',
+              );
+            }
+          } else if (manifest.format == OfflineMapFormat.mbtiles) {
+            if (backupFile.lengthSync() >= 16) {
+              final raf = backupFile.openSync(mode: FileMode.read);
+              final headerBytes = raf.readSync(16);
+              raf.closeSync();
+              validateMbtilesHeader(headerBytes);
+            } else {
+              throw InvalidPackageFormatException(
+                'Arquivo MBTiles inválido: menor que 16 bytes.',
+              );
+            }
+          }
+          backupFile.renameSync(file.path);
+          AppLogger.info('Backup de pacote restaurado com sucesso: ${file.path}');
+        } catch (e) {
+          AppLogger.warning('Falha ao restaurar backup corrompido: $e');
+        }
+      }
 
       if (file.existsSync()) {
         final length = file.lengthSync();
@@ -378,12 +420,34 @@ class OfflineMapPackageManager {
         );
       }
 
-      final isPartial = response.statusCode == 206;
-      final fileMode = (isPartial && existingBytes > 0)
-          ? FileMode.append
-          : FileMode.write;
-      if (!isPartial && existingBytes > 0) {
-        existingBytes = 0; // Servidor reiniciou do começo
+      var fileMode = FileMode.write;
+      if (response.statusCode == 206) {
+        final contentRange = response.headers['content-range'];
+        var rangeValid = false;
+        if (contentRange != null && existingBytes > 0) {
+          final match = RegExp(
+            r'^bytes\s+(\d+)-(\d+)/(?:\d+|\*)',
+            caseSensitive: false,
+          ).firstMatch(contentRange.trim());
+          if (match != null) {
+            final startByte = int.tryParse(match.group(1)!);
+            if (startByte == existingBytes) {
+              rangeValid = true;
+            }
+          }
+        }
+        if (rangeValid) {
+          fileMode = FileMode.append;
+        } else {
+          // Servidor retornou 206 sem cabeçalho válido ou com início divergente;
+          // reinicia o download do início truncando o arquivo existente.
+          existingBytes = 0;
+          fileMode = FileMode.write;
+        }
+      } else {
+        // Status 200 (ou outro): servidor reiniciou do começo, trunca arquivo .tmp
+        existingBytes = 0;
+        fileMode = FileMode.write;
       }
 
       sink = stagingFile.openWrite(mode: fileMode);
@@ -459,17 +523,27 @@ class OfflineMapPackageManager {
         );
       }
 
-      // Validação 2: Formato do arquivo (Magic String PMTiles)
+      // Validação 2: Formato do arquivo (Magic String PMTiles / MBTiles)
       if (manifest.format == OfflineMapFormat.pmtiles) {
         if (stagingLength < 127) {
           throw InvalidPackageFormatException(
-            'Arquivo PMTiles inválido: menor que 127 bytes.',
+            'Pacote PMTiles sintético ou corrompido: cabeçalho sem diretório ou tiles válidos.',
           );
         }
         final raf = stagingFile.openSync(mode: FileMode.read);
         final headerBytes = raf.readSync(127);
         raf.closeSync();
         validatePmtilesHeader(headerBytes);
+      } else if (manifest.format == OfflineMapFormat.mbtiles) {
+        if (stagingLength < 16) {
+          throw InvalidPackageFormatException(
+            'Arquivo MBTiles inválido: menor que 16 bytes.',
+          );
+        }
+        final raf = stagingFile.openSync(mode: FileMode.read);
+        final headerBytes = raf.readSync(16);
+        raf.closeSync();
+        validateMbtilesHeader(headerBytes);
       }
 
       // Validação 3: Checksum SHA-256 criptográfico (Streaming seguro para memória)
@@ -531,7 +605,19 @@ class OfflineMapPackageManager {
           await sink.close();
         } catch (_) {}
       }
-      if (stagingFile.existsSync()) {
+
+      // Expurgar .tmp se for erro irrecuperável ou cancelamento explícito do download.
+      // Em falhas transitórias de rede (SocketException, TimeoutException, etc.),
+      // preservar o arquivo .tmp para permitir retomada via HTTP Range.
+      final isCancellation = e is DownloadCancelledException ||
+          (e is http.ClientException &&
+              e.message.toLowerCase().contains('cancelad'));
+      final shouldPurge = e is CorruptedPackageException ||
+          e is InvalidPackageFormatException ||
+          e is RangeNotSatisfiableException ||
+          isCancellation;
+
+      if (shouldPurge && stagingFile.existsSync()) {
         try {
           stagingFile.deleteSync();
         } catch (_) {}
@@ -665,23 +751,94 @@ class OfflineMapPackageManager {
     return digest.toString().toLowerCase();
   }
 
-  /// Validador de cabeçalho PMTiles v3 (127 bytes).
+  /// Validador profundo de cabeçalho PMTiles v3 (127 bytes).
+  ///
+  /// Garante que o arquivo possui cabeçalho canônico v3, diretório raiz válido,
+  /// offsets consistentes, tiles reais (rejeitando pacotes sintéticos/vazios),
+  /// bounding box WGS84 válido e não invertido, e níveis de zoom coerentes.
   static void validatePmtilesHeader(Uint8List headerBytes) {
+    const errorMsg =
+        'Pacote PMTiles sintético ou corrompido: cabeçalho sem diretório ou tiles válidos.';
+
     if (headerBytes.length < 127) {
       throw InvalidPackageFormatException(
         'Cabeçalho PMTiles inválido: menor que 127 bytes.',
       );
     }
+
     final magic = String.fromCharCodes(headerBytes.sublist(0, 7));
     if (magic != 'PMTiles') {
       throw InvalidPackageFormatException(
-        'Assinatura mágica PMTiles inválida: "$magic"',
+        'Assinatura mágica PMTiles inválida: esperado "PMTiles".',
       );
     }
+
     final version = headerBytes[7];
     if (version != 3) {
       throw InvalidPackageFormatException(
         'Versão do PMTiles não suportada: $version (apenas v3 é suportada).',
+      );
+    }
+
+    final bd = ByteData.sublistView(headerBytes);
+
+    int getUint64(int offset) {
+      final low = bd.getUint32(offset, Endian.little);
+      final high = bd.getUint32(offset + 4, Endian.little);
+      return (high << 32) | low;
+    }
+
+    final rootDirOffset = getUint64(8);
+    final rootDirLength = getUint64(16);
+    if (rootDirOffset < 127 || rootDirLength <= 0) {
+      throw InvalidPackageFormatException(errorMsg);
+    }
+
+    final tileDataOffset = getUint64(56);
+    final tileDataLength = getUint64(64);
+    if (tileDataOffset < rootDirOffset + rootDirLength || tileDataLength <= 0) {
+      throw InvalidPackageFormatException(errorMsg);
+    }
+
+    final numAddressedTiles = getUint64(72);
+    final numTileEntries = getUint64(80);
+    if (numTileEntries <= 0 && numAddressedTiles <= 0) {
+      throw InvalidPackageFormatException(errorMsg);
+    }
+
+    final minZoom = headerBytes[100];
+    final maxZoom = headerBytes[101];
+    if (minZoom < 0 || minZoom > maxZoom || maxZoom > 26) {
+      throw InvalidPackageFormatException(errorMsg);
+    }
+
+    final minLon = bd.getInt32(102, Endian.little) / 10000000.0;
+    final minLat = bd.getInt32(106, Endian.little) / 10000000.0;
+    final maxLon = bd.getInt32(110, Endian.little) / 10000000.0;
+    final maxLat = bd.getInt32(114, Endian.little) / 10000000.0;
+
+    if (minLon < -180.0 ||
+        maxLon > 180.0 ||
+        minLat < -90.0 ||
+        maxLat > 90.0 ||
+        minLon >= maxLon ||
+        minLat >= maxLat) {
+      throw InvalidPackageFormatException(errorMsg);
+    }
+  }
+
+  /// Validador de cabeçalho SQLite para MBTiles (16 bytes).
+  static void validateMbtilesHeader(Uint8List headerBytes) {
+    if (headerBytes.length < 16) {
+      throw InvalidPackageFormatException(
+        'Arquivo MBTiles inválido: menor que 16 bytes.',
+      );
+    }
+    const sqliteMagic = 'SQLite format 3\x00';
+    final magic = String.fromCharCodes(headerBytes.sublist(0, 16));
+    if (magic != sqliteMagic) {
+      throw InvalidPackageFormatException(
+        'Assinatura mágica SQLite inválida no arquivo MBTiles.',
       );
     }
   }

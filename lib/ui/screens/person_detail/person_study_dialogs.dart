@@ -994,9 +994,17 @@ extension _PersonDetailStudyDialogs on _PersonDetailScreenState {
     AppRepository repo,
     BibleStudyEntry study,
     PersonEntry person,
-  ) {
+  ) async {
     String selectedReason = 'Falta de interesse / tempo';
+    if (!context.mounted) return;
 
+    final coordinator = ref.read(scheduleReleaseCoordinatorProvider);
+    final futureAppts = await coordinator.getFutureAppointmentsForStudy(
+      study.id,
+    );
+    final participants = await repo.getParticipantsForStudy(study.id);
+
+    if (!context.mounted) return;
     showDialog(
       context: context,
       builder: (ctx) => ManagedTextControllers(
@@ -1019,9 +1027,110 @@ extension _PersonDetailStudyDialogs on _PersonDetailScreenState {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Você está encerrando o estudo bíblico com ${person.name}. O contato NÃO será excluído e continuará preservado no seu histórico.',
+                      'Você está encerrando o estudo bíblico com ${person.name}. O contato NÃO será excluído e continuará preservado no seu histórico como revisita.',
                       style: const TextStyle(fontSize: 13),
                     ),
+                    const SizedBox(height: 14),
+
+                    // Bloco de aviso de compromissos futuros
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: futureAppts.isNotEmpty
+                            ? AppTheme.primaryBlue.withValues(alpha: 0.08)
+                            : Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: futureAppts.isNotEmpty
+                              ? AppTheme.primaryBlue.withValues(alpha: 0.3)
+                              : Colors.grey.shade300,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.event_available,
+                                size: 16,
+                                color: futureAppts.isNotEmpty
+                                    ? AppTheme.primaryBlue
+                                    : AppTheme.textMuted,
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  'Agenda: ${futureAppts.length} compromisso(s) futuro(s) vinculado(s)',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          if (futureAppts.isNotEmpty) ...[
+                            const Text(
+                              'Ao confirmar, os horários abaixo serão cancelados e liberados na agenda ativa:',
+                              style: TextStyle(fontSize: 11),
+                            ),
+                            const SizedBox(height: 4),
+                            ...futureAppts.map(
+                              (a) => Padding(
+                                padding: const EdgeInsets.only(
+                                  left: 6,
+                                  bottom: 2,
+                                ),
+                                child: Text(
+                                  '• ${a.title} (${AppDateUtils.formatDateTime(a.startTime)} às ${AppDateUtils.formatTime(a.endTime)})',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            const Text(
+                              'Os lembretes locais programados serão removidos e sessões passadas permanecerão intactas.',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontStyle: FontStyle.italic,
+                                color: AppTheme.textMuted,
+                              ),
+                            ),
+                          ] else
+                            const Text(
+                              'Nenhum compromisso futuro agendado para este estudo.',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: AppTheme.textMuted,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+
+                    if (participants.length > 1) ...[
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: AppTheme.alertAmber.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: AppTheme.alertAmber.withValues(alpha: 0.4),
+                          ),
+                        ),
+                        child: Text(
+                          'Aviso: Este estudo possui ${participants.length} participantes. Ao encerrá-lo, o status de todos será alterado para revisita e os horários vinculados serão liberados.',
+                          style: const TextStyle(fontSize: 11),
+                        ),
+                      ),
+                    ],
+
                     const SizedBox(height: 14),
                     DropdownButtonFormField<String>(
                       initialValue: selectedReason,
@@ -1084,28 +1193,23 @@ extension _PersonDetailStudyDialogs on _PersonDetailScreenState {
                     foregroundColor: Colors.black,
                   ),
                   onPressed: () async {
-                    final reasonPayload = jsonEncode({
-                      'endReason': selectedReason,
-                      'notes': notesController.text.trim(),
-                      'endedAt': DateTime.now().toIso8601String(),
-                    });
-                    await repo.updateStudy(
-                      study.copyWith(
-                        status: selectedReason == 'Estudo concluído / Batizado'
-                            ? 'concluido'
-                            : 'encerrado',
-                        pauseOrCloseReason: Value(reasonPayload),
-                      ),
+                    final coordinator = ref.read(
+                      scheduleReleaseCoordinatorProvider,
                     );
-                    await repo.updatePerson(
-                      person.copyWith(status: 'revisita'),
-                    );
+                    final result = await coordinator
+                        .endStudyWithScheduleRelease(
+                          study: study,
+                          endReason: selectedReason,
+                          notes: notesController.text.trim(),
+                          releaseFutureAppointments: true,
+                        );
+
                     if (ctx.mounted) Navigator.pop(ctx);
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text(
-                            'Estudo encerrado ($selectedReason). Contato mantido no território!',
+                            'Estudo encerrado ($selectedReason). ${result.message}',
                           ),
                         ),
                       );

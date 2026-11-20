@@ -41,13 +41,33 @@ Future<GeolocationResult> getPlatformCoordinates() async {
       );
     }
 
-    final position = await Geolocator.getCurrentPosition(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.high,
-        timeLimit: Duration(seconds: 10),
-      ),
-    );
-    if (!position.latitude.isFinite || !position.longitude.isFinite) {
+    Position? position;
+    try {
+      position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 7),
+        ),
+      );
+    } catch (_) {
+      try {
+        position = await Geolocator.getLastKnownPosition();
+      } catch (_) {}
+      if (position == null) {
+        try {
+          position = await Geolocator.getCurrentPosition(
+            locationSettings: const LocationSettings(
+              accuracy: LocationAccuracy.medium,
+              timeLimit: Duration(seconds: 5),
+            ),
+          );
+        } catch (_) {}
+      }
+    }
+
+    if (position == null ||
+        !position.latitude.isFinite ||
+        !position.longitude.isFinite) {
       return const GeolocationResult(
         status: GeolocationStatus.unavailableOrTimeout,
       );
@@ -96,6 +116,14 @@ Future<GeolocationResult> getPlatformCoordinates() async {
     return const GeolocationResult(
       status: GeolocationStatus.unavailableOrTimeout,
     );
+  }
+}
+
+Future<bool> openPlatformLocationSettings() async {
+  try {
+    return await Geolocator.openAppSettings();
+  } catch (_) {
+    return false;
   }
 }
 

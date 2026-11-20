@@ -5,7 +5,7 @@
 
 BEGIN;
 
-SELECT plan(24);
+SELECT plan(31);
 
 -- ----------------------------------------------------------------------------
 -- 0. Preparação de identidades de teste (user_a e user_b) em auth.users
@@ -60,6 +60,20 @@ SELECT throws_ok(
     '42501',
     NULL,
     'anon é recusado em encrypted_records_pull_since'
+);
+
+SELECT throws_ok(
+    $$ SELECT public.encrypted_records_reconcile_start() $$,
+    '42501',
+    NULL,
+    'anon é recusado em encrypted_records_reconcile_start'
+);
+
+SELECT throws_ok(
+    $$ SELECT * FROM public.encrypted_records_scan_page(NULL, 10) $$,
+    '42501',
+    NULL,
+    'anon é recusado em encrypted_records_scan_page'
 );
 
 SELECT throws_ok(
@@ -127,6 +141,25 @@ SELECT is(
 );
 
 SELECT is(
+    public.encrypted_records_reconcile_start() > 0,
+    true,
+    'user_a obtém watermark positivo via encrypted_records_reconcile_start'
+);
+
+SELECT is(
+    (SELECT count(*)::int FROM public.encrypted_records_scan_page(NULL, 50)),
+    1,
+    'user_a lê seus registros via encrypted_records_scan_page'
+);
+
+SELECT throws_ok(
+    $$ SELECT * FROM public.encrypted_records_scan_page('invalid-route', 10) $$,
+    '22023',
+    NULL,
+    'encrypted_records_scan_page rejeita rota não hexadecimal com código 22023'
+);
+
+SELECT is(
     (public.recovery_vault_create(
         '{"version":1,"vaultId":"0123456789abcdef0123456789abcdef","envelope":{"v":1,"algorithm":"A256GCM","nonce":"1234567890123456","ciphertext":"YWJj","tag":"123456789012345678901234"}}'::jsonb
     )->>'success')::boolean,
@@ -175,6 +208,18 @@ SELECT is(
     (SELECT count(*)::int FROM public.encrypted_records_pull_since(0, 100)),
     0,
     'user_b não recebe registros de user_a via encrypted_records_pull_since'
+);
+
+SELECT is(
+    public.encrypted_records_reconcile_start(),
+    0::bigint,
+    'user_b obtém piso legado 0 via encrypted_records_reconcile_start'
+);
+
+SELECT is(
+    (SELECT count(*)::int FROM public.encrypted_records_scan_page(NULL, 100)),
+    0,
+    'user_b não recebe registros de user_a via encrypted_records_scan_page'
 );
 
 SELECT is(

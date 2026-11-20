@@ -332,6 +332,39 @@ class PhoneContactsManager {
     await _refresh();
   }
 
+  Future<void> permanentlyDeletePhoneContact(String id) async {
+    final now = DateTime.now();
+    await (db.delete(db.phoneContacts)..where((t) => t.id.equals(id))).go();
+
+    try {
+      await db
+          .into(db.syncQueue)
+          .insert(
+            SyncQueueCompanion.insert(
+              id: _uuid.v4(),
+              entityType: 'phone_contacts',
+              entityId: id,
+              operation: 'HARD_DELETE',
+              payload: jsonEncode({
+                'id': id,
+                'hardDelete': true,
+                'deleted_at': now.toIso8601String(),
+              }),
+              createdAt: now,
+              status: const Value('pending'),
+            ),
+          );
+    } catch (e, st) {
+      AppLogger.error(
+        'Falha ao enfileirar HARD_DELETE de phone_contact $id',
+        e,
+        st,
+      );
+    }
+
+    await _refresh();
+  }
+
   /// Converte/Exporta um contato telefônico para o cadastro completo de Pessoas
   Future<PersonEntry> convertToPerson({
     required PhoneContactItem contact,

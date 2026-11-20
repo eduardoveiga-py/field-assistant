@@ -46,7 +46,7 @@ Localizado em `lib/territory/map_engine/maplibre_native_adapter.dart`:
   - `supportsOfflineStorage: true`
   - `supportsRotation: true`
   - `supportsPitch: true`
-  - `supportsOfflineRouting: true`
+  - `supportsOfflineRouting: false`
   - `supportsOfflineGeocoding: true`
 
 ### 2.2. Visualizador Vetorial Nativo (`MapLibreVectorMapView`)

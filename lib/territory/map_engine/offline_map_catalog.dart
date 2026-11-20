@@ -22,10 +22,10 @@ class OfflineMapCatalog {
         sha256:
             '61d368e5461c360877918fcf57a4a2ad554f24ef5eecde9d4ef7b5bc6082ee20',
         bbox: const GeoBoundingBox(
-          minLat: -3.4000,
-          minLon: -68.2000,
-          maxLat: -3.0000,
-          maxLon: -67.7000,
+          minLat: -3.8500,
+          minLon: -69.0000,
+          maxLat: -2.7000,
+          maxLon: -67.5000,
         ),
         minZoom: 8,
         maxZoom: 16,

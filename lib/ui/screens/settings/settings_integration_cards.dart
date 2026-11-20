@@ -1131,10 +1131,316 @@ extension _SettingsIntegrationCards on _SettingsScreenState {
     }
   }
 
+  Widget _buildMultiAccountsConfigCard(bool isDark) {
+    final db = ref.read(repositoryProvider).db;
+    return Card(
+      child: ExpansionTile(
+        leading: const Icon(Icons.mark_email_read_outlined, color: AppTheme.primaryBlue),
+        title: const Text(
+          'Multi-contas de E-mail (Google, Hotmail, JWPUB)',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+        ),
+        subtitle: const Text(
+          'Gerencie múltiplas caixas postais unificadas estilo Outlook',
+          style: TextStyle(fontSize: 12),
+        ),
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: FutureBuilder<List<EmailAccount>>(
+              future: EmailAccountsManager.loadAccounts(db),
+              builder: (ctx, snapshot) {
+                final accounts = snapshot.data ?? [];
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (accounts.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8),
+                        child: Text(
+                          'Nenhuma conta adicional configurada. O Field Assistant pode sincronizar e-mails do Google, Hotmail, JWPUB ou servidores IMAP.',
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
+                      )
+                    else
+                      ...accounts.map((acc) {
+                        IconData icon;
+                        Color iconColor;
+                        switch (acc.providerType) {
+                          case EmailProviderType.google:
+                            icon = Icons.mail;
+                            iconColor = Colors.red;
+                            break;
+                          case EmailProviderType.hotmail:
+                            icon = Icons.email;
+                            iconColor = Colors.blue;
+                            break;
+                          case EmailProviderType.jwpub:
+                            icon = Icons.library_books;
+                            iconColor = AppTheme.primaryBlue;
+                            break;
+                          case EmailProviderType.exchange:
+                            icon = Icons.business;
+                            iconColor = Colors.teal;
+                            break;
+                          case EmailProviderType.custom:
+                            icon = Icons.alternate_email;
+                            iconColor = Colors.purple;
+                            break;
+                        }
+                        return ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: CircleAvatar(
+                            backgroundColor: iconColor.withValues(alpha: 0.15),
+                            child: Icon(icon, color: iconColor, size: 20),
+                          ),
+                          title: Text(acc.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                          subtitle: Text('${acc.email} (${acc.providerType.label})', style: const TextStyle(fontSize: 12)),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+                            onPressed: () async {
+                              await EmailAccountsManager.deleteAccount(db, acc.id);
+                              if (mounted) _updateState(() {});
+                            },
+                          ),
+                        );
+                      }),
+                    const SizedBox(height: 12),
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('Adicionar Conta de E-mail'),
+                      onPressed: () => _showAddEmailAccountDialog(db),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showAddEmailAccountDialog(AppDatabase db) async {
+    var selectedProvider = EmailProviderType.google;
+    final nameCtrl = TextEditingController(text: 'Google Pessoal');
+    final emailCtrl = TextEditingController();
+    final passCtrl = TextEditingController();
+    final userCtrl = TextEditingController();
+    final hostCtrl = TextEditingController();
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlgState) => AlertDialog(
+          title: const Text('Adicionar Conta de E-mail'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                DropdownButtonFormField<EmailProviderType>(
+                  initialValue: selectedProvider,
+                  decoration: const InputDecoration(labelText: 'Provedor de E-mail'),
+                  items: EmailProviderType.values.map((p) {
+                    return DropdownMenuItem(value: p, child: Text(p.label));
+                  }).toList(),
+                  onChanged: (val) {
+                    if (val != null) {
+                      setDlgState(() {
+                        selectedProvider = val;
+                        nameCtrl.text = val.label;
+                        hostCtrl.text = val.defaultHost;
+                      });
+                    }
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(labelText: 'Nome da Conta (ex: Gmail Pessoal)'),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: emailCtrl,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: const InputDecoration(labelText: 'Endereço de E-mail *'),
+                  onChanged: (val) {
+                    if (userCtrl.text.isEmpty) {
+                      userCtrl.text = val;
+                    }
+                  },
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: userCtrl,
+                  decoration: const InputDecoration(labelText: 'Nome de Usuário / Login'),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: passCtrl,
+                  obscureText: true,
+                  decoration: const InputDecoration(labelText: 'Senha ou Senha de Aplicativo *'),
+                ),
+                if (selectedProvider == EmailProviderType.custom || selectedProvider == EmailProviderType.exchange) ...[
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: hostCtrl,
+                    decoration: const InputDecoration(labelText: 'Servidor / Host'),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                final email = emailCtrl.text.trim();
+                final pass = passCtrl.text;
+                if (email.isEmpty || !email.contains('@')) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Informe um e-mail válido.')),
+                  );
+                  return;
+                }
+                final acc = EmailAccount.createPreset(
+                  providerType: selectedProvider,
+                  name: nameCtrl.text.trim(),
+                  email: email,
+                  username: userCtrl.text.trim().isNotEmpty ? userCtrl.text.trim() : email,
+                  customHost: hostCtrl.text.trim().isNotEmpty ? hostCtrl.text.trim() : null,
+                );
+                await EmailAccountsManager.saveAccount(db, acc, password: pass);
+                if (ctx.mounted) Navigator.pop(ctx);
+                if (mounted) _updateState(() {});
+              },
+              child: const Text('Salvar Conta'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmailContactsRegistryCard(bool isDark) {
+    final db = ref.read(repositoryProvider).db;
+    return Card(
+      child: ExpansionTile(
+        leading: const Icon(Icons.contacts_outlined, color: AppTheme.accentTeal),
+        title: const Text(
+          'Registro de Contatos de E-mail',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+        ),
+        subtitle: const Text(
+          'Remetentes salvos automaticamente e lista de sugestões',
+          style: TextStyle(fontSize: 12),
+        ),
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: FutureBuilder<List<EmailContact>>(
+              future: EmailContactsManager.loadSavedContacts(db),
+              builder: (ctx, snapshot) {
+                final contacts = snapshot.data ?? [];
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (contacts.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8),
+                        child: Text(
+                          'Nenhum contato registrado ainda. Novos remetentes de e-mails recebidos serão salvos aqui automaticamente.',
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
+                      )
+                    else
+                      ...contacts.map((c) {
+                        return ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: CircleAvatar(
+                            backgroundColor: AppTheme.accentTeal.withValues(alpha: 0.15),
+                            child: const Icon(Icons.person, color: AppTheme.accentTeal, size: 20),
+                          ),
+                          title: Text(c.name.isNotEmpty ? c.name : c.email, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                          subtitle: Text(c.email, style: const TextStyle(fontSize: 12)),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+                            onPressed: () async {
+                              await EmailContactsManager.deleteContact(db, c.email);
+                              if (mounted) _updateState(() {});
+                            },
+                          ),
+                        );
+                      }),
+                    const SizedBox(height: 12),
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.person_add, size: 18),
+                      label: const Text('Adicionar Contato Manualmente'),
+                      onPressed: () => _showAddEmailContactDialog(db),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showAddEmailContactDialog(AppDatabase db) async {
+    final nameCtrl = TextEditingController();
+    final emailCtrl = TextEditingController();
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Novo Contato de E-mail'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameCtrl,
+              decoration: const InputDecoration(labelText: 'Nome do Contato'),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: emailCtrl,
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(labelText: 'Endereço de E-mail *'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          FilledButton(
+            onPressed: () async {
+              final em = emailCtrl.text.trim();
+              if (em.isEmpty || !em.contains('@')) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Informe um e-mail válido.')),
+                );
+                return;
+              }
+              await EmailContactsManager.saveContact(db, email: em, name: nameCtrl.text.trim(), source: 'manual');
+              if (ctx.mounted) Navigator.pop(ctx);
+              if (mounted) _updateState(() {});
+            },
+            child: const Text('Salvar'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildExchangeConfigCard() => Card(
     child: ExpansionTile(
       title: const Text(
-        'Exchange ActiveSync (experimental)',
+        'Exchange ActiveSync',
         style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
       ),
       children: [
@@ -1144,7 +1450,7 @@ extension _SettingsIntegrationCards on _SettingsScreenState {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Somente leitura da INBOX, por senha (Basic) e HTTPS. Não suporta OAuth, políticas de dispositivo, envio ou anexos. Mensagens podem ser parciais; mantenha o correio oficial e seu backup.',
+                'Conexão com servidor Exchange corporativo/teocrático para sincronização de pastas de e-mail e envio direto via protocolo ActiveSync.',
                 style: TextStyle(fontSize: 12),
               ),
               const SizedBox(height: 12),

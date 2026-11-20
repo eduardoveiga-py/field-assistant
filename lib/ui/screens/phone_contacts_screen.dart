@@ -1268,18 +1268,182 @@ class _PhoneContactsScreenState extends ConsumerState<PhoneContactsScreen> {
                                               final mgr = ref.read(
                                                 phoneContactsManagerProvider,
                                               );
-                                              await mgr.deletePhoneContact(
-                                                item.id,
+                                              final repo = ref.read(
+                                                repositoryProvider,
                                               );
-                                              if (context.mounted) {
-                                                ScaffoldMessenger.of(context)
-                                                    .showSnackBar(
-                                                      const SnackBar(
-                                                        content: Text(
-                                                          'Contato telefônico removido.',
+                                              final hasConvertedPerson =
+                                                  item.convertedPersonId !=
+                                                  null;
+                                              PersonEntry? convertedPerson;
+                                              if (hasConvertedPerson) {
+                                                convertedPerson = await repo
+                                                    .getPersonById(
+                                                      item.convertedPersonId!,
+                                                    );
+                                              }
+
+                                              if (!context.mounted) return;
+                                              final action = await showDialog<String>(
+                                                context: context,
+                                                builder: (c) => AlertDialog(
+                                                  title: const Row(
+                                                    children: [
+                                                      Icon(
+                                                        Icons
+                                                            .warning_amber_rounded,
+                                                        color:
+                                                            AppTheme.alertRed,
+                                                      ),
+                                                      SizedBox(width: 8),
+                                                      Expanded(
+                                                        child: Text(
+                                                          'Excluir Contato Telefônico',
                                                         ),
                                                       ),
+                                                    ],
+                                                  ),
+                                                  content: Column(
+                                                    mainAxisSize:
+                                                        MainAxisSize.min,
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .start,
+                                                    children: [
+                                                      Text(
+                                                        'Deseja excluir o contato telefônico "${item.name}" (${item.phone})?',
+                                                        style: const TextStyle(
+                                                          fontSize: 14,
+                                                        ),
+                                                      ),
+                                                      if (hasConvertedPerson) ...[
+                                                        const SizedBox(
+                                                          height: 12,
+                                                        ),
+                                                        Container(
+                                                          padding:
+                                                              const EdgeInsets.all(
+                                                                10,
+                                                              ),
+                                                          decoration: BoxDecoration(
+                                                            color: AppTheme
+                                                                .accentTeal
+                                                                .withValues(
+                                                                  alpha: 0.1,
+                                                                ),
+                                                            borderRadius:
+                                                                BorderRadius.circular(
+                                                                  8,
+                                                                ),
+                                                            border: Border.all(
+                                                              color: AppTheme
+                                                                  .accentTeal
+                                                                  .withValues(
+                                                                    alpha: 0.3,
+                                                                  ),
+                                                            ),
+                                                          ),
+                                                          child: Text(
+                                                            'Aviso de Independência: Este contato foi promovido para o cadastro de Pessoas'
+                                                            '${convertedPerson != null ? " (\"${convertedPerson.name}\")" : ""}. '
+                                                            'Trata-se de registros distintos; excluir este contato telefônico NÃO afetará nem apagará a pessoa cadastrada.',
+                                                            style:
+                                                                const TextStyle(
+                                                                  fontSize: 12,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w500,
+                                                                ),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                      const SizedBox(
+                                                        height: 12,
+                                                      ),
+                                                      const Text(
+                                                        'A exclusão definitiva remove o contato permanentemente deste aparelho.',
+                                                        style: TextStyle(
+                                                          fontSize: 11,
+                                                          color: AppTheme
+                                                              .textMuted,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  actions: [
+                                                    TextButton(
+                                                      onPressed: () =>
+                                                          Navigator.pop(
+                                                            c,
+                                                            null,
+                                                          ),
+                                                      child: const Text(
+                                                        'Cancelar',
+                                                      ),
+                                                    ),
+                                                    OutlinedButton(
+                                                      onPressed: () =>
+                                                          Navigator.pop(
+                                                            c,
+                                                            'trash',
+                                                          ),
+                                                      child: const Text(
+                                                        'Mover para Lixeira',
+                                                      ),
+                                                    ),
+                                                    ElevatedButton(
+                                                      style:
+                                                          ElevatedButton.styleFrom(
+                                                            backgroundColor:
+                                                                AppTheme
+                                                                    .alertRed,
+                                                            foregroundColor:
+                                                                Colors.white,
+                                                          ),
+                                                      onPressed: () =>
+                                                          Navigator.pop(
+                                                            c,
+                                                            'permanent',
+                                                          ),
+                                                      child: const Text(
+                                                        'Excluir Definitivamente',
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              );
+
+                                              if (action == 'trash') {
+                                                await mgr.deletePhoneContact(
+                                                  item.id,
+                                                );
+                                                if (context.mounted) {
+                                                  ScaffoldMessenger.of(
+                                                    context,
+                                                  ).showSnackBar(
+                                                    SnackBar(
+                                                      content: Text(
+                                                        '"${item.name}" movido para a Lixeira.',
+                                                      ),
+                                                    ),
+                                                  );
+                                                }
+                                              } else if (action ==
+                                                  'permanent') {
+                                                await mgr
+                                                    .permanentlyDeletePhoneContact(
+                                                      item.id,
                                                     );
+                                                if (context.mounted) {
+                                                  ScaffoldMessenger.of(
+                                                    context,
+                                                  ).showSnackBar(
+                                                    SnackBar(
+                                                      content: Text(
+                                                        '"${item.name}" excluído definitivamente.',
+                                                      ),
+                                                    ),
+                                                  );
+                                                }
                                               }
                                             }
                                           },

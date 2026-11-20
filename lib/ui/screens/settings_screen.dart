@@ -7,6 +7,8 @@ import 'package:uuid/uuid.dart';
 import 'package:eas_client/eas_client.dart' as eas;
 
 import '../../inbox/exchange_service.dart';
+import '../../inbox/email_account_model.dart';
+import '../../inbox/email_contacts_manager.dart';
 import '../../appointments/calendar_sync_coordinator.dart';
 import '../../core/app_logger.dart';
 import '../../database/app_database.dart';
@@ -860,12 +862,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
           const SizedBox(height: 20),
 
-          // Seção: E-mail Teocrático e JW Pub (IMAP)
+          // Seção: E-mail Teocrático, Multi-contas e Contatos
           const Text(
-            'E-mail Teocrático',
+            'Contas de E-mail & Contatos (Multi-contas)',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
+          _buildMultiAccountsConfigCard(isDark),
+          _buildEmailContactsRegistryCard(isDark),
           _buildJwEmailConfigCard(isDark),
           _buildExchangeConfigCard(),
 

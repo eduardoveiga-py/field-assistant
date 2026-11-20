@@ -26,6 +26,7 @@ import 'screens/contacts_map_screen.dart';
 import 'screens/inbox_screen.dart';
 import 'screens/tasks_screen.dart';
 import 'screens/knowledge_base_screen.dart';
+import 'screens/picture_bank_screen.dart';
 
 class MainNavigationShell extends ConsumerStatefulWidget {
   const MainNavigationShell({super.key});
@@ -204,6 +205,8 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
         return const TasksScreen();
       case AppFeature.knowledge:
         return const KnowledgeBaseScreen();
+      case AppFeature.pictureBank:
+        return const PictureBankScreen();
     }
   }
 
@@ -252,11 +255,16 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     color: (isDark ? const Color(0xFF94A3B8) : Colors.blueGrey)
-                        .withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(8),
+                        .withValues(alpha: 0.16),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: (isDark ? const Color(0xFF94A3B8) : Colors.blueGrey)
+                          .withValues(alpha: 0.35),
+                      width: 1.2,
+                    ),
                   ),
                   child: Icon(
-                    Icons.settings,
+                    _showingSettings ? Icons.settings : Icons.settings_outlined,
                     color: isDark ? const Color(0xFF94A3B8) : Colors.blueGrey,
                     size: 24,
                   ),
@@ -293,44 +301,134 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
     );
   }
 
+  static Color _getFeatureColor(AppFeature feature) {
+    switch (feature) {
+      case AppFeature.today:
+        return const Color(0xFF3B82F6);
+      case AppFeature.people:
+        return const Color(0xFF10B981);
+      case AppFeature.phones:
+        return const Color(0xFF6366F1);
+      case AppFeature.agenda:
+        return const Color(0xFFF59E0B);
+      case AppFeature.studies:
+        return const Color(0xFF7C3AED);
+      case AppFeature.dashboard:
+        return AppTheme.primaryBlue;
+      case AppFeature.experiences:
+        return const Color(0xFF059669);
+      case AppFeature.notesResearch:
+        return const Color(0xFFD97706);
+      case AppFeature.ticuna:
+        return const Color(0xFF0D9488);
+      case AppFeature.territoryMaps:
+        return const Color(0xFF0284C7);
+      case AppFeature.inbox:
+        return const Color(0xFF2563EB);
+      case AppFeature.pictureBank:
+        return const Color(0xFFE11D48);
+      case AppFeature.tasksProjects:
+        return const Color(0xFF0891B2);
+      case AppFeature.knowledge:
+        return const Color(0xFF4F46E5);
+    }
+  }
+
+  static IconData _getFeatureIcon(
+    AppFeature feature, {
+    required bool isSelected,
+  }) {
+    switch (feature) {
+      case AppFeature.today:
+        return isSelected ? Icons.today : Icons.today_outlined;
+      case AppFeature.people:
+        return isSelected ? Icons.people : Icons.people_outline;
+      case AppFeature.phones:
+        return isSelected ? Icons.phone : Icons.phone_outlined;
+      case AppFeature.agenda:
+        return isSelected
+            ? Icons.calendar_month
+            : Icons.calendar_month_outlined;
+      case AppFeature.studies:
+        return isSelected ? Icons.school : Icons.school_outlined;
+      case AppFeature.dashboard:
+        return isSelected ? Icons.analytics : Icons.analytics_outlined;
+      case AppFeature.experiences:
+        return isSelected ? Icons.auto_stories : Icons.auto_stories_outlined;
+      case AppFeature.notesResearch:
+        return isSelected ? Icons.note_alt : Icons.note_alt_outlined;
+      case AppFeature.ticuna:
+        return isSelected ? Icons.translate : Icons.translate_outlined;
+      case AppFeature.territoryMaps:
+        return isSelected ? Icons.explore : Icons.explore_outlined;
+      case AppFeature.inbox:
+        return isSelected ? Icons.mail : Icons.mail_outline;
+      case AppFeature.pictureBank:
+        return isSelected
+            ? Icons.photo_library
+            : Icons.photo_library_outlined;
+      case AppFeature.tasksProjects:
+        return isSelected ? Icons.task_alt : Icons.task_alt_outlined;
+      case AppFeature.knowledge:
+        return isSelected ? Icons.menu_book : Icons.menu_book_outlined;
+    }
+  }
+
+  static Widget _buildNavIcon({
+    required IconData icon,
+    required Color color,
+    required bool isSelected,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: isSelected
+            ? color.withValues(alpha: 0.24)
+            : color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isSelected ? color : color.withValues(alpha: 0.36),
+          width: isSelected ? 1.8 : 1.2,
+        ),
+        boxShadow: isSelected
+            ? [
+                BoxShadow(
+                  color: color.withValues(alpha: 0.28),
+                  blurRadius: 6,
+                  offset: const Offset(0, 1),
+                ),
+              ]
+            : null,
+      ),
+      child: Icon(
+        icon,
+        size: 22,
+        color: isSelected ? color : color.withValues(alpha: 0.92),
+      ),
+    );
+  }
+
   Widget _buildMoreMenuItem(
     BuildContext ctx, {
     required AppFeature feature,
     required bool isSelected,
     required VoidCallback onTap,
   }) {
-    Color color;
-    switch (feature) {
-      case AppFeature.studies:
-        color = const Color(0xFF7C3AED);
-        break;
-      case AppFeature.dashboard:
-        color = AppTheme.primaryBlue;
-        break;
-      case AppFeature.experiences:
-        color = const Color(0xFF059669);
-        break;
-      case AppFeature.notesResearch:
-        color = const Color(0xFFD97706);
-        break;
-      case AppFeature.ticuna:
-        color = const Color(0xFF0D9488);
-        break;
-      case AppFeature.territoryMaps:
-        color = const Color(0xFF0284C7);
-        break;
-      default:
-        color = AppTheme.primaryBlue;
-    }
+    final color = _getFeatureColor(feature);
+    final icon = _getFeatureIcon(feature, isSelected: isSelected);
 
     return ListTile(
       leading: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(8),
+          color: color.withValues(alpha: isSelected ? 0.22 : 0.12),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected ? color : color.withValues(alpha: 0.32),
+            width: isSelected ? 1.6 : 1.0,
+          ),
         ),
-        child: Icon(feature.icon, color: color, size: 24),
+        child: Icon(icon, color: color, size: 24),
       ),
       title: Text(
         feature.title,
@@ -375,6 +473,8 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
         return 'Tarefas';
       case AppFeature.knowledge:
         return 'Conhecimento';
+      case AppFeature.pictureBank:
+        return 'Gravuras';
     }
   }
 
@@ -420,26 +520,35 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
         AppFeature.notesResearch,
         AppFeature.ticuna,
         AppFeature.territoryMaps,
+        AppFeature.inbox,
+        AppFeature.tasksProjects,
+        AppFeature.knowledge,
+        AppFeature.pictureBank,
       ];
 
       for (final f in railCandidates) {
         if (!activeFeatures.contains(f)) continue;
-        final railIcon = f == AppFeature.territoryMaps
-            ? Icons.explore_outlined
-            : f.icon;
-        final selectedRailIcon = f == AppFeature.territoryMaps
-            ? Icons.explore
-            : f.icon;
+        final iconUnselected = _getFeatureIcon(f, isSelected: false);
+        final iconSelected = _getFeatureIcon(f, isSelected: true);
+        final color = _getFeatureColor(f);
         railDestinations.add(
           NavigationRailDestination(
             icon: Semantics(
               label: 'Navegar para ${_getFeatureLabel(f, strings)}',
-              child: Icon(railIcon),
+              child: _buildNavIcon(
+                icon: iconUnselected,
+                color: color,
+                isSelected: false,
+              ),
             ),
             selectedIcon: Semantics(
               selected: true,
               label: 'Navegar para ${_getFeatureLabel(f, strings)}',
-              child: Icon(selectedRailIcon),
+              child: _buildNavIcon(
+                icon: iconSelected,
+                color: color,
+                isSelected: true,
+              ),
             ),
             label: Text(_getFeatureLabel(f, strings)),
           ),
@@ -447,17 +556,29 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
         railFeatures.add(f);
       }
 
+      final isDark = Theme.of(context).brightness == Brightness.dark;
+      final settingsColor =
+          isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+
       // Adiciona Ajustes no final do Rail
       railDestinations.add(
         NavigationRailDestination(
           icon: Semantics(
             label: 'Navegar para Ajustes e Backup',
-            child: const Icon(Icons.settings_outlined),
+            child: _buildNavIcon(
+              icon: Icons.settings_outlined,
+              color: settingsColor,
+              isSelected: false,
+            ),
           ),
           selectedIcon: Semantics(
             selected: true,
             label: 'Navegar para Ajustes e Backup',
-            child: const Icon(Icons.settings),
+            child: _buildNavIcon(
+              icon: Icons.settings,
+              color: settingsColor,
+              isSelected: true,
+            ),
           ),
           label: Text(strings.navSettings.split(' ').first),
         ),
@@ -493,6 +614,7 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
                           }
                         },
                         labelType: NavigationRailLabelType.all,
+                        indicatorColor: Colors.transparent,
                         leading: const Padding(
                           padding: EdgeInsets.symmetric(vertical: 14),
                           child: Icon(
@@ -544,30 +666,56 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
     final barDestinations = <NavigationDestination>[];
     for (final f in primaryBarFeatures) {
       final label = _getFeatureLabel(f, strings);
+      final color = _getFeatureColor(f);
+      final iconUnselected = _getFeatureIcon(f, isSelected: false);
+      final iconSelected = _getFeatureIcon(f, isSelected: true);
       barDestinations.add(
         NavigationDestination(
-          icon: Semantics(label: 'Aba $label', child: Icon(f.icon, size: 22)),
+          icon: Semantics(
+            label: 'Aba $label',
+            child: _buildNavIcon(
+              icon: iconUnselected,
+              color: color,
+              isSelected: false,
+            ),
+          ),
           selectedIcon: Semantics(
             selected: true,
             label: 'Aba $label',
-            child: Icon(f.icon, size: 22),
+            child: _buildNavIcon(
+              icon: iconSelected,
+              color: color,
+              isSelected: true,
+            ),
           ),
           label: label,
         ),
       );
     }
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final moreColor =
+        isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+
     // Botão Mais
     barDestinations.add(
       NavigationDestination(
         icon: Semantics(
           label: 'Abrir menu Mais recursos do ministério',
-          child: const Icon(Icons.more_horiz, size: 22),
+          child: _buildNavIcon(
+            icon: Icons.more_horiz,
+            color: moreColor,
+            isSelected: false,
+          ),
         ),
         selectedIcon: Semantics(
           selected: true,
           label: 'Abrir menu Mais recursos do ministério',
-          child: const Icon(Icons.more_horiz, size: 22),
+          child: _buildNavIcon(
+            icon: Icons.more_horiz,
+            color: moreColor,
+            isSelected: true,
+          ),
         ),
         label: 'Mais',
       ),
@@ -594,7 +742,7 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
         },
         height: 64,
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-        indicatorColor: AppTheme.primaryBlue.withValues(alpha: 0.15),
+        indicatorColor: Colors.transparent,
         destinations: barDestinations,
       ),
     );

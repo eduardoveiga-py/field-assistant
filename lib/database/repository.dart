@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 
 import '../core/app_logger.dart';
 import '../core/sync_timestamp.dart';
+import '../notifications/local_reminder_service.dart';
 import 'app_database.dart';
 
 class AppRepository {
@@ -21,7 +22,7 @@ class AppRepository {
     return SyncTimestamp.normalizeMapDates(raw);
   }
 
-  Future<void> _recordSyncOperation({
+  Future<void> recordSyncOperation({
     required String entityType,
     required String entityId,
     required String operation,
@@ -47,6 +48,20 @@ class AppRepository {
         );
   }
 
+  Future<void> _recordSyncOperation({
+    required String entityType,
+    required String entityId,
+    required String operation,
+    required Map<String, dynamic> payload,
+    Map<String, dynamic>? baseData,
+  }) => recordSyncOperation(
+    entityType: entityType,
+    entityId: entityId,
+    operation: operation,
+    payload: payload,
+    baseData: baseData,
+  );
+
   // --------------------------------------------------------------------------
   // MÓDULO: PESSOAS
   // --------------------------------------------------------------------------
@@ -68,10 +83,12 @@ class AppRepository {
         .get();
   }
 
-  Future<PersonEntry?> getPersonById(String id) {
-    return (db.select(db.people)
-          ..where((tbl) => tbl.id.equals(id) & tbl.deletedAt.isNull()))
-        .getSingleOrNull();
+  Future<PersonEntry?> getPersonById(String id, {bool includeDeleted = false}) {
+    final query = db.select(db.people)..where((tbl) => tbl.id.equals(id));
+    if (!includeDeleted) {
+      query.where((tbl) => tbl.deletedAt.isNull());
+    }
+    return query.getSingleOrNull();
   }
 
   Future<List<PersonEntry>> searchPeople(String query) async {
@@ -507,10 +524,15 @@ class AppRepository {
     )..where((tbl) => tbl.deletedAt.isNull())).get();
   }
 
-  Future<BibleStudyEntry?> getStudyById(String id) {
-    return (db.select(db.bibleStudies)
-          ..where((tbl) => tbl.id.equals(id) & tbl.deletedAt.isNull()))
-        .getSingleOrNull();
+  Future<BibleStudyEntry?> getStudyById(
+    String id, {
+    bool includeDeleted = false,
+  }) {
+    final query = db.select(db.bibleStudies)..where((tbl) => tbl.id.equals(id));
+    if (!includeDeleted) {
+      query.where((tbl) => tbl.deletedAt.isNull());
+    }
+    return query.getSingleOrNull();
   }
 
   Future<BibleStudyEntry?> getPrimaryStudyForPerson(String personId) async {
@@ -1244,6 +1266,18 @@ class AppRepository {
         'deletedAt': act.deletedAt,
       });
     }
+    final phoneContacts = await (db.select(
+      db.phoneContacts,
+    )..where((tbl) => tbl.deletedAt.isNotNull())).get();
+    for (final pc in phoneContacts) {
+      result.add({
+        'type': 'phone_contacts',
+        'id': pc.id,
+        'title': pc.name,
+        'subtitle': 'Contato Telefônico (${pc.phone})',
+        'deletedAt': pc.deletedAt,
+      });
+    }
     result.sort(
       (a, b) =>
           (b['deletedAt'] as DateTime).compareTo(a['deletedAt'] as DateTime),
@@ -1326,6 +1360,20 @@ class AppRepository {
           await db.update(db.activityRecords).replace(updated);
           restoredJson = updated.toJson();
         }
+      } else if (entityType == 'phone_contacts') {
+        final item = await (db.select(
+          db.phoneContacts,
+        )..where((t) => t.id.equals(id))).getSingleOrNull();
+        if (item != null) {
+          baseJson = item.toJson();
+          final updated = item.copyWith(
+            deletedAt: const Value(null),
+            updatedAt: now,
+            revision: item.revision + 1,
+          );
+          await db.update(db.phoneContacts).replace(updated);
+          restoredJson = updated.toJson();
+        }
       }
       await _recordSyncOperation(
         entityType: entityType,
@@ -1346,6 +1394,23 @@ class AppRepository {
   Future<void> permanentlyDeleteItem(String entityType, String id) async {
     await db.transaction(() async {
       if (entityType == 'people') {
+        // Desvincula tarefas, artigos e notas sem apagá-los
+        await (db.update(db.tasks)..where((t) => t.personId.equals(id))).write(
+          const TasksCompanion(personId: Value(null)),
+        );
+        await (db.update(db.knowledgeNotes)
+              ..where((t) => t.personId.equals(id)))
+            .write(const KnowledgeNotesCompanion(personId: Value(null)));
+        await (db.update(db.knowledgeQuestions)
+              ..where((t) => t.personId.equals(id)))
+            .write(const KnowledgeQuestionsCompanion(personId: Value(null)));
+        await (db.update(db.knowledgeDocuments)
+              ..where((t) => t.personId.equals(id)))
+            .write(const KnowledgeDocumentsCompanion(personId: Value(null)));
+        await (db.update(db.knowledgeResources)
+              ..where((t) => t.personId.equals(id)))
+            .write(const KnowledgeResourcesCompanion(personId: Value(null)));
+
         // Uma nota pode referenciar uma visita desta pessoa mesmo quando seu
         // personId é outro; remova-a antes da visita para respeitar a FK.
         final visits = await (db.select(
@@ -1356,9 +1421,20 @@ class AppRepository {
           db.appointments,
         )..where((t) => t.personId.equals(id))).get();
         final appointmentIds = appointments.map((a) => a.id).toList();
-        await (db.delete(
-          db.calendarEventLinks,
-        )..where((t) => t.appointmentId.isIn(appointmentIds))).go();
+        final now = DateTime.now();
+
+        if (appointmentIds.isNotEmpty) {
+          await (db.update(
+            db.calendarEventLinks,
+          )..where((t) => t.appointmentId.isIn(appointmentIds))).write(
+            CalendarEventLinksCompanion(
+              syncStatus: const Value('pending_upload'),
+              deletedAt: Value(now),
+              updatedAt: Value(now),
+            ),
+          );
+        }
+
         await (db.delete(
           db.voiceNotes,
         )..where((t) => t.personId.equals(id) | t.visitId.isIn(visitIds))).go();
@@ -1368,9 +1444,75 @@ class AppRepository {
           const PhoneContactsCompanion(convertedPersonId: Value(null)),
         );
         await (db.delete(db.visits)..where((t) => t.personId.equals(id))).go();
+
+        // Trata estudos: exclui estudos exclusivos; estudos compartilhados apenas perdem a participação
+        final myParticipants = await (db.select(
+          db.studyParticipants,
+        )..where((t) => t.personId.equals(id))).get();
+
+        for (final mp in myParticipants) {
+          final allStudyParts =
+              await (db.select(db.studyParticipants)..where(
+                    (t) => t.studyId.equals(mp.studyId) & t.deletedAt.isNull(),
+                  ))
+                  .get();
+          final otherParts = allStudyParts
+              .where((p) => p.personId != id)
+              .toList();
+          if (otherParts.isEmpty) {
+            final studyAppts = await (db.select(
+              db.appointments,
+            )..where((t) => t.studyId.equals(mp.studyId))).get();
+            final studyApptIds = studyAppts.map((a) => a.id).toList();
+            if (studyApptIds.isNotEmpty) {
+              await LocalReminderService(db: db)
+                  .cancelRemindersForAppointments(studyApptIds);
+            }
+            await (db.delete(
+              db.studySessions,
+            )..where((t) => t.studyId.equals(mp.studyId))).go();
+            await (db.delete(
+              db.appointments,
+            )..where((t) => t.studyId.equals(mp.studyId))).go();
+            await (db.delete(
+              db.bibleStudies,
+            )..where((t) => t.id.equals(mp.studyId))).go();
+            await _recordSyncOperation(
+              entityType: 'bible_studies',
+              entityId: mp.studyId,
+              operation: 'HARD_DELETE',
+              payload: {'id': mp.studyId, 'hardDelete': true},
+            );
+          } else {
+            // Estudo compartilhado com outros participantes:
+            // Reatribui compromissos do estudo para o participante remanescente,
+            // garantindo que o estudo e seus horários sejam preservados para os outros participantes
+            final nextOwnerId = otherParts.first.personId;
+            await (db.update(db.appointments)..where(
+                  (t) => t.studyId.equals(mp.studyId) & t.personId.equals(id),
+                ))
+                .write(
+                  AppointmentsCompanion(
+                    personId: Value(nextOwnerId),
+                    updatedAt: Value(now),
+                  ),
+                );
+          }
+        }
+
         await (db.delete(
           db.studyParticipants,
         )..where((t) => t.personId.equals(id))).go();
+
+        // Cancela lembretes e remove compromissos exclusivos restantes da pessoa
+        final remainingAppts = await (db.select(
+          db.appointments,
+        )..where((t) => t.personId.equals(id))).get();
+        final remainingApptIds = remainingAppts.map((a) => a.id).toList();
+        if (remainingApptIds.isNotEmpty) {
+          await LocalReminderService(db: db)
+              .cancelRemindersForAppointments(remainingApptIds);
+        }
         await (db.delete(
           db.appointments,
         )..where((t) => t.personId.equals(id))).go();
@@ -1403,24 +1545,44 @@ class AppRepository {
         final appointments = await (db.select(
           db.appointments,
         )..where((t) => t.studyId.equals(id))).get();
-        await (db.delete(db.calendarEventLinks)..where(
-              (t) =>
-                  t.appointmentId.isIn(appointments.map((a) => a.id).toList()),
-            ))
-            .go();
+        final apptIds = appointments.map((a) => a.id).toList();
+        if (apptIds.isNotEmpty) {
+          final now = DateTime.now();
+          await LocalReminderService(db: db)
+              .cancelRemindersForAppointments(apptIds);
+          await (db.update(
+            db.calendarEventLinks,
+          )..where((t) => t.appointmentId.isIn(apptIds))).write(
+            CalendarEventLinksCompanion(
+              syncStatus: const Value('pending_upload'),
+              deletedAt: Value(now),
+              updatedAt: Value(now),
+            ),
+          );
+        }
         await (db.delete(
           db.appointments,
         )..where((t) => t.studyId.equals(id))).go();
         await (db.delete(db.bibleStudies)..where((t) => t.id.equals(id))).go();
       } else if (entityType == 'appointments') {
-        await (db.delete(
+        final now = DateTime.now();
+        await LocalReminderService(db: db).cancelRemindersForAppointment(id);
+        await (db.update(
           db.calendarEventLinks,
-        )..where((t) => t.appointmentId.equals(id))).go();
+        )..where((t) => t.appointmentId.equals(id))).write(
+          CalendarEventLinksCompanion(
+            syncStatus: const Value('pending_upload'),
+            deletedAt: Value(now),
+            updatedAt: Value(now),
+          ),
+        );
         await (db.delete(db.appointments)..where((t) => t.id.equals(id))).go();
       } else if (entityType == 'activity_records') {
         await (db.delete(
           db.activityRecords,
         )..where((t) => t.id.equals(id))).go();
+      } else if (entityType == 'phone_contacts') {
+        await (db.delete(db.phoneContacts)..where((t) => t.id.equals(id))).go();
       }
       await _recordSyncOperation(
         entityType: entityType,

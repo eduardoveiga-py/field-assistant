@@ -2,9 +2,11 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:drift/drift.dart' as drift;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/app_logger.dart';
 import '../database/app_database.dart';
+import '../ui/providers.dart';
 
 /// Tipo de lembrete local do ministério
 enum ReminderType {
@@ -172,6 +174,46 @@ class LocalReminderService {
     AppLogger.info('Lembrete local cancelado: $reminderId');
   }
 
+  /// Cancela todos os lembretes associados a um compromisso específico
+  Future<int> cancelRemindersForAppointment(String appointmentId) async {
+    int cancelledCount = 0;
+    final defaultKey = '$kvPrefix$appointmentId';
+    final defaultApptKey = '${kvPrefix}appt_$appointmentId';
+    final deletedDirect =
+        await (db.delete(db.appKvStore)..where(
+              (t) => t.key.equals(defaultKey) | t.key.equals(defaultApptKey),
+            ))
+            .go();
+    cancelledCount += deletedDirect;
+
+    final allReminders = await getAllReminders();
+    for (final rem in allReminders) {
+      if (rem.relatedEntityId == appointmentId &&
+          rem.id != appointmentId &&
+          rem.id != 'appt_$appointmentId') {
+        await cancelReminder(rem.id);
+        cancelledCount++;
+      }
+    }
+    AppLogger.info(
+      'Lembretes cancelados para o compromisso $appointmentId: $cancelledCount',
+    );
+    return cancelledCount;
+  }
+
+  /// Cancela lembretes para múltiplos compromissos
+  Future<int> cancelRemindersForAppointments(
+    Iterable<String> appointmentIds,
+  ) async {
+    final idSet = appointmentIds.toSet();
+    if (idSet.isEmpty) return 0;
+    int total = 0;
+    for (final id in idSet) {
+      total += await cancelRemindersForAppointment(id);
+    }
+    return total;
+  }
+
   /// Sincroniza lembretes a partir de compromissos futuros da Agenda
   Future<int> syncRemindersFromAppointments() async {
     final now = DateTime.now().toUtc();
@@ -210,3 +252,9 @@ class LocalReminderService {
     _reminderTriggeredController.close();
   }
 }
+
+/// Provider do LocalReminderService
+final localReminderServiceProvider = Provider<LocalReminderService>((ref) {
+  final db = ref.watch(databaseProvider);
+  return LocalReminderService(db: db);
+});

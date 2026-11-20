@@ -24,9 +24,11 @@ output="$work/output"
 layers="$work/layers"
 
 echo "=== [1/6] Verificando dependências de ferramentas cartográficas ==="
-for cmd in curl sha256sum osmium ogr2ogr tippecanoe; do
+for cmd in curl sha256sum osmium ogr2ogr tippecanoe python3; do
   if ! command -v "$cmd" &>/dev/null; then
-    echo "Aviso: '$cmd' não encontrado no PATH. Modo emulação ou ambiente de produção requerido." >&2
+    echo "ERRO CRÍTICO: Ferramenta cartográfica obrigatória '$cmd' não encontrada no PATH." >&2
+    echo "O pipeline vetorial regional encerra em modo fail-closed." >&2
+    exit 1
   fi
 done
 
@@ -41,16 +43,25 @@ else
   echo "Arquivo $source_pbf já existente, pulando download."
 fi
 
+if [ ! -s "$source_pbf" ]; then
+  echo "ERRO CRÍTICO: Extrato OSM '$source_pbf' ausente ou vazio." >&2
+  exit 1
+fi
+if ! osmium fileinfo "$source_pbf" &>/dev/null; then
+  echo "ERRO CRÍTICO: Extrato OSM '$source_pbf' corrompido ou inválido (falha em osmium fileinfo)." >&2
+  exit 1
+fi
+
 sha256sum "$source_pbf" > "$output/source-amazonas-sha256.txt"
 
-echo "=== [3/6] Recortando Bounding Box do Alto Solimões (-68.20, -3.40, -67.70, -3.00) ==="
+echo "=== [3/6] Recortando Bounding Box Canônica do Alto Solimões (-69.00, -3.85, -67.50, -2.70) ==="
 sai_pbf="$work/alto_solimoes.osm.pbf"
-if command -v osmium &>/dev/null; then
-  osmium extract --strategy=smart --bbox=-68.20,-3.40,-67.70,-3.00 \
-    "$source_pbf" -o "$sai_pbf" --overwrite
-else
-  echo "Emulando recorte de PBF para $sai_pbf..."
-  touch "$sai_pbf"
+osmium extract --strategy=smart --bbox=-69.00,-3.85,-67.50,-2.70 \
+  "$source_pbf" -o "$sai_pbf" --overwrite
+
+if [ ! -s "$sai_pbf" ]; then
+  echo "ERRO CRÍTICO: Falha ao gerar extrato recortado '$sai_pbf' (arquivo vazio ou ausente)." >&2
+  exit 1
 fi
 
 echo "=== [4/6] Extraindo camadas temáticas vetoriais GeoJSON / GeoPackage ==="
@@ -61,58 +72,41 @@ echo "=== [4/6] Extraindo camadas temáticas vetoriais GeoJSON / GeoPackage ==="
 # 4. places: sede municipal, bairros, comunidades indígenas (Betânia) e ribeirinhas
 # 5. poi: postos de saúde, escolas, portos, templos e locais de utilidade
 
-if command -v ogr2ogr &>/dev/null && [ -s "$sai_pbf" ]; then
-  ogr2ogr -f GeoJSONSeq "$layers/water.geojsonseq" "$sai_pbf" multipolygons \
-    -where "natural IN ('water','bay') OR other_tags LIKE '%riverbank%'"
-  ogr2ogr -f GeoJSONSeq "$layers/waterways.geojsonseq" "$sai_pbf" lines \
-    -where "waterway IS NOT NULL"
-  ogr2ogr -f GeoJSONSeq "$layers/transportation.geojsonseq" "$sai_pbf" lines \
-    -where "highway IS NOT NULL"
-  ogr2ogr -f GeoJSONSeq "$layers/places.geojsonseq" "$sai_pbf" points \
-    -where "place IS NOT NULL AND name IS NOT NULL"
-  ogr2ogr -f GeoJSONSeq "$layers/poi.geojsonseq" "$sai_pbf" points \
-    -where "amenity IS NOT NULL OR leisure IS NOT NULL OR shop IS NOT NULL"
-fi
+ogr2ogr -f GeoJSONSeq "$layers/water.geojsonseq" "$sai_pbf" multipolygons \
+  -where "natural IN ('water','bay') OR other_tags LIKE '%riverbank%'"
+ogr2ogr -f GeoJSONSeq "$layers/waterways.geojsonseq" "$sai_pbf" lines \
+  -where "waterway IS NOT NULL"
+ogr2ogr -f GeoJSONSeq "$layers/transportation.geojsonseq" "$sai_pbf" lines \
+  -where "highway IS NOT NULL"
+ogr2ogr -f GeoJSONSeq "$layers/places.geojsonseq" "$sai_pbf" points \
+  -where "place IS NOT NULL AND name IS NOT NULL"
+ogr2ogr -f GeoJSONSeq "$layers/poi.geojsonseq" "$sai_pbf" points \
+  -where "amenity IS NOT NULL OR leisure IS NOT NULL OR shop IS NOT NULL"
 
 echo "=== [5/6] Gerando arquivo PMTiles v3 através do Tippecanoe ==="
 pmtiles_target="$output/alto_solimoes.pmtiles"
 
-if command -v tippecanoe &>/dev/null && [ -d "$layers" ]; then
-  tippecanoe \
-    -o "$pmtiles_target" \
-    --minimum-zoom=8 \
-    --maximum-zoom=16 \
-    --drop-densest-as-needed \
-    --extend-zooms-if-still-dropping \
-    --force \
-    -l water "$layers/water.geojsonseq" \
-    -l waterways "$layers/waterways.geojsonseq" \
-    -l transportation "$layers/transportation.geojsonseq" \
-    -l places "$layers/places.geojsonseq" \
-    -l poi "$layers/poi.geojsonseq"
-else
-  echo "Tippecanoe indisponível; gerando arquivo sintético verificado PMTiles v3..."
-  # Escreve arquivo estruturado PMTiles v3 de contingência para validação estrita
-  python3 -c "
-import sys
-header = bytearray(127)
-header[0:7] = b'PMTiles'
-header[7] = 3 # v3
-# Escreve offsets canônicos
-with open('$pmtiles_target', 'wb') as f:
-    f.write(header)
-    f.write(b'\x00' * (1024 * 64))
-" 2>/dev/null || true
+tippecanoe \
+  -o "$pmtiles_target" \
+  --minimum-zoom=8 \
+  --maximum-zoom=16 \
+  --drop-densest-as-needed \
+  --extend-zooms-if-still-dropping \
+  --force \
+  -l water "$layers/water.geojsonseq" \
+  -l waterways "$layers/waterways.geojsonseq" \
+  -l transportation "$layers/transportation.geojsonseq" \
+  -l places "$layers/places.geojsonseq" \
+  -l poi "$layers/poi.geojsonseq"
+
+if [ ! -s "$pmtiles_target" ]; then
+  echo "ERRO CRÍTICO: Falha na execução do tippecanoe ou arquivo '$pmtiles_target' vazio." >&2
+  exit 1
 fi
 
 echo "=== [6/6] Gerando Manifesto Imutável e Checksum SHA-256 ==="
-if [ -f "$pmtiles_target" ]; then
-  pkg_size=$(stat -c%s "$pmtiles_target" 2>/dev/null || stat -f%z "$pmtiles_target" 2>/dev/null || wc -c < "$pmtiles_target")
-  pkg_hash=$(sha256sum "$pmtiles_target" | awk '{print $1}')
-else
-  pkg_size=15728640
-  pkg_hash="61d368e5461c360877918fcf57a4a2ad554f24ef5eecde9d4ef7b5bc6082ee20"
-fi
+pkg_size=$(stat -c%s "$pmtiles_target" 2>/dev/null || stat -f%z "$pmtiles_target" 2>/dev/null || wc -c < "$pmtiles_target")
+pkg_hash=$(sha256sum "$pmtiles_target" | awk '{print $1}')
 
 cat <<EOF > "$output/alto_solimoes_manifest.json"
 {
@@ -122,10 +116,10 @@ cat <<EOF > "$output/alto_solimoes_manifest.json"
   "sizeBytes": $pkg_size,
   "sha256": "$pkg_hash",
   "bbox": {
-    "minLat": -3.4000,
-    "minLon": -68.2000,
-    "maxLat": -3.0000,
-    "maxLon": -67.7000
+    "minLat": -3.8500,
+    "minLon": -69.0000,
+    "maxLat": -2.7000,
+    "maxLon": -67.5000
   },
   "minZoom": 8,
   "maxZoom": 16,

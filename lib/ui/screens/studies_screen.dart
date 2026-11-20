@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'knowledge_base_screen.dart';
 
 import '../../appointments/availability_engine.dart';
+import '../../appointments/schedule_release_coordinator.dart';
 import '../../core/app_logger.dart';
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';

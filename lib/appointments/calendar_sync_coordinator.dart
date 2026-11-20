@@ -57,7 +57,9 @@ class CalendarSyncCoordinator {
 
   CalendarProvider? getProviderByName(String providerName) {
     if (providerName == 'google') return googleProvider;
-    if (providerName == 'apple_eventkit') return appleProvider;
+    if (providerName == 'apple_eventkit' || providerName == 'apple') {
+      return appleProvider;
+    }
     return null;
   }
 
@@ -400,7 +402,7 @@ class CalendarSyncCoordinator {
   }
 
   /// Trata exclusão lógica de compromisso: propaga ao calendário externo e marca tombstone no vínculo
-  Future<void> handleLocalAppointmentDeleted(String appointmentId) async {
+  Future<bool> handleLocalAppointmentDeleted(String appointmentId) async {
     final links =
         await (db.select(db.calendarEventLinks)..where(
               (t) =>
@@ -408,30 +410,65 @@ class CalendarSyncCoordinator {
             ))
             .get();
 
+    bool allSucceeded = true;
     for (final link in links) {
       final provider = getProviderByName(link.provider);
+      bool deletedRemotely = false;
+      String? errorMessage;
+
       if (provider != null && provider.isSupportedOnCurrentPlatform) {
         try {
           if (await provider.isAuthorized()) {
-            await provider.deleteExternalEvent(db, link.externalEventId);
+            final ok = await provider.deleteExternalEvent(
+              db,
+              link.externalEventId,
+            );
+            if (ok) {
+              deletedRemotely = true;
+            } else {
+              errorMessage = 'Provedor retornou falha na exclusão';
+              allSucceeded = false;
+            }
+          } else {
+            errorMessage = 'Provedor não autorizado no momento';
+            allSucceeded = false;
           }
         } catch (e, st) {
+          errorMessage = e.toString();
+          allSucceeded = false;
           AppLogger.warning(
             'Falha ao excluir evento externo (${link.externalEventId})',
             e,
             st,
           );
         }
+      } else {
+        errorMessage = 'Plataforma não suportada ou provedor indisponível';
+        allSucceeded = false;
       }
+
       await (db.update(
         db.calendarEventLinks,
       )..where((t) => t.id.equals(link.id))).write(
         CalendarEventLinksCompanion(
           deletedAt: drift.Value(DateTime.now()),
-          syncStatus: const drift.Value('synced'),
+          syncStatus: drift.Value(
+            deletedRemotely ? 'synced' : 'pending_upload',
+          ),
+          lastError: drift.Value(errorMessage),
           updatedAt: drift.Value(DateTime.now()),
         ),
       );
+    }
+    return allSucceeded;
+  }
+
+  /// Trata exclusão lógica de múltiplos compromissos em lote
+  Future<void> handleLocalAppointmentsDeleted(
+    Iterable<String> appointmentIds,
+  ) async {
+    for (final id in appointmentIds) {
+      await handleLocalAppointmentDeleted(id);
     }
   }
 

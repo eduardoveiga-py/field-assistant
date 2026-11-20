@@ -55,7 +55,7 @@ class MapLibreVectorMapView extends StatefulWidget {
 
   /// Indica se o plugin `maplibre_gl` possui implementação nativa na plataforma atual.
   static bool get isSupportedOnCurrentPlatform {
-    if (kIsWeb) return true;
+    if (kIsWeb) return false;
     return defaultTargetPlatform == TargetPlatform.iOS ||
         defaultTargetPlatform == TargetPlatform.android;
   }

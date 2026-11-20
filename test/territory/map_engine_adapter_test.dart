@@ -317,4 +317,27 @@ void main() {
       expect(adapter.isInitialized, isFalse);
     });
   });
+
+  group('MapEngineCapabilities Offline Routing Contract Tests', () {
+    test('All canonical adapters declare supportsOfflineRouting: false', () {
+      final nativeAdapter = MaplibreNativeAdapter(ownsTileServer: false);
+      final rasterAdapter = RasterFallbackAdapter();
+
+      expect(
+        nativeAdapter.capabilities.supportsOfflineRouting,
+        isFalse,
+        reason:
+            'MaplibreNativeAdapter does not embed a native routing engine (Valhalla/GraphHopper).',
+      );
+      expect(
+        rasterAdapter.capabilities.supportsOfflineRouting,
+        isFalse,
+        reason:
+            'RasterFallbackAdapter does not support native offline routing.',
+      );
+
+      nativeAdapter.dispose();
+      rasterAdapter.dispose();
+    });
+  });
 }

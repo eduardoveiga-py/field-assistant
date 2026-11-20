@@ -38,8 +38,8 @@ Acesse a página de **[Releases Oficiais](https://github.com/eduardoveiga-py/fie
 
 Adicione o Ministério Pessoal diretamente como **Fonte (Source)** no **LiveContainer** ou **SideStore/AltStore** para receber e atualizar o app internamente:
 
-* **URL da Fonte:** `https://cdn.jsdelivr.net/gh/eduardoveiga-py/field-assistant@master/apps.json`
-* **Adicionar ao LiveContainer com 1 Toque:** [Toque aqui para abrir no LiveContainer](livecontainer://sources?url=https://cdn.jsdelivr.net/gh/eduardoveiga-py/field-assistant@master/apps.json)
+* **URL da Fonte:** `https://github.com/eduardoveiga-py/field-assistant/releases/latest/download/apps.json`
+* **Adicionar ao LiveContainer com 1 Toque:** [Toque aqui para abrir no LiveContainer](livecontainer://sources?url=https%3A%2F%2Fgithub.com%2Feduardoveiga-py%2Ffield-assistant%2Freleases%2Flatest%2Fdownload%2Fapps.json)
 
 > [!TIP]
 > **Modo Offline Sem Conta**: Você não precisa criar conta nem efetuar login para usar o app! Ao abrir pela primeira vez, toque em **"Continuar em Modo Offline (Sem Conta)"** e o sistema funcionará imediatamente com banco de dados SQLite local no seu aparelho.
@@ -295,6 +295,59 @@ Enquanto caminha entre uma residência e outra, registre tudo sem precisar digit
 
 ---
 
+### 🛡️ 22. Exclusão Definitiva de Pessoa e Contatos com Janela Informativa de 5 Pontos
+- **Segurança Relacional e Integridade**: ao solicitar a exclusão de qualquer pessoa, o diálogo transparente `PersonDeletionDialog` detalha com clareza os **5 pontos do ciclo de vida**:
+  1. *Liberação Atômica da Agenda*: cancelamento de revisitas e compromissos futuros vinculados.
+  2. *Encerramento de Estudos Bíblicos*: finalização segura de estudos com status "Interrompido" ou desvinculação limpa.
+  3. *Preservação Histórica*: histórico de conversas passadas e relatórios de campo anteriores permanecem preservados para contagem ministerial.
+  4. *Limpeza Local de Mídia*: remoção segura da foto local e desassociação de contatos telefônicos rápidos.
+  5. *Tombstones e Sincronização Conflito-Zero*: emissão de registros de remoção no Drift SQLite com garantia de propagação segura ao Supabase.
+
+---
+
+### ⚡ 23. Liberação Atômica da Agenda ao Encerrar ou Excluir
+- **Coordenação Transacional (`ScheduleReleaseCoordinator`)**:
+  - Cancelamento em cascata imediato de compromissos pendentes no banco local.
+  - Cancelamento de alertas e notificações agendadas via `LocalReminderService`.
+  - Remoção automática de eventos sincronizados nos provedores externos (Google Calendar e Apple EventKit).
+  - Execução atômica sem estados intermediários órfãos ou notificações fantasmas na barra de status.
+
+---
+
+### 🗺️ 24. Map Engine Nível 2: Alto Solimões Canônico & Fallback Raster
+- **Cartografia Vetorial Offline de Precisão**:
+  - Pacotes vetoriais MBTiles cobrindo os municípios de **Betânia** e **Santo Antônio do Içá** com camadas hidrográficas, eixos viários e setores censitários do Alto Solimões.
+  - Servidor loopback local RFC 7233 para streaming de tiles vetoriais sem consumo de dados móveis.
+  - **Fallback Dinâmico de Alta Disponibilidade (`RasterFallbackAdapter`)**: transição automática e imperceptível para camadas raster cacheadas em dispositivos legados ou sem suporte a aceleração gráfica por hardware (Metal/Vulkan).
+  - Layout totalmente responsivo com suporte a rotação horizontal no iPad e modo compacto no iPhone.
+
+---
+
+### 📬 25. Sistema de E-mails Exchange / JWPUB / Multi-Contas
+- **Experiência de Comunicação Ministerial Profissional**:
+  - Navegação completa por caixas postais: **Caixa de Entrada**, **Enviados**, **Rascunhos** e **Lixeira**.
+  - **Compositor Limpo e Profissional**: remoção de estilos/marcações indesejadas e formatação tipográfica padronizada.
+  - **Gerenciador de Contatos Inteligente (`EmailContactsManager`)**: auto-completar instantâneo de endereços conforme digitação e salvamento automático de novos destinatários.
+  - **Anexos Integrados**: download direto e pré-visualização no Visualizador Universal de Anexos sem depender de clientes de terceiros.
+  - Proteção por autenticação biométrica local e retenção permanente contra expiração remota de servidores.
+
+---
+
+### 🎨 26. Banco de Gravuras Interativo com Super Zoom de até 10x
+- **Galeria Ministerial de Imagens e Ilustrações Teocráticas**:
+  - Catálogo organizado por marcadores e temas práticos para demonstrações na pregação de casa em casa e no carrinho.
+  - **Visualizador em Tela Cheia com Zoom de 10x**: implementado com `InteractiveViewer(minScale: 0.5, maxScale: 10.0)`, permitindo examinar com máxima fidelidade infográficos, mapas bíblicos e detalhes de gravuras em qualquer condição de iluminação no ministério.
+
+---
+
+### 💎 27. Ícones Dinâmicos & Badges Cromáticos na Navegação Shell
+- **Nova Identidade Visual da Barra Inferior e NavigationRail**:
+  - Badges cromáticos destacados com bordas suaves e tonalidades específicas para cada módulo ministerial.
+  - Alternância inteligente entre ícones delineados (*outlined*) no estado inativo e preenchidos (*filled*) no estado ativo.
+  - Indicador de seleção translúcido e sem interferência de contraste, garantindo clareza total tanto no tema claro quanto no tema escuro.
+
+---
+
 ## 🚀 Guia Rápido de Uso
 
 ```mermaid
@@ -497,9 +550,48 @@ flowchart LR
 - Integração da publicação *Seja Feliz para Sempre!* com links profundos para o JW Library.
 - Ditado rápido de notas de voz com extração inteligente de dados da visita.
 
-### 📦 Versão 2.0.0 — 18/11/2026
+### 📦 Versão 2.0.0 — 20/11/2026 (Lançamento Oficial Estável)
 
-**Programa de Estabilização e Evolução — FAES Master Program**
+**Programa de Estabilização, Integridade e Evolução Ministerial**
+
+**🛡️ Exclusão Segura & Integridade Relacional (5 Pontos)**
+- Modal `PersonDeletionDialog` detalhando de forma transparente e clara os 5 pontos do ciclo de vida da exclusão.
+- Preservação estrita de relatórios ministeriais históricos e histórico de conversas passadas.
+- Limpeza segura de fotos locais associadas e desassociação ordenada de contatos telefônicos rápidos.
+
+**⚡ Liberação Atômica da Agenda & Lembretes Locais**
+- Motor transacional `ScheduleReleaseCoordinator` com cancelamento automático de revisitas e compromissos futuros ao encerrar estudos ou excluir contatos.
+- Descarte imediato de notificações pendentes no sistema operacional via `LocalReminderService`.
+- Sincronização e remoção imediata dos eventos nos calendários externos (Google Calendar e Apple EventKit).
+
+**🗺️ Map Engine Nível 2 (Alto Solimões Canônico & Fallback)**
+- Cartografia vetorial de alta precisão com pacotes MBTiles cobrindo **Betânia** e **Santo Antônio do Içá**.
+- Servidor HTTP loopback local RFC 7233 (`OfflineTileServer`) para entrega de azulejos vetoriais com streaming sem internet.
+- **Fallback Dinâmico Automático (`RasterFallbackAdapter`)**: comutação instantânea para renderização raster de alto desempenho quando o dispositivo não possuir aceleração GL/Metal.
+- Layout responsivo adaptado com orientação horizontal para iPad e modo compacto para iPhone.
+
+**📬 Sistema Completo de E-mails Exchange / JWPUB / Multi-Contas**
+- Suporte a todas as caixas postais: **Caixa de Entrada**, **Enviados**, **Rascunhos** e **Lixeira**.
+- **Gerenciador de Contatos Inteligente (`EmailContactsManager`)**: autocompletar e persistência imediata de novos endereços.
+- Download de anexos integrado com visualização direta no Visualizador Universal.
+- Editor de e-mail limpo com formatação profissional.
+
+**🎨 Banco de Gravuras Interativo com Super Zoom 10x**
+- Galeria temática de imagens e ilustrações teocráticas com filtros rápidos por tags.
+- Visualizador em tela cheia com zoom contínuo de até 10x (`InteractiveViewer`), perfeito para detalhes bíblicos sob luz intensa.
+
+**💎 Navegação Shell Reestilizada com Badges Cromáticos**
+- Identidade visual moderna na barra inferior e no `NavigationRail` com badges cromáticos suaves para cada recurso.
+- Ícones em pares delineados (*outlined*) e preenchidos (*filled*) com cores vivas e exclusivas para cada módulo ministerial.
+
+**🔒 Criptografia Fail-Closed & E2EE**
+- Máquina de estados explícita com 5 estados: `encrypted`, `migration_required`, `encryption_unavailable`, `migration_failed`, `recovery_required`.
+- Proteção de arquivos iOS Classe B (`NSFileProtectionCompleteUntilFirstUserAuthentication`).
+- Versionamento imutável de mídias criptografadas (`v_$versionId/chunk_$index.enc`) e CAS atômico.
+
+---
+
+### 📦 Versão 2.0.0-rc — 18/11/2026 (Release Candidate)
 
 **🗺️ Mapas Nativo (MapLibre Level 2)**
 - Integração completa do MapLibre Native (`maplibre_gl: 0.28.0`) com renderização via Metal (iOS), Vulkan/OpenGL (Android) e WebGL (Web).

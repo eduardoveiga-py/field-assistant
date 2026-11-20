@@ -992,6 +992,18 @@ class _DownloadMapsScreenState extends State<DownloadMapsScreen> {
                     ),
                     onPressed: () async {
                       final messenger = ScaffoldMessenger.of(context);
+                      if (kIsWeb) {
+                        messenger.showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Download direto de pacotes cartográficos grandes é restrito no navegador Web devido a políticas de CORS do navegador. Utilize o app no iOS, iPadOS ou Android, ou importe o arquivo localmente.',
+                            ),
+                            backgroundColor: AppTheme.alertRed,
+                            duration: Duration(seconds: 5),
+                          ),
+                        );
+                        return;
+                      }
                       try {
                         await MBTilesService.instance.downloadRegion(region.id);
                         if (context.mounted) {
@@ -1006,10 +1018,13 @@ class _DownloadMapsScreenState extends State<DownloadMapsScreen> {
                         }
                       } catch (e) {
                         if (context.mounted) {
+                          final msg = e.toString().contains('Failed to fetch')
+                              ? 'Servidor indisponível ou bloqueado por restrições de rede/CORS. Configure uma URL alternativa.'
+                              : '$e';
                           messenger.showSnackBar(
                             SnackBar(
                               content: Text(
-                                'Erro ao baixar "${region.name}": $e',
+                                'Erro ao baixar "${region.name}": $msg',
                               ),
                               backgroundColor: AppTheme.alertRed,
                               duration: const Duration(seconds: 6),

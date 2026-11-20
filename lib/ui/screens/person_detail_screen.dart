@@ -14,6 +14,7 @@ import '../../core/date_utils.dart';
 import '../../database/app_database.dart';
 import '../../database/repository.dart';
 import '../../appointments/availability_engine.dart';
+import '../../appointments/schedule_release_coordinator.dart';
 import '../../publications/publication_catalog.dart';
 import '../../publications/publication_link_resolver.dart';
 import '../../dashboard/counting_rules.dart';
@@ -33,6 +34,7 @@ import '../widgets/map_location_picker_dialog.dart';
 import '../../territory/sector_manager.dart';
 import 'contacts_map_screen.dart';
 import '../../contacts/doorstep_briefing_helper.dart';
+import '../widgets/person_deletion_dialog.dart';
 import '../widgets/doorstep_briefing_card.dart';
 import '../../voice_notes/voice_notes_manager.dart';
 import '../../voice_notes/voice_note_models.dart';
@@ -226,6 +228,26 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                 icon: const Icon(Icons.edit_outlined),
                 tooltip: 'Editar Dados do Contato',
                 onPressed: () => _showEditPersonDialog(context, repo, person),
+              ),
+            ),
+            Semantics(
+              button: true,
+              label: 'Excluir contato ${person.name}',
+              child: IconButton(
+                icon: const Icon(
+                  Icons.delete_outline,
+                  color: AppTheme.alertRed,
+                ),
+                tooltip: 'Excluir Contato',
+                onPressed: () async {
+                  final deleted = await PersonDeletionDialog.show(
+                    context,
+                    person: person,
+                  );
+                  if (deleted == true && context.mounted) {
+                    Navigator.of(context).pop();
+                  }
+                },
               ),
             ),
           ],

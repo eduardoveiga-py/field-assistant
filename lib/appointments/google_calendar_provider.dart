@@ -710,6 +710,13 @@ class GoogleCalendarProvider implements CalendarProvider {
     if (api == null) return false;
 
     final calendarId = await _getEffectiveCalendarId();
+    final readOnlyIds = await getReadOnlyCalendarIds();
+    if (readOnlyIds.contains(calendarId)) {
+      AppLogger.warning(
+        'Tentativa de exclusão em calendário Google marcado como somente leitura ($calendarId)',
+      );
+      return false;
+    }
     try {
       await api.events.delete(calendarId, externalEventId);
       final now = DateTime.now();
