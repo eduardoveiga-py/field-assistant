@@ -72,7 +72,7 @@ jobs:
           cp ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-76x76@2x.png dist-ios/Payload/Runner.app/AppIcon76x76.png
           cp ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-76x76@2x.png dist-ios/Payload/Runner.app/AppIcon76x76@2x~ipad.png
           cd dist-ios && zip -qr app-release-unsigned.ipa Payload && rm -rf Payload
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: iphone-test-ipa
           path: dist-ios/app-release-unsigned.ipa

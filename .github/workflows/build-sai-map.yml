@@ -21,7 +21,7 @@ jobs:
           set -o pipefail
           bash tool/map/build_sai.sh "$RUNNER_TEMP/sai" 2>&1 | tee /tmp/render-sai.log || { python3 tool/ci_diagnostics_summary.py test /tmp/render-sai.log; exit 1; }
       - name: Upload experimental MBTiles and provenance
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: sai-mapa-offline-experimental
           path: ${{ runner.temp }}/sai/output/
