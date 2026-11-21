@@ -50,7 +50,7 @@ abstract class ITicunaAudioService {
 
   Future<bool> deleteAudioFile(String? filePath);
   Future<void> clearAllAudioFiles() async {}
-  
+
   Future<String?> uploadToSupabase({
     required String id,
     required String localFilePath,
@@ -594,32 +594,35 @@ class TicunaAudioService implements ITicunaAudioService {
   /// Apaga todos os arquivos de áudio locais do diretório ticuna_audio.
   @override
   Future<void> clearAllAudioFiles() async {
-    if (_isPlaying) await stop();
-if (kIsWeb) return;
-try {
-final appDir = await getApplicationDocumentsDirectory();
-final audioDir = Directory('${appDir.path}/ticuna_audio');
-if (await audioDir.exists()) {
-await for (final entity in audioDir.list()) {
-await entity.delete(recursive: true);
-}
-}
-} catch (e, st) {
-AppLogger.debug('Falha ao limpar ticuna_audio em DocumentsDirectory: $e', st);
-}
-try {
-final sysTemp = Directory.systemTemp;
-final tempAudioDir = Directory('${sysTemp.path}/ticuna_audio');
-if (await tempAudioDir.exists()) {
-await for (final entity in tempAudioDir.list()) {
-await entity.delete(recursive: true);
-}
-}
-} catch (e, st) {
-AppLogger.debug('Falha ao limpar ticuna_audio em systemTemp: $e', st);
-}
+    if (isPlaying) await stop();
+    if (kIsWeb) return;
+    try {
+      final appDir = await getApplicationDocumentsDirectory();
+      final audioDir = Directory('${appDir.path}/ticuna_audio');
+      if (await audioDir.exists()) {
+        await for (final entity in audioDir.list()) {
+          await entity.delete(recursive: true);
+        }
+      }
+    } catch (e, st) {
+      AppLogger.debug(
+        'Falha ao limpar ticuna_audio em DocumentsDirectory: $e',
+        st,
+      );
+    }
+    try {
+      final sysTemp = Directory.systemTemp;
+      final tempAudioDir = Directory('${sysTemp.path}/ticuna_audio');
+      if (await tempAudioDir.exists()) {
+        await for (final entity in tempAudioDir.list()) {
+          await entity.delete(recursive: true);
+        }
+      }
+    } catch (e, st) {
+      AppLogger.debug('Falha ao limpar ticuna_audio em systemTemp: $e', st);
+    }
   }
-  
+
   // ==========================================
   // SINCRONIZAÇÃO COM SUPABASE STORAGE
   // ==========================================
@@ -975,14 +978,13 @@ class FakeTicunaAudioService implements ITicunaAudioService {
           'Falha ao apagar arquivo em FakeTicunaAudioService: $e',
           st,
         );
-    
-
-@override
-Future<void> clearAllAudioFiles() async {}
       }
     }
     return true;
   }
+
+  @override
+  Future<void> clearAllAudioFiles() async {}
 
   @override
   Future<String?> uploadToSupabase({

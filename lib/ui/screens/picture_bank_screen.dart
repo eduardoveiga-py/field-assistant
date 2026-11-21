@@ -366,9 +366,10 @@ class _PictureBankScreenState extends ConsumerState<PictureBankScreen> {
       ),
     );
   }
+
   void _showThumbnailOptions(PictureEntry picture) {
     showModalBottomSheet<void>(
-context: context,
+      context: context,
       builder: (ctx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -403,7 +404,9 @@ context: context,
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Excluir gravura'),
-        content: const Text('Deseja excluir esta gravura do banco de gravuras?'),
+        content: const Text(
+          'Deseja excluir esta gravura do banco de gravuras?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -422,12 +425,11 @@ context: context,
     await PictureBankManager.deletePicture(db, picture.id);
     await _loadPictures();
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Gravura excluída.')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Gravura excluída.')));
     }
   }
-  
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -562,7 +564,7 @@ context: context,
                         ),
                         child: InkWell(
                           onTap: () => _openPictureViewer(pic),
-                    onLongPress: () => _showThumbnailOptions(pic),
+                          onLongPress: () => _showThumbnailOptions(pic),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
