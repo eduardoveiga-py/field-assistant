@@ -32,8 +32,9 @@ async function runMode({ port, sqliteMime, label }) {
       if (decodedPath === '/' || decodedPath === '') decodedPath = '/index.html';
       const baseDir = rootDir;
       const safePrefix = baseDir + path.sep;
-      const resolvedPath = path.resolve(baseDir, '.' + decodedPath);
-      if (!resolvedPath.startsWith(safePrefix) && resolvedPath !== baseDir) {
+      const cleanPath = decodedPath.replace(/^[/\\]+/, '');
+      const resolvedPath = path.resolve(baseDir, cleanPath);
+      if (!resolvedPath.startsWith(safePrefix)) {
         res.writeHead(403, { 'Content-Type': 'text/html' });
         res.end('<h1>403 Forbidden</h1>');
         return;
