@@ -9,12 +9,16 @@ import '../../core/app_logger.dart';
 import '../../database/app_database.dart';
 import '../../search/offline_search_index.dart';
 import '../geocoding_service.dart';
+import 'osm_fts_search.dart';
 
 /// Tipo de entidade encontrada em busca local offline.
 enum LocalResultType {
   contact('contact'),
   landmark('landmark'),
-  sector('sector');
+  sector('sector'),
+  street('street'),
+  place('place'),
+  poi('poi');
 
   final String wireName;
   const LocalResultType(this.wireName);
@@ -29,6 +33,7 @@ class LocalSearchResult {
   final double? latitude;
   final double? longitude;
   final Map<String, dynamic> metadata;
+  final String origin;
 
   const LocalSearchResult({
     required this.id,
@@ -38,6 +43,7 @@ class LocalSearchResult {
     this.latitude,
     this.longitude,
     this.metadata = const {},
+    this.origin = 'local',
   });
 
   bool get hasCoordinates => latitude != null && longitude != null;
@@ -50,7 +56,24 @@ class LocalSearchResult {
     'latitude': latitude,
     'longitude': longitude,
     'metadata': metadata,
+    'origin': origin,
   };
+
+  factory LocalSearchResult.fromJson(Map<String, dynamic> json) {
+    return LocalSearchResult(
+      id: json['id'] as String,
+      type: LocalResultType.values.firstWhere(
+        (t) => t.wireName == json['type'],
+        orElse: () => LocalResultType.poi,
+      ),
+      title: json['title'] as String,
+      subtitle: json['subtitle'] as String?,
+      latitude: (json['latitude'] as num?)?.toDouble(),
+      longitude: (json['longitude'] as num?)?.toDouble(),
+      metadata: (json['metadata'] as Map<String, dynamic>?) ?? const {},
+      origin: json['origin'] as String? ?? 'local',
+    );
+  }
 }
 
 /// Serviço de Geocodificação Híbrido e Offline-First (FA-MAP-01/02).
@@ -62,6 +85,7 @@ class LocalSearchResult {
 class OfflineGeocodingService {
   static const Duration cacheTtl = Duration(days: 30);
 
+  static String? packagesDirectoryPath;
   static final Map<String, _CachedEntry> _memoryCache = {};
   static DateTime? _lastRequestTime;
   static Future<void> _rateLimitChain = Future<void>.value();
@@ -425,140 +449,213 @@ class OfflineGeocodingService {
     return null;
   }
 
+  static String _stripDiacritics(String text) {
+    const withDia = 'áàãâäéèêëíìîïóòõôöúùûüçñÁÀÃÂÄÉÈÊËÍÌÎÏÓÒÕÔÖÚÙÛÜÇÑ';
+    const withoutDia = 'aaaaaeeeeiiiiooooouuuucnAAAAAEEEEIIIIOOOOOUUUUCN';
+    var result = text;
+    for (var i = 0; i < withDia.length; i++) {
+      result = result.replaceAll(withDia[i], withoutDia[i]);
+    }
+    return result;
+  }
+
+  static List<LocalSearchResult> _mergeAndDeduplicate(
+    List<LocalSearchResult> primary,
+    List<LocalSearchResult> secondary,
+  ) {
+    final seen = <String>{};
+    final merged = <LocalSearchResult>[];
+
+    for (final item in [...primary, ...secondary]) {
+      final titleNorm = _stripDiacritics(item.title.trim().toLowerCase());
+      final key = item.hasCoordinates
+          ? '$titleNorm|${item.latitude!.toStringAsFixed(4)}|${item.longitude!.toStringAsFixed(4)}'
+          : '${item.type.wireName}|$titleNorm|${item.subtitle != null ? _stripDiacritics(item.subtitle!.trim().toLowerCase()) : ''}';
+      if (seen.add(key)) {
+        merged.add(item);
+      }
+    }
+
+    return merged;
+  }
+
   /// Busca offline local instantânea em contatos, marcos territoriais e setores
-  /// cadastrados no banco de dados SQLite local, permitindo localizar ruas e POIs
-  /// mesmo em modo avião ou em territórios sem qualquer sinal de celular.
+  /// cadastrados no banco de dados SQLite local e arquivos opcionais FTS5 (*.search.db),
+  /// permitindo localizar ruas, aldeias, comunidades e POIs mesmo sem internet.
   static Future<List<LocalSearchResult>> searchOffline({
     required String query,
     required AppDatabase? db,
+    dynamic packagesDir,
+    String? packagesDirectoryPath,
+    dynamic searchDatabases,
+    int limit = 50,
   }) async {
     final clean = query.trim().toLowerCase();
-    if (clean.isEmpty || db == null) return [];
+    if (clean.isEmpty) return [];
 
-    // Tenta primeiro o índice unificado FTS5 com unicode61 remove_diacritics 2
-    try {
-      final ftsIndex = OfflineSearchIndex(db);
-      final ftsMatches = await ftsIndex.search(clean);
-      if (ftsMatches.isNotEmpty) {
-        return ftsMatches.map((r) {
-          final type = r.entityType == 'person'
-              ? LocalResultType.contact
-              : r.entityType == 'sector'
-              ? LocalResultType.sector
-              : LocalResultType.landmark;
-          return LocalSearchResult(
-            id: r.entityId,
-            type: type,
-            title: r.name,
-            subtitle: r.address.isNotEmpty ? r.address : r.category,
-            latitude: r.latitude,
-            longitude: r.longitude,
-            metadata: {
-              'category': r.category,
-              'notes': r.notes,
-              'rank': r.rank,
-            },
+    final localResults = <LocalSearchResult>[];
+
+    if (db != null) {
+      // Tenta primeiro o índice unificado FTS5 com unicode61 remove_diacritics 2
+      try {
+        final ftsIndex = OfflineSearchIndex(db);
+        final ftsMatches = await ftsIndex.search(clean, limit: limit);
+        if (ftsMatches.isNotEmpty) {
+          localResults.addAll(
+            ftsMatches.map((r) {
+              final type = r.entityType == 'person'
+                  ? LocalResultType.contact
+                  : r.entityType == 'sector'
+                  ? LocalResultType.sector
+                  : LocalResultType.landmark;
+              return LocalSearchResult(
+                id: r.entityId,
+                type: type,
+                title: r.name,
+                subtitle: r.address.isNotEmpty ? r.address : r.category,
+                latitude: r.latitude,
+                longitude: r.longitude,
+                metadata: {
+                  'category': r.category,
+                  'notes': r.notes,
+                  'rank': r.rank,
+                },
+                origin: 'local',
+              );
+            }),
           );
-        }).toList();
+        }
+      } catch (e, st) {
+        AppLogger.debug(
+          'Busca FTS5 falhou ou tabela ausente, utilizando scan SQLite padrão: $e',
+          st,
+        );
       }
-    } catch (e, st) {
-      AppLogger.debug(
-        'Busca FTS5 falhou ou tabela ausente, utilizando scan SQLite padrão: $e',
-        st,
-      );
+
+      if (localResults.isEmpty) {
+        try {
+          // 1. Busca em Pessoas / Contatos do Território (com endereço ou coordenadas)
+          final people = await (db.select(
+            db.people,
+          )..where((t) => t.deletedAt.isNull())).get();
+
+          final cleanNorm = _stripDiacritics(clean);
+
+          for (final person in people) {
+            final name = person.name.toLowerCase();
+            final address = (person.address ?? '').toLowerCase();
+            final notes = (person.generalNotes ?? '').toLowerCase();
+
+            final nameNorm = _stripDiacritics(name);
+            final addressNorm = _stripDiacritics(address);
+            final notesNorm = _stripDiacritics(notes);
+
+            if (nameNorm.contains(cleanNorm) ||
+                addressNorm.contains(cleanNorm) ||
+                notesNorm.contains(cleanNorm)) {
+              localResults.add(
+                LocalSearchResult(
+                  id: person.id,
+                  type: LocalResultType.contact,
+                  title: person.name,
+                  subtitle:
+                      (person.address != null && person.address!.isNotEmpty)
+                      ? person.address
+                      : 'Contato no território',
+                  latitude: person.latitude,
+                  longitude: person.longitude,
+                  metadata: {'status': person.status, 'phone': person.phone},
+                  origin: 'local',
+                ),
+              );
+            }
+          }
+
+          // 2. Busca em Marcos Territoriais (TerritoryLandmarks - POIs)
+          final landmarks = await (db.select(
+            db.territoryLandmarks,
+          )..where((t) => t.deletedAt.isNull())).get();
+
+          for (final lm in landmarks) {
+            final name = lm.name.toLowerCase();
+            final address = (lm.address ?? '').toLowerCase();
+            final category = lm.category.toLowerCase();
+            final notes = (lm.notes ?? '').toLowerCase();
+
+            final nameNorm = _stripDiacritics(name);
+            final addressNorm = _stripDiacritics(address);
+            final categoryNorm = _stripDiacritics(category);
+            final notesNorm = _stripDiacritics(notes);
+
+            if (nameNorm.contains(cleanNorm) ||
+                addressNorm.contains(cleanNorm) ||
+                categoryNorm.contains(cleanNorm) ||
+                notesNorm.contains(cleanNorm)) {
+              localResults.add(
+                LocalSearchResult(
+                  id: lm.id,
+                  type: LocalResultType.landmark,
+                  title: lm.name,
+                  subtitle: (lm.address != null && lm.address!.isNotEmpty)
+                      ? '${lm.category.toUpperCase()} • ${lm.address}'
+                      : lm.category.toUpperCase(),
+                  latitude: lm.latitude,
+                  longitude: lm.longitude,
+                  metadata: {'category': lm.category, 'notes': lm.notes},
+                  origin: 'local',
+                ),
+              );
+            }
+          }
+
+          // 3. Busca em Setores Territoriais (TerritorySectors)
+          final sectors = await (db.select(
+            db.territorySectors,
+          )..where((t) => t.deletedAt.isNull())).get();
+
+          for (final sec in sectors) {
+            final name = sec.name.toLowerCase();
+            final desc = (sec.description ?? '').toLowerCase();
+
+            final nameNorm = _stripDiacritics(name);
+            final descNorm = _stripDiacritics(desc);
+
+            if (nameNorm.contains(cleanNorm) || descNorm.contains(cleanNorm)) {
+              localResults.add(
+                LocalSearchResult(
+                  id: sec.id,
+                  type: LocalResultType.sector,
+                  title: sec.name,
+                  subtitle:
+                      (sec.description != null && sec.description!.isNotEmpty)
+                      ? sec.description
+                      : 'Setor de território',
+                  metadata: {'description': sec.description ?? ''},
+                  origin: 'local',
+                ),
+              );
+            }
+          }
+        } catch (e, st) {
+          AppLogger.warning('Erro ao executar busca local offline', e, st);
+        }
+      }
     }
 
-    final results = <LocalSearchResult>[];
+    // Consulta índices FTS5 opcionais de pacotes cartográficos offline (*.search.db)
+    final osmResults = OsmFtsSearch.search(
+      query: query,
+      packagesDir: packagesDir,
+      packagesDirectoryPath: packagesDirectoryPath,
+      searchDatabases: searchDatabases,
+      limit: limit,
+    );
 
-    try {
-      // 1. Busca em Pessoas / Contatos do Território (com endereço ou coordenadas)
-      final people = await (db.select(
-        db.people,
-      )..where((t) => t.deletedAt.isNull())).get();
-
-      for (final person in people) {
-        final name = person.name.toLowerCase();
-        final address = (person.address ?? '').toLowerCase();
-        final notes = (person.generalNotes ?? '').toLowerCase();
-
-        if (name.contains(clean) ||
-            address.contains(clean) ||
-            notes.contains(clean)) {
-          results.add(
-            LocalSearchResult(
-              id: person.id,
-              type: LocalResultType.contact,
-              title: person.name,
-              subtitle: (person.address != null && person.address!.isNotEmpty)
-                  ? person.address
-                  : 'Contato no território',
-              latitude: person.latitude,
-              longitude: person.longitude,
-              metadata: {'status': person.status, 'phone': person.phone},
-            ),
-          );
-        }
-      }
-
-      // 2. Busca em Marcos Territoriais (TerritoryLandmarks - POIs)
-      final landmarks = await (db.select(
-        db.territoryLandmarks,
-      )..where((t) => t.deletedAt.isNull())).get();
-
-      for (final lm in landmarks) {
-        final name = lm.name.toLowerCase();
-        final address = (lm.address ?? '').toLowerCase();
-        final category = lm.category.toLowerCase();
-        final notes = (lm.notes ?? '').toLowerCase();
-
-        if (name.contains(clean) ||
-            address.contains(clean) ||
-            category.contains(clean) ||
-            notes.contains(clean)) {
-          results.add(
-            LocalSearchResult(
-              id: lm.id,
-              type: LocalResultType.landmark,
-              title: lm.name,
-              subtitle: (lm.address != null && lm.address!.isNotEmpty)
-                  ? '${lm.category.toUpperCase()} • ${lm.address}'
-                  : lm.category.toUpperCase(),
-              latitude: lm.latitude,
-              longitude: lm.longitude,
-              metadata: {'category': lm.category, 'notes': lm.notes},
-            ),
-          );
-        }
-      }
-
-      // 3. Busca em Setores Territoriais (TerritorySectors)
-      final sectors = await (db.select(
-        db.territorySectors,
-      )..where((t) => t.deletedAt.isNull())).get();
-
-      for (final sec in sectors) {
-        final name = sec.name.toLowerCase();
-        final desc = (sec.description ?? '').toLowerCase();
-
-        if (name.contains(clean) || desc.contains(clean)) {
-          results.add(
-            LocalSearchResult(
-              id: sec.id,
-              type: LocalResultType.sector,
-              title: sec.name,
-              subtitle: (sec.description != null && sec.description!.isNotEmpty)
-                  ? sec.description
-                  : 'Setor de território',
-              metadata: {'description': sec.description ?? ''},
-            ),
-          );
-        }
-      }
-    } catch (e, st) {
-      AppLogger.warning('Erro ao executar busca local offline', e, st);
+    final merged = _mergeAndDeduplicate(localResults, osmResults);
+    if (merged.length > limit) {
+      return merged.sublist(0, limit);
     }
-
-    return results;
+    return merged;
   }
 
   /// Limpa entradas de cache expiradas (> 30 dias) do banco de dados SQLite Drift.

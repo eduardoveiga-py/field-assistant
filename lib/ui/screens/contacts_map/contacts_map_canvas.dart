@@ -1531,6 +1531,40 @@ extension _ContactsMapCanvas on _ContactsMapScreenState {
                             ),
                           ],
                         ),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            key: const Key('btn_navigate_external_landmark'),
+                            icon: const Icon(Icons.explore_outlined, size: 16),
+                            label: const Text('Navegar (Mapas externos)'),
+                            onPressed: () {
+                              final lm = _selectedPinLandmark!;
+                              final lat = lm.latitude;
+                              final lon = lm.longitude;
+                              if (lat == null ||
+                                  lon == null ||
+                                  (lat == 0.0 && lon == 0.0)) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Este marco não possui coordenadas GPS válidas para navegação.',
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
+                              ExternalNavigationLauncher.showNavigationSheet(
+                                context,
+                                lat: lat,
+                                lng: lon,
+                                label: lm.name,
+                                originLat: _userGpsLocation?.latitude,
+                                originLng: _userGpsLocation?.longitude,
+                              );
+                            },
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -1692,6 +1726,40 @@ extension _ContactsMapCanvas on _ContactsMapScreenState {
                               },
                             ),
                           ],
+                        ),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            key: const Key('btn_navigate_external_contact'),
+                            icon: const Icon(Icons.explore_outlined, size: 16),
+                            label: const Text('Navegar (Mapas externos)'),
+                            onPressed: () {
+                              final p = _selectedPinPerson!;
+                              final lat = p.latitude;
+                              final lon = p.longitude;
+                              if (lat == null ||
+                                  lon == null ||
+                                  (lat == 0.0 && lon == 0.0)) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Este contato não possui coordenadas GPS válidas para navegação.',
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
+                              ExternalNavigationLauncher.showNavigationSheet(
+                                context,
+                                lat: lat,
+                                lng: lon,
+                                label: p.name,
+                                originLat: _userGpsLocation?.latitude,
+                                originLng: _userGpsLocation?.longitude,
+                              );
+                            },
+                          ),
                         ),
                         const SizedBox(height: 8),
                         SizedBox(

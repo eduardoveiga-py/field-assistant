@@ -1,0 +1,543 @@
+import 'dart:io';
+
+import 'package:drift/drift.dart' hide isNull, isNotNull;
+import 'package:drift/native.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:ministerio_pessoal/database/app_database.dart';
+import 'package:ministerio_pessoal/territory/geocoding/offline_geocoding_service.dart';
+import 'package:ministerio_pessoal/territory/geocoding/osm_fts_search.dart';
+import 'package:ministerio_pessoal/territory/geocoding/osm_fts_search_web.dart'
+    as osm_web;
+import 'package:sqlite3/sqlite3.dart' as sql;
+
+void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  late Directory tempDir;
+  late File searchDbFile;
+  late AppDatabase appDb;
+
+  setUp(() {
+    OfflineGeocodingService.packagesDirectoryPath = null;
+    tempDir = Directory.systemTemp.createTempSync('fts5_search_test_');
+    searchDbFile = File('${tempDir.path}/am_solimoes.search.db');
+
+    // Cria tabela virtual SQLite FTS5 conforme especificação
+    final db = sql.sqlite3.open(searchDbFile.path);
+    db.execute('''
+      CREATE VIRTUAL TABLE osm_places_fts USING fts5(
+        name,
+        category,
+        subtitle,
+        lat UNINDEXED,
+        lng UNINDEXED,
+        tokenize='unicode61 remove_diacritics 2'
+      );
+    ''');
+
+    final stmt = db.prepare(
+      'INSERT INTO osm_places_fts (name, category, subtitle, lat, lng) VALUES (?, ?, ?, ?, ?);',
+    );
+    // Ruas, comunidades e POIs com acentos em Português e nomes amazônicos/indígenas
+    stmt.execute([
+      'Rua São Sebastião',
+      'street',
+      'Bairro da Esperança',
+      '-3.1020',
+      '-60.0200',
+    ]);
+    stmt.execute([
+      'Comunidade Boa Esperança',
+      'place',
+      'Alto Solimões',
+      '-3.5000',
+      '-68.0000',
+    ]);
+    stmt.execute([
+      'Aldeia São Jerônimo Ticuna',
+      'place',
+      'Terra Indígena Éware',
+      '-3.7000',
+      '-69.1000',
+    ]);
+    stmt.execute([
+      'Farmácia Coração de Jesus',
+      'poi',
+      'Centro Comercial',
+      '-3.1100',
+      '-60.0300',
+    ]);
+    stmt.close();
+    db.close();
+
+    appDb = AppDatabase.forTesting(NativeDatabase.memory());
+  });
+
+  tearDown(() async {
+    OfflineGeocodingService.packagesDirectoryPath = null;
+    await appDb.close();
+    if (tempDir.existsSync()) {
+      try {
+        tempDir.deleteSync(recursive: true);
+      } catch (_) {}
+    }
+  });
+
+  group('Offline FTS5 Geocoding Service (Phase 3)', () {
+    test(
+      'Accent-insensitive search matches Português and indigenous names',
+      () async {
+        // 1. Busca sem acento para encontrar "Rua São Sebastião"
+        final resSemAcento = await OfflineGeocodingService.searchOffline(
+          query: 'Sao Sebastiao',
+          db: appDb,
+          packagesDir: tempDir,
+        );
+        expect(resSemAcento, isNotEmpty);
+        expect(resSemAcento.first.title, equals('Rua São Sebastião'));
+        expect(resSemAcento.first.type, equals(LocalResultType.street));
+        expect(resSemAcento.first.origin, equals('am_solimoes.search.db'));
+        expect(resSemAcento.first.latitude, equals(-3.1020));
+        expect(resSemAcento.first.longitude, equals(-60.0200));
+
+        // 2. Busca com acento idêntico
+        final resComAcento = await OfflineGeocodingService.searchOffline(
+          query: 'São Sebastião',
+          db: appDb,
+          packagesDir: tempDir,
+        );
+        expect(resComAcento, isNotEmpty);
+        expect(resComAcento.first.title, equals('Rua São Sebastião'));
+
+        // 3. Busca por POI sem acento "Farmacia" e "Coracao"
+        final resPoi = await OfflineGeocodingService.searchOffline(
+          query: 'farmacia coracao',
+          db: appDb,
+          packagesDir: tempDir,
+        );
+        expect(resPoi, isNotEmpty);
+        expect(resPoi.first.title, equals('Farmácia Coração de Jesus'));
+        expect(resPoi.first.type, equals(LocalResultType.poi));
+
+        // 4. Busca por comunidade indígena "Jeronimo Ticuna"
+        final resComunidade = await OfflineGeocodingService.searchOffline(
+          query: 'Jeronimo Ticuna',
+          db: appDb,
+          packagesDir: tempDir,
+        );
+        expect(resComunidade, isNotEmpty);
+        expect(resComunidade.first.title, equals('Aldeia São Jerônimo Ticuna'));
+        expect(resComunidade.first.type, equals(LocalResultType.place));
+      },
+    );
+
+    test(
+      'Merges and deduplicates local app DB records with OSM search.db',
+      () async {
+        final now = DateTime.now().toUtc();
+        // Insere contato local no app DB
+        await appDb
+            .into(appDb.people)
+            .insert(
+              PeopleCompanion.insert(
+                id: 'p-local-1',
+                name: 'Sebastião Silva',
+                address: const Value('Rua das Acácias, 10'),
+                latitude: const Value(-3.1000),
+                longitude: const Value(-60.0100),
+                firstContactAt: now,
+                createdAt: now,
+                updatedAt: now,
+              ),
+            );
+
+        // Busca por "Sebastiao" deve trazer tanto o contato local quanto a rua do OSM
+        final merged = await OfflineGeocodingService.searchOffline(
+          query: 'Sebastiao',
+          db: appDb,
+          packagesDir: tempDir,
+        );
+
+        expect(merged.length, greaterThanOrEqualTo(2));
+        final localContact = merged.firstWhere(
+          (r) => r.type == LocalResultType.contact,
+        );
+        expect(localContact.title, equals('Sebastião Silva'));
+        expect(localContact.origin, equals('local'));
+
+        final osmStreet = merged.firstWhere(
+          (r) => r.type == LocalResultType.street,
+        );
+        expect(osmStreet.title, equals('Rua São Sebastião'));
+        expect(osmStreet.origin, equals('am_solimoes.search.db'));
+      },
+    );
+
+    test(
+      'Gracefully degrades when no search.db or when search.db is corrupt',
+      () async {
+        // Cria diretório vazio sem .search.db
+        final emptyDir = Directory.systemTemp.createTempSync('empty_search_');
+        try {
+          final resEmpty = await OfflineGeocodingService.searchOffline(
+            query: 'Sebastiao',
+            db: appDb,
+            packagesDir: emptyDir,
+          );
+          expect(resEmpty, isEmpty);
+
+          // Cria arquivo corrupto
+          final corruptFile = File('${emptyDir.path}/corrupt.search.db');
+          corruptFile.writeAsStringSync('NÃO É UM BANCO SQLITE VÁLIDO');
+
+          // Não deve lançar exceção e não deve quebrar
+          final resCorrupt = await OfflineGeocodingService.searchOffline(
+            query: 'Sebastiao',
+            db: appDb,
+            packagesDir: emptyDir,
+          );
+          expect(resCorrupt, isEmpty);
+        } finally {
+          if (emptyDir.existsSync()) {
+            try {
+              emptyDir.deleteSync(recursive: true);
+            } catch (_) {}
+          }
+        }
+      },
+    );
+
+    test(
+      'Clean SQLite descriptor closing allows file deletion on Windows',
+      () async {
+        final singleDir = Directory.systemTemp.createTempSync('lock_check_');
+        final singleDbFile = File('${singleDir.path}/quick.search.db');
+        final db = sql.sqlite3.open(singleDbFile.path);
+        db.execute('''
+        CREATE VIRTUAL TABLE osm_places_fts USING fts5(
+          name, category, subtitle, lat UNINDEXED, lng UNINDEXED
+        );
+      ''');
+        db.execute(
+          "INSERT INTO osm_places_fts VALUES ('Rua Teste', 'street', 'Centro', '0', '0');",
+        );
+        db.close();
+
+        // Executa busca
+        final results = await OfflineGeocodingService.searchOffline(
+          query: 'Teste',
+          db: null,
+          packagesDir: singleDir,
+        );
+        expect(results.length, equals(1));
+
+        // Deletar o arquivo e pasta no Windows DEVE funcionar sem erro de arquivo aberto
+        expect(() => singleDbFile.deleteSync(), returnsNormally);
+        expect(() => singleDir.deleteSync(recursive: true), returnsNormally);
+      },
+    );
+
+    test(
+      'Robust handling of hyphens, commas, and punctuation in queries',
+      () async {
+        // 1. Busca com hífen: "São-Sebastião"
+        final resHifen = await OfflineGeocodingService.searchOffline(
+          query: 'São-Sebastião',
+          db: appDb,
+          packagesDir: tempDir,
+        );
+        expect(resHifen, isNotEmpty);
+        expect(resHifen.first.title, equals('Rua São Sebastião'));
+
+        // 2. Busca com vírgula e número: "São Sebastião, 10"
+        final resVirgula = await OfflineGeocodingService.searchOffline(
+          query: 'São Sebastião, 10',
+          db: appDb,
+          packagesDir: tempDir,
+        );
+        expect(resVirgula, isNotEmpty);
+        expect(resVirgula.first.title, equals('Rua São Sebastião'));
+
+        // 3. Busca com pontuação mista e símbolos: "Aldeia & Jerônimo?!"
+        final resSimbolos = await OfflineGeocodingService.searchOffline(
+          query: 'Aldeia & Jerônimo?!',
+          db: appDb,
+          packagesDir: tempDir,
+        );
+        expect(resSimbolos, isNotEmpty);
+        expect(resSimbolos.first.title, equals('Aldeia São Jerônimo Ticuna'));
+      },
+    );
+
+    test('Strict limit parameter enforcement on merged results', () async {
+      final resLimit = await OfflineGeocodingService.searchOffline(
+        query: 'a', // Termo amplo que casa com múltiplos registros
+        db: appDb,
+        packagesDir: tempDir,
+        limit: 2,
+      );
+      expect(resLimit.length, lessThanOrEqualTo(2));
+    });
+
+    test(
+      'Supports multiple regional *.search.db packages simultaneously',
+      () async {
+        final secondDbFile = File('${tempDir.path}/am_manaus.search.db');
+        final db2 = sql.sqlite3.open(secondDbFile.path);
+        db2.execute('''
+        CREATE VIRTUAL TABLE osm_places_fts USING fts5(
+          name, category, subtitle, lat UNINDEXED, lng UNINDEXED,
+          tokenize='unicode61 remove_diacritics 2'
+        );
+      ''');
+        db2.execute(
+          "INSERT INTO osm_places_fts VALUES ('Teatro Amazonas', 'poi', 'Centro Histórico', '-3.1303', '-60.0234');",
+        );
+        db2.close();
+
+        final resMulti = await OfflineGeocodingService.searchOffline(
+          query: 'Teatro',
+          db: appDb,
+          packagesDir: tempDir,
+        );
+        expect(resMulti, isNotEmpty);
+        expect(resMulti.first.title, equals('Teatro Amazonas'));
+        expect(resMulti.first.origin, equals('am_manaus.search.db'));
+        expect(resMulti.first.type, equals(LocalResultType.poi));
+      },
+    );
+
+    test(
+      'Deduplicates records when diacritics vary between local and OSM',
+      () async {
+        final now = DateTime.now().toUtc();
+        // Registro local sem acento com mesmas coordenadas
+        await appDb
+            .into(appDb.territoryLandmarks)
+            .insert(
+              TerritoryLandmarksCompanion.insert(
+                id: 'lm-dup-1',
+                name: 'Rua Sao Sebastiao',
+                category: 'street',
+                address: const Value('Bairro da Esperança'),
+                latitude: const Value(-3.1020),
+                longitude: const Value(-60.0200),
+                createdAt: now,
+                updatedAt: now,
+              ),
+            );
+
+        final merged = await OfflineGeocodingService.searchOffline(
+          query: 'Sebastiao',
+          db: appDb,
+          packagesDir: tempDir,
+        );
+
+        // Deve deduplicar porque título normalizado, subtítulo normalizado e coordenadas coincidem
+        final matching = merged
+            .where((r) => r.latitude == -3.1020 && r.longitude == -60.0200)
+            .toList();
+        expect(matching.length, equals(1));
+        expect(
+          matching.first.origin,
+          equals('local'),
+        ); // Preserva registro local
+      },
+    );
+
+    test('Supports packagesDirectoryPath (String) and static packagesDirectoryPath configuration', () async {
+      // 1. Usando packagesDirectoryPath como String diretamente no parâmetro
+      final resPath = await OfflineGeocodingService.searchOffline(
+        query: 'Sao Sebastiao',
+        db: appDb,
+        packagesDirectoryPath: tempDir.path,
+      );
+      expect(resPath, isNotEmpty);
+      expect(resPath.first.title, equals('Rua São Sebastião'));
+
+      // 2. Usando a propriedade estática OfflineGeocodingService.packagesDirectoryPath
+      OfflineGeocodingService.packagesDirectoryPath = tempDir.path;
+      try {
+        final resStatic = await OfflineGeocodingService.searchOffline(
+          query: 'Boa Esperanca',
+          db: appDb,
+        );
+        expect(resStatic, isNotEmpty);
+        expect(resStatic.first.title, equals('Comunidade Boa Esperança'));
+      } finally {
+        OfflineGeocodingService.packagesDirectoryPath = null;
+      }
+
+      // 3. Usando searchDatabases explicitamente com lista de arquivos
+      final resExplicitFiles = await OfflineGeocodingService.searchOffline(
+        query: 'Jeronimo',
+        db: appDb,
+        searchDatabases: [searchDbFile],
+      );
+      expect(resExplicitFiles, isNotEmpty);
+      expect(
+        resExplicitFiles.first.title,
+        equals('Aldeia São Jerônimo Ticuna'),
+      );
+    });
+
+    test('OsmFtsSearch native facade methods and top-level helper', () async {
+      // 1. packagesDirectory getter/setter e setPackagesDirectory
+      OsmFtsSearch.packagesDirectory = tempDir;
+      expect(OsmFtsSearch.packagesDirectory?.path, equals(tempDir.path));
+      expect(
+        OfflineGeocodingService.packagesDirectoryPath,
+        equals(tempDir.path),
+      );
+
+      OsmFtsSearch.setPackagesDirectory(tempDir.path);
+      expect(
+        OfflineGeocodingService.packagesDirectoryPath,
+        equals(tempDir.path),
+      );
+
+      OsmFtsSearch.packagesDirectory = null;
+      expect(OsmFtsSearch.packagesDirectory, isNull);
+      expect(OfflineGeocodingService.packagesDirectoryPath, isNull);
+
+      // 2. OsmFtsSearch.search direto com packagesDir
+      final directResults = OsmFtsSearch.search(
+        query: 'Sebastiao',
+        packagesDir: tempDir,
+      );
+      expect(directResults, isNotEmpty);
+      expect(directResults.first.title, equals('Rua São Sebastião'));
+
+      // 3. searchOsmFts top-level helper
+      final helperResults = searchOsmFts(
+        query: 'Boa Esperanca',
+        packagesDirectoryPath: tempDir.path,
+      );
+      expect(helperResults, isNotEmpty);
+      expect(helperResults.first.title, equals('Comunidade Boa Esperança'));
+
+      // 4. searchDatabases com File único e com String de caminho direto
+      final singleFileRes = OsmFtsSearch.search(
+        query: 'Jeronimo',
+        searchDatabases: searchDbFile,
+      );
+      expect(singleFileRes, isNotEmpty);
+      expect(singleFileRes.first.title, equals('Aldeia São Jerônimo Ticuna'));
+
+      final singleStringRes = OsmFtsSearch.search(
+        query: 'Jeronimo',
+        searchDatabases: searchDbFile.path,
+      );
+      expect(singleStringRes, isNotEmpty);
+      expect(singleStringRes.first.title, equals('Aldeia São Jerônimo Ticuna'));
+
+      // 5. Caminho inexistente degrada graciosamente sem erro
+      final nonExistentRes = OsmFtsSearch.search(
+        query: 'qualquer',
+        searchDatabases: '${tempDir.path}/inexistente.search.db',
+      );
+      expect(nonExistentRes, isEmpty);
+
+      // 6. limit <= 0 retorna lista vazia
+      final zeroLimitRes = OsmFtsSearch.search(
+        query: 'Sebastiao',
+        packagesDir: tempDir,
+        limit: 0,
+      );
+      expect(zeroLimitRes, isEmpty);
+
+      // 7. Sanitização de FTS5 query
+      expect(OsmFtsSearch.sanitizeFtsQuery(''), equals(''));
+      expect(OsmFtsSearch.sanitizeFtsQuery('  !@#\$%^&*()  '), equals(''));
+      expect(
+        OsmFtsSearch.sanitizeFtsQuery('Rua 15 de Novembro'),
+        equals('"Rua"* "15"* "de"* "Novembro"*'),
+      );
+      expect(
+        OsmFtsSearch.sanitizeFtsQuery('Rua 15 de Novembro', stripNumbers: true),
+        equals('"Rua"* "de"* "Novembro"*'),
+      );
+
+      // 8. Mapeamento de categorias OSM para LocalResultType
+      expect(
+        OsmFtsSearch.mapCategoryToResultType('street'),
+        equals(LocalResultType.street),
+      );
+      expect(
+        OsmFtsSearch.mapCategoryToResultType('rua'),
+        equals(LocalResultType.street),
+      );
+      expect(
+        OsmFtsSearch.mapCategoryToResultType('place'),
+        equals(LocalResultType.place),
+      );
+      expect(
+        OsmFtsSearch.mapCategoryToResultType('comunidade'),
+        equals(LocalResultType.place),
+      );
+      expect(
+        OsmFtsSearch.mapCategoryToResultType('contact'),
+        equals(LocalResultType.contact),
+      );
+      expect(
+        OsmFtsSearch.mapCategoryToResultType('sector'),
+        equals(LocalResultType.sector),
+      );
+      expect(
+        OsmFtsSearch.mapCategoryToResultType('landmark'),
+        equals(LocalResultType.landmark),
+      );
+      expect(
+        OsmFtsSearch.mapCategoryToResultType('hospital'),
+        equals(LocalResultType.poi),
+      );
+    });
+
+    test('OsmFtsSearch Web stub contract safety', () {
+      // Garante que o stub Web exportado para navegadores não quebra chamadas
+      expect(osm_web.OsmFtsSearch.packagesDirectory, isNull);
+      osm_web.OsmFtsSearch.packagesDirectory = tempDir;
+      expect(osm_web.OsmFtsSearch.packagesDirectory, isNull);
+      osm_web.OsmFtsSearch.setPackagesDirectory(tempDir.path);
+
+      expect(
+        osm_web.OsmFtsSearch.resolveSearchFiles(packagesDir: tempDir),
+        isEmpty,
+      );
+      expect(
+        osm_web.OsmFtsSearch.searchOsmDatabase(searchDbFile, 'test', 10),
+        isEmpty,
+      );
+      expect(
+        osm_web.OsmFtsSearch.search(
+          query: 'Sebastiao',
+          packagesDir: tempDir,
+          packagesDirectoryPath: tempDir.path,
+          searchDatabases: [searchDbFile],
+        ),
+        isEmpty,
+      );
+      expect(
+        osm_web.searchOsmFts(
+          query: 'Sebastiao',
+          packagesDirectoryPath: tempDir.path,
+        ),
+        isEmpty,
+      );
+
+      // Métodos de sanitização e mapeamento funcionam na Web
+      expect(
+        osm_web.OsmFtsSearch.sanitizeFtsQuery('Rua São Sebastião'),
+        equals('"Rua"* "São"* "Sebastião"*'),
+      );
+      expect(
+        osm_web.OsmFtsSearch.mapCategoryToResultType('avenida'),
+        equals(LocalResultType.street),
+      );
+      expect(
+        osm_web.OsmFtsSearch.mapCategoryToResultType('aldeia'),
+        equals(LocalResultType.place),
+      );
+    });
+  });
+}
