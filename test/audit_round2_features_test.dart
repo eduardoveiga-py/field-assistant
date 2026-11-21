@@ -42,6 +42,7 @@ _startLoopbackSmtpServer({
 
   server.listen(
     (socket) {
+      socket.done.catchError((Object _) {});
       final session = _CapturedSmtpSession();
       final dataBuffer = StringBuffer();
       bool inDataMode = false;
@@ -50,6 +51,14 @@ _startLoopbackSmtpServer({
       void safeWrite(String text) {
         try {
           socket.write(text);
+        } on SocketException catch (_) {
+        } catch (_) {}
+      }
+
+      void safeClose() {
+        try {
+          socket.close();
+        } on SocketException catch (_) {
         } catch (_) {}
       }
 
@@ -122,15 +131,13 @@ _startLoopbackSmtpServer({
               safeWrite('354 End data with <CR><LF>.<CR><LF>\r\n');
             } else if (upper == 'QUIT') {
               safeWrite('221 2.0.0 Bye\r\n');
-              try {
-                socket.close();
-              } catch (_) {}
+              safeClose();
             } else {
               safeWrite('500 Unrecognized command\r\n');
             }
           }
         },
-        onError: (e) {
+        onError: (Object _) {
           if (!completer.isCompleted) {
             completer.complete(session);
           }
@@ -143,11 +150,12 @@ _startLoopbackSmtpServer({
         cancelOnError: true,
       );
     },
-    onError: (e) {
+    onError: (Object _) {
       if (!completer.isCompleted) {
         completer.complete(_CapturedSmtpSession());
       }
     },
+    cancelOnError: true,
   );
 
   return (server: server, sessionFuture: completer.future);
@@ -541,9 +549,12 @@ void main() {
             inData = true;
             writeFn('354 Go ahead\r\n');
           } else if (upper == 'QUIT') {
-            writeFn('221 Bye\r\n');
-            await flushFn();
-            await closeFn();
+            try {
+              writeFn('221 Bye\r\n');
+              await flushFn();
+              await closeFn();
+            } on SocketException catch (_) {
+            } catch (_) {}
             break;
           }
         }
@@ -558,17 +569,25 @@ void main() {
       addTearDown(sslServer.close);
       final sslSession = _CapturedSmtpSession();
       final sslDone = Completer<void>();
-      sslServer.listen((sock) async {
-        sock.write('220 localhost ESMTP SSL\r\n');
-        await handleTlsSmtpSession(
-          sock,
-          sock.write,
-          sock.flush,
-          sock.close,
-          sslSession,
-        );
-        if (!sslDone.isCompleted) sslDone.complete();
-      });
+      sslServer.listen(
+        (sock) async {
+          sock.done.catchError((Object _) {});
+          try {
+            sock.write('220 localhost ESMTP SSL\r\n');
+            await handleTlsSmtpSession(
+              sock,
+              sock.write,
+              sock.flush,
+              sock.close,
+              sslSession,
+            );
+          } on SocketException catch (_) {
+          } catch (_) {}
+          if (!sslDone.isCompleted) sslDone.complete();
+        },
+        onError: (Object _) {},
+        cancelOnError: true,
+      );
 
       final smtpTls = JwSmtpClient(onBadCertificateForTesting: (_) => true);
       await smtpTls.sendMail(
@@ -598,42 +617,67 @@ void main() {
       addTearDown(startTlsServer.close);
       final startTlsSession = _CapturedSmtpSession();
       final startTlsDone = Completer<void>();
-      startTlsServer.listen((sock) {
-        sock.write('220 localhost ESMTP\r\n');
-        final lineBuf = StringBuffer();
-        // ignore: cancel_subscriptions
-        late StreamSubscription<List<int>> sub;
-        sub = sock.listen((bytes) async {
-          lineBuf.write(utf8.decode(bytes));
-          while (true) {
-            final s = lineBuf.toString();
-            final idx = s.indexOf('\r\n');
-            if (idx == -1) break;
-            final line = s.substring(0, idx);
-            lineBuf.clear();
-            lineBuf.write(s.substring(idx + 2));
-            startTlsSession.commands.add(line);
-            final upper = line.toUpperCase();
-            if (upper.startsWith('EHLO')) {
-              sock.write('250-localhost\r\n250 STARTTLS\r\n');
-            } else if (upper == 'STARTTLS') {
-              sock.write('220 Ready to start TLS\r\n');
-              await sock.flush();
-              sub.pause();
-              final secured = await SecureSocket.secureServer(sock, serverCtx);
-              await handleTlsSmtpSession(
-                secured,
-                secured.write,
-                secured.flush,
-                secured.close,
-                startTlsSession,
-              );
-              if (!startTlsDone.isCompleted) startTlsDone.complete();
-              break;
-            }
-          }
-        });
-      });
+      startTlsServer.listen(
+        (sock) {
+          sock.done.catchError((Object _) {});
+          try {
+            sock.write('220 localhost ESMTP\r\n');
+          } on SocketException catch (_) {
+          } catch (_) {}
+          final lineBuf = StringBuffer();
+          // ignore: cancel_subscriptions
+          late StreamSubscription<List<int>> sub;
+          sub = sock.listen(
+            (bytes) async {
+              lineBuf.write(utf8.decode(bytes));
+              while (true) {
+                final s = lineBuf.toString();
+                final idx = s.indexOf('\r\n');
+                if (idx == -1) break;
+                final line = s.substring(0, idx);
+                lineBuf.clear();
+                lineBuf.write(s.substring(idx + 2));
+                startTlsSession.commands.add(line);
+                final upper = line.toUpperCase();
+                if (upper.startsWith('EHLO')) {
+                  try {
+                    sock.write('250-localhost\r\n250 STARTTLS\r\n');
+                  } on SocketException catch (_) {
+                  } catch (_) {}
+                } else if (upper == 'STARTTLS') {
+                  try {
+                    sock.write('220 Ready to start TLS\r\n');
+                    await sock.flush();
+                  } on SocketException catch (_) {
+                  } catch (_) {}
+                  sub.pause();
+                  try {
+                    final secured = await SecureSocket.secureServer(
+                      sock,
+                      serverCtx,
+                    );
+                    secured.done.catchError((Object _) {});
+                    await handleTlsSmtpSession(
+                      secured,
+                      secured.write,
+                      secured.flush,
+                      secured.close,
+                      startTlsSession,
+                    );
+                  } on SocketException catch (_) {
+                  } catch (_) {}
+                  if (!startTlsDone.isCompleted) startTlsDone.complete();
+                  break;
+                }
+              }
+            },
+            onError: (Object _) {},
+            cancelOnError: true,
+          );
+        },
+        onError: (Object _) {},
+        cancelOnError: true,
+      );
 
       await smtpTls.sendMail(
         host: '127.0.0.1',

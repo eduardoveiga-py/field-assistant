@@ -1,10 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../core/app_theme.dart';
 import '../core/i18n/app_locale_strings.dart';
 import '../appointments/calendar_provider.dart';
 import '../appointments/calendar_sync_coordinator.dart';
@@ -252,22 +251,33 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
               // Ajustes é sempre exibido no menu mais
               ListTile(
                 leading: Container(
-                  padding: const EdgeInsets.all(8),
+                  width: 40,
+                  height: 40,
                   decoration: BoxDecoration(
-                    color: (isDark ? const Color(0xFF94A3B8) : Colors.blueGrey)
-                        .withValues(alpha: 0.16),
+                    color: _showingSettings
+                        ? (isDark
+                                  ? const Color(0xFF3B82F6)
+                                  : const Color(0xFF2563EB))
+                              .withValues(alpha: 0.14)
+                        : (isDark
+                              ? Colors.white.withValues(alpha: 0.05)
+                              : const Color(0xFFF1F5F9)),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color:
-                          (isDark ? const Color(0xFF94A3B8) : Colors.blueGrey)
-                              .withValues(alpha: 0.35),
-                      width: 1.2,
-                    ),
                   ),
-                  child: Icon(
-                    _showingSettings ? Icons.settings : Icons.settings_outlined,
-                    color: isDark ? const Color(0xFF94A3B8) : Colors.blueGrey,
-                    size: 24,
+                  child: Center(
+                    child: Icon(
+                      _showingSettings
+                          ? Icons.settings
+                          : Icons.settings_outlined,
+                      color: _showingSettings
+                          ? (isDark
+                                ? const Color(0xFF3B82F6)
+                                : const Color(0xFF2563EB))
+                          : (isDark
+                                ? const Color(0xFF8B95A5)
+                                : const Color(0xFF64748B)),
+                      size: 22,
+                    ),
                   ),
                 ),
                 title: Text(
@@ -276,20 +286,39 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
                     fontWeight: _showingSettings
                         ? FontWeight.bold
                         : FontWeight.w600,
-                    color: _showingSettings ? AppTheme.primaryBlue : null,
+                    color: _showingSettings
+                        ? (isDark
+                              ? const Color(0xFF3B82F6)
+                              : const Color(0xFF2563EB))
+                        : (isDark
+                              ? const Color(0xFFF8FAFC)
+                              : const Color(0xFF0F172A)),
                   ),
                 ),
-                subtitle: const Text(
+                subtitle: Text(
                   'Sincronização, exportação de dados e configurações',
-                  style: TextStyle(fontSize: 12),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark
+                        ? const Color(0xFF94A3B8)
+                        : const Color(0xFF64748B),
+                  ),
                 ),
                 trailing: _showingSettings
-                    ? const Icon(
+                    ? Icon(
                         Icons.check,
-                        color: AppTheme.primaryBlue,
+                        color: isDark
+                            ? const Color(0xFF3B82F6)
+                            : const Color(0xFF2563EB),
                         size: 20,
                       )
-                    : const Icon(Icons.chevron_right, size: 18),
+                    : Icon(
+                        Icons.chevron_right,
+                        color: isDark
+                            ? const Color(0xFF8B95A5)
+                            : const Color(0xFF64748B),
+                        size: 18,
+                      ),
                 onTap: () {
                   Navigator.pop(ctx);
                   _onSelectSettings();
@@ -300,39 +329,6 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
         ),
       ),
     );
-  }
-
-  static Color _getFeatureColor(AppFeature feature) {
-    switch (feature) {
-      case AppFeature.today:
-        return const Color(0xFF3B82F6);
-      case AppFeature.people:
-        return const Color(0xFF10B981);
-      case AppFeature.phones:
-        return const Color(0xFF6366F1);
-      case AppFeature.agenda:
-        return const Color(0xFFF59E0B);
-      case AppFeature.studies:
-        return const Color(0xFF7C3AED);
-      case AppFeature.dashboard:
-        return AppTheme.primaryBlue;
-      case AppFeature.experiences:
-        return const Color(0xFF059669);
-      case AppFeature.notesResearch:
-        return const Color(0xFFD97706);
-      case AppFeature.ticuna:
-        return const Color(0xFF0D9488);
-      case AppFeature.territoryMaps:
-        return const Color(0xFF0284C7);
-      case AppFeature.inbox:
-        return const Color(0xFF2563EB);
-      case AppFeature.pictureBank:
-        return const Color(0xFFE11D48);
-      case AppFeature.tasksProjects:
-        return const Color(0xFF0891B2);
-      case AppFeature.knowledge:
-        return const Color(0xFF4F46E5);
-    }
   }
 
   static IconData _getFeatureIcon(
@@ -373,37 +369,26 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
     }
   }
 
-  static Widget _buildNavIcon({
+  static Widget _buildNavIcon(
+    BuildContext context, {
     required IconData icon,
-    required Color color,
     required bool isSelected,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primary = isDark ? const Color(0xFF3B82F6) : const Color(0xFF2563EB);
+    final inactiveColor = isDark
+        ? const Color(0xFF8B95A5)
+        : const Color(0xFF64748B);
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: isSelected
-            ? color.withValues(alpha: 0.24)
-            : color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isSelected ? color : color.withValues(alpha: 0.36),
-          width: isSelected ? 1.8 : 1.2,
-        ),
-        boxShadow: isSelected
-            ? [
-                BoxShadow(
-                  color: color.withValues(alpha: 0.28),
-                  blurRadius: 6,
-                  offset: const Offset(0, 1),
-                ),
-              ]
-            : null,
-      ),
-      child: Icon(
-        icon,
-        size: 22,
-        color: isSelected ? color : color.withValues(alpha: 0.92),
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      decoration: isSelected
+          ? BoxDecoration(
+              color: primary.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(10),
+            )
+          : null,
+      child: Icon(icon, size: 22, color: isSelected ? primary : inactiveColor),
     );
   }
 
@@ -413,33 +398,52 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
     required bool isSelected,
     required VoidCallback onTap,
   }) {
-    final color = _getFeatureColor(feature);
+    final isDark = Theme.of(ctx).brightness == Brightness.dark;
+    final primary = isDark ? const Color(0xFF3B82F6) : const Color(0xFF2563EB);
+    final inactiveColor = isDark
+        ? const Color(0xFF8B95A5)
+        : const Color(0xFF64748B);
     final icon = _getFeatureIcon(feature, isSelected: isSelected);
 
     return ListTile(
       leading: Container(
-        padding: const EdgeInsets.all(8),
+        width: 40,
+        height: 40,
         decoration: BoxDecoration(
-          color: color.withValues(alpha: isSelected ? 0.22 : 0.12),
+          color: isSelected
+              ? primary.withValues(alpha: 0.14)
+              : (isDark
+                    ? Colors.white.withValues(alpha: 0.05)
+                    : const Color(0xFFF1F5F9)),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: isSelected ? color : color.withValues(alpha: 0.32),
-            width: isSelected ? 1.6 : 1.0,
+        ),
+        child: Center(
+          child: Icon(
+            icon,
+            color: isSelected ? primary : inactiveColor,
+            size: 22,
           ),
         ),
-        child: Icon(icon, color: color, size: 24),
       ),
       title: Text(
         feature.title,
         style: TextStyle(
           fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-          color: isSelected ? color : null,
+          color: isSelected
+              ? primary
+              : (isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A)),
         ),
       ),
-      subtitle: Text(feature.description, style: const TextStyle(fontSize: 12)),
+      subtitle: Text(
+        feature.description,
+        style: TextStyle(
+          fontSize: 12,
+          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+        ),
+      ),
       trailing: isSelected
-          ? Icon(Icons.check, color: color, size: 20)
-          : const Icon(Icons.chevron_right, size: 18),
+          ? Icon(Icons.check, color: primary, size: 20)
+          : Icon(Icons.chevron_right, color: inactiveColor, size: 18),
       onTap: onTap,
     );
   }
@@ -529,14 +533,13 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
         if (!activeFeatures.contains(f)) continue;
         final iconUnselected = _getFeatureIcon(f, isSelected: false);
         final iconSelected = _getFeatureIcon(f, isSelected: true);
-        final color = _getFeatureColor(f);
         railDestinations.add(
           NavigationRailDestination(
             icon: Semantics(
               label: 'Navegar para ${_getFeatureLabel(f, strings)}',
               child: _buildNavIcon(
+                context,
                 icon: iconUnselected,
-                color: color,
                 isSelected: false,
               ),
             ),
@@ -544,8 +547,8 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
               selected: true,
               label: 'Navegar para ${_getFeatureLabel(f, strings)}',
               child: _buildNavIcon(
+                context,
                 icon: iconSelected,
-                color: color,
                 isSelected: true,
               ),
             ),
@@ -556,9 +559,6 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
       }
 
       final isDark = Theme.of(context).brightness == Brightness.dark;
-      final settingsColor = isDark
-          ? const Color(0xFF94A3B8)
-          : const Color(0xFF64748B);
 
       // Adiciona Ajustes no final do Rail
       railDestinations.add(
@@ -566,8 +566,8 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
           icon: Semantics(
             label: 'Navegar para Ajustes e Backup',
             child: _buildNavIcon(
+              context,
               icon: Icons.settings_outlined,
-              color: settingsColor,
               isSelected: false,
             ),
           ),
@@ -575,8 +575,8 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
             selected: true,
             label: 'Navegar para Ajustes e Backup',
             child: _buildNavIcon(
+              context,
               icon: Icons.settings,
-              color: settingsColor,
               isSelected: true,
             ),
           ),
@@ -602,6 +602,9 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
                     ),
                     child: IntrinsicHeight(
                       child: NavigationRail(
+                        backgroundColor: isDark
+                            ? const Color(0xFF0E131F)
+                            : const Color(0xFFF1F5F9),
                         selectedIndex: selectedRailIndex,
                         onDestinationSelected: (idx) {
                           if (idx >= 0 && idx < railFeatures.length) {
@@ -614,13 +617,29 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
                           }
                         },
                         labelType: NavigationRailLabelType.all,
+                        selectedLabelTextStyle: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: isDark
+                              ? const Color(0xFF3B82F6)
+                              : const Color(0xFF2563EB),
+                        ),
+                        unselectedLabelTextStyle: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: isDark
+                              ? const Color(0xFF8B95A5)
+                              : const Color(0xFF64748B),
+                        ),
                         indicatorColor: Colors.transparent,
-                        leading: const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 14),
+                        leading: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
                           child: Icon(
                             Icons.menu_book,
-                            color: AppTheme.primaryBlue,
-                            size: 30,
+                            color: isDark
+                                ? const Color(0xFF3B82F6)
+                                : const Color(0xFF2563EB),
+                            size: 28,
                           ),
                         ),
                         destinations: railDestinations,
@@ -666,7 +685,6 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
     final barDestinations = <NavigationDestination>[];
     for (final f in primaryBarFeatures) {
       final label = _getFeatureLabel(f, strings);
-      final color = _getFeatureColor(f);
       final iconUnselected = _getFeatureIcon(f, isSelected: false);
       final iconSelected = _getFeatureIcon(f, isSelected: true);
       barDestinations.add(
@@ -674,19 +692,15 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
           icon: Semantics(
             label: 'Aba $label',
             child: _buildNavIcon(
+              context,
               icon: iconUnselected,
-              color: color,
               isSelected: false,
             ),
           ),
           selectedIcon: Semantics(
             selected: true,
             label: 'Aba $label',
-            child: _buildNavIcon(
-              icon: iconSelected,
-              color: color,
-              isSelected: true,
-            ),
+            child: _buildNavIcon(context, icon: iconSelected, isSelected: true),
           ),
           label: label,
         ),
@@ -694,9 +708,6 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
     }
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final moreColor = isDark
-        ? const Color(0xFF94A3B8)
-        : const Color(0xFF64748B);
 
     // Botão Mais
     barDestinations.add(
@@ -704,8 +715,8 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
         icon: Semantics(
           label: 'Abrir menu Mais recursos do ministério',
           child: _buildNavIcon(
+            context,
             icon: Icons.more_horiz,
-            color: moreColor,
             isSelected: false,
           ),
         ),
@@ -713,8 +724,8 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
           selected: true,
           label: 'Abrir menu Mais recursos do ministério',
           child: _buildNavIcon(
+            context,
             icon: Icons.more_horiz,
-            color: moreColor,
             isSelected: true,
           ),
         ),
@@ -733,6 +744,9 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
     return Scaffold(
       body: _buildScreenForCurrentState(),
       bottomNavigationBar: NavigationBar(
+        backgroundColor: isDark
+            ? const Color(0xFF0E131F)
+            : const Color(0xFFF1F5F9),
         selectedIndex: barSelectedIndex,
         onDestinationSelected: (idx) {
           if (idx == primaryBarFeatures.length) {
