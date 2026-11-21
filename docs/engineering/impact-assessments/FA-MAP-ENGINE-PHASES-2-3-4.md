@@ -98,6 +98,10 @@
    - *Finding:* Missing coordinates on selected pins fell back to hardcoded coordinates (`-3.1022, -67.9397` in São Paulo de Olivença), which would mislead users for unlocated contacts. The method was named `showNavigationSheet` without the `showNavigationChooser` alias mentioned in documentation. Apple Maps fallback lacked user feedback.
    - *Fix:* Added null-coordinate guards showing an informative SnackBar; added `showNavigationChooser` alias; added optional `isApple` flag for cross-platform widget testing; added SnackBar feedback when Apple Maps falls back to Google Maps.
 
+4. **Fase 3 (Web Release Build Conditional Imports):**
+   - *Finding:* Direct imports of `dart:io` and `package:sqlite3/sqlite3.dart` in `offline_geocoding_service.dart` caused Flutter Web release builds (`flutter build web --release`) to fail with dart2js compilation error (`Error: Dart library 'dart:ffi' is not available on this platform`, `Only JS interop members may be 'external'`).
+   - *Fix:* Extracted OSM FTS5 search into conditional facade `lib/territory/geocoding/osm_fts_search.dart` exporting `osm_fts_search_io.dart` on IO platforms and `osm_fts_search_web.dart` (safe empty stub) on Web. Replaced `Directory? packagesDirectory` with `String? packagesDirectoryPath` in `OfflineGeocodingService`. Verified that `dart format lib test`, `dart analyze lib test`, `flutter test test/territory/` (156 tests passing), and `flutter build web --release` compile and pass with exit code 0.
+
 ---
 
 ## 6. Scorecard & Quality Gate Evaluation

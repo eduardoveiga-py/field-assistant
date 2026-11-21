@@ -1,17 +1,15 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'package:path/path.dart' as p;
-import 'package:sqlite3/sqlite3.dart' as sql;
 
 import '../../core/app_logger.dart';
 import '../../database/app_database.dart';
 import '../../search/offline_search_index.dart';
 import '../geocoding_service.dart';
+import 'osm_fts_search.dart';
 
 /// Tipo de entidade encontrada em busca local offline.
 enum LocalResultType {
@@ -87,7 +85,7 @@ class LocalSearchResult {
 class OfflineGeocodingService {
   static const Duration cacheTtl = Duration(days: 30);
 
-  static Directory? packagesDirectory;
+  static String? packagesDirectoryPath;
   static final Map<String, _CachedEntry> _memoryCache = {};
   static DateTime? _lastRequestTime;
   static Future<void> _rateLimitChain = Future<void>.value();
@@ -451,34 +449,6 @@ class OfflineGeocodingService {
     return null;
   }
 
-  static List<File> _resolveSearchFiles({
-    Directory? packagesDir,
-    List<File>? searchDatabases,
-  }) {
-    if (kIsWeb) return const [];
-    if (searchDatabases != null) {
-      return searchDatabases.where((f) => f.existsSync()).toList();
-    }
-    final dir = packagesDir ?? packagesDirectory;
-    if (dir == null || !dir.existsSync()) {
-      return const [];
-    }
-    try {
-      return dir
-          .listSync()
-          .whereType<File>()
-          .where((f) => f.path.toLowerCase().endsWith('.search.db'))
-          .toList();
-    } catch (e, st) {
-      AppLogger.warning(
-        'Erro ao listar índices de busca em ${dir.path}',
-        e,
-        st,
-      );
-      return const [];
-    }
-  }
-
   static String _stripDiacritics(String text) {
     const withDia = 'áàãâäéèêëíìîïóòõôöúùûüçñÁÀÃÂÄÉÈÊËÍÌÎÏÓÒÕÔÖÚÙÛÜÇÑ';
     const withoutDia = 'aaaaaeeeeiiiiooooouuuucnAAAAAEEEEIIIIOOOOOUUUUCN';
@@ -487,52 +457,6 @@ class OfflineGeocodingService {
       result = result.replaceAll(withDia[i], withoutDia[i]);
     }
     return result;
-  }
-
-  static String _sanitizeFtsQuery(String input, {bool stripNumbers = false}) {
-    final trimmed = input.trim();
-    if (trimmed.isEmpty) return '';
-    // Substitui pontuações, hífens, apóstrofos e caracteres especiais por espaço
-    final cleanInput = trimmed.replaceAll(
-      RegExp(r'[^\p{L}\p{N}]+', unicode: true),
-      ' ',
-    );
-    final words = cleanInput
-        .split(RegExp(r'\s+'))
-        .where((w) => w.isNotEmpty)
-        .where((w) => !stripNumbers || !RegExp(r'^\d+$').hasMatch(w))
-        .map((w) => '"$w"*')
-        .toList();
-    if (words.isEmpty) return '';
-    return words.join(' ');
-  }
-
-  static LocalResultType _mapCategoryToResultType(String category) {
-    final c = category.toLowerCase().trim();
-    if (c == 'street' ||
-        c == 'highway' ||
-        c == 'road' ||
-        c == 'rua' ||
-        c == 'avenida' ||
-        c == 'travessa' ||
-        c == 'alameda') {
-      return LocalResultType.street;
-    }
-    if (c == 'place' ||
-        c == 'suburb' ||
-        c == 'village' ||
-        c == 'community' ||
-        c == 'comunidade' ||
-        c == 'aldeia' ||
-        c == 'bairro' ||
-        c == 'cidade' ||
-        c == 'municipality') {
-      return LocalResultType.place;
-    }
-    if (c == 'contact') return LocalResultType.contact;
-    if (c == 'sector') return LocalResultType.sector;
-    if (c == 'landmark') return LocalResultType.landmark;
-    return LocalResultType.poi;
   }
 
   static List<LocalSearchResult> _mergeAndDeduplicate(
@@ -555,83 +479,15 @@ class OfflineGeocodingService {
     return merged;
   }
 
-  static List<LocalSearchResult> _searchOsmDatabase(
-    File file,
-    String rawQuery,
-    int limit,
-  ) {
-    if (kIsWeb) return const [];
-    final results = <LocalSearchResult>[];
-    sql.Database? osmDb;
-    try {
-      osmDb = sql.sqlite3.open(file.path, mode: sql.OpenMode.readOnly);
-      final check = osmDb.select(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='osm_places_fts';",
-      );
-      if (check.isEmpty) return const [];
-
-      final sanitized = _sanitizeFtsQuery(rawQuery);
-      if (sanitized.isEmpty) return const [];
-
-      final originName = p.basename(file.path);
-      final stmt = osmDb.prepare(
-        'SELECT rowid, name, category, subtitle, lat, lng FROM osm_places_fts WHERE osm_places_fts MATCH ? LIMIT ?;',
-      );
-      try {
-        var rows = stmt.select([sanitized, limit]);
-        if (rows.isEmpty) {
-          final fallbackQuery = _sanitizeFtsQuery(rawQuery, stripNumbers: true);
-          if (fallbackQuery.isNotEmpty && fallbackQuery != sanitized) {
-            rows = stmt.select([fallbackQuery, limit]);
-          }
-        }
-        for (final row in rows) {
-          final rawCat = (row['category']?.toString() ?? 'poi').trim();
-          final type = _mapCategoryToResultType(rawCat);
-          final title = row['name']?.toString() ?? '';
-          final subtitle = row['subtitle']?.toString();
-          final lat = double.tryParse(row['lat']?.toString() ?? '');
-          final lng = double.tryParse(row['lng']?.toString() ?? '');
-          final rowid = row['rowid']?.toString() ?? '';
-
-          results.add(
-            LocalSearchResult(
-              id: 'osm_${originName}_$rowid',
-              type: type,
-              title: title,
-              subtitle: subtitle,
-              latitude: lat,
-              longitude: lng,
-              metadata: {'category': rawCat, 'origin': originName},
-              origin: originName,
-            ),
-          );
-        }
-      } finally {
-        stmt.close();
-      }
-    } catch (e, st) {
-      AppLogger.warning(
-        'Erro ao consultar índice FTS5 no arquivo ${file.path}',
-        e,
-        st,
-      );
-    } finally {
-      try {
-        osmDb?.close();
-      } catch (_) {}
-    }
-    return results;
-  }
-
   /// Busca offline local instantânea em contatos, marcos territoriais e setores
   /// cadastrados no banco de dados SQLite local e arquivos opcionais FTS5 (*.search.db),
   /// permitindo localizar ruas, aldeias, comunidades e POIs mesmo sem internet.
   static Future<List<LocalSearchResult>> searchOffline({
     required String query,
     required AppDatabase? db,
-    Directory? packagesDir,
-    List<File>? searchDatabases,
+    dynamic packagesDir,
+    String? packagesDirectoryPath,
+    dynamic searchDatabases,
     int limit = 50,
   }) async {
     final clean = query.trim().toLowerCase();
@@ -787,16 +643,13 @@ class OfflineGeocodingService {
     }
 
     // Consulta índices FTS5 opcionais de pacotes cartográficos offline (*.search.db)
-    final osmResults = <LocalSearchResult>[];
-    final searchFiles = _resolveSearchFiles(
+    final osmResults = OsmFtsSearch.search(
+      query: query,
       packagesDir: packagesDir,
+      packagesDirectoryPath: packagesDirectoryPath,
       searchDatabases: searchDatabases,
+      limit: limit,
     );
-
-    for (final file in searchFiles) {
-      final fileResults = _searchOsmDatabase(file, query, limit);
-      osmResults.addAll(fileResults);
-    }
 
     final merged = _mergeAndDeduplicate(localResults, osmResults);
     if (merged.length > limit) {

@@ -339,5 +339,41 @@ void main() {
         ); // Preserva registro local
       },
     );
+
+    test('Supports packagesDirectoryPath (String) and static packagesDirectoryPath configuration', () async {
+      // 1. Usando packagesDirectoryPath como String diretamente no parâmetro
+      final resPath = await OfflineGeocodingService.searchOffline(
+        query: 'Sao Sebastiao',
+        db: appDb,
+        packagesDirectoryPath: tempDir.path,
+      );
+      expect(resPath, isNotEmpty);
+      expect(resPath.first.title, equals('Rua São Sebastião'));
+
+      // 2. Usando a propriedade estática OfflineGeocodingService.packagesDirectoryPath
+      OfflineGeocodingService.packagesDirectoryPath = tempDir.path;
+      try {
+        final resStatic = await OfflineGeocodingService.searchOffline(
+          query: 'Boa Esperanca',
+          db: appDb,
+        );
+        expect(resStatic, isNotEmpty);
+        expect(resStatic.first.title, equals('Comunidade Boa Esperança'));
+      } finally {
+        OfflineGeocodingService.packagesDirectoryPath = null;
+      }
+
+      // 3. Usando searchDatabases explicitamente com lista de arquivos
+      final resExplicitFiles = await OfflineGeocodingService.searchOffline(
+        query: 'Jeronimo',
+        db: appDb,
+        searchDatabases: [searchDbFile],
+      );
+      expect(resExplicitFiles, isNotEmpty);
+      expect(
+        resExplicitFiles.first.title,
+        equals('Aldeia São Jerônimo Ticuna'),
+      );
+    });
   });
 }
