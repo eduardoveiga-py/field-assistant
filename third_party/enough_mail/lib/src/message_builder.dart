@@ -247,7 +247,7 @@ class PartBuilder {
           disposition!.filename,
           disposition.size,
           disposition.disposition,
-          utf8.encode(text) as Uint8List,
+          utf8.encode(text),
           child);
       _attachments.add(info);
     }
@@ -484,7 +484,7 @@ class PartBuilder {
     if (disposition == ContentDisposition.attachment) {
       _attachments.add(
         AttachmentInfo(null, mediaType, filename, null, disposition,
-            utf8.encode(messageText) as Uint8List, partBuilder),
+            utf8.encode(messageText), partBuilder),
       );
     }
     return partBuilder;

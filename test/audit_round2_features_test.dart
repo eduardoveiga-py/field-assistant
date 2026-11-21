@@ -601,6 +601,7 @@ void main() {
       startTlsServer.listen((sock) {
         sock.write('220 localhost ESMTP\r\n');
         final lineBuf = StringBuffer();
+        // ignore: cancel_subscriptions
         late StreamSubscription<List<int>> sub;
         sub = sock.listen((bytes) async {
           lineBuf.write(utf8.decode(bytes));
