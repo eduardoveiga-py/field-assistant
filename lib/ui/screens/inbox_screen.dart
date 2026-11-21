@@ -3018,55 +3018,48 @@ bool _unreadOnly = false;
                           const SizedBox(height: 8),
                           ...msg.attachments.map((att) {
                             final name = att['name']?.toString() ?? 'anexo';
-                  final rawPath = att['path']?.toString().trim();
-                  final hasPath =
-                      rawPath != null && rawPath.isNotEmpty;
-                  final rawType = att['type']?.toString().trim();
-                  final ext = name.contains('.')
-                      ? name.split('.').last.toLowerCase()
-                      : '';
-                  final type =
-                      (rawType != null && rawType.isNotEmpty)
-                      ? rawType
-                      : (ext.isNotEmpty ? ext : 'file');
-                  final base64Str = att['base64']?.toString();
-                  Uint8List? rawBytes;
-                  if (base64Str != null && base64Str.isNotEmpty) {
-                    try {
-                      var cleaned = base64Str.trim();
-                      final idx = cleaned.indexOf('base64,');
-                      if (cleaned.startsWith('data:') &&
-                          idx != -1) {
-                        cleaned = cleaned.substring(idx + 7);
+                      final rawPath = att['path']?.toString().trim();
+                      final hasPath = rawPath != null && rawPath.isNotEmpty;
+                      final rawType = att['type']?.toString().trim();
+                      final ext = name.contains('.')
+                          ? name.split('.').last.toLowerCase()
+                          : '';
+                      final type =
+                          (rawType != null && rawType.isNotEmpty)
+                          ? rawType
+                          : (ext.isNotEmpty ? ext : 'file');
+                      final base64Str = att['base64']?.toString();
+                      Uint8List? rawBytes;
+                      if (base64Str != null && base64Str.isNotEmpty) {
+                        try {
+                          var cleaned = base64Str.trim();
+                          final idx = cleaned.indexOf('base64,');
+                          if (cleaned.startsWith('data:') && idx != -1) {
+                            cleaned = cleaned.substring(idx + 7);
+                          }
+                          cleaned = cleaned.replaceAll(RegExp(r'\s+'), '');
+                          rawBytes = base64.decode(cleaned);
+                        } catch (_) {}
                       }
-                      cleaned = cleaned.replaceAll(
-                        RegExp(r'\s+'),
-                        '',
-                      );
-                      rawBytes = base64.decode(cleaned);
-                    } catch (_) {}
-                  }
-                  final sizeVal = att['size'];
-                  final sizeNum = sizeVal is num ? sizeVal : null;
-                  void openAttachment() {
-                    if (rawBytes == null && !hasPath) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Anexo indisponível para abrir.',
-                          ),
-                        ),
-                      );
-                      return;
-                    }
-                    showUniversalAttachmentViewer(
-                      context,
-                      filePath: hasPath ? rawPath : name,
-                      title: name,
-                      fileType: type,
-                      bytes: rawBytes,
-                    );
-                  }
+                      final sizeVal = att['size'];
+                      final sizeNum = sizeVal is num ? sizeVal : null;
+                      void openAttachment() {
+                        if (rawBytes == null && !hasPath) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                  content: Text('Anexo indisponível para abrir.'),
+                            ),
+                          );
+                          return;
+                        }
+                        showUniversalAttachmentViewer(
+                          context,
+                          filePath: hasPath ? rawPath : name,
+                          title: name,
+                          fileType: type,
+                          bytes: rawBytes,
+                        );
+                      }
                             return ListTile(
                               dense: true,
                               leading: const Icon(
