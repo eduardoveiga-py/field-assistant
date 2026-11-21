@@ -1,13 +1,13 @@
 # ESTADO DO PROJETO: FIELD ASSISTANT
 
-- **Branch de Estabilização:** `stabilization/definitive-hardening`
-- **Branch Base:** `master`
-- **Commit Base:** `6bd1e6cc72bb469ea76fe6cb749f7b15fb7986f3`
-- **Schema Drift/SQLite:** Versão `4`
-- **Total de Testes Automatizados:** 508 testes aprovados (100% de sucesso)
-- **Status do Build Web:** Concluído com sucesso (`flutter build web --release`)
-- **Status da Análise Estática:** 0 issues (`dart analyze lib test --fatal-infos`)
-- **Status da Formatação:** 100% em conformidade (`dart format --output=none --set-exit-if-changed lib test`)
+- **Versão:** `2.1.0+15` (v2.1.0 Build 15)
+- **Data de Homologação:** 21 de Novembro de 2026
+- **Branch:** `master`
+- **Schema Drift/SQLite:** Versão `14`
+- **Status do Build Multiplataforma:** Aprovado (Android, iOS/iPadOS, Web, Windows, Linux, macOS)
+- **Status da Análise Estática:** 0 issues (`dart analyze lib test integration_test --fatal-infos`)
+- **Status da Formatação:** 100% em conformidade (`dart format --output=none --set-exit-if-changed lib test integration_test`)
+- **Validação Pré-Push:** Aprovada (`tool/pre_push.ps1` exit code 0)
 
 ---
 

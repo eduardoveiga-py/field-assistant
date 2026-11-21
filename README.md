@@ -3,7 +3,7 @@
 # 📖 Ministério Pessoal
 ### *Gestão Eficiente, Discreta e Offline-First do Ministério de Campo*
 
-[![Versão](https://img.shields.io/badge/Versão-2.0.0_(Build_14)-blue?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/eduardoveiga-py/field-assistant/releases/latest)
+[![Versão](https://img.shields.io/badge/Versão-2.1.0_(Build_15)-blue?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/eduardoveiga-py/field-assistant/releases/latest)
 [![Flutter](https://img.shields.io/badge/Flutter-3.47+-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev)
 [![Dart](https://img.shields.io/badge/Dart-3.13+-0175C2?style=for-the-badge&logo=dart&logoColor=white)](https://dart.dev)
 [![Offline First](https://img.shields.io/badge/Arquitetura-Offline--First-success?style=for-the-badge&logo=sqlite&logoColor=white)](https://drift.simonbinder.eu/)
@@ -384,260 +384,22 @@ flowchart LR
 
 ## 📋 Histórico de Lançamentos e Changelog
 
-### 🚀 Versão 1.3.3 (Build 10) — 11/11/2026: Operação Integral Sem Stubs, Endurecimento Supabase e Secrets Embutidos no CI
-- **Configuração Supabase & OAuth Embutida nos Binários**:
-  - `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `GOOGLE_WEB_CLIENT_ID` e `GOOGLE_IOS_CLIENT_ID` injetados automaticamente nos 6 alvos de build do GitHub Actions (`Web`, `Android APK`, `iOS IPA`, `Windows`, `Linux` e `macOS`) via `--dart-define`, sem credenciais hardcoded no código-fonte.
-- **Alinhamento Completo do Banco Supabase e Segurança**:
-  - Schema remoto e migrações locais alinhados para todas as 26 tabelas sincronizadas + `sync_queue`, criação e políticas RLS do bucket privado `ticuna_audio`, proteção otimista em `sync_upsert`, índices de chave estrangeira e RLS otimizado com `(select auth.uid())`.
-- **Funcionalidades Reais e Segurança Local**:
-  - E-mail IMAP/SMTP operacional (`JwEmailService`), armazenamento offline de mapas `.mbtiles` (`MbtilesService`), geolocalização real (`geolocator`) sem coordenadas ou seeds fictícios, PIN obrigatório na ausência de biometria, verificação SHA-256 fail-closed para atualizações Android, sincronização completa das 7 tabelas estratégicas com tela de resolução de conflitos e backup/restauração cifrados integrais.
+> **Versão Homologada Atual:** **v2.1.0 (Build 15)** — Data de Lançamento: **21/11/2026** *(versão 2.0.0 lançada em 18/11/2026 e consolidada em 20/11/2026)*.
 
-### 🚀 Versão 1.3.2 (Build 9) — 10/11/2026: Suporte Nativo Completo para Desktop (Windows, Linux e macOS)
-- **Compilação Nativa Desktop e Distribuição Universal**:
-  - Geração automatizada no GitHub Actions de binários nativos para **Windows 10/11 x64** (`field-assistant-windows-x64.zip`), **Linux GTK x64** (`field-assistant-linux-x64.tar.gz`) e **macOS Universal** (`field-assistant-macos.zip`), somados aos binários oficiais de **Android**, **iOS/iPadOS** e **Web**, acompanhados de manifesto de integridade `SHA256SUMS.txt`.
-- **Abstrações e Isolamento Seguro de Plugins Móveis**:
-  - **`VoiceDictationService`**: Factory condicional com fallback gracioso para plataformas desktop sem reconhecimento de voz nativo contínuo, preservando gravação de áudio e entrada manual no `QuickVoiceNoteDialog`.
-  - **`CalendarProvider` / `AppleEventKitProvider`**: Isolamento condicional de plataforma impedindo chamadas nativas ao `device_calendar` em Windows, Linux e macOS, desabilitando o calendário Apple graciosamente na UI enquanto mantém o Google Calendar ativo.
-- **Scaffolding e Compatibilidade CMake / MSVC / GStreamer**:
-  - Estruturas nativas configuradas para `linux/` (GTK+ 3.0) e `macos/` (entitlements Sandbox de rede, áudio/microfone e arquivos + `Info.plist`).
-  - Correções no build desktop para compatibilidade com **MSVC 14.51 (Visual Studio 2026)**, `local_auth_windows` e isolamento do `jni` transitivo.
+As notas de atualização detalhadas de cada lançamento foram retiradas do README principal e organizadas em documento próprio e anexadas a cada release:
 
-### 🚀 Versão 1.3.1 (Build 8) — 09/11/2026: Paridade Cartográfica Organic Maps, Extensibilidade Multilíngue e Hardening de Módulos
-- **Paridade Cartográfica Avançada com Organic Maps (Anti-Flicker, Camadas, Bússola e 23 Regiões)**:
-  - **Eliminação Total de Flashes no Zoom**: Implementação de pirâmide de blocos com cache de fallback multinível (`getFallbackFromMemory`): ao alterar o zoom, o mapa preserva e escala o bloco pai ($z-1$ / $z-2$) em memória até o carregamento assíncrono do bloco exato, eliminando 100% da tela cinza piscando.
-  - **4 Camadas e Estilos de Mapas Selecionáveis**: Botão flutuante de camadas (`Icons.layers_rounded`) permitindo alternar instantaneamente entre:
-    - 🗺️ *Padrão (OpenStreetMap)*: Ruas, números e povoados com máxima legibilidade.
-    - 🛰️ *Satélite (Esri World Imagery)*: Fotografia aérea de alta resolução para identificar telhados, trilhas e rios na Amazônia.
-    - 🏔️ *Topográfico (OpenTopoMap)*: Curvas de nível, relevo e hidrografia para zonas rurais e ribeirinhas.
-    - 🌙 *Modo Noturno (Carto Dark)*: Alto contraste para economia de bateria e ministério noturno.
-  - **Catálogo de 23 Regiões do Brasil no Gerenciador de Downloads**: Estrutura idêntica ao Organic Maps (`Brasil — Mapas: 1 de 23`), cobrindo todos os estados e eixos estratégicos (Santo Antônio do Içá, Yanomami, Guajajara, Manaus, São Paulo, Rio, Curitiba, Brasília, etc.), com resumo de megabytes instalados e barra de rodapé persistente com botão "Atualizar tudo".
-  - **Toque Longo para Marcações**: Gesto de pressão longa em qualquer ponto do mapa captura as coordenadas $(lat, lng)$ e abre o formulário de cadastro de marcadores com endereço e coordenadas já preenchidos.
-  - **Bússola Magnética & Rotação Contínua**: Agulha apontando para o Norte magnético ($360^\circ$); toque rápido redefine para $0^\circ$ e toque longo gira $90^\circ$ em sentido horário.
-  - **Modo Tela Cheia 100% Imersivo**: Oculta o `NavigationRail` no iPad/Desktop e o `NavigationBar` no Mobile, dedicando a tela inteira exclusivamente ao mapa com botão flutuante de saída.
-  - **Escala Métrica Dinâmica**: Barra métrica estilo colchete (`|────────|`) com cálculo geodésico em tempo real de metros por pixel em função da latitude e zoom.
+- 📦 **[Releases Oficiais no GitHub](https://github.com/eduardoveiga-py/field-assistant/releases)**: Download dos pacotes oficiais para todas as plataformas (Android APK, iOS unsigned IPA, Web PWA, Windows x64, Linux x64 e macOS) e notas de versão de cada lançamento.
+- 📜 **[CHANGELOG.md](CHANGELOG.md)**: Histórico completo, auditável e detalhado de todas as versões desde a versão 1.0.0 até a versão 2.1.0.
 
-- **Extensibilidade Multilíngue Persistente & Criação de Idiomas**:
-  - Persistência reativa do idioma ativo no SQLite via `AppKvStore` (`active_language_code`), mantendo a escolha do usuário entre sessões e reinicializações.
-  - Seeding formal de 5 idiomas teocráticos padrão no banco Drift (`tca` Ticuna [Padrão], `por` Português, `spa` Espanhol, `gub` Guajajara e `yan` Yanomami) executado no `beforeOpen` de migração.
-  - Barra dinâmica de caracteres especiais (diacríticos) ajustada automaticamente conforme o idioma selecionado.
-  - Sistema extensível para cadastrar e gerenciar novos idiomas indígenas e estrangeiros dentro do aplicativo com símbolos, diacríticos customizados e vocabulário individualizado.
-
-- **Visualizador Universal Multi-Formato (`UniversalAttachmentViewerDialog`)**:
-  - Visualizador integrado para todos os formatos de anexos: PDFs via `PdfPreview` (com zoom contínuo, impressão e compartilhamento), imagens interativas com zoom gestual, áudios com player dedicado e textos/markdown. Resolve em definitivo o erro de abertura externa de documentos (ex.: `CIN - Eduardo Veiga.pdf`).
-
-- **Persistência de Autenticação Google & Supressão de Popups**:
-  - Verificação de autorização explícita (`_keyUserExplicitlyConnected`) antes de checagens silenciosas do Google Calendar, extinguindo o popup recorrente em localhost e web.
-  - Gerenciamento de conta Google centralizado em Configurações com opções para alternar e desconectar conta.
-
-- **Bloqueio Biométrico na Inbox & E-mail JW.org**:
-  - Proteção biométrica/PIN na tela inteira da Inbox Universal (`BiometricAuthService`).
-  - Formulário completo para conexão de e-mail JW.org (`mail.jw.org`, porta 993) em Configurações com teste de conectividade, remoção e retenção local permanente.
-
-- **Tarefas e Estudos Aprimorados**:
-  - Exibição de descrição detalhada diretamente nos cards de tarefas com busca e filtros por tags.
-  - Cards de estudos bíblicos retráteis/expansíveis com 1 toque para economia de espaço vertical, com foto/avatar colorido idêntico à aba Pessoas.
-  - Barra de edição avançada `RichMarkdownToolbar` em todo o aplicativo com inserção de fotos e links teocráticos formatados (`[📖 ...]`, `[🎥 ...]`).
-
-### 🚀 Versão 1.3.0 (Build 7) — 09/11/2026: A Grande Evolução Estratégica Integrada
-- **MÓDULO A — Inbox Universal**:
-  - Ponto central e de atrito zero para capturar qualquer informação sem interromper o foco ministerial ou pessoal.
-  - Modal adaptativo de captura rápida (`QuickCaptureSheet`) acessível via FAB flutuante e atalho na AppBar da tela Início.
-  - 3 modos de captura:
-    - ✍️ *Ideia / Texto*: Campo rápido com salvamento instantâneo e chips de categoria (Ministério, Pessoal, Estudo, Dúvida, Ideia).
-    - 🎤 *Voz / Ditado*: Gravação de áudio de até 5 minutos (300 segundos) com contador em tempo real, visualizador de onda e player de pré-visualização.
-    - 📎 *Documento / Foto*: Anexação de arquivos locais (PDF, DOC, TXT, EPUB) ou fotos da galeria com cálculo automático de tamanho e hash.
-  - Tela `InboxScreen` com filtros por status (*Pendentes*, *Em Análise*, *Processadas*, *Todas*), badges por tipo de mídia, player de áudio embutido e menu de triagem.
-  - Pipeline de conversão não-destrutiva: transforma itens capturados em **Tarefas**, **Projetos**, **Notas** ou **Dúvidas Teocráticas**, preservando o registro original com `status = 'converted'`, `converted_entity_type` e `converted_entity_id`.
-
-- **MÓDULO B — Tarefas e Projetos**:
-  - `TaskManager`: Gerenciador de responsabilidades com suporte a prioridades (*baixa, normal, alta, urgente*), prazos, vínculos a contatos ou estudos e **recorrência automática contínua** (*diária, semanal, mensal*): ao concluir uma tarefa recorrente, a próxima ocorrência é gerada automaticamente com data futura.
-  - `ProjectManager`: Estruturação de iniciativas de médio e longo prazo com metas, alvos e cálculo reativo de progresso percentual (`ProjectProgress`: tarefas concluídas / total de tarefas).
-  - Tela `TasksScreen` com 5 abas otimizadas:
-    - ⚡ *Hoje & Urgentes*: Tarefas com vencimento para hoje ou em atraso.
-    - 📋 *Minhas Tarefas*: Lista completa com ordenação inteligente.
-    - 📁 *Projetos*: Visão geral dos projetos ativos com barras de progresso % em tempo real.
-    - 👥 *Ações de Contatos*: Histórico e pendências de revisitas dos contatos.
-    - ✅ *Concluídas*: Registro de tarefas finalizadas.
-  - Tela `ProjectDetailScreen` com objetivos, descrição, barra de progresso visual, lista de tarefas vinculadas e modal de adição rápida.
-
-- **MÓDULO C — Base de Conhecimento**:
-  - `KnowledgeManager`: Repositório central de conhecimento, estudos e pesquisa teocrática.
-  - 4 pilares estruturados na tela `KnowledgeBaseScreen`:
-    - 📝 *Notas de Conhecimento*: Anotações ricas em Markdown, marcação de favoritos, fixação de notas importantes no topo e categorização.
-    - ❓ *Perguntas & Dúvidas Teocráticas*: Registro de objeções ou dúvidas de moradores para pesquisa posterior, com status *Em Aberto* ou *Respondida*, textos bíblicos de apoio e respostas detalhadas.
-    - 📁 *Documentos*: Gerenciador de arquivos locais (apostilas, PDFs, manuais) com tamanho em KB e hash criptográfico SHA-256 para auditoria de integridade.
-    - 🔗 *Recursos & JW.org*: Catálogo de links diretos de artigos, vídeos do Ministério e ferramentas do site oficial com abertura rápida externa.
-
-- **Integração Global dos Três Módulos**:
-  - `GlobalSearchDelegate`: Barra de busca unificada de `Hoje no Ministério` agora indexa e pesquisa em tempo real Pessoas, Telefones, Agenda, Estudos, **Tarefas**, **Projetos**, **Notas de Conhecimento** e **Itens da Inbox**.
-  - `PersonDetailScreen`: Aba *Alvos & Tarefas* sincronizada diretamente com a tabela `tasks` (`watchTasksForPerson`), permitindo gerenciar tarefas formais da pessoa sem perder o histórico legado.
-  - `StudiesScreen`: Atalho na AppBar para consulta imediata de recursos e notas de conhecimento durante o curso bíblico.
-  - Banco de Dados Drift (Schema v6): 7 novas tabelas (`inbox_entries`, `projects`, `tasks`, `knowledge_notes`, `knowledge_questions`, `knowledge_documents`, `knowledge_resources`), coluna `appointments.task_id` e colunas contextuais em `research_articles`.
-  - Migração Supabase DDL com RLS (`auth.uid() = owner_id`), 26 tabelas no `SupabaseSyncService` e 29 tabelas no `BackupService` criptografado (PBKDF2-HMAC-SHA256).
-
-### 🚀 Versão 1.2.1 (Build 6) — 09/11/2026
-- **Componentes Adaptativos (Regra 10)**:
-  - Implementação do componente universal `showAdaptiveMinistrySheet`: em telas > 600pt (iPads, tablets e navegadores desktop), renderiza como `Dialog` flutuante centralizado (`maxWidth: 720`, `maxHeight: 0.85 * viewportHeight`), cantos 100% arredondados (`BorderRadius.circular(24)`), sombra e botão "✕" de fechar no topo, eliminando a janela vertical infinita. Em telas mobile (<= 600pt), utiliza folha inferior com limite estrito de 88% da altura.
-  - Ativação plena de internacionalização em `main.dart` observando `appLocaleTypeProvider` e plugging dinâmico de `appStringsProvider` no `MainNavigationShell`.
-- **Assistente de Idiomas Dinâmico no Drift (Regra 11 - Schema v5)**:
-  - Nova tabela `AppLanguages` integrada com persistência local SQLite, mantendo 100% dos dados legados e seeding do Ticuna (`tca`) como língua padrão.
-  - Seletor Pill interativo no AppBar da aba de Idiomas (`🏹 Ticuna (Magüta) ▾`).
-  - Modal `+ Novo Idioma` com atalhos de 1-toque para línguas pré-catalogadas (`🌿 Guajajara` e `🌳 Yanomami`) a partir do `LanguageRegistry`.
-  - Barra de diacríticos dinâmica (`TicunaDiacriticsBar`) que exibe em tempo real os caracteres especiais do idioma ativo e auto-oculta para idiomas sem diacríticos.
-  - Filtragem dinâmica de vocabulário, frases de campo e flashcards SM-2 pelo `language_id` ativo.
-- **Motor Cartográfico de Alto Desempenho estilo Organic Maps (Regra 12 & Imagem 2)**:
-  - Rotação 2D contínua em qualquer ângulo ($360^\circ$) por gesto de dois dedos na tela.
-  - Bússola interativa na tela com agulha apontada para o Norte Magnético e reset instantâneo para 0° ao tocar.
-  - Barra de escala métrica dinâmica (50m, 200m, 1 km, 5 km) recalculada em tempo real com base na latitude e zoom.
-  - Botão flutuante de Tela Cheia (Fullscreen toggle) para expansão imersiva e ocultação de barras de navegação no iPad.
-  - GPS nativo de alta precisão no iPadOS e Android: ponto azul pulsante com raio de precisão e cone de orientação (heading), com permissões em `AndroidManifest.xml` e `Info.plist`.
-  - Gerenciador "Baixar Mapas" completo idêntico à Imagem 2: campo de busca `Localizar mapa`, seção `Baixado (X MB)`, catálogo hierárquico por país/estado (ex.: Brasil > Amazonas — Santo Antônio do Içá & Alto Solimões), barra de progresso em MB e botão `Atualizar tudo`. Suporte consolidado a arquivos SQLite `.mbtiles` servidos localmente com tempo de resposta ultrarrápido (<0.2ms) e zero risco de banimento de IP no OSM.
-- **Auditoria Crítica de Sincronização e Resiliência (C1 a C5)**:
-  - C1: Backoff exponencial real na `sync_queue` com limite de até 5 tentativas (`last_attempt_at`), transicionando para dead-letter queue `'failed'` com opção de reprocessamento manual.
-  - C2: Ciclo de sincronização pull-before-push com pré-verificação de revisão remota antes de upsert, merge 3-way e substituição de exclusão cega por soft-delete (`deleted_at`).
-  - C3: Substituição do executor fantasma na Web por `_SafeWebUnavailableQueryExecutor`, interrompendo silenciosos descartes de escrita.
-  - C4: Utilitário universal `SyncTimestamp.parse(dynamic v)` tolerante a inteiros em milissegundos, segundos, instâncias `DateTime` e ISO-8601.
-  - C5: Normalização estrita de payloads para formato ISO-8601 na restauração de backups (`backup_service.dart`), eliminando erro 400 do PostgREST.
-- **Hardening de Segurança e Auditoria (A1 a A10, M1 a M13)**:
-  - Validação de integridade criptográfica SHA-256 no verificador de atualizações.
-  - Limpeza completa de PII em User-Agent e credenciais hardcoded.
-  - 100% de testes automatizados passando e 0 issues no `dart analyze`.
-
-### 🚀 Versão 1.2.0 (Build 5) — 08/11/2026
-- **Centralização de Versão**:
-  - Criação da classe `AppVersion` em `lib/core/app_version.dart` como fonte única da verdade para versão (`1.2.0`), compilação (`5`), release date, User-Agent canônico e esquemas do LiveContainer.
-- **Atualizador Automático In-App**:
-  - Implementação do `UpdateCheckerService` com consulta ao GitHub Releases API e fallback via CDN do `apps.json`.
-  - Banner visual inteligente na Splash Screen, na tela de Início (Home) e em Configurações, exibindo notas da versão e tamanho em MB.
-  - Ação em 1 toque conectada ao esquema oficial `livecontainer://sources?url=...` no iOS, download direto de APK no Android e reload de Service Worker na Web.
-- **Assistente Teocrático de Idiomas & Tradução**:
-  - Expansão do módulo com `LanguageRegistry` suportando Ticuna (golden flagship), Português, Espanhol, Guajajara e Yanomami.
-  - 6 Momentos-Chave do ministério com frases situacionais, guias fonéticos e áudios de pronúncia.
-  - Comparador multilíngue e modo Flashcards com repetição espaçada SM-2 (SuperMemo-2).
-  - Histórico persistente de pesquisas recentes.
-- **Internacionalização (i18n)**:
-  - Catálogo tipado `AppLocaleStrings` com suporte a Português (Brasil), Inglês (US) e Espanhol com fallback automático.
-  - Seletor dinâmico de idiomas em Configurações.
-- **Território Inteligente & Análise de Cobertura**:
-  - Cálculo do Índice de Cobertura ($IC$) nos últimos 90 dias.
-  - Identificação e overlay de Zonas Esquecidas (>90 dias sem visita).
-  - Detecção automática de endereços duplicados por proximidade geodésica (<25m Haversine) e similaridade textual de bigramas.
-  - Exportação e importação completa em KML 2.2, GeoJSON (RFC 7946) e CSV.
-- **Agendamento de Retorno na Porta por Proximidade**:
-  - Botão de 1 toque no perfil do contato (`DoorstepReturnBookingDialog`).
-  - Motor de cálculo de horários com base em preferências habituais, proximidade física de outros estudos e buffers de deslocamento.
-  - Detecção automática de conflitos com agenda local e calendários externos.
-- **Identidade Visual Conectada**:
-  - Componente `ScreenHeroAccentBand` integrando as cores dos cards da Home com as barras de navegação das telas secundárias.
-  - Saudação dinâmica contextual conforme o período do dia (manhã, tarde, noite) com efeito glassmorphic.
-- **CI/CD Paralelo Otimizado**:
-  - Desacoplamento do workflow do GitHub Actions em jobs paralelos (`test_and_lint`, `build_android_and_web`, `ios_build_check`, `publish_release`) para redução drástica do tempo de CI.
-- **Suíte de Testes**:
-  - Suíte expandida para mais de 630 testes automatizados com 100% de aprovação e zero issues no `dart analyze`.
-
-### 📦 Versão 1.1.2 — 07/11/2026
-- Adicionada verificação de compatibilidade com LiveContainer iOS.
-- Correção no tamanho e hashes do pacote IPA no catálogo `apps.json`.
-- Melhorias na estabilidade da fila de sincronização offline com Supabase.
-
-### 📦 Versão 1.1.1 — 06/11/2026
-- Ajustes de responsividade para telas pequenas de smartphones.
-- Aperfeiçoamento do Modo Sol Intenso sob iluminação direta.
-- Cache nativo aprimorado para renderização rápida de azulejos OpenStreetMap.
-
-### 📦 Versão 1.1.0 — 05/11/2026
-- Lançamento do módulo de Territórios e Setores com suporte a marcos de referência (POIs).
-- Integração da publicação *Seja Feliz para Sempre!* com links profundos para o JW Library.
-- Ditado rápido de notas de voz com extração inteligente de dados da visita.
-
-### 📦 Versão 2.0.0 — 20/11/2026 (Lançamento Oficial Estável)
-
-**Programa de Estabilização, Integridade e Evolução Ministerial**
-
-**🛡️ Exclusão Segura & Integridade Relacional (5 Pontos)**
-- Modal `PersonDeletionDialog` detalhando de forma transparente e clara os 5 pontos do ciclo de vida da exclusão.
-- Preservação estrita de relatórios ministeriais históricos e histórico de conversas passadas.
-- Limpeza segura de fotos locais associadas e desassociação ordenada de contatos telefônicos rápidos.
-
-**⚡ Liberação Atômica da Agenda & Lembretes Locais**
-- Motor transacional `ScheduleReleaseCoordinator` com cancelamento automático de revisitas e compromissos futuros ao encerrar estudos ou excluir contatos.
-- Descarte imediato de notificações pendentes no sistema operacional via `LocalReminderService`.
-- Sincronização e remoção imediata dos eventos nos calendários externos (Google Calendar e Apple EventKit).
-
-**🗺️ Map Engine Nível 2 (Alto Solimões Canônico & Fallback)**
-- Cartografia vetorial de alta precisão com pacotes MBTiles cobrindo **Betânia** e **Santo Antônio do Içá**.
-- Servidor HTTP loopback local RFC 7233 (`OfflineTileServer`) para entrega de azulejos vetoriais com streaming sem internet.
-- **Fallback Dinâmico Automático (`RasterFallbackAdapter`)**: comutação instantânea para renderização raster de alto desempenho quando o dispositivo não possuir aceleração GL/Metal.
-- Layout responsivo adaptado com orientação horizontal para iPad e modo compacto para iPhone.
-
-**📬 Sistema Completo de E-mails Exchange / JWPUB / Multi-Contas**
-- Suporte a todas as caixas postais: **Caixa de Entrada**, **Enviados**, **Rascunhos** e **Lixeira**.
-- **Gerenciador de Contatos Inteligente (`EmailContactsManager`)**: autocompletar e persistência imediata de novos endereços.
-- Download de anexos integrado com visualização direta no Visualizador Universal.
-- Editor de e-mail limpo com formatação profissional.
-
-**🎨 Banco de Gravuras Interativo com Super Zoom 10x**
-- Galeria temática de imagens e ilustrações teocráticas com filtros rápidos por tags.
-- Visualizador em tela cheia com zoom contínuo de até 10x (`InteractiveViewer`), perfeito para detalhes bíblicos sob luz intensa.
-
-**💎 Navegação Shell Reestilizada com Badges Cromáticos**
-- Identidade visual moderna na barra inferior e no `NavigationRail` com badges cromáticos suaves para cada recurso.
-- Ícones em pares delineados (*outlined*) e preenchidos (*filled*) com cores vivas e exclusivas para cada módulo ministerial.
-
-**🔒 Criptografia Fail-Closed & E2EE**
-- Máquina de estados explícita com 5 estados: `encrypted`, `migration_required`, `encryption_unavailable`, `migration_failed`, `recovery_required`.
-- Proteção de arquivos iOS Classe B (`NSFileProtectionCompleteUntilFirstUserAuthentication`).
-- Versionamento imutável de mídias criptografadas (`v_$versionId/chunk_$index.enc`) e CAS atômico.
+### 🚀 Destaques do Lançamento 2.1.0 (21/11/2026)
+- **🎨 Redesign Minimalista Profissional**: Design system moderno e sóbrio (estilo Linear e Apple HIG) no Dark Mode e Light Mode, barra de navegação/sidebar com pills translúcidas e tela "Hoje no Ministério" limpa com tipografia hierárquica e cards de atalho 40x40.
+- **🗺️ Map Engine Padrão Organic Maps**: Estilos vetoriais claros (`organic_maps_light.json`) e escuros (`organic_maps_dark.json`), suporte a overzoom offline sem telas pretas e gestos de pinça (pinch-to-zoom) aprimorados no iOS.
+- **📬 Caixa de Entrada & E-mails Pro**: Filtros inteligentes na Inbox, correções no fluxo de envio Exchange ActiveSync multi-contas e guarda no loop de SyncKey.
+- **🎨 Banco de Gravuras**: Exclusão rápida integrada e visualizador interativo em tela cheia com zoom contínuo de até 10x.
+- **🛡️ Estabilidade & Qualidade**: Correção definitiva do teste de integração SMTP intermitente, concorrência de pipeline CI e scripts pré-push padronizados.
 
 ---
 
-### 📦 Versão 2.0.0-rc — 18/11/2026 (Release Candidate)
-
-**🗺️ Mapas Nativo (MapLibre Level 2)**
-- Integração completa do MapLibre Native (`maplibre_gl: 0.28.0`) com renderização via Metal (iOS), Vulkan/OpenGL (Android) e WebGL (Web).
-- Leitor PMTiles v3 nativo com busca binária Hilbert, resolução de diretórios folha e header de 127 bytes.
-- Servidor HTTP loopback RFC 7233 (`OfflineTileServer`) para servir tiles, fontes SDF e sprites sem internet.
-- Fontes Protobuf SDF autênticas (`0-255.pbf`, 76 KB, 195 glifos) e sprite RGBA real gerados localmente.
-- Geocodificação reversa offline com cache Drift de 30 dias e limitador de 1 req/s.
-- Fallback automático para mapa raster (DynamicTileLayer) em Desktop e ambientes sem suporte a GL.
-
-**🔒 Criptografia Fail-Closed (Banco de Dados Local)**
-- Máquina de estados explícita com 5 estados: `encrypted`, `migration_required`, `encryption_unavailable`, `migration_failed`, `recovery_required`.
-- Nunca abre banco plaintext silenciosamente. Falha é informada ao usuário com opções de recuperação.
-- Proteção de arquivos iOS Classe B (`NSFileProtectionCompleteUntilFirstUserAuthentication`) auditada e documentada.
-- 11 cenários de falha cobertos por testes automatizados.
-
-**🛡️ Integridade de Mídias E2EE (Versionamento Imutável)**
-- Chunks com identificador de versão exclusivo (`v_$versionId/chunk_$index.enc`) — sem sobrescrita parcial.
-- Publicação de manifesto somente após verificação completa dos chunks (CAS atômico).
-- 3 detectores de conflito de domínio: estudos bíblicos, notas de voz e agendamentos.
-- Correção crítica de ressurreição/soft-delete no Supabase (`handle_soft_delete_and_resurrection_guard`).
-
-**🎙️ Gravação de Áudio — Segurança contra Interrupções iOS**
-- Tratamento de `AVAudioSession` via `audio_session` para chamadas telefônicas e alarmes.
-- Interrupções preservam o áudio gravado (`stopRecording()`), sem descartes acidentais.
-
-**📱 iPad & Acessibilidade**
-- Split View Master-Detail adaptativo em 900px, multitasking em 678px sem overflow.
-- Conformidade semântica completa para Apple VoiceOver e TalkBack (todos os botões ≥ 48×48 dp).
-- `Semantics(container: true, excludeSemantics: true)` em todos os botões de ação customizados.
-
-**🏗️ Arquitetura Modular**
-- 5 telas monolíticas decompostas: `appointments/`, `contacts_map/`, `person_detail/`, `settings/`, `studies/`.
-
-**✅ CI/CD & Cobertura**
-- Gate de cobertura criptográfica: mínimo 90% (atual: 93,21% em 52 testes).
-- `dart analyze --fatal-warnings` obrigatório no pipeline — 0 erros, 0 warnings.
-- `dart format` limpo em todos os 366 arquivos.
-
----
-
-### 📦 Versão 1.0.0 — 01/11/2026
-- Lançamento inicial oficial do Ministério Pessoal com arquitetura 100% Offline-First.
-- Gestão de contatos, estudos bíblicos, agenda ministerial e contagem rigorosa de relatórios.
-- Criptografia AES-256 GCM e backups locais protegidos por senha.
-
----
 
 ## 🛠️ Desenvolvimento e Compilação
 
