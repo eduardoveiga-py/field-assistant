@@ -56,6 +56,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
   final TextEditingController _emailSearchController = TextEditingController();
   String? _selectedEmailTag;
   String? _selectedEmailFolder;
+  bool _unreadOnly = false;
   String? _selectedEmailAccount;
   bool _isSyncingEmails = false;
 
@@ -2139,6 +2140,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
 
               final currentFolder = _selectedEmailFolder ?? 'Todas as pastas';
               final visible = emails.where((email) {
+                if (_unreadOnly && email.isRead) return false;
                 // Filtro por pasta
                 if (currentFolder == 'Caixa de Entrada') {
                   final fn = (email.folderName ?? '').toLowerCase();
@@ -2147,6 +2149,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                       fn.contains('sent') ||
                       fn.contains('lixeir') ||
                       fn.contains('trash') ||
+                      fn.contains('delet') ||
                       fn.contains('rascunh') ||
                       fn.contains('draft')) {
                     return false;
@@ -2284,10 +2287,33 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                     child: ListView.separated(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       scrollDirection: Axis.horizontal,
-                      itemCount: standardFolders.length,
+                      itemCount: standardFolders.length + 1,
                       separatorBuilder: (c, i) => const SizedBox(width: 6),
                       itemBuilder: (c, i) {
-                        final folder = standardFolders[i];
+                        if (i == 0) {
+                          return FilterChip(
+                            avatar: Icon(
+                              _unreadOnly
+                                  ? Icons.mark_email_unread
+                                  : Icons.mark_email_unread_outlined,
+                              size: 16,
+                            ),
+                            label: const Text(
+                              'Não lidos',
+                              style: TextStyle(fontSize: 12),
+                            ),
+                            selected: _unreadOnly,
+                            selectedColor: AppTheme.primaryBlue.withValues(
+                              alpha: 0.2,
+                            ),
+                            onSelected: (val) {
+                              setState(() {
+                                _unreadOnly = val;
+                              });
+                            },
+                          );
+                        }
+                        final folder = standardFolders[i - 1];
                         final isSelected = currentFolder == folder;
                         IconData icon;
                         switch (folder) {
@@ -2597,6 +2623,36 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
             // Topo: Badge + De + Data + Menu
             Row(
               children: [
+                if (!msg.isRead)
+                  Container(
+                    width: 8,
+                    height: 8,
+                    margin: const EdgeInsets.only(right: 6),
+                    decoration: const BoxDecoration(
+                      color: AppTheme.primaryBlue,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                CircleAvatar(
+                  radius: 15,
+                  backgroundColor: badgeColor.withValues(alpha: 0.16),
+                  child: Text(
+                    msg.from.trim().isEmpty
+                        ? '?'
+                        : msg.from
+                              .trim()
+                              .split(RegExp(r'\s+'))
+                              .take(2)
+                              .map((w) => w[0].toUpperCase())
+                              .join(),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: badgeColor,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 8,
@@ -2962,15 +3018,54 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                           const SizedBox(height: 8),
                           ...msg.attachments.map((att) {
                             final name = att['name']?.toString() ?? 'anexo';
-                            final path = att['path'] as String? ?? name;
-                            final type = att['type'] as String? ?? 'pdf';
-                            final base64Str = att['base64'] as String?;
+                            final rawPath = att['path']?.toString().trim();
+                            final hasPath =
+                                rawPath != null && rawPath.isNotEmpty;
+                            final rawType = att['type']?.toString().trim();
+                            final ext = name.contains('.')
+                                ? name.split('.').last.toLowerCase()
+                                : '';
+                            final type = (rawType != null && rawType.isNotEmpty)
+                                ? rawType
+                                : (ext.isNotEmpty ? ext : 'file');
+                            final base64Str = att['base64']?.toString();
                             Uint8List? rawBytes;
                             if (base64Str != null && base64Str.isNotEmpty) {
                               try {
-                                rawBytes = base64.decode(base64Str);
+                                var cleaned = base64Str.trim();
+                                final idx = cleaned.indexOf('base64,');
+                                if (cleaned.startsWith('data:') && idx != -1) {
+                                  cleaned = cleaned.substring(idx + 7);
+                                }
+                                cleaned = cleaned.replaceAll(
+                                  RegExp(r'\s+'),
+                                  '',
+                                );
+                                rawBytes = base64.decode(cleaned);
                               } catch (_) {}
                             }
+                            final sizeVal = att['size'];
+                            final sizeNum = sizeVal is num ? sizeVal : null;
+                            void openAttachment() {
+                              if (rawBytes == null && !hasPath) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Anexo indisponível para abrir.',
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
+                              showUniversalAttachmentViewer(
+                                context,
+                                filePath: hasPath ? rawPath : name,
+                                title: name,
+                                fileType: type,
+                                bytes: rawBytes,
+                              );
+                            }
+
                             return ListTile(
                               dense: true,
                               leading: const Icon(
@@ -2978,34 +3073,16 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                 color: AppTheme.primaryBlue,
                               ),
                               title: Text(name),
-                              subtitle:
-                                  att['size'] != null &&
-                                      (att['size'] as num) > 0
+                              subtitle: sizeNum != null && sizeNum > 0
                                   ? Text(
-                                      '${((att['size'] as num) / 1024).toStringAsFixed(1)} KB',
+                                      '${(sizeNum / 1024).toStringAsFixed(1)} KB',
                                     )
                                   : null,
                               trailing: IconButton(
                                 icon: const Icon(Icons.open_in_new),
-                                onPressed: () {
-                                  showUniversalAttachmentViewer(
-                                    context,
-                                    filePath: path,
-                                    title: name,
-                                    fileType: type,
-                                    bytes: rawBytes,
-                                  );
-                                },
+                                onPressed: openAttachment,
                               ),
-                              onTap: () {
-                                showUniversalAttachmentViewer(
-                                  context,
-                                  filePath: path,
-                                  title: name,
-                                  fileType: type,
-                                  bytes: rawBytes,
-                                );
-                              },
+                              onTap: openAttachment,
                             );
                           }),
                         ],
