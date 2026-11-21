@@ -1101,7 +1101,7 @@ extension _SettingsIntegrationCards on _SettingsScreenState {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'Conexão Exchange verificada e salva. As mensagens ainda não foram baixadas: abra Inbox & JW Mail e toque em Sincronizar. Leitura experimental.',
+              'Conexão Exchange verificada e salva. As mensagens ainda não foram baixadas: abra Inbox & JW Mail e toque em Sincronizar.',
             ),
             backgroundColor: Colors.green,
             duration: Duration(seconds: 10),
