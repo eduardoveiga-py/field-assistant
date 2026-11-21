@@ -1540,8 +1540,20 @@ extension _ContactsMapCanvas on _ContactsMapScreenState {
                             label: const Text('Navegar (Mapas externos)'),
                             onPressed: () {
                               final lm = _selectedPinLandmark!;
-                              final lat = lm.latitude ?? -3.1022;
-                              final lon = lm.longitude ?? -67.9397;
+                              final lat = lm.latitude;
+                              final lon = lm.longitude;
+                              if (lat == null ||
+                                  lon == null ||
+                                  (lat == 0.0 && lon == 0.0)) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Este marco não possui coordenadas GPS válidas para navegação.',
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
                               ExternalNavigationLauncher.showNavigationSheet(
                                 context,
                                 lat: lat,
@@ -1724,8 +1736,20 @@ extension _ContactsMapCanvas on _ContactsMapScreenState {
                             label: const Text('Navegar (Mapas externos)'),
                             onPressed: () {
                               final p = _selectedPinPerson!;
-                              final lat = p.latitude ?? -3.1022;
-                              final lon = p.longitude ?? -67.9397;
+                              final lat = p.latitude;
+                              final lon = p.longitude;
+                              if (lat == null ||
+                                  lon == null ||
+                                  (lat == 0.0 && lon == 0.0)) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Este contato não possui coordenadas GPS válidas para navegação.',
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
                               ExternalNavigationLauncher.showNavigationSheet(
                                 context,
                                 lat: lat,

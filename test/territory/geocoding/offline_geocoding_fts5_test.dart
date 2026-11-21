@@ -231,5 +231,113 @@ void main() {
         expect(() => singleDir.deleteSync(recursive: true), returnsNormally);
       },
     );
+
+    test(
+      'Robust handling of hyphens, commas, and punctuation in queries',
+      () async {
+        // 1. Busca com hífen: "São-Sebastião"
+        final resHifen = await OfflineGeocodingService.searchOffline(
+          query: 'São-Sebastião',
+          db: appDb,
+          packagesDir: tempDir,
+        );
+        expect(resHifen, isNotEmpty);
+        expect(resHifen.first.title, equals('Rua São Sebastião'));
+
+        // 2. Busca com vírgula e número: "São Sebastião, 10"
+        final resVirgula = await OfflineGeocodingService.searchOffline(
+          query: 'São Sebastião, 10',
+          db: appDb,
+          packagesDir: tempDir,
+        );
+        expect(resVirgula, isNotEmpty);
+        expect(resVirgula.first.title, equals('Rua São Sebastião'));
+
+        // 3. Busca com pontuação mista e símbolos: "Aldeia & Jerônimo?!"
+        final resSimbolos = await OfflineGeocodingService.searchOffline(
+          query: 'Aldeia & Jerônimo?!',
+          db: appDb,
+          packagesDir: tempDir,
+        );
+        expect(resSimbolos, isNotEmpty);
+        expect(resSimbolos.first.title, equals('Aldeia São Jerônimo Ticuna'));
+      },
+    );
+
+    test('Strict limit parameter enforcement on merged results', () async {
+      final resLimit = await OfflineGeocodingService.searchOffline(
+        query: 'a', // Termo amplo que casa com múltiplos registros
+        db: appDb,
+        packagesDir: tempDir,
+        limit: 2,
+      );
+      expect(resLimit.length, lessThanOrEqualTo(2));
+    });
+
+    test(
+      'Supports multiple regional *.search.db packages simultaneously',
+      () async {
+        final secondDbFile = File('${tempDir.path}/am_manaus.search.db');
+        final db2 = sql.sqlite3.open(secondDbFile.path);
+        db2.execute('''
+        CREATE VIRTUAL TABLE osm_places_fts USING fts5(
+          name, category, subtitle, lat UNINDEXED, lng UNINDEXED,
+          tokenize='unicode61 remove_diacritics 2'
+        );
+      ''');
+        db2.execute(
+          "INSERT INTO osm_places_fts VALUES ('Teatro Amazonas', 'poi', 'Centro Histórico', '-3.1303', '-60.0234');",
+        );
+        db2.close();
+
+        final resMulti = await OfflineGeocodingService.searchOffline(
+          query: 'Teatro',
+          db: appDb,
+          packagesDir: tempDir,
+        );
+        expect(resMulti, isNotEmpty);
+        expect(resMulti.first.title, equals('Teatro Amazonas'));
+        expect(resMulti.first.origin, equals('am_manaus.search.db'));
+        expect(resMulti.first.type, equals(LocalResultType.poi));
+      },
+    );
+
+    test(
+      'Deduplicates records when diacritics vary between local and OSM',
+      () async {
+        final now = DateTime.now().toUtc();
+        // Registro local sem acento com mesmas coordenadas
+        await appDb
+            .into(appDb.territoryLandmarks)
+            .insert(
+              TerritoryLandmarksCompanion.insert(
+                id: 'lm-dup-1',
+                name: 'Rua Sao Sebastiao',
+                category: 'street',
+                address: const Value('Bairro da Esperança'),
+                latitude: const Value(-3.1020),
+                longitude: const Value(-60.0200),
+                createdAt: now,
+                updatedAt: now,
+              ),
+            );
+
+        final merged = await OfflineGeocodingService.searchOffline(
+          query: 'Sebastiao',
+          db: appDb,
+          packagesDir: tempDir,
+        );
+
+        // Deve deduplicar porque título normalizado, subtítulo normalizado e coordenadas coincidem
+        final matching = merged
+            .where((r) => r.latitude == -3.1020 && r.longitude == -60.0200)
+            .toList();
+        expect(matching.length, equals(1));
+        expect(
+          matching.first.origin,
+          equals('local'),
+        ); // Preserva registro local
+      },
+    );
   });
 }

@@ -53,6 +53,9 @@ class OfflineTileServer {
   @visibleForTesting
   int get openMbtilesDatabasesCount => _mbtilesDatabases.length;
 
+  @visibleForTesting
+  int get openMbtilesConnectionCount => _mbtilesDatabases.length;
+
   Uint8List? _getCachedTile(String key) {
     final value = _tileCache.remove(key);
     if (value != null) {
@@ -78,6 +81,9 @@ class OfflineTileServer {
 
   /// Define o diretório físico onde pacotes .pmtiles e .mbtiles residem.
   void setPackagesDirectory(Directory dir) {
+    _closeMbtilesDatabases();
+    _pmtilesReaders.clear();
+    _tileCache.clear();
     packagesDir = dir;
   }
 
@@ -101,23 +107,26 @@ class OfflineTileServer {
     _tileCache.clear();
   }
 
+  void _closeMbtilesDatabases() {
+    for (final db in _mbtilesDatabases.values) {
+      try {
+        db.close();
+      } catch (_) {}
+    }
+    _mbtilesDatabases.clear();
+  }
+
   /// Registra explicitamente um arquivo MBTiles mapeado a um identificador seguro.
   void registerMbtilesPackage(String packageId, File file) {
     _validateSafeId(packageId);
-    final oldDb = _mbtilesDatabases.remove(packageId);
-    try {
-      oldDb?.close();
-    } catch (_) {}
+    _closeMbtilesDatabases();
     _mbtilesPackages[packageId] = file;
     _tileCache.clear();
   }
 
   /// Remove registro explícito de um pacote MBTiles.
   void unregisterMbtilesPackage(String packageId) {
-    final oldDb = _mbtilesDatabases.remove(packageId);
-    try {
-      oldDb?.close();
-    } catch (_) {}
+    _closeMbtilesDatabases();
     _mbtilesPackages.remove(packageId);
     _tileCache.clear();
   }
@@ -157,12 +166,7 @@ class OfflineTileServer {
     _port = null;
     _pmtilesReaders.clear();
     _tileCache.clear();
-    for (final db in _mbtilesDatabases.values) {
-      try {
-        db.close();
-      } catch (_) {}
-    }
-    _mbtilesDatabases.clear();
+    _closeMbtilesDatabases();
     if (server != null) {
       await server.close(force: force);
       AppLogger.info('OfflineTileServer finalizado.');
@@ -548,14 +552,15 @@ class OfflineTileServer {
     Uint8List? tileBytes;
 
     if (file != null && file.existsSync()) {
-      sql.Database? db = _mbtilesDatabases[cleanRegion];
-      if (db == null) {
-        try {
-          db = sql.sqlite3.open(file.path, mode: sql.OpenMode.readOnly);
-          _mbtilesDatabases[cleanRegion] = db;
-        } catch (e, st) {
-          AppLogger.warning('Erro ao abrir MBTiles ${file.path}', e, st);
-        }
+      final safeFile = file;
+      sql.Database? db;
+      try {
+        db = _mbtilesDatabases.putIfAbsent(
+          cleanRegion,
+          () => sql.sqlite3.open(safeFile.path, mode: sql.OpenMode.readOnly),
+        );
+      } catch (e, st) {
+        AppLogger.warning('Erro ao abrir MBTiles ${safeFile.path}', e, st);
       }
 
       if (db != null) {

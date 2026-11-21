@@ -235,6 +235,68 @@ void main() {
       // Unregister clears cache
       server.unregisterMbtilesPackage('pkg_a');
       expect(server.tileCacheLength, equals(0));
+      expect(server.openMbtilesDatabasesCount, equals(0));
+      expect(server.openMbtilesConnectionCount, equals(0));
+    });
+
+    test(
+      'setPackagesDirectory clears cache and closes MBTiles connections',
+      () async {
+        final mbtilesFile = File('${tempDir.path}/dir_switch.mbtiles');
+        final db = sql.sqlite3.open(mbtilesFile.path);
+        db.execute('''
+        CREATE TABLE metadata (name TEXT, value TEXT);
+        CREATE TABLE tiles (zoom_level INTEGER, tile_column INTEGER, tile_row INTEGER, tile_data BLOB);
+      ''');
+        final stmt = db.prepare('INSERT INTO tiles VALUES (?, ?, ?, ?)');
+        stmt.execute([
+          1,
+          0,
+          0,
+          Uint8List.fromList([7, 8, 9]),
+        ]);
+        stmt.close();
+        db.close();
+
+        await server.start();
+        final res = await http.get(
+          Uri.parse('${server.baseUrl}/mbtiles/dir_switch/1/0/0'),
+        );
+        expect(res.statusCode, equals(200));
+        expect(server.tileCacheLength, equals(1));
+        expect(server.openMbtilesDatabasesCount, equals(1));
+
+        final newDir = Directory.systemTemp.createTempSync('new_pkg_dir_');
+        try {
+          server.setPackagesDirectory(newDir);
+          expect(server.tileCacheLength, equals(0));
+          expect(server.openMbtilesDatabasesCount, equals(0));
+          expect(server.openMbtilesConnectionCount, equals(0));
+        } finally {
+          if (newDir.existsSync()) newDir.deleteSync(recursive: true);
+        }
+      },
+    );
+
+    test('Serves PMTiles tile via fallback lookup with Cache-Control and LRU cache', () async {
+      final sampleTile = Uint8List.fromList([10, 20, 30]);
+      server.setTileLookup((z, x, y) async => sampleTile);
+      await server.start();
+
+      final url = '${server.baseUrl}/pmtiles/region_fake/12/34/56.pbf';
+      final res = await http.get(Uri.parse(url));
+      expect(res.statusCode, equals(200));
+      expect(
+        res.headers['cache-control'],
+        equals('public, max-age=86400, immutable'),
+      );
+      expect(server.hasCachedTile('pmtiles:region_fake:12:34:56'), isTrue);
+      expect(server.tileCacheLength, equals(1));
+
+      // Second request hits cache
+      final res2 = await http.get(Uri.parse(url));
+      expect(res2.statusCode, equals(200));
+      expect(res2.bodyBytes, equals(sampleTile));
     });
   });
 }

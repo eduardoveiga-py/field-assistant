@@ -204,5 +204,39 @@ void main() {
         expect(find.text('Google Maps'), findsOneWidget);
       },
     );
+
+    testWidgets(
+      'Displays Apple Maps option when isApple is true via showNavigationChooser',
+      (tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: Builder(
+                builder: (ctx) => ElevatedButton(
+                  onPressed: () =>
+                      ExternalNavigationLauncher.showNavigationChooser(
+                        ctx,
+                        lat: -23.5505,
+                        lng: -46.6333,
+                        label: 'Praça da Sé',
+                        isApple: true,
+                      ),
+                  child: const Text('Abrir Apple'),
+                ),
+              ),
+            ),
+          ),
+        );
+
+        await tester.tap(find.text('Abrir Apple'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Navegar até "Praça da Sé"'), findsOneWidget);
+        expect(find.byKey(const Key('nav_opt_organic_maps')), findsOneWidget);
+        expect(find.byKey(const Key('nav_opt_apple_maps')), findsOneWidget);
+        expect(find.text('Apple Maps'), findsOneWidget);
+        expect(find.byKey(const Key('nav_opt_google_maps')), findsOneWidget);
+      },
+    );
   });
 }

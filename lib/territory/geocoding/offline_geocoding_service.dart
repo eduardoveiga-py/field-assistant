@@ -489,21 +489,22 @@ class OfflineGeocodingService {
     return result;
   }
 
-  static String _sanitizeFtsQuery(String input) {
+  static String _sanitizeFtsQuery(String input, {bool stripNumbers = false}) {
     final trimmed = input.trim();
     if (trimmed.isEmpty) return '';
-    final words = trimmed.split(RegExp(r'\s+'));
-    final escaped = words
+    // Substitui pontuações, hífens, apóstrofos e caracteres especiais por espaço
+    final cleanInput = trimmed.replaceAll(
+      RegExp(r'[^\p{L}\p{N}]+', unicode: true),
+      ' ',
+    );
+    final words = cleanInput
+        .split(RegExp(r'\s+'))
         .where((w) => w.isNotEmpty)
-        .map((w) {
-          final clean = w.replaceAll(RegExp(r'["\(\)\*\+\-\^:]'), '');
-          if (clean.isEmpty) return null;
-          return '"$clean"*';
-        })
-        .whereType<String>()
+        .where((w) => !stripNumbers || !RegExp(r'^\d+$').hasMatch(w))
+        .map((w) => '"$w"*')
         .toList();
-    if (escaped.isEmpty) return '';
-    return escaped.join(' ');
+    if (words.isEmpty) return '';
+    return words.join(' ');
   }
 
   static LocalResultType _mapCategoryToResultType(String category) {
@@ -542,8 +543,10 @@ class OfflineGeocodingService {
     final merged = <LocalSearchResult>[];
 
     for (final item in [...primary, ...secondary]) {
-      final key =
-          '${item.type.wireName}|${item.title.trim().toLowerCase()}|${item.subtitle?.trim().toLowerCase() ?? ''}|${item.latitude?.toStringAsFixed(4) ?? ''}|${item.longitude?.toStringAsFixed(4) ?? ''}';
+      final titleNorm = _stripDiacritics(item.title.trim().toLowerCase());
+      final key = item.hasCoordinates
+          ? '$titleNorm|${item.latitude!.toStringAsFixed(4)}|${item.longitude!.toStringAsFixed(4)}'
+          : '${item.type.wireName}|$titleNorm|${item.subtitle != null ? _stripDiacritics(item.subtitle!.trim().toLowerCase()) : ''}';
       if (seen.add(key)) {
         merged.add(item);
       }
@@ -575,7 +578,13 @@ class OfflineGeocodingService {
         'SELECT rowid, name, category, subtitle, lat, lng FROM osm_places_fts WHERE osm_places_fts MATCH ? LIMIT ?;',
       );
       try {
-        final rows = stmt.select([sanitized, limit]);
+        var rows = stmt.select([sanitized, limit]);
+        if (rows.isEmpty) {
+          final fallbackQuery = _sanitizeFtsQuery(rawQuery, stripNumbers: true);
+          if (fallbackQuery.isNotEmpty && fallbackQuery != sanitized) {
+            rows = stmt.select([fallbackQuery, limit]);
+          }
+        }
         for (final row in rows) {
           final rawCat = (row['category']?.toString() ?? 'poi').trim();
           final type = _mapCategoryToResultType(rawCat);
@@ -789,7 +798,11 @@ class OfflineGeocodingService {
       osmResults.addAll(fileResults);
     }
 
-    return _mergeAndDeduplicate(localResults, osmResults);
+    final merged = _mergeAndDeduplicate(localResults, osmResults);
+    if (merged.length > limit) {
+      return merged.sublist(0, limit);
+    }
+    return merged;
   }
 
   /// Limpa entradas de cache expiradas (> 30 dias) do banco de dados SQLite Drift.

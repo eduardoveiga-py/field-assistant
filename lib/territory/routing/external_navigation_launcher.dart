@@ -161,6 +161,26 @@ class ExternalNavigationLauncher {
   }
 
   /// Exibe ModalBottomSheet com opções de navegação externa com 1 toque.
+  /// Alias compatível com a especificação da arquitetura.
+  static Future<void> showNavigationChooser(
+    BuildContext context, {
+    required double lat,
+    required double lng,
+    required String label,
+    double? originLat,
+    double? originLng,
+    bool? isApple,
+  }) => showNavigationSheet(
+    context,
+    lat: lat,
+    lng: lng,
+    label: label,
+    originLat: originLat,
+    originLng: originLng,
+    isApple: isApple,
+  );
+
+  /// Exibe ModalBottomSheet com opções de navegação externa com 1 toque.
   static Future<void> showNavigationSheet(
     BuildContext context, {
     required double lat,
@@ -168,8 +188,10 @@ class ExternalNavigationLauncher {
     required String label,
     double? originLat,
     double? originLng,
+    bool? isApple,
   }) async {
-    final isApplePlatform = !kIsWeb && (Platform.isIOS || Platform.isMacOS);
+    final isApplePlatform =
+        isApple ?? (!kIsWeb && (Platform.isIOS || Platform.isMacOS));
 
     await showModalBottomSheet<void>(
       context: context,
@@ -263,7 +285,7 @@ class ExternalNavigationLauncher {
                     trailing: const Icon(Icons.arrow_forward_ios, size: 14),
                     onTap: () async {
                       Navigator.pop(sheetContext);
-                      await launchNavigation(
+                      final openedDirectly = await launchNavigation(
                         app: ExternalNavigationApp.appleMaps,
                         lat: lat,
                         lng: lng,
@@ -271,6 +293,16 @@ class ExternalNavigationLauncher {
                         originLat: originLat,
                         originLng: originLng,
                       );
+                      if (!openedDirectly && context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Apple Maps não disponível. Abrindo no Google Maps...',
+                            ),
+                            duration: Duration(seconds: 3),
+                          ),
+                        );
+                      }
                     },
                   ),
                 ListTile(

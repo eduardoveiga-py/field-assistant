@@ -32,6 +32,8 @@ class OfflineTileServer {
 
   int get openMbtilesDatabasesCount => 0;
 
+  int get openMbtilesConnectionCount => 0;
+
   void setTileLookup(TileLookup lookup) {
     tileLookup = lookup;
   }
