@@ -40,94 +40,115 @@ _startLoopbackSmtpServer({
   final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
   final completer = Completer<_CapturedSmtpSession>();
 
-  server.listen((socket) {
-    final session = _CapturedSmtpSession();
-    final dataBuffer = StringBuffer();
-    bool inDataMode = false;
-    int authStep = 0;
+  server.listen(
+    (socket) {
+      final session = _CapturedSmtpSession();
+      final dataBuffer = StringBuffer();
+      bool inDataMode = false;
+      int authStep = 0;
 
-    socket.write('220 localhost ESMTP TestRelay\r\n');
-    final lineBuffer = StringBuffer();
+      void safeWrite(String text) {
+        try {
+          socket.write(text);
+        } catch (_) {}
+      }
 
-    socket.listen(
-      (bytes) {
-        lineBuffer.write(utf8.decode(bytes));
-        while (true) {
-          final content = lineBuffer.toString();
-          final crlf = content.indexOf('\r\n');
-          if (crlf == -1) break;
-          final line = content.substring(0, crlf);
-          lineBuffer.clear();
-          lineBuffer.write(content.substring(crlf + 2));
+      safeWrite('220 localhost ESMTP TestRelay\r\n');
+      final lineBuffer = StringBuffer();
 
-          if (inDataMode) {
-            if (line == '.') {
-              inDataMode = false;
-              session.receivedDataPayload = dataBuffer.toString();
-              socket.write('250 2.0.0 Ok: queued\r\n');
+      socket.listen(
+        (bytes) {
+          lineBuffer.write(utf8.decode(bytes));
+          while (true) {
+            final content = lineBuffer.toString();
+            final crlf = content.indexOf('\r\n');
+            if (crlf == -1) break;
+            final line = content.substring(0, crlf);
+            lineBuffer.clear();
+            lineBuffer.write(content.substring(crlf + 2));
+
+            if (inDataMode) {
+              if (line == '.') {
+                inDataMode = false;
+                session.receivedDataPayload = dataBuffer.toString();
+                safeWrite('250 2.0.0 Ok: queued\r\n');
+              } else {
+                dataBuffer.writeln(line);
+              }
+              continue;
+            }
+
+            session.commands.add(line);
+            final upper = line.toUpperCase();
+
+            if (authStep == 1) {
+              authStep = 2;
+              safeWrite('334 UGFzc3dvcmQ6\r\n'); // Password:
+              continue;
+            }
+            if (authStep == 2) {
+              authStep = 0;
+              if (authResultCode == 235) {
+                safeWrite('235 2.7.0 Authentication successful\r\n');
+              } else {
+                safeWrite('535 5.7.8 Authentication credentials invalid\r\n');
+              }
+              continue;
+            }
+
+            if (upper.startsWith('EHLO')) {
+              safeWrite('250-localhost Hello\r\n');
+              if (advertiseStartTls) {
+                safeWrite('250-STARTTLS\r\n');
+              }
+              safeWrite('250 $authCapabilities\r\n');
+            } else if (upper.startsWith('AUTH PLAIN')) {
+              if (authResultCode == 235) {
+                safeWrite('235 2.7.0 Authentication successful\r\n');
+              } else {
+                safeWrite('535 5.7.8 Authentication credentials invalid\r\n');
+              }
+            } else if (upper == 'AUTH LOGIN') {
+              authStep = 1;
+              safeWrite('334 VXNlcm5hbWU6\r\n'); // Username:
+            } else if (upper.startsWith('MAIL FROM:')) {
+              session.receivedMailFrom = line.substring(10).trim();
+              safeWrite('250 2.1.0 Ok\r\n');
+            } else if (upper.startsWith('RCPT TO:')) {
+              session.receivedRcptTo.add(line.substring(8).trim());
+              safeWrite('250 2.1.5 Ok\r\n');
+            } else if (upper == 'DATA') {
+              inDataMode = true;
+              safeWrite('354 End data with <CR><LF>.<CR><LF>\r\n');
+            } else if (upper == 'QUIT') {
+              safeWrite('221 2.0.0 Bye\r\n');
+              try {
+                socket.close();
+              } catch (_) {}
             } else {
-              dataBuffer.writeln(line);
+              safeWrite('500 Unrecognized command\r\n');
             }
-            continue;
           }
-
-          session.commands.add(line);
-          final upper = line.toUpperCase();
-
-          if (authStep == 1) {
-            authStep = 2;
-            socket.write('334 UGFzc3dvcmQ6\r\n'); // Password:
-            continue;
+        },
+        onError: (e) {
+          if (!completer.isCompleted) {
+            completer.complete(session);
           }
-          if (authStep == 2) {
-            authStep = 0;
-            if (authResultCode == 235) {
-              socket.write('235 2.7.0 Authentication successful\r\n');
-            } else {
-              socket.write('535 5.7.8 Authentication credentials invalid\r\n');
-            }
-            continue;
+        },
+        onDone: () {
+          if (!completer.isCompleted) {
+            completer.complete(session);
           }
-
-          if (upper.startsWith('EHLO')) {
-            socket.write('250-localhost Hello\r\n');
-            if (advertiseStartTls) {
-              socket.write('250-STARTTLS\r\n');
-            }
-            socket.write('250 $authCapabilities\r\n');
-          } else if (upper.startsWith('AUTH PLAIN')) {
-            if (authResultCode == 235) {
-              socket.write('235 2.7.0 Authentication successful\r\n');
-            } else {
-              socket.write('535 5.7.8 Authentication credentials invalid\r\n');
-            }
-          } else if (upper == 'AUTH LOGIN') {
-            authStep = 1;
-            socket.write('334 VXNlcm5hbWU6\r\n'); // Username:
-          } else if (upper.startsWith('MAIL FROM:')) {
-            session.receivedMailFrom = line.substring(10).trim();
-            socket.write('250 2.1.0 Ok\r\n');
-          } else if (upper.startsWith('RCPT TO:')) {
-            session.receivedRcptTo.add(line.substring(8).trim());
-            socket.write('250 2.1.5 Ok\r\n');
-          } else if (upper == 'DATA') {
-            inDataMode = true;
-            socket.write('354 End data with <CR><LF>.<CR><LF>\r\n');
-          } else if (upper == 'QUIT') {
-            socket.write('221 2.0.0 Bye\r\n');
-            socket.close();
-          } else {
-            socket.write('500 Unrecognized command\r\n');
-          }
-        }
-      },
-      onDone: () {
-        if (!completer.isCompleted) {
-          completer.complete(session);
-        }
-      },
-    );
-  });
+        },
+        cancelOnError: true,
+      );
+    },
+    onError: (e) {
+      if (!completer.isCompleted) {
+        completer.complete(_CapturedSmtpSession());
+      }
+    },
+  );
 
   return (server: server, sessionFuture: completer.future);
 }

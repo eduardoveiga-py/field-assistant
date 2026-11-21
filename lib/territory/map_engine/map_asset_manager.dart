@@ -70,13 +70,16 @@ class MapAssetManager {
           AppLogger.debug('Ativo cartográfico copiado: $relativeSubpath');
         } else {
           final byteData = await _bundle.load(assetPath);
-          final bytes = byteData.buffer.asUint8List(byteData.offsetInBytes, byteData.lengthInBytes);
-final existingBytes = await destinationFile.readAsBytes();
-if (!_bytesEqual(existingBytes, bytes)) {
-await destinationFile.writeAsBytes(bytes, flush: true);
-AppLogger.debug('Ativo cartográfico atualizado: $relativeSubpath');
+          final bytes = byteData.buffer.asUint8List(
+            byteData.offsetInBytes,
+            byteData.lengthInBytes,
+          );
+          final existingBytes = await destinationFile.readAsBytes();
+          if (!_bytesEqual(existingBytes, bytes)) {
+            await destinationFile.writeAsBytes(bytes, flush: true);
+            AppLogger.debug('Ativo cartográfico atualizado: $relativeSubpath');
           }
-        }  
+        }
       } catch (e, st) {
         AppLogger.warning(
           'Falha ao copiar ativo cartográfico $assetPath para disco',
@@ -86,7 +89,7 @@ AppLogger.debug('Ativo cartográfico atualizado: $relativeSubpath');
       }
     }
   }
-  
+
   bool _bytesEqual(List<int> a, List<int> b) {
     if (a.length != b.length) return false;
     for (var i = 0; i < a.length; i++) {
@@ -94,7 +97,6 @@ AppLogger.debug('Ativo cartográfico atualizado: $relativeSubpath');
     }
     return true;
   }
-  
 
   /// Retorna o caminho do arquivo de estilo pronto para uso em disco (`file://...`).
   Future<String> getStyleFilePath(String styleName) async {
