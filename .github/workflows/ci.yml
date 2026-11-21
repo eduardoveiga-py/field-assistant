@@ -257,6 +257,7 @@ jobs:
                   defines.append(f"--dart-define={key}={val}")
           if os.environ.get("AUTH_NATIVE_CALLBACK", "").strip().lower() == "true":
               defines.append("--dart-define=AUTH_NATIVE_CALLBACK=true")
+          defines.append("--dart-define=ENABLE_E2EE_SYNC=true")
           with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as f:
               f.write(f"DART_DEFINES={' '.join(defines)}\n")
           PY
@@ -373,6 +374,7 @@ jobs:
                   defines.append(f"--dart-define={key}={val}")
           if os.environ.get("AUTH_NATIVE_CALLBACK", "").strip().lower() == "true":
               defines.append("--dart-define=AUTH_NATIVE_CALLBACK=true")
+          defines.append("--dart-define=ENABLE_E2EE_SYNC=true")
           with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as f:
               f.write(f"DART_DEFINES={' '.join(defines)}\n")
           PY

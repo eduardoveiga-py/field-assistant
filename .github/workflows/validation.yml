@@ -108,7 +108,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          flutter build ios --no-codesign --release > /tmp/ios-build.txt 2>&1
+          flutter build ios --no-codesign --release --dart-define=ENABLE_E2EE_SYNC=true > /tmp/ios-build.txt 2>&1
           status=$?
           cat /tmp/ios-build.txt
           if [ "$status" -ne 0 ]; then

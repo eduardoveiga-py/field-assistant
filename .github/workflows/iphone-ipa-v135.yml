@@ -74,7 +74,7 @@ jobs:
               text = text.replace('com.googleusercontent.apps.YOUR_GOOGLE_IOS_CLIENT_ID', 'com.googleusercontent.apps.' + prefix)
               plist.write_text(text, encoding='utf-8')
           PY
-          args=("--dart-define=SUPABASE_URL=$SUPABASE_URL" "--dart-define=SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY" "--dart-define=AUTH_NATIVE_CALLBACK=false")
+          args=("--dart-define=SUPABASE_URL=$SUPABASE_URL" "--dart-define=SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY" "--dart-define=AUTH_NATIVE_CALLBACK=false" "--dart-define=ENABLE_E2EE_SYNC=true")
           if [ -n "${GOOGLE_WEB_CLIENT_ID:-}" ]; then args+=("--dart-define=GOOGLE_WEB_CLIENT_ID=$GOOGLE_WEB_CLIENT_ID"); fi
           flutter build ios --no-codesign --release "${args[@]}"
           mkdir -p dist-ios/Payload

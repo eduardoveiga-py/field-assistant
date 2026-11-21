@@ -736,7 +736,10 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
         selectedIndex: barSelectedIndex,
         onDestinationSelected: (idx) {
           if (idx == primaryBarFeatures.length) {
-            _showMoreMenuModal(context, moreFeatures);
+            _showMoreMenuModal(context, [
+              ...primaryBarFeatures,
+              ...moreFeatures,
+            ]);
           } else if (idx < primaryBarFeatures.length) {
             _onFeatureSelect(primaryBarFeatures[idx]);
           }

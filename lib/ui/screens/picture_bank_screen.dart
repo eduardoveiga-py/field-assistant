@@ -367,6 +367,69 @@ class _PictureBankScreenState extends ConsumerState<PictureBankScreen> {
     );
   }
 
+  void _showThumbnailOptions(PictureEntry picture) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.open_in_new),
+              title: const Text('Abrir gravura'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _openPictureViewer(picture);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline, color: Colors.red),
+              title: const Text(
+                'Excluir gravura',
+                style: TextStyle(color: Colors.red),
+              ),
+              onTap: () {
+                Navigator.pop(ctx);
+                _confirmDeletePicture(picture);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmDeletePicture(PictureEntry picture) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Excluir gravura'),
+        content: const Text(
+          'Deseja excluir esta gravura do banco de gravuras?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Excluir'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    final db = ref.read(repositoryProvider).db;
+    await PictureBankManager.deletePicture(db, picture.id);
+    await _loadPictures();
+    if (mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Gravura excluída.')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -501,6 +564,7 @@ class _PictureBankScreenState extends ConsumerState<PictureBankScreen> {
                         ),
                         child: InkWell(
                           onTap: () => _openPictureViewer(pic),
+                          onLongPress: () => _showThumbnailOptions(pic),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
