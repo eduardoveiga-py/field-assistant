@@ -493,7 +493,9 @@ class ExchangeReadService {
           key = result.syncKey;
           // EAS initial key negotiation is followed by a fetch even if the first
           // response has no MoreAvailable flag.
-          more = (initial && result.syncKey.isNotEmpty && result.syncKey != '0') || result.moreAvailable;
+          more =
+              (initial && result.syncKey.isNotEmpty && result.syncKey != '0') ||
+              result.moreAvailable;
         }
         totalSaved += saved;
         anyMore = anyMore || more;
