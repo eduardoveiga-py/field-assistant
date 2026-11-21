@@ -5,6 +5,9 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ministerio_pessoal/database/app_database.dart';
 import 'package:ministerio_pessoal/territory/geocoding/offline_geocoding_service.dart';
+import 'package:ministerio_pessoal/territory/geocoding/osm_fts_search.dart';
+import 'package:ministerio_pessoal/territory/geocoding/osm_fts_search_web.dart'
+    as osm_web;
 import 'package:sqlite3/sqlite3.dart' as sql;
 
 void main() {
@@ -15,6 +18,7 @@ void main() {
   late AppDatabase appDb;
 
   setUp(() {
+    OfflineGeocodingService.packagesDirectoryPath = null;
     tempDir = Directory.systemTemp.createTempSync('fts5_search_test_');
     searchDbFile = File('${tempDir.path}/am_solimoes.search.db');
 
@@ -70,6 +74,7 @@ void main() {
   });
 
   tearDown(() async {
+    OfflineGeocodingService.packagesDirectoryPath = null;
     await appDb.close();
     if (tempDir.existsSync()) {
       try {
@@ -373,6 +378,165 @@ void main() {
       expect(
         resExplicitFiles.first.title,
         equals('Aldeia São Jerônimo Ticuna'),
+      );
+    });
+
+    test('OsmFtsSearch native facade methods and top-level helper', () async {
+      // 1. packagesDirectory getter/setter e setPackagesDirectory
+      OsmFtsSearch.packagesDirectory = tempDir;
+      expect(OsmFtsSearch.packagesDirectory?.path, equals(tempDir.path));
+      expect(
+        OfflineGeocodingService.packagesDirectoryPath,
+        equals(tempDir.path),
+      );
+
+      OsmFtsSearch.setPackagesDirectory(tempDir.path);
+      expect(
+        OfflineGeocodingService.packagesDirectoryPath,
+        equals(tempDir.path),
+      );
+
+      OsmFtsSearch.packagesDirectory = null;
+      expect(OsmFtsSearch.packagesDirectory, isNull);
+      expect(OfflineGeocodingService.packagesDirectoryPath, isNull);
+
+      // 2. OsmFtsSearch.search direto com packagesDir
+      final directResults = OsmFtsSearch.search(
+        query: 'Sebastiao',
+        packagesDir: tempDir,
+      );
+      expect(directResults, isNotEmpty);
+      expect(directResults.first.title, equals('Rua São Sebastião'));
+
+      // 3. searchOsmFts top-level helper
+      final helperResults = searchOsmFts(
+        query: 'Boa Esperanca',
+        packagesDirectoryPath: tempDir.path,
+      );
+      expect(helperResults, isNotEmpty);
+      expect(helperResults.first.title, equals('Comunidade Boa Esperança'));
+
+      // 4. searchDatabases com File único e com String de caminho direto
+      final singleFileRes = OsmFtsSearch.search(
+        query: 'Jeronimo',
+        searchDatabases: searchDbFile,
+      );
+      expect(singleFileRes, isNotEmpty);
+      expect(singleFileRes.first.title, equals('Aldeia São Jerônimo Ticuna'));
+
+      final singleStringRes = OsmFtsSearch.search(
+        query: 'Jeronimo',
+        searchDatabases: searchDbFile.path,
+      );
+      expect(singleStringRes, isNotEmpty);
+      expect(singleStringRes.first.title, equals('Aldeia São Jerônimo Ticuna'));
+
+      // 5. Caminho inexistente degrada graciosamente sem erro
+      final nonExistentRes = OsmFtsSearch.search(
+        query: 'qualquer',
+        searchDatabases: '${tempDir.path}/inexistente.search.db',
+      );
+      expect(nonExistentRes, isEmpty);
+
+      // 6. limit <= 0 retorna lista vazia
+      final zeroLimitRes = OsmFtsSearch.search(
+        query: 'Sebastiao',
+        packagesDir: tempDir,
+        limit: 0,
+      );
+      expect(zeroLimitRes, isEmpty);
+
+      // 7. Sanitização de FTS5 query
+      expect(OsmFtsSearch.sanitizeFtsQuery(''), equals(''));
+      expect(OsmFtsSearch.sanitizeFtsQuery('  !@#\$%^&*()  '), equals(''));
+      expect(
+        OsmFtsSearch.sanitizeFtsQuery('Rua 15 de Novembro'),
+        equals('"Rua"* "15"* "de"* "Novembro"*'),
+      );
+      expect(
+        OsmFtsSearch.sanitizeFtsQuery('Rua 15 de Novembro', stripNumbers: true),
+        equals('"Rua"* "de"* "Novembro"*'),
+      );
+
+      // 8. Mapeamento de categorias OSM para LocalResultType
+      expect(
+        OsmFtsSearch.mapCategoryToResultType('street'),
+        equals(LocalResultType.street),
+      );
+      expect(
+        OsmFtsSearch.mapCategoryToResultType('rua'),
+        equals(LocalResultType.street),
+      );
+      expect(
+        OsmFtsSearch.mapCategoryToResultType('place'),
+        equals(LocalResultType.place),
+      );
+      expect(
+        OsmFtsSearch.mapCategoryToResultType('comunidade'),
+        equals(LocalResultType.place),
+      );
+      expect(
+        OsmFtsSearch.mapCategoryToResultType('contact'),
+        equals(LocalResultType.contact),
+      );
+      expect(
+        OsmFtsSearch.mapCategoryToResultType('sector'),
+        equals(LocalResultType.sector),
+      );
+      expect(
+        OsmFtsSearch.mapCategoryToResultType('landmark'),
+        equals(LocalResultType.landmark),
+      );
+      expect(
+        OsmFtsSearch.mapCategoryToResultType('hospital'),
+        equals(LocalResultType.poi),
+      );
+    });
+
+    test('OsmFtsSearch Web stub contract safety', () {
+      // Garante que o stub Web exportado para navegadores não quebra chamadas
+      expect(osm_web.OsmFtsSearch.packagesDirectory, isNull);
+      osm_web.OsmFtsSearch.packagesDirectory = tempDir;
+      expect(osm_web.OsmFtsSearch.packagesDirectory, isNull);
+      osm_web.OsmFtsSearch.setPackagesDirectory(tempDir.path);
+
+      expect(
+        osm_web.OsmFtsSearch.resolveSearchFiles(packagesDir: tempDir),
+        isEmpty,
+      );
+      expect(
+        osm_web.OsmFtsSearch.searchOsmDatabase(searchDbFile, 'test', 10),
+        isEmpty,
+      );
+      expect(
+        osm_web.OsmFtsSearch.search(
+          query: 'Sebastiao',
+          packagesDir: tempDir,
+          packagesDirectoryPath: tempDir.path,
+          searchDatabases: [searchDbFile],
+        ),
+        isEmpty,
+      );
+      expect(
+        osm_web.searchOsmFts(
+          query: 'Sebastiao',
+          packagesDirectoryPath: tempDir.path,
+        ),
+        isEmpty,
+      );
+
+      // Métodos de sanitização e mapeamento funcionam na Web
+      expect(
+        osm_web.OsmFtsSearch.sanitizeFtsQuery('Rua São Sebastião'),
+        equals('"Rua"* "São"* "Sebastião"*'),
+      );
+      expect(
+        osm_web.OsmFtsSearch.mapCategoryToResultType('avenida'),
+        equals(LocalResultType.street),
+      );
+      expect(
+        osm_web.OsmFtsSearch.mapCategoryToResultType('aldeia'),
+        equals(LocalResultType.place),
       );
     });
   });

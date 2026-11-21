@@ -22,6 +22,9 @@ class OsmFtsSearch {
     }
   }
 
+  /// Setter conveniente para definir o diretório de pacotes cartográficos.
+  static set packagesDirectory(dynamic dir) => setPackagesDirectory(dir);
+
   /// Retorna o diretório padrão de pacotes como [Directory], se configurado.
   static Directory? get packagesDirectory {
     final path = OfflineGeocodingService.packagesDirectoryPath;
@@ -38,6 +41,13 @@ class OsmFtsSearch {
     if (searchDatabases != null) {
       if (searchDatabases is List<File>) {
         return searchDatabases.where((f) => f.existsSync()).toList();
+      }
+      if (searchDatabases is File) {
+        return searchDatabases.existsSync() ? [searchDatabases] : const [];
+      }
+      if (searchDatabases is String) {
+        final f = File(searchDatabases);
+        return f.existsSync() ? [f] : const [];
       }
       if (searchDatabases is Iterable) {
         final result = <File>[];
@@ -136,14 +146,25 @@ class OsmFtsSearch {
 
   /// Executa consulta FTS5 direta em um arquivo `.search.db`.
   static List<LocalSearchResult> searchOsmDatabase(
-    File file,
+    dynamic file,
     String rawQuery,
     int limit,
   ) {
+    if (limit <= 0) return const [];
+    final File f;
+    if (file is File) {
+      f = file;
+    } else if (file is String && file.trim().isNotEmpty) {
+      f = File(file);
+    } else {
+      return const [];
+    }
+    if (!f.existsSync()) return const [];
+
     final results = <LocalSearchResult>[];
     sql.Database? osmDb;
     try {
-      osmDb = sql.sqlite3.open(file.path, mode: sql.OpenMode.readOnly);
+      osmDb = sql.sqlite3.open(f.path, mode: sql.OpenMode.readOnly);
       final check = osmDb.select(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='osm_places_fts';",
       );
@@ -152,7 +173,7 @@ class OsmFtsSearch {
       final sanitized = sanitizeFtsQuery(rawQuery);
       if (sanitized.isEmpty) return const [];
 
-      final originName = p.basename(file.path);
+      final originName = p.basename(f.path);
       final stmt = osmDb.prepare(
         'SELECT rowid, name, category, subtitle, lat, lng FROM osm_places_fts WHERE osm_places_fts MATCH ? LIMIT ?;',
       );
@@ -191,7 +212,7 @@ class OsmFtsSearch {
       }
     } catch (e, st) {
       AppLogger.warning(
-        'Erro ao consultar índice FTS5 no arquivo ${file.path}',
+        'Erro ao consultar índice FTS5 no arquivo ${f.path}',
         e,
         st,
       );
@@ -211,6 +232,7 @@ class OsmFtsSearch {
     dynamic searchDatabases,
     int limit = 50,
   }) {
+    if (limit <= 0) return const [];
     final osmResults = <LocalSearchResult>[];
     final searchFiles = resolveSearchFiles(
       packagesDir: packagesDir,
@@ -219,7 +241,9 @@ class OsmFtsSearch {
     );
 
     for (final file in searchFiles) {
-      final fileResults = searchOsmDatabase(file, query, limit);
+      final remaining = limit - osmResults.length;
+      if (remaining <= 0) break;
+      final fileResults = searchOsmDatabase(file, query, remaining);
       osmResults.addAll(fileResults);
     }
     return osmResults;
