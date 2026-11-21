@@ -1122,7 +1122,11 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
           : AppBar(
               title: Semantics(
                 header: true,
-                child: const Text('Mapa dos Contatos e Território'),
+                child: const FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text('Mapa dos Contatos e Território'),
+                ),
               ),
               bottom: ScreenHeroAccentBand.territory(),
               actions: [

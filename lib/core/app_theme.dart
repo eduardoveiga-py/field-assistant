@@ -65,9 +65,10 @@ class AppTheme {
         foregroundColor: Colors.white,
         centerTitle: false,
         elevation: 0,
+        titleSpacing: 8,
         titleTextStyle: TextStyle(
           color: Colors.white,
-          fontSize: 20,
+          fontSize: 18,
           fontWeight: FontWeight.w600,
         ),
       ),
@@ -146,9 +147,10 @@ class AppTheme {
         foregroundColor: Colors.white,
         centerTitle: false,
         elevation: 0,
+        titleSpacing: 8,
         titleTextStyle: TextStyle(
           color: Colors.white,
-          fontSize: 20,
+          fontSize: 18,
           fontWeight: FontWeight.w600,
         ),
       ),

@@ -41,26 +41,42 @@ Future<GeolocationResult> getPlatformCoordinates() async {
       );
     }
 
+    final isApple =
+        !kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.iOS ||
+            defaultTargetPlatform == TargetPlatform.macOS);
     Position? position;
     try {
       position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 7),
-        ),
+        locationSettings: isApple
+            ? AppleSettings(
+                accuracy: LocationAccuracy.best,
+                distanceFilter: 0,
+                timeLimit: const Duration(seconds: 15),
+              )
+            : const LocationSettings(
+                accuracy: LocationAccuracy.high,
+                timeLimit: Duration(seconds: 15),
+              ),
       );
     } catch (_) {
       try {
-        position = await Geolocator.getLastKnownPosition();
+        position = await Geolocator.getCurrentPosition(
+          locationSettings: isApple
+              ? AppleSettings(
+                  accuracy: LocationAccuracy.medium,
+                  distanceFilter: 0,
+                  timeLimit: const Duration(seconds: 10),
+                )
+              : const LocationSettings(
+                  accuracy: LocationAccuracy.medium,
+                  timeLimit: Duration(seconds: 10),
+                ),
+        );
       } catch (_) {}
       if (position == null) {
         try {
-          position = await Geolocator.getCurrentPosition(
-            locationSettings: const LocationSettings(
-              accuracy: LocationAccuracy.medium,
-              timeLimit: Duration(seconds: 5),
-            ),
-          );
+          position = await Geolocator.getLastKnownPosition();
         } catch (_) {}
       }
     }

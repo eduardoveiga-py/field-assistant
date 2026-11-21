@@ -521,9 +521,11 @@ extension _ContactsMapCanvas on _ContactsMapScreenState {
                             while (diff < -math.pi) {
                               diff += 2 * math.pi;
                             }
-                            _rotationAnimController.stop();
-                            _rotationNotifier.value =
-                                _rotationAtTouchStart + diff;
+                            if (diff.abs() > 0.08) {
+                              _rotationAnimController.stop();
+                              _rotationNotifier.value =
+                                  _rotationAtTouchStart + diff;
+                            }
                           }
                         },
                         onPointerUp: (event) {
@@ -580,6 +582,7 @@ extension _ContactsMapCanvas on _ContactsMapScreenState {
                                   // Quase sem inércia: a origem é realinhada ao fim do gesto.
                                   interactionEndFrictionCoefficient: 1e-100,
                                   onInteractionEnd: (details) {
+                                    if (details.pointerCount >= 2) return;
                                     _hasAppliedInitialMatrix = true;
                                     final m = _applyPendingResizeTo(
                                       _transformationController.value,
