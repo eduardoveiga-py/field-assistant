@@ -62,6 +62,10 @@ app.*.map.json
 .agents/*
 !.agents/skills/
 !.agents/skills/**
+!.agents/rules/
+!.agents/rules/**
+!.agents/workflows/
+!.agents/workflows/**
 android/local.properties
 **/GeneratedPluginRegistrant.java
 

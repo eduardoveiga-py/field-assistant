@@ -20,9 +20,23 @@ const MIME_TYPES = {
 async function runMode({ port, sqliteMime, label }) {
   return new Promise((resolve, reject) => {
     const server = http.createServer((req, res) => {
-      let reqPath = req.url.split('?')[0];
-      if (reqPath === '/') reqPath = '/index.html';
-      const filePath = path.join(rootDir, reqPath);
+      let rawPath = req.url.split('?')[0];
+      let decodedPath;
+      try {
+        decodedPath = decodeURIComponent(rawPath);
+      } catch {
+        res.writeHead(400, { 'Content-Type': 'text/html' });
+        res.end('<h1>400 Bad Request</h1>');
+        return;
+      }
+      if (decodedPath === '/' || decodedPath === '') decodedPath = '/index.html';
+      const safeRelativePath = '.' + decodedPath;
+      const filePath = path.resolve(rootDir, safeRelativePath);
+      if (filePath !== rootDir && !filePath.startsWith(rootDir + path.sep)) {
+        res.writeHead(403, { 'Content-Type': 'text/html' });
+        res.end('<h1>403 Forbidden</h1>');
+        return;
+      }
 
       fs.stat(filePath, (err, stats) => {
         if (err || !stats.isFile()) {
@@ -32,7 +46,7 @@ async function runMode({ port, sqliteMime, label }) {
         }
         const ext = path.extname(filePath).toLowerCase();
         let contentType = MIME_TYPES[ext] || 'application/octet-stream';
-        if (reqPath.endsWith('sqlite3.wasm')) {
+        if (decodedPath.endsWith('sqlite3.wasm')) {
           contentType = sqliteMime;
         }
         res.writeHead(200, {
@@ -118,7 +132,7 @@ async function runMode({ port, sqliteMime, label }) {
               const parsed = JSON.parse(event.data);
               if (parsed.method === 'Log.entryAdded') {
                 const entry = parsed.params.entry || {};
-                console.log(`[${label} LOG ${entry.level}/${entry.source}]`, entry.text);
+                console.log('%s', `[${label} LOG ${entry.level}/${entry.source}] ${entry.text || ''}`);
                 if (entry.source === 'security' || (entry.text || '').includes('Content Security Policy')) {
                   hasCspViolation = true;
                 }

@@ -1,0 +1,8 @@
+name: "CodeQL Configuration"
+
+# Exclui apenas bundles compilados gerados por ferramentas terceiras (Drift Web worker)
+# para evitar falsos positivos de ReDoS em código gerado/minificado, mantendo scripts/
+# e todo o restante do código sob análise ativa do CodeQL.
+paths-ignore:
+  - 'web/drift_worker.js'
+  - 'web/drift_worker.dart.js'
