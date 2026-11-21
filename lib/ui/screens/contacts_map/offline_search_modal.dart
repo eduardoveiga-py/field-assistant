@@ -98,7 +98,15 @@ class _OfflineSearchModalState extends State<OfflineSearchModal> {
       return _results.where((r) => r.type == LocalResultType.contact).toList();
     }
     if (_selectedFilter == 'Marcos') {
-      return _results.where((r) => r.type == LocalResultType.landmark).toList();
+      return _results
+          .where(
+            (r) =>
+                r.type == LocalResultType.landmark ||
+                r.type == LocalResultType.poi ||
+                r.type == LocalResultType.street ||
+                r.type == LocalResultType.place,
+          )
+          .toList();
     }
     if (_selectedFilter == 'Setores') {
       return _results.where((r) => r.type == LocalResultType.sector).toList();
@@ -337,6 +345,18 @@ class _OfflineSearchModalState extends State<OfflineSearchModal> {
           case LocalResultType.sector:
             itemIcon = Icons.crop_free;
             iconColor = Colors.purple;
+            break;
+          case LocalResultType.street:
+            itemIcon = Icons.add_road;
+            iconColor = Colors.blue;
+            break;
+          case LocalResultType.place:
+            itemIcon = Icons.location_city;
+            iconColor = Colors.teal;
+            break;
+          case LocalResultType.poi:
+            itemIcon = Icons.storefront;
+            iconColor = Colors.amber;
             break;
         }
 
