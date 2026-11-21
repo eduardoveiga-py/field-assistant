@@ -1,8 +1,9 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:sqlite3/sqlite3.dart' as sql;
@@ -17,6 +18,11 @@ typedef TileLookup = Future<Uint8List?> Function(int z, int x, int y);
 /// para servir pacotes vetoriais e raster PMTiles e MBTiles nativamente para MapLibre Native
 /// ou motores de mapa desacoplados (FA-MAP-01/02).
 class OfflineTileServer {
+  static const int _maxTileCacheEntries = 256;
+  final LinkedHashMap<String, Uint8List> _tileCache =
+      LinkedHashMap<String, Uint8List>();
+  final Map<String, sql.Database> _mbtilesDatabases = {};
+
   HttpServer? _server;
   int? _port;
   TileLookup? tileLookup;
@@ -38,6 +44,33 @@ class OfflineTileServer {
   /// URL base para requisições no loopback IPv4.
   String? get baseUrl => _port != null ? 'http://127.0.0.1:$_port' : null;
 
+  @visibleForTesting
+  int get tileCacheLength => _tileCache.length;
+
+  @visibleForTesting
+  bool hasCachedTile(String key) => _tileCache.containsKey(key);
+
+  @visibleForTesting
+  int get openMbtilesDatabasesCount => _mbtilesDatabases.length;
+
+  Uint8List? _getCachedTile(String key) {
+    final value = _tileCache.remove(key);
+    if (value != null) {
+      _tileCache[key] = value;
+      return value;
+    }
+    return null;
+  }
+
+  void _putCachedTile(String key, Uint8List bytes) {
+    if (_tileCache.containsKey(key)) {
+      _tileCache.remove(key);
+    } else if (_tileCache.length >= _maxTileCacheEntries) {
+      _tileCache.remove(_tileCache.keys.first);
+    }
+    _tileCache[key] = bytes;
+  }
+
   /// Registra ou atualiza o provedor de tiles padrão (fallback).
   void setTileLookup(TileLookup lookup) {
     tileLookup = lookup;
@@ -58,23 +91,35 @@ class OfflineTileServer {
     _validateSafeId(packageId);
     _pmtilesPackages[packageId] = file;
     _pmtilesReaders[packageId] = PmtilesReader(file);
+    _tileCache.clear();
   }
 
   /// Remove registro explícito de um pacote PMTiles.
   void unregisterPmtilesPackage(String packageId) {
     _pmtilesPackages.remove(packageId);
     _pmtilesReaders.remove(packageId);
+    _tileCache.clear();
   }
 
   /// Registra explicitamente um arquivo MBTiles mapeado a um identificador seguro.
   void registerMbtilesPackage(String packageId, File file) {
     _validateSafeId(packageId);
+    final oldDb = _mbtilesDatabases.remove(packageId);
+    try {
+      oldDb?.close();
+    } catch (_) {}
     _mbtilesPackages[packageId] = file;
+    _tileCache.clear();
   }
 
   /// Remove registro explícito de um pacote MBTiles.
   void unregisterMbtilesPackage(String packageId) {
+    final oldDb = _mbtilesDatabases.remove(packageId);
+    try {
+      oldDb?.close();
+    } catch (_) {}
     _mbtilesPackages.remove(packageId);
+    _tileCache.clear();
   }
 
   /// Inicializa e vincula o servidor na interface loopback local (`127.0.0.1`)
@@ -111,6 +156,13 @@ class OfflineTileServer {
     _server = null;
     _port = null;
     _pmtilesReaders.clear();
+    _tileCache.clear();
+    for (final db in _mbtilesDatabases.values) {
+      try {
+        db.close();
+      } catch (_) {}
+    }
+    _mbtilesDatabases.clear();
     if (server != null) {
       await server.close(force: force);
       AppLogger.info('OfflineTileServer finalizado.');
@@ -398,6 +450,16 @@ class OfflineTileServer {
       return shelf.Response(HttpStatus.badRequest);
     }
 
+    final cacheKey = 'pmtiles:$cleanRegion:$z:$x:$y';
+    final cachedBytes = _getCachedTile(cacheKey);
+    if (cachedBytes != null) {
+      final headers = _detectContentTypeHeaders(cachedBytes);
+      headers[HttpHeaders.contentLengthHeader] = cachedBytes.length.toString();
+      headers[HttpHeaders.cacheControlHeader] =
+          'public, max-age=86400, immutable';
+      return shelf.Response.ok(cachedBytes, headers: headers);
+    }
+
     var reader = _pmtilesReaders[cleanRegion];
     if (reader == null) {
       File? file = _pmtilesPackages[cleanRegion];
@@ -435,8 +497,12 @@ class OfflineTileServer {
       return shelf.Response.notFound('Tile não encontrado no pacote PMTiles');
     }
 
+    _putCachedTile(cacheKey, tileBytes);
+
     final headers = _detectContentTypeHeaders(tileBytes);
     headers[HttpHeaders.contentLengthHeader] = tileBytes.length.toString();
+    headers[HttpHeaders.cacheControlHeader] =
+        'public, max-age=86400, immutable';
     return shelf.Response.ok(tileBytes, headers: headers);
   }
 
@@ -459,6 +525,16 @@ class OfflineTileServer {
       return shelf.Response(HttpStatus.badRequest);
     }
 
+    final cacheKey = 'mbtiles:$cleanRegion:$z:$x:$y';
+    final cachedBytes = _getCachedTile(cacheKey);
+    if (cachedBytes != null) {
+      final headers = _detectContentTypeHeaders(cachedBytes);
+      headers[HttpHeaders.contentLengthHeader] = cachedBytes.length.toString();
+      headers[HttpHeaders.cacheControlHeader] =
+          'public, max-age=86400, immutable';
+      return shelf.Response.ok(cachedBytes, headers: headers);
+    }
+
     File? file = _mbtilesPackages[cleanRegion];
     if (file == null || !file.existsSync()) {
       if (packagesDir != null) {
@@ -472,22 +548,36 @@ class OfflineTileServer {
     Uint8List? tileBytes;
 
     if (file != null && file.existsSync()) {
-      sql.Database? db;
-      try {
-        db = sql.sqlite3.open(file.path, mode: sql.OpenMode.readOnly);
-        final tmsY = (1 << z) - 1 - y;
-        final stmt = db.prepare(
-          'SELECT tile_data FROM tiles WHERE zoom_level = ? AND tile_column = ? AND (tile_row = ? OR tile_row = ?) LIMIT 1;',
-        );
-        final result = stmt.select([z, x, tmsY, y]);
-        stmt.close();
-        if (result.isNotEmpty && result.first['tile_data'] is Uint8List) {
-          tileBytes = result.first['tile_data'] as Uint8List;
+      sql.Database? db = _mbtilesDatabases[cleanRegion];
+      if (db == null) {
+        try {
+          db = sql.sqlite3.open(file.path, mode: sql.OpenMode.readOnly);
+          _mbtilesDatabases[cleanRegion] = db;
+        } catch (e, st) {
+          AppLogger.warning('Erro ao abrir MBTiles ${file.path}', e, st);
         }
-      } catch (e, st) {
-        AppLogger.warning('Erro ao ler MBTiles ${file.path}', e, st);
-      } finally {
-        db?.close();
+      }
+
+      if (db != null) {
+        try {
+          final tmsY = (1 << z) - 1 - y;
+          final stmt = db.prepare(
+            'SELECT tile_data FROM tiles WHERE zoom_level = ? AND tile_column = ? AND tile_row = ? LIMIT 1;',
+          );
+          try {
+            var result = stmt.select([z, x, tmsY]);
+            if (result.isEmpty) {
+              result = stmt.select([z, x, y]);
+            }
+            if (result.isNotEmpty && result.first['tile_data'] is Uint8List) {
+              tileBytes = result.first['tile_data'] as Uint8List;
+            }
+          } finally {
+            stmt.close();
+          }
+        } catch (e, st) {
+          AppLogger.warning('Erro ao ler MBTiles ${file.path}', e, st);
+        }
       }
     }
     if ((tileBytes == null || tileBytes.isEmpty) && tileLookup != null) {
@@ -498,8 +588,12 @@ class OfflineTileServer {
       return shelf.Response.notFound('Tile não encontrado no MBTiles');
     }
 
+    _putCachedTile(cacheKey, tileBytes);
+
     final headers = _detectContentTypeHeaders(tileBytes);
     headers[HttpHeaders.contentLengthHeader] = tileBytes.length.toString();
+    headers[HttpHeaders.cacheControlHeader] =
+        'public, max-age=86400, immutable';
     return shelf.Response.ok(tileBytes, headers: headers);
   }
 

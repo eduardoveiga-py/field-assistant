@@ -26,6 +26,12 @@ class OfflineTileServer {
   /// URL base nula em ambiente Web.
   String? get baseUrl => null;
 
+  int get tileCacheLength => 0;
+
+  bool hasCachedTile(String key) => false;
+
+  int get openMbtilesDatabasesCount => 0;
+
   void setTileLookup(TileLookup lookup) {
     tileLookup = lookup;
   }
