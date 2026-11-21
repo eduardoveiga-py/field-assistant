@@ -40,7 +40,7 @@ class GoogleCalendarProvider implements CalendarProvider {
     defaultValue: '',
   );
   static const String defaultIosClientId = String.fromEnvironment(
-      'GOOGLE_IOS_CLIENT_ID',
+    'GOOGLE_IOS_CLIENT_ID',
     defaultValue: '',
   );
   static const String _calendarScope =
