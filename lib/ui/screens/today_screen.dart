@@ -1214,7 +1214,7 @@ class TodayScreen extends ConsumerWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              fontSize: 26,
+                              fontSize: 28,
                               fontWeight: FontWeight.w700,
                               letterSpacing: -0.5,
                               color: isDark
@@ -1310,7 +1310,7 @@ class TodayScreen extends ConsumerWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              fontSize: 26,
+                              fontSize: 28,
                               fontWeight: FontWeight.w700,
                               letterSpacing: -0.5,
                               color: isDark
@@ -2162,7 +2162,7 @@ class _QuickActionButton extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 14,
+                        fontSize: 15,
                         fontWeight: FontWeight.w600,
                         letterSpacing: -0.2,
                         color: titleColor,
