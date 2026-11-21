@@ -111,11 +111,10 @@ class GoogleCalendarProvider implements CalendarProvider {
         await _googleSignIn.initialize(clientId: defaultWebClientId);
         _webUserEmail ??= await _secureStorage.read(key: _keyConnectedEmail);
       } else {
+        final isIos = defaultTargetPlatform == TargetPlatform.iOS;
+        final iosClientId = defaultIosClientId.trim();
         await _googleSignIn.initialize(
-          clientId: defaultTargetPlatform == TargetPlatform.iOS &&
-              defaultIosClientId.trim().isNotEmpty
-          ? defaultIosClientId.trim()
-          : null,
+          clientId: isIos && iosClientId.isNotEmpty ? iosClientId : null,
         );
       }
     } catch (e) {
