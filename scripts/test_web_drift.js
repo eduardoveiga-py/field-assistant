@@ -30,21 +30,22 @@ async function runMode({ port, sqliteMime, label }) {
         return;
       }
       if (decodedPath === '/' || decodedPath === '') decodedPath = '/index.html';
-      const safeRelativePath = '.' + decodedPath;
-      const filePath = path.resolve(rootDir, safeRelativePath);
-      if (filePath !== rootDir && !filePath.startsWith(rootDir + path.sep)) {
+      const baseDir = rootDir;
+      const safePrefix = baseDir + path.sep;
+      const resolvedPath = path.resolve(baseDir, '.' + decodedPath);
+      if (!resolvedPath.startsWith(safePrefix) && resolvedPath !== baseDir) {
         res.writeHead(403, { 'Content-Type': 'text/html' });
         res.end('<h1>403 Forbidden</h1>');
         return;
       }
 
-      fs.stat(filePath, (err, stats) => {
+      fs.stat(resolvedPath, (err, stats) => {
         if (err || !stats.isFile()) {
           res.writeHead(404, { 'Content-Type': 'text/html' });
           res.end('<h1>404 Not Found</h1>');
           return;
         }
-        const ext = path.extname(filePath).toLowerCase();
+        const ext = path.extname(resolvedPath).toLowerCase();
         let contentType = MIME_TYPES[ext] || 'application/octet-stream';
         if (decodedPath.endsWith('sqlite3.wasm')) {
           contentType = sqliteMime;
@@ -54,7 +55,7 @@ async function runMode({ port, sqliteMime, label }) {
           'Cross-Origin-Opener-Policy': 'same-origin',
           'Cross-Origin-Embedder-Policy': 'require-corp',
         });
-        fs.createReadStream(filePath).pipe(res);
+        fs.createReadStream(resolvedPath).pipe(res);
       });
     });
 
