@@ -2637,9 +2637,9 @@ bool _unreadOnly = false;
                 radius: 15,
                 backgroundColor: badgeColor.withValues(alpha: 0.16),
                 child: Text(
-                  msg.senderName.trim().isEmpty
+                  msg.from.trim().isEmpty
                       ? '?'
-                      : msg.senderName
+                      : msg.from
                           .trim()
                           .split(RegExp(r'\s+'))
                           .take(2)
@@ -3084,7 +3084,7 @@ bool _unreadOnly = false;
                       onPressed: openAttachment,
                     ),
                     onTap: openAttachment,
-                  ),
+                  );
 
                           }),
                         ],
