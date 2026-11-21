@@ -8,9 +8,9 @@ updates:
     groups:
       github-actions-minor-and-patch:
         patterns:
-        - "*"
+          - "*"
         update-types:
-        - "minor"
+          - "minor"
           - "patch"  
   - package-ecosystem: "pub"
     directory: "/"
@@ -20,7 +20,7 @@ updates:
     groups:
       pub-minor-and-patch:
         patterns:
-        - "*"
+          - "*"
         update-types:
-        - "minor"
+          - "minor"
           - "patch"  
