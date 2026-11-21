@@ -11,7 +11,7 @@
         "http://127.0.0.1:8080/tiles/mbtiles/{z}/{x}/{y}.pbf"
       ],
       "minzoom": 0,
-      "maxzoom": 18
+      "maxzoom": 16
     }
   },
   "sprite": "{assets_dir}/sprites/sprite",
