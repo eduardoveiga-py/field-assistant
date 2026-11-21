@@ -42,6 +42,7 @@ _startLoopbackSmtpServer({
 
   server.listen(
     (socket) {
+      socket.done.catchError((Object _) {});
       final session = _CapturedSmtpSession();
       final dataBuffer = StringBuffer();
       bool inDataMode = false;
@@ -50,6 +51,14 @@ _startLoopbackSmtpServer({
       void safeWrite(String text) {
         try {
           socket.write(text);
+        } on SocketException catch (_) {
+        } catch (_) {}
+      }
+
+      void safeClose() {
+        try {
+          socket.close();
+        } on SocketException catch (_) {
         } catch (_) {}
       }
 
@@ -122,15 +131,13 @@ _startLoopbackSmtpServer({
               safeWrite('354 End data with <CR><LF>.<CR><LF>\r\n');
             } else if (upper == 'QUIT') {
               safeWrite('221 2.0.0 Bye\r\n');
-              try {
-                socket.close();
-              } catch (_) {}
+              safeClose();
             } else {
               safeWrite('500 Unrecognized command\r\n');
             }
           }
         },
-        onError: (e) {
+        onError: (Object _) {
           if (!completer.isCompleted) {
             completer.complete(session);
           }
@@ -143,11 +150,12 @@ _startLoopbackSmtpServer({
         cancelOnError: true,
       );
     },
-    onError: (e) {
+    onError: (Object _) {
       if (!completer.isCompleted) {
         completer.complete(_CapturedSmtpSession());
       }
     },
+    cancelOnError: true,
   );
 
   return (server: server, sessionFuture: completer.future);
