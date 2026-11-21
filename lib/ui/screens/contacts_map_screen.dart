@@ -35,6 +35,7 @@ import '../../territory/map_engine/map_engine_selector.dart';
 import '../../territory/map_engine/maplibre_native_adapter.dart';
 import '../../territory/geocoding/offline_geocoding_service.dart';
 import '../../territory/routing/offline_routing_engine.dart';
+import '../../territory/routing/external_navigation_launcher.dart';
 import 'contacts_map/offline_search_modal.dart';
 import '../widgets/person_deletion_dialog.dart';
 

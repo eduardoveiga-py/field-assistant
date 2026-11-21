@@ -1531,6 +1531,28 @@ extension _ContactsMapCanvas on _ContactsMapScreenState {
                             ),
                           ],
                         ),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            key: const Key('btn_navigate_external_landmark'),
+                            icon: const Icon(Icons.explore_outlined, size: 16),
+                            label: const Text('Navegar (Mapas externos)'),
+                            onPressed: () {
+                              final lm = _selectedPinLandmark!;
+                              final lat = lm.latitude ?? -3.1022;
+                              final lon = lm.longitude ?? -67.9397;
+                              ExternalNavigationLauncher.showNavigationSheet(
+                                context,
+                                lat: lat,
+                                lng: lon,
+                                label: lm.name,
+                                originLat: _userGpsLocation?.latitude,
+                                originLng: _userGpsLocation?.longitude,
+                              );
+                            },
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -1692,6 +1714,28 @@ extension _ContactsMapCanvas on _ContactsMapScreenState {
                               },
                             ),
                           ],
+                        ),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            key: const Key('btn_navigate_external_contact'),
+                            icon: const Icon(Icons.explore_outlined, size: 16),
+                            label: const Text('Navegar (Mapas externos)'),
+                            onPressed: () {
+                              final p = _selectedPinPerson!;
+                              final lat = p.latitude ?? -3.1022;
+                              final lon = p.longitude ?? -67.9397;
+                              ExternalNavigationLauncher.showNavigationSheet(
+                                context,
+                                lat: lat,
+                                lng: lon,
+                                label: p.name,
+                                originLat: _userGpsLocation?.latitude,
+                                originLng: _userGpsLocation?.longitude,
+                              );
+                            },
+                          ),
                         ),
                         const SizedBox(height: 8),
                         SizedBox(
