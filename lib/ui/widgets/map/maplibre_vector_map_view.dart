@@ -195,6 +195,11 @@ class _MapLibreVectorMapViewState extends State<MapLibreVectorMapView> {
   @override
   void dispose() {
     _controller?.onFeatureTapped.remove(_handleFeatureTapped);
+    _controller = null;
+    _styleLoaded = false;
+    if (widget.adapter.ownsTileServer) {
+      widget.adapter.dispose();
+    }
     super.dispose();
   }
 
@@ -222,9 +227,6 @@ class _MapLibreVectorMapViewState extends State<MapLibreVectorMapView> {
       label: 'Mapa vetorial offline MapLibre',
       container: true,
       child: MapLibreMap(
-        key: ValueKey<String>(
-          'maplibre_${widget.isDarkMode}_${widget.packageId ?? 'default'}',
-        ),
         styleString: styleJson,
         initialCameraPosition: CameraPosition(
           target: LatLng(widget.initialLat, widget.initialLng),
