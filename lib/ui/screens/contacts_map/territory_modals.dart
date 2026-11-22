@@ -171,6 +171,10 @@ extension _ContactsMapTerritoryModals on _ContactsMapScreenState {
                               final pos =
                                   await GeolocationHelper.getCurrentLocation();
                               if (pos != null) {
+                                _saveLastKnownLocation(
+                                  pos.latitude,
+                                  pos.longitude,
+                                );
                                 setDialogState(() {
                                   latController.text = pos.latitude
                                       .toStringAsFixed(6);

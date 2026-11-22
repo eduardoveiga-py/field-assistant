@@ -131,6 +131,7 @@ class EmailAccount {
 
   /// Gera predefinição de configuração recomendada baseada no provedor
   static EmailAccount createPreset({
+    String? id,
     required EmailProviderType providerType,
     required String name,
     required String email,
@@ -138,10 +139,11 @@ class EmailAccount {
     String? customHost,
   }) {
     final now = DateTime.now();
+    final effectiveId = id ?? const Uuid().v4();
     switch (providerType) {
       case EmailProviderType.jwpub:
         return EmailAccount(
-          id: const Uuid().v4(),
+          id: effectiveId,
           name: name.isNotEmpty ? name : 'JWPUB Oficial',
           email: email,
           providerType: EmailProviderType.jwpub,
@@ -160,7 +162,7 @@ class EmailAccount {
         );
       case EmailProviderType.google:
         return EmailAccount(
-          id: const Uuid().v4(),
+          id: effectiveId,
           name: name.isNotEmpty ? name : 'Google (Gmail)',
           email: email,
           providerType: EmailProviderType.google,
@@ -175,7 +177,7 @@ class EmailAccount {
         );
       case EmailProviderType.hotmail:
         return EmailAccount(
-          id: const Uuid().v4(),
+          id: effectiveId,
           name: name.isNotEmpty ? name : 'Hotmail / Outlook',
           email: email,
           providerType: EmailProviderType.hotmail,
@@ -190,7 +192,7 @@ class EmailAccount {
         );
       case EmailProviderType.exchange:
         return EmailAccount(
-          id: const Uuid().v4(),
+          id: effectiveId,
           name: name.isNotEmpty ? name : 'Exchange Corporativo',
           email: email,
           providerType: EmailProviderType.exchange,
@@ -209,7 +211,7 @@ class EmailAccount {
         );
       case EmailProviderType.custom:
         return EmailAccount(
-          id: const Uuid().v4(),
+          id: effectiveId,
           name: name.isNotEmpty ? name : 'Personalizado',
           email: email,
           providerType: EmailProviderType.custom,
@@ -230,6 +232,8 @@ class EmailAccount {
 class EmailAccountsManager {
   static const String _accountsKvKey = 'multi_email_accounts_registry';
   static const FlutterSecureStorage _secureStorage = FlutterSecureStorage();
+  static const String legacyImapAccountId = 'legacy_imap_account';
+  static const String legacyEasAccountId = 'legacy_eas_account';
 
   static String _passwordKey(String accountId) =>
       'email_acc_${accountId}_password';
@@ -276,6 +280,7 @@ class EmailAccountsManager {
           db.appKvStore,
         )..where((t) => t.key.equals('jw_eas_host'))).getSingleOrNull();
         final acc = EmailAccount.createPreset(
+          id: legacyEasAccountId,
           providerType: EmailProviderType.exchange,
           name: 'Exchange Principal',
           email: legacyEasEmail!.value,
@@ -288,6 +293,7 @@ class EmailAccountsManager {
           db.appKvStore,
         )..where((t) => t.key.equals('jw_imap_host'))).getSingleOrNull();
         final acc = EmailAccount.createPreset(
+          id: legacyImapAccountId,
           providerType: EmailProviderType.jwpub,
           name: 'JWPUB Principal',
           email: legacyImapEmail!.value,
@@ -331,8 +337,41 @@ class EmailAccountsManager {
   }
 
   /// Recupera a senha armazenada com criptografia de hardware
-  static Future<String?> getAccountPassword(String accountId) async {
-    return _secureStorage.read(key: _passwordKey(accountId));
+  static Future<String?> getAccountPassword(
+    String accountId, [
+    AppDatabase? db,
+  ]) async {
+    final direct = await _secureStorage.read(key: _passwordKey(accountId));
+    if (direct != null && direct.isNotEmpty) return direct;
+
+    if (accountId == legacyEasAccountId ||
+        accountId.contains('eas') ||
+        accountId.contains('exchange')) {
+      final easPass = await _secureStorage.read(key: 'jw_eas_password');
+      if (easPass != null && easPass.isNotEmpty) return easPass;
+      final altEasPass = await _secureStorage.read(key: 'eas_password');
+      if (altEasPass != null && altEasPass.isNotEmpty) return altEasPass;
+    }
+
+    final imapPass = await _secureStorage.read(key: 'jw_imap_password');
+    if (imapPass != null && imapPass.isNotEmpty) return imapPass;
+
+    if (db != null) {
+      final legacyRow = await (db.select(
+        db.appKvStore,
+      )..where((t) => t.key.equals('jw_imap_password'))).getSingleOrNull();
+      if (legacyRow != null && legacyRow.value.isNotEmpty) {
+        return legacyRow.value;
+      }
+      final legacyEasRow = await (db.select(
+        db.appKvStore,
+      )..where((t) => t.key.equals('jw_eas_password'))).getSingleOrNull();
+      if (legacyEasRow != null && legacyEasRow.value.isNotEmpty) {
+        return legacyEasRow.value;
+      }
+    }
+
+    return null;
   }
 
   /// Remove uma conta cadastrada e suas credenciais

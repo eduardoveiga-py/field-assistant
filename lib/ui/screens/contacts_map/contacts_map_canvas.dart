@@ -215,8 +215,8 @@ extension _ContactsMapCanvas on _ContactsMapScreenState {
         final canvasHeight =
             (gridHalfSize * 2 + 1) * _ContactsMapScreenState._tileSize;
 
-        final centerPx = _lon2pixelX(centerLng, _zoom) - originPx;
-        final centerPy = _lat2pixelY(centerLat, _zoom) - originPy;
+        final centerPx = _lon2pixelX(effectiveCenterLng, _zoom) - originPx;
+        final centerPy = _lat2pixelY(effectiveCenterLat, _zoom) - originPy;
 
         Matrix4? frameMatrixOverride;
         if (!_hasAppliedInitialMatrix) {
@@ -1142,6 +1142,10 @@ extension _ContactsMapCanvas on _ContactsMapScreenState {
                                 _userGpsLocation = loc;
                                 _isLocatingUser = false;
                               });
+                              _saveLastKnownLocation(
+                                loc.latitude,
+                                loc.longitude,
+                              );
                               _centerOnCoords(
                                 loc.latitude,
                                 loc.longitude,

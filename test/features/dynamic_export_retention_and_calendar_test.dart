@@ -25,6 +25,7 @@ class _TestJwImapClient extends JwImapClient {
     int? port,
     String? username,
     String? password,
+    String? accountEmail,
     Duration timeout = const Duration(seconds: 60),
     JwMissingUids? missingUids,
   }) async* {

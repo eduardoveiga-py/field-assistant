@@ -597,6 +597,7 @@ class JwImapClient {
     int? port,
     String? username,
     String? password,
+    String? accountEmail,
     Duration timeout = const Duration(seconds: 60),
     JwMissingUids? missingUids,
   }) async* {
@@ -680,6 +681,10 @@ class JwImapClient {
             'Página IMAP incompleta; sincronize novamente para retomar.',
           );
         }
+        final effectiveAccountEmail =
+            (accountEmail != null && accountEmail.trim().isNotEmpty)
+            ? accountEmail.trim().toLowerCase()
+            : username.trim();
         yield fetched
             .map(
               (item) => item.copyWith(
@@ -690,6 +695,8 @@ class JwImapClient {
                   uidValidity: validity,
                   uid: item.remoteUid!,
                 ),
+                accountEmail: effectiveAccountEmail,
+                folderName: item.folderName ?? 'Caixa de Entrada',
               ),
             )
             .toList();
@@ -1086,7 +1093,7 @@ class JwSmtpClient {
     return buffer.toString();
   }
 
-  static String _formatRfc2822Date(DateTime dateTime) {
+  static String formatRfc2822Date(DateTime dateTime) {
     final utc = dateTime.toUtc();
     const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     const months = [
@@ -1108,6 +1115,9 @@ class JwSmtpClient {
         '${utc.year} ${two(utc.hour)}:${two(utc.minute)}:${two(utc.second)} +0000';
   }
 
+  static String _formatRfc2822Date(DateTime dateTime) =>
+      formatRfc2822Date(dateTime);
+
   Future<void> _executeSmtpSession({
     required String? host,
     required int? port,
@@ -1127,7 +1137,13 @@ class JwSmtpClient {
     }
 
     final cleanUser = username.trim();
-    final senderAddr = extractValidEmailAddress(cleanUser);
+    final messageSender =
+        (messageToSend != null &&
+            messageToSend.from.trim().isNotEmpty &&
+            messageToSend.from.trim() != 'local@dispositivo')
+        ? extractValidEmailAddress(messageToSend.from)
+        : null;
+    final senderAddr = messageSender ?? extractValidEmailAddress(cleanUser);
     if (senderAddr == null) {
       throw const JwEmailAuthException(
         'Endereço de e-mail remetente inválido nas configurações.',
@@ -1525,6 +1541,7 @@ class JwEmailService {
     int? port,
     String? username,
     String? password,
+    String? accountEmail,
   }) async {
     final targetHost = host?.trim().isNotEmpty == true
         ? host!.trim()
@@ -1538,6 +1555,7 @@ class JwEmailService {
       port: port,
       username: username,
       password: password,
+      accountEmail: accountEmail,
       missingUids: (validity, uids) async {
         final ids = {
           for (final uid in uids)
@@ -1784,6 +1802,8 @@ class JwEmailService {
 
     final now = DateTime.now().toUtc();
     final sentMsg = message.copyWith(
+      accountEmail: message.accountEmail ?? username.trim(),
+      folderName: message.folderName ?? 'Enviados',
       from:
           message.from.trim().isNotEmpty && message.from != 'local@dispositivo'
           ? message.from
