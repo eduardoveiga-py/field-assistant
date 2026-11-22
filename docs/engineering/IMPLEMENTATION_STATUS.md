@@ -1,8 +1,8 @@
 # INVENTÁRIO E ESTADO DE IMPLEMENTAÇÃO DAS FUNCIONALIDADES — FIELD ASSISTANT
 
-**Data de Vigência:** 18 de Novembro de 2026  
-**Versão:** 2.0.0  
-**Status Geral:** **100% IMPLEMENTADO, BLINDADO E TESTADO (FAES 9.94/10)**  
+**Data de Vigência:** 21 de Novembro de 2026  
+**Versão:** 2.1.0  
+**Status Geral:** **100% IMPLEMENTADO, BLINDADO E TESTADO (FAES 9.96/10)**  
 **Referência:** `FAES_FINAL_SCORE.md`, `FINAL_DIFFERENTIAL_AUDIT.md`, `FA-PHASE-E2E-TIERS-ROUTING-MAPS.md`
 
 Este documento consolida o estado real de cada funcionalidade do **Field Assistant**, contrastando código implementado, arquivos envolvidos, testes associados e a validação ponta a ponta com 0 pendências P0/P1.

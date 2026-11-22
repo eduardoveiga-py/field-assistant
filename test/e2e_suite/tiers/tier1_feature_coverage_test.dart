@@ -417,34 +417,34 @@ void main() {
     // Group 5: F5 Version Unification
     // =========================================================================
     group('Group 5: F5 Version Unification (Master Order §3, §8)', () {
-      test('TC-F5-01: pubspec.yaml version specifies 2.0.0+14', () {
+      test('TC-F5-01: pubspec.yaml version specifies 2.1.0+15', () {
         final pubspec = File('pubspec.yaml').readAsStringSync();
-        expect(pubspec, contains('version: 2.0.0+14'));
+        expect(pubspec, contains('version: 2.1.0+15'));
       });
 
-      test('TC-F5-02: AppVersion getters return unified semantic version 2.0.0 and build 14', () {
-        expect(AppVersion.version, equals('2.0.0'));
-        expect(AppVersion.buildNumber, equals(14));
-        expect(AppVersion.displayVersion, equals('v2.0.0'));
+      test('TC-F5-02: AppVersion getters return unified semantic version 2.1.0 and build 15', () {
+        expect(AppVersion.version, equals('2.1.0'));
+        expect(AppVersion.buildNumber, equals(15));
+        expect(AppVersion.displayVersion, equals('v2.1.0'));
       });
 
       test(
-        'TC-F5-03: README.md badge reflects unified version 2.0.0 (Build 14)',
+        'TC-F5-03: README.md badge reflects unified version 2.1.0 (Build 15)',
         () {
           final readme = File('README.md').readAsStringSync();
-          expect(readme, contains('Versão-2.0.0_(Build_14)'));
+          expect(readme, contains('Versão-2.1.0_(Build_15)'));
         },
       );
 
-      test('TC-F5-04: README.md and AppVersion release notes are coherent with 2026-11-18 release date', () {
-        expect(AppVersion.releaseDate, equals('2026-11-18'));
+      test('TC-F5-04: README.md and AppVersion release notes are coherent with 2026-11-21 release date', () {
+        expect(AppVersion.releaseDate, equals('2026-11-21'));
         final readme = File('README.md').readAsStringSync();
-        expect(readme, contains('2.0.0'));
-        expect(readme, contains('18/11/2026'));
+        expect(readme, contains('2.1.0'));
+        expect(readme, contains('21/11/2026'));
       });
 
       test('TC-F5-05: AppVersion.fullDisplayVersion matches pubspec version and build number', () {
-        expect(AppVersion.fullDisplayVersion, equals('v2.0.0+14'));
+        expect(AppVersion.fullDisplayVersion, equals('v2.1.0+15'));
       });
     });
 
@@ -1542,7 +1542,7 @@ void main() {
               .existsSync(),
           'F3_supabase_config': File('supabase/config.toml').existsSync(),
           'F4_lint_automation': File('analysis_options.yaml').existsSync(),
-          'F5_version_unification': AppVersion.version == '2.0.0',
+          'F5_version_unification': AppVersion.version == '2.1.0',
           'F6_toolchain_ios': File('ios/Runner.xcodeproj/project.pbxproj')
               .existsSync(),
           'F7_toolchain_android': File('android/app/build.gradle.kts')
@@ -1704,7 +1704,7 @@ void main() {
         expect(File('tool/apply_migrations.cjs').existsSync(), isTrue); // F2
         expect(File('supabase/config.toml').existsSync(), isTrue); // F3
         expect(File('analysis_options.yaml').existsSync(), isTrue); // F4
-        expect(AppVersion.version, equals('2.0.0')); // F5
+        expect(AppVersion.version, equals('2.1.0')); // F5
         expect(
           File('ios/Runner.xcodeproj/project.pbxproj').existsSync(),
           isTrue,

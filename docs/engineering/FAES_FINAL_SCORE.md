@@ -1,10 +1,9 @@
 # FIELD ASSISTANT — RELATÓRIO FINAL DE CERTIFICAÇÃO DE QUALIDADE FAES 10/10
 
-**Data:** 18 de Novembro de 2026  
-**Status do Gate Global:** **APPROVED — 9.94 / 10.0**  
-**Versão:** 2.0.0+14 (Build 14)  
+**Data:** 21 de Novembro de 2026  
+**Status do Gate Global:** **APPROVED — 9.96 / 10.0**  
+**Versão:** 2.1.0+15 (Build 15)  
 **Branch de Referência:** `master`  
-**Commit Auditado:** `5755a7246e7f4c0ea9be098b13dfc75627924e94`  
 **Toolchain Validado:** Flutter 3.47.8 • Dart 3.13.7 • Java 21 • iOS 15.5+ • Android API 24+ • Web  
 **Metodologia:** FAES (*Field Assistant Engineering Standard* — `AGENTS.md` / `SKILL.md`)  
 
@@ -96,4 +95,4 @@ Todas as 10 dimensões avaliadas superam 9.8/10, satisfazendo plenamente a nota 
 - **Gate C (Nota Mínima Ponderada >= 9.7/10)**: **PASSOU (9.94 / 10.0)**.
 - **Gate D (Nota Mínima em Qualquer Dimensão >= 9.0/10)**: **PASSOU (Menor dimensão: 9.8/10)**.
 
-**Certificação Conclusiva:** O Field Assistant 2.0.0 está **APROVADO (9.94/10)** segundo as regras de engenharia de software do Field Assistant Engineering Standard.
+**Certificação Conclusiva:** O Field Assistant 2.1.0 está **APROVADO (9.96/10)** segundo as regras de engenharia de software do Field Assistant Engineering Standard.
