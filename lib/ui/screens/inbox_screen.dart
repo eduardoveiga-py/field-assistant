@@ -239,6 +239,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                     port: acc.incomingPort,
                     username: acc.username,
                     password: pass,
+                    accountEmail: acc.email,
                   );
               totalSavedAcrossAccounts += saved;
               accountsSynced++;
@@ -418,6 +419,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
         port: port,
         username: username,
         password: password,
+        accountEmail: username,
       );
 
       // Envia imediatamente novas mensagens importadas para o Supabase

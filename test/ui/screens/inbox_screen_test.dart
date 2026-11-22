@@ -22,13 +22,7 @@ class _AlwaysUnlockedBiometricService extends BiometricAuthService {
 }
 
 class _TestJwEmailService extends JwEmailService {
-  Future<int> Function({
-    String? host,
-    int? port,
-    String? username,
-    String? password,
-  })?
-  onSyncEmails;
+  Function? onSyncEmails;
 
   _TestJwEmailService({required super.db, required super.biometricAuth});
 
@@ -38,14 +32,27 @@ class _TestJwEmailService extends JwEmailService {
     int? port,
     String? username,
     String? password,
+    String? accountEmail,
   }) async {
     if (onSyncEmails != null) {
-      return onSyncEmails!(
-        host: host,
-        port: port,
-        username: username,
-        password: password,
-      );
+      try {
+        final res = await Function.apply(onSyncEmails!, [], {
+          #host: host,
+          #port: port,
+          #username: username,
+          #password: password,
+          #accountEmail: accountEmail,
+        });
+        return res as int;
+      } on NoSuchMethodError {
+        final res = await Function.apply(onSyncEmails!, [], {
+          #host: host,
+          #port: port,
+          #username: username,
+          #password: password,
+        });
+        return res as int;
+      }
     }
     return 0;
   }

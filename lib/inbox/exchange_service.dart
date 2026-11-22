@@ -170,8 +170,8 @@ class ExchangeProtocolSession implements ExchangeSession {
       payload.write('Cc: ${cc.join(", ")}\r\n');
     }
     payload
-      ..write('Subject: $subject\r\n')
-      ..write('Date: ${nowUtc.toIso8601String()}\r\n')
+      ..write('Subject: ${JwSmtpClient.encodeHeaderValue(subject)}\r\n')
+      ..write('Date: ${JwSmtpClient.formatRfc2822Date(nowUtc)}\r\n')
       ..write('MIME-Version: 1.0\r\n');
 
     if (attachments.isEmpty) {

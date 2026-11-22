@@ -1,10 +1,14 @@
+import 'dart:convert';
+
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:drift/native.dart';
 
+import 'package:ministerio_pessoal/core/biometric_auth_service.dart';
 import 'package:ministerio_pessoal/database/app_database.dart';
 import 'package:ministerio_pessoal/inbox/email_contacts_manager.dart';
 import 'package:ministerio_pessoal/inbox/email_account_model.dart';
+import 'package:ministerio_pessoal/inbox/jw_email_service.dart';
 import 'package:ministerio_pessoal/picture_bank/picture_entry_model.dart';
 
 void main() {
@@ -216,4 +220,104 @@ void main() {
       expect(recovered.category, equals('Estudos Bíblicos'));
     });
   });
+
+  group('RFC Compliance & IMAP/SMTP Integration Edge Cases', () {
+    late AppDatabase db;
+
+    setUp(() {
+      db = AppDatabase.forTesting(NativeDatabase.memory());
+    });
+
+    tearDown(() async {
+      await db.close();
+    });
+
+    test('JwSmtpClient formats valid RFC 2822 date and RFC 2047 header', () {
+      final date = DateTime.utc(2026, 11, 22, 14, 30, 45);
+      final formattedDate = JwSmtpClient.formatRfc2822Date(date);
+      expect(formattedDate, equals('Sun, 22 Nov 2026 14:30:45 +0000'));
+
+      final asciiHeader = JwSmtpClient.encodeHeaderValue('Meeting invitation');
+      expect(asciiHeader, equals('Meeting invitation'));
+
+      final unicodeHeader = JwSmtpClient.encodeHeaderValue(
+        'Reunião e Ação Pastoral em Santo Antônio',
+      );
+      expect(unicodeHeader, startsWith('=?UTF-8?B?'));
+      expect(unicodeHeader, endsWith('?='));
+      final encodedPart = unicodeHeader.substring(10, unicodeHeader.length - 2);
+      final decoded = utf8.decode(base64.decode(encodedPart));
+      expect(decoded, equals('Reunião e Ação Pastoral em Santo Antônio'));
+    });
+
+    test(
+      'syncEmails tags Drift inbox entries with provided accountEmail',
+      () async {
+        final testMsg = JwEmailMessage(
+          id: 'msg_imap_1',
+          remoteUid: 42,
+          folderName: 'Caixa de Entrada',
+          subject: 'Comunicado Regional',
+          from: 'sede@jw.org',
+          to: 'servo@dominio.com.br',
+          date: DateTime.utc(2026, 11, 22),
+          bodyText: 'Texto do comunicado',
+        );
+
+        final service = JwEmailService(
+          db: db,
+          biometricAuth: BiometricAuthService(),
+          imapClient: JwImapClient(
+            sessionFactory: (_) => _FakeImapSession([testMsg]),
+          ),
+        );
+
+        final saved = await service.syncEmails(
+          host: 'imap.dominio.com.br',
+          port: 993,
+          username: 'servo123',
+          password: 'secret_password',
+          accountEmail: 'servo@dominio.com.br',
+        );
+
+        expect(saved, equals(1));
+        final entries = await db.select(db.inboxEntries).get();
+        expect(entries.length, equals(1));
+
+        final metadata =
+            jsonDecode(entries.first.metadata) as Map<String, dynamic>;
+        final emailJson = metadata['email'] as Map<String, dynamic>;
+        expect(emailJson['accountEmail'], equals('servo@dominio.com.br'));
+        expect(emailJson['folderName'], equals('Caixa de Entrada'));
+      },
+    );
+  });
+}
+
+class _FakeImapSession implements JwImapSession {
+  final List<JwEmailMessage> messages;
+  _FakeImapSession(this.messages);
+
+  @override
+  Future<void> connect(
+    String host,
+    int port,
+    String username,
+    String password,
+    Duration timeout,
+  ) async {}
+
+  @override
+  Future<int> selectInbox() async => 99;
+
+  @override
+  Future<List<int>> searchUids() async =>
+      messages.map((m) => m.remoteUid!).toList();
+
+  @override
+  Future<List<JwEmailMessage>> fetchUids(List<int> uids) async =>
+      messages.where((m) => uids.contains(m.remoteUid)).toList();
+
+  @override
+  Future<void> close() async {}
 }
