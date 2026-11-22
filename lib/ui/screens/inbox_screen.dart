@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:collection/collection.dart';
 import 'package:drift/drift.dart' as drift;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -109,6 +110,64 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
     }
   }
 
+  String _friendlySyncError(Object e, [EmailAccount? acc]) {
+    final msg = e.toString().toLowerCase();
+    final isAuthError =
+        e is JwEmailAuthException ||
+        msg.contains('401') ||
+        msg.contains('auth') ||
+        msg.contains('autenticação') ||
+        msg.contains('senha') ||
+        msg.contains('credencia');
+
+    final isGmail =
+        (acc != null &&
+            (acc.email.toLowerCase().contains('gmail') ||
+                acc.incomingHost.toLowerCase().contains('gmail'))) ||
+        msg.contains('gmail');
+
+    final isMicrosoft =
+        (acc != null &&
+            (acc.email.toLowerCase().contains('outlook') ||
+                acc.email.toLowerCase().contains('hotmail') ||
+                acc.incomingHost.toLowerCase().contains('outlook') ||
+                acc.incomingHost.toLowerCase().contains('office365'))) ||
+        msg.contains('outlook') ||
+        msg.contains('hotmail') ||
+        msg.contains('office365');
+
+    if (isAuthError) {
+      if (isGmail) {
+        return 'Falha de autenticação (401). No Gmail, use uma Senha de App de 16 dígitos ou OAuth2 se a verificação em duas etapas estiver ativa.';
+      }
+      if (isMicrosoft) {
+        return 'Falha de autenticação (401). No Hotmail/Outlook, configure uma Senha de Aplicativo ou habilite OAuth2/autenticação moderna.';
+      }
+      return 'Falha de autenticação (verifique usuário e senha).';
+    }
+
+    if (e is ExchangeException) {
+      return e.message;
+    }
+
+    if (e is TimeoutException ||
+        msg.contains('timeout') ||
+        msg.contains('tempo esgotado')) {
+      return 'Tempo limite de conexão esgotado.';
+    }
+
+    if (e is JwEmailConnectionException ||
+        (!kIsWeb && e is SocketException) ||
+        msg.contains('socket') ||
+        msg.contains('conexão') ||
+        msg.contains('connection')) {
+      return 'Falha de conexão. Servidor inacessível ou rede indisponível.';
+    }
+
+    final clean = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
+    return clean.isNotEmpty ? clean : 'Erro desconhecido ao sincronizar.';
+  }
+
   Future<void> _syncEmails() async {
     setState(() => _isSyncingEmails = true);
     try {
@@ -120,7 +179,8 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                'Sincronização em nuvem (Web): ${syncResult.message}',
+                'Sincronização direta IMAP/Exchange não é suportada no navegador web. '
+                'Mensagens sincronizam via Supabase: ${syncResult.message}',
               ),
               backgroundColor: syncResult.success
                   ? Colors.green
@@ -137,54 +197,56 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
       if (accounts.isNotEmpty) {
         var totalSavedAcrossAccounts = 0;
         var accountsSynced = 0;
+        final failedDetails = <String>[];
 
         for (final acc in accounts) {
           if (!acc.isActive) continue;
           try {
+            final pass = await EmailAccountsManager.getAccountPassword(
+              acc.id,
+              db,
+            );
+            if (pass == null || pass.trim().isEmpty) {
+              failedDetails.add('${acc.name}: senha não configurada');
+              continue;
+            }
+
             if (acc.incomingProtocol == 'exchange') {
-              final pass = await EmailAccountsManager.getAccountPassword(
-                acc.id,
-              );
-              const storage = FlutterSecureStorage();
+              final storage = const FlutterSecureStorage();
               final deviceId =
                   (await storage.read(key: 'jw_eas_device_id')) ??
                   const Uuid().v4();
-              if (pass != null && pass.isNotEmpty) {
-                final session = ExchangeProtocolSession(
-                  host: acc.incomingHost,
-                  username: acc.username,
-                  password: pass,
-                  deviceId: deviceId,
-                );
-                final res = await ExchangeReadService(db).sync(
-                  session: session,
-                  host: acc.incomingHost,
-                  account: acc.email,
-                  deviceId: deviceId,
-                  allMailFolders: true,
-                );
-                totalSavedAcrossAccounts += res.saved;
-                accountsSynced++;
-              }
-            } else {
-              final pass = await EmailAccountsManager.getAccountPassword(
-                acc.id,
+              final session = ExchangeProtocolSession(
+                host: acc.incomingHost,
+                username: acc.username,
+                password: pass,
+                deviceId: deviceId,
               );
-              if (pass != null && pass.isNotEmpty) {
-                final saved = await ref
-                    .read(jwEmailServiceProvider)
-                    .syncEmails(
-                      host: acc.incomingHost,
-                      port: acc.incomingPort,
-                      username: acc.username,
-                      password: pass,
-                    );
-                totalSavedAcrossAccounts += saved;
-                accountsSynced++;
-              }
+              final res = await ExchangeReadService(db).sync(
+                session: session,
+                host: acc.incomingHost,
+                account: acc.email,
+                deviceId: deviceId,
+                allMailFolders: true,
+              );
+              totalSavedAcrossAccounts += res.saved;
+              accountsSynced++;
+            } else {
+              final saved = await ref
+                  .read(jwEmailServiceProvider)
+                  .syncEmails(
+                    host: acc.incomingHost,
+                    port: acc.incomingPort,
+                    username: acc.username,
+                    password: pass,
+                    accountEmail: acc.email,
+                  );
+              totalSavedAcrossAccounts += saved;
+              accountsSynced++;
             }
           } catch (e) {
             AppLogger.warning('Falha ao sincronizar conta ${acc.name}: $e');
+            failedDetails.add('${acc.name}: ${_friendlySyncError(e, acc)}');
           }
         }
 
@@ -195,14 +257,43 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
         }());
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Sincronização global concluída: $totalSavedAcrossAccounts nova(s) mensagem(ns) de $accountsSynced conta(s) e todas as pastas.',
+          if (failedDetails.isNotEmpty && accountsSynced == 0) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Falha na sincronização de e-mail:\n${failedDetails.join('\n')}',
+                ),
+                backgroundColor: Theme.of(context).colorScheme.error,
+                duration: const Duration(seconds: 6),
               ),
-              backgroundColor: AppTheme.successGreen,
-            ),
-          );
+            );
+          } else if (accountsSynced > 0 && failedDetails.isNotEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Sincronização parcial: $totalSavedAcrossAccounts nova(s) mensagem(ns) de $accountsSynced conta(s). '
+                  'Falhas:\n${failedDetails.join('\n')}',
+                ),
+                backgroundColor: Colors.orange.shade800,
+                duration: const Duration(seconds: 6),
+              ),
+            );
+          } else if (accountsSynced > 0) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Sincronização global concluída: $totalSavedAcrossAccounts nova(s) mensagem(ns) de $accountsSynced conta(s) e todas as pastas.',
+                ),
+                backgroundColor: AppTheme.successGreen,
+              ),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Nenhuma conta ativa para sincronização.'),
+              ),
+            );
+          }
         }
         return;
       }
@@ -328,6 +419,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
         port: port,
         username: username,
         password: password,
+        accountEmail: username,
       );
 
       // Envia imediatamente novas mensagens importadas para o Supabase
@@ -359,7 +451,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Erro na sincronização de e-mail: $e. Páginas já salvas foram preservadas; sincronize novamente.',
+              'Erro na sincronização de e-mail: ${_friendlySyncError(e)}. Páginas já salvas foram preservadas; sincronize novamente.',
             ),
             backgroundColor: Theme.of(context).colorScheme.error,
           ),
@@ -2053,6 +2145,74 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
         ),
         const Divider(height: 1),
 
+        // Barra Dedicada de Pastas
+        Container(
+          key: const Key('email_folder_selector_bar'),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                ...const [
+                  'Todas as pastas',
+                  'Caixa de Entrada',
+                  'Enviadas',
+                  'Rascunhos',
+                  'Spam',
+                  'Lixeira',
+                ].map((folder) {
+                  final currentFolder =
+                      _selectedEmailFolder ?? 'Todas as pastas';
+                  final isSelected = currentFolder == folder;
+                  IconData icon;
+                  switch (folder) {
+                    case 'Caixa de Entrada':
+                      icon = Icons.inbox_outlined;
+                      break;
+                    case 'Enviadas':
+                    case 'Enviados':
+                      icon = Icons.send_outlined;
+                      break;
+                    case 'Rascunhos':
+                      icon = Icons.drafts_outlined;
+                      break;
+                    case 'Spam':
+                      icon = Icons.report_outlined;
+                      break;
+                    case 'Lixeira':
+                      icon = Icons.delete_outline;
+                      break;
+                    default:
+                      icon = Icons.folder_outlined;
+                  }
+                  final chipKey =
+                      'folder_chip_${folder.toLowerCase().replaceAll(' ', '_')}';
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: ChoiceChip(
+                      key: Key(chipKey),
+                      avatar: Icon(icon, size: 16),
+                      label: Text(folder, style: const TextStyle(fontSize: 12)),
+                      selected: isSelected,
+                      selectedColor: AppTheme.primaryBlue.withValues(
+                        alpha: 0.2,
+                      ),
+                      onSelected: (val) {
+                        setState(() {
+                          _selectedEmailFolder = folder == 'Todas as pastas'
+                              ? null
+                              : folder;
+                        });
+                      },
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+        ),
+        const Divider(height: 1),
+
         // Lista Reativa de E-mails
         Expanded(
           child: StreamBuilder<List<JwEmailMessage>>(
@@ -2130,14 +2290,6 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                 );
               }
 
-              const standardFolders = [
-                'Todas as pastas',
-                'Caixa de Entrada',
-                'Enviados',
-                'Rascunhos',
-                'Lixeira',
-              ];
-
               final currentFolder = _selectedEmailFolder ?? 'Todas as pastas';
               final visible = emails.where((email) {
                 if (_unreadOnly && email.isRead) return false;
@@ -2151,10 +2303,14 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                       fn.contains('trash') ||
                       fn.contains('delet') ||
                       fn.contains('rascunh') ||
-                      fn.contains('draft')) {
+                      fn.contains('draft') ||
+                      fn.contains('spam') ||
+                      fn.contains('junk') ||
+                      fn.contains('lixo eletr')) {
                     return false;
                   }
-                } else if (currentFolder == 'Enviados') {
+                } else if (currentFolder == 'Enviadas' ||
+                    currentFolder == 'Enviados') {
                   final fn = (email.folderName ?? '').toLowerCase();
                   if (!fn.contains('enviad') && !fn.contains('sent')) {
                     return false;
@@ -2164,6 +2320,13 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                   if (!email.isDraft &&
                       !fn.contains('rascunh') &&
                       !fn.contains('draft')) {
+                    return false;
+                  }
+                } else if (currentFolder == 'Spam') {
+                  final fn = (email.folderName ?? '').toLowerCase();
+                  if (!fn.contains('spam') &&
+                      !fn.contains('junk') &&
+                      !fn.contains('lixo eletr')) {
                     return false;
                   }
                 } else if (currentFolder == 'Lixeira') {
@@ -2192,7 +2355,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
 
               return Column(
                 children: [
-                  // Barra de Seleção de Conta e Pastas estilo Outlook
+                  // Barra de Seleção de Conta e Não Lidos
                   Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 16,
@@ -2268,6 +2431,29 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                             );
                           },
                         ),
+                        const SizedBox(width: 8),
+                        FilterChip(
+                          key: const Key('filter_unread_chip'),
+                          avatar: Icon(
+                            _unreadOnly
+                                ? Icons.mark_email_unread
+                                : Icons.mark_email_unread_outlined,
+                            size: 16,
+                          ),
+                          label: const Text(
+                            'Não lidos',
+                            style: TextStyle(fontSize: 12),
+                          ),
+                          selected: _unreadOnly,
+                          selectedColor: AppTheme.primaryBlue.withValues(
+                            alpha: 0.2,
+                          ),
+                          onSelected: (val) {
+                            setState(() {
+                              _unreadOnly = val;
+                            });
+                          },
+                        ),
                         const Spacer(),
                         // Contador de Mensagens
                         Text(
@@ -2278,79 +2464,6 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                           ),
                         ),
                       ],
-                    ),
-                  ),
-
-                  // Chips Horizontais de Pastas
-                  SizedBox(
-                    height: 42,
-                    child: ListView.separated(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      scrollDirection: Axis.horizontal,
-                      itemCount: standardFolders.length + 1,
-                      separatorBuilder: (c, i) => const SizedBox(width: 6),
-                      itemBuilder: (c, i) {
-                        if (i == 0) {
-                          return FilterChip(
-                            avatar: Icon(
-                              _unreadOnly
-                                  ? Icons.mark_email_unread
-                                  : Icons.mark_email_unread_outlined,
-                              size: 16,
-                            ),
-                            label: const Text(
-                              'Não lidos',
-                              style: TextStyle(fontSize: 12),
-                            ),
-                            selected: _unreadOnly,
-                            selectedColor: AppTheme.primaryBlue.withValues(
-                              alpha: 0.2,
-                            ),
-                            onSelected: (val) {
-                              setState(() {
-                                _unreadOnly = val;
-                              });
-                            },
-                          );
-                        }
-                        final folder = standardFolders[i - 1];
-                        final isSelected = currentFolder == folder;
-                        IconData icon;
-                        switch (folder) {
-                          case 'Caixa de Entrada':
-                            icon = Icons.inbox_outlined;
-                            break;
-                          case 'Enviados':
-                            icon = Icons.send_outlined;
-                            break;
-                          case 'Rascunhos':
-                            icon = Icons.drafts_outlined;
-                            break;
-                          case 'Lixeira':
-                            icon = Icons.delete_outline;
-                            break;
-                          default:
-                            icon = Icons.folder_outlined;
-                        }
-                        return ChoiceChip(
-                          avatar: Icon(icon, size: 16),
-                          label: Text(
-                            folder,
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                          selected: isSelected,
-                          selectedColor: AppTheme.primaryBlue.withValues(
-                            alpha: 0.2,
-                          ),
-                          onSelected: (val) {
-                            setState(() {
-                              _selectedEmailFolder = folder == 'Todas as pastas'
-                                  ? null
-                                  : folder;
-                            });
-                          },
-                        );
-                      },
                     ),
                   ),
 
@@ -3122,6 +3235,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                           _showNewDraftDialog(
                             initialTo: replyTo,
                             initialSubject: replySubj,
+                            initialAccountEmail: msg.accountEmail,
                           );
                         },
                       ),
@@ -3350,11 +3464,37 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
   // COMPOR / EDITAR / ENVIAR E-MAIL TEOCRÁTICO
   // ==========================================
 
-  void _showNewDraftDialog({
+  Future<void> _showNewDraftDialog({
     JwEmailMessage? existingDraft,
     String? initialTo,
     String? initialSubject,
-  }) {
+    String? initialAccountEmail,
+  }) async {
+    final db = ref.read(repositoryProvider).db;
+    final accounts = await EmailAccountsManager.loadAccounts(db);
+
+    EmailAccount? selectedAccount;
+    if (existingDraft?.accountEmail != null &&
+        existingDraft!.accountEmail!.isNotEmpty) {
+      selectedAccount = accounts.firstWhereOrNull(
+        (a) =>
+            a.email.toLowerCase() == existingDraft.accountEmail!.toLowerCase(),
+      );
+    } else if (initialAccountEmail != null && initialAccountEmail.isNotEmpty) {
+      selectedAccount = accounts.firstWhereOrNull(
+        (a) => a.email.toLowerCase() == initialAccountEmail.toLowerCase(),
+      );
+    } else if (_selectedEmailAccount != null &&
+        _selectedEmailAccount!.isNotEmpty) {
+      selectedAccount = accounts.firstWhereOrNull(
+        (a) => a.email.toLowerCase() == _selectedEmailAccount!.toLowerCase(),
+      );
+    }
+    selectedAccount ??=
+        accounts.where((a) => a.isActive).firstOrNull ?? accounts.firstOrNull;
+
+    if (!mounted) return;
+
     final initTo = existingDraft?.to ?? initialTo ?? '';
     final initCc = existingDraft?.cc.join(', ') ?? '';
     final initBcc = existingDraft?.bcc.join(', ') ?? '';
@@ -3362,7 +3502,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
     final initBody = existingDraft?.bodyText ?? '';
     final initTags = existingDraft?.tags.join(', ') ?? '';
 
-    showModalBottomSheet(
+    await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
@@ -3513,6 +3653,41 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                 ],
                               ],
                             ),
+                          ),
+                        ],
+                        if (accounts.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          DropdownButtonFormField<EmailAccount>(
+                            key: const ValueKey('compose_account_selector'),
+                            initialValue: selectedAccount,
+                            decoration: const InputDecoration(
+                              labelText: 'De (Conta de Envio) *',
+                              isDense: true,
+                              prefixIcon: Icon(
+                                Icons.alternate_email,
+                                color: AppTheme.primaryBlue,
+                                size: 20,
+                              ),
+                            ),
+                            items: accounts.map((acc) {
+                              return DropdownMenuItem(
+                                value: acc,
+                                child: Text(
+                                  '${acc.name} <${acc.email}>',
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 13),
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: isSending
+                                ? null
+                                : (val) {
+                                    if (val != null) {
+                                      setSheetState(
+                                        () => selectedAccount = val,
+                                      );
+                                    }
+                                  },
                           ),
                         ],
                         const SizedBox(height: 12),
@@ -3985,12 +4160,15 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                                 ))
                                               .getSingleOrNull();
                                       final userEmail =
-                                          emailEntry?.value.trim() ?? '';
+                                          selectedAccount?.email ??
+                                          emailEntry?.value.trim() ??
+                                          '';
 
                                       final draft = JwEmailMessage(
                                         id:
                                             existingDraft?.id ??
                                             const Uuid().v4(),
+                                        accountEmail: selectedAccount?.email,
                                         folderName: 'Rascunhos',
                                         subject: subject,
                                         from: userEmail.isNotEmpty
@@ -4073,14 +4251,14 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                       });
 
                                       try {
-                                        final protocol =
-                                            await (db.select(db.appKvStore)
-                                                  ..where(
-                                                    (t) => t.key.equals(
-                                                      'jw_mail_protocol',
-                                                    ),
-                                                  ))
-                                                .getSingleOrNull();
+                                        if (kIsWeb) {
+                                          setSheetState(() {
+                                            isSending = false;
+                                            needsConfig = false;
+                                            inlineError = 'Envio direto via socket SMTP/Exchange não é suportado no navegador Web. Utilize o aplicativo Desktop ou Mobile.';
+                                          });
+                                          return;
+                                        }
 
                                         final tags = tagsCtrl.text
                                             .split(',')
@@ -4090,6 +4268,220 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                             )
                                             .where((t) => t.isNotEmpty)
                                             .toList();
+
+                                        if (selectedAccount != null) {
+                                          final pass =
+                                              await EmailAccountsManager.getAccountPassword(
+                                                selectedAccount!.id,
+                                                db,
+                                              );
+                                          if (pass == null ||
+                                              pass.trim().isEmpty) {
+                                            if (ctx.mounted) {
+                                              setSheetState(() {
+                                                isSending = false;
+                                                needsConfig = true;
+                                                inlineError =
+                                                    'Senha não configurada para a conta ${selectedAccount!.name}. Acesse Configurações para validar seu acesso.';
+                                              });
+                                            }
+                                            return;
+                                          }
+
+                                          if (selectedAccount!
+                                                  .incomingProtocol ==
+                                              'exchange') {
+                                            final storage =
+                                                const FlutterSecureStorage();
+                                            final deviceId =
+                                                (await storage.read(
+                                                  key: 'jw_eas_device_id',
+                                                )) ??
+                                                const Uuid().v4();
+                                            final session =
+                                                ExchangeProtocolSession(
+                                                  host: selectedAccount!
+                                                      .incomingHost,
+                                                  username:
+                                                      selectedAccount!.username,
+                                                  password: pass,
+                                                  deviceId: deviceId,
+                                                );
+
+                                            await session.sendMail(
+                                              to: to,
+                                              subject: subject,
+                                              body: bodyText,
+                                              from: selectedAccount!.email,
+                                              cc: ccList,
+                                              bcc: bccList,
+                                              attachments: attachments,
+                                            );
+
+                                            final now = DateTime.now().toUtc();
+                                            final sentMsg = JwEmailMessage(
+                                              id:
+                                                  existingDraft?.id ??
+                                                  const Uuid().v4(),
+                                              accountEmail:
+                                                  selectedAccount!.email,
+                                              folderName: 'Enviados',
+                                              subject: subject,
+                                              from: selectedAccount!.email,
+                                              to: to,
+                                              cc: ccList,
+                                              bcc: bccList,
+                                              date: now,
+                                              bodyText: bodyText,
+                                              attachments: attachments,
+                                              isDraft: false,
+                                              isPermanentRetained: true,
+                                              tags: tags,
+                                            );
+
+                                            final metadata = {
+                                              'permanentRetention': true,
+                                              'isDraft': false,
+                                              'sentAt': now.toIso8601String(),
+                                              'exchangeMail': true,
+                                              'email': sentMsg.toJson(),
+                                            };
+
+                                            final entryId =
+                                                'email_${sentMsg.id}';
+                                            await db
+                                                .into(db.inboxEntries)
+                                                .insertOnConflictUpdate(
+                                                  InboxEntriesCompanion.insert(
+                                                    id: entryId,
+                                                    content:
+                                                        '${sentMsg.subject}\n\n${sentMsg.bodyText}',
+                                                    sourceType:
+                                                        const drift.Value(
+                                                          'email',
+                                                        ),
+                                                    suggestedCategory:
+                                                        const drift.Value(
+                                                          'email_jw',
+                                                        ),
+                                                    attachments: drift.Value(
+                                                      jsonEncode(
+                                                        sentMsg.attachments,
+                                                      ),
+                                                    ),
+                                                    capturedAt: now,
+                                                    metadata: drift.Value(
+                                                      jsonEncode(metadata),
+                                                    ),
+                                                    createdAt: now,
+                                                    updatedAt: now,
+                                                  ),
+                                                );
+
+                                            for (final rcpt in [
+                                              ...JwSmtpClient.parseRecipients(
+                                                to,
+                                              ),
+                                              ...ccList,
+                                              ...bccList,
+                                            ]) {
+                                              await EmailContactsManager.saveContact(
+                                                db,
+                                                email: rcpt,
+                                                source: 'sent_recipient',
+                                              );
+                                            }
+
+                                            if (ctx.mounted) Navigator.pop(ctx);
+                                            if (mounted) {
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
+                                                SnackBar(
+                                                  content: Text(
+                                                    'E-mail enviado via Exchange (${selectedAccount!.name}) e arquivado na pasta Enviados!',
+                                                  ),
+                                                  backgroundColor: Colors.green,
+                                                ),
+                                              );
+                                            }
+                                            return;
+                                          } else {
+                                            // Envio via SMTP
+                                            final msgToSend = JwEmailMessage(
+                                              id:
+                                                  existingDraft?.id ??
+                                                  const Uuid().v4(),
+                                              accountEmail:
+                                                  selectedAccount!.email,
+                                              folderName: 'Enviados',
+                                              subject: subject,
+                                              from: selectedAccount!.email,
+                                              to: to,
+                                              cc: ccList,
+                                              bcc: bccList,
+                                              date: DateTime.now(),
+                                              bodyText: bodyText,
+                                              attachments: attachments,
+                                              isDraft: false,
+                                              tags: tags,
+                                            );
+
+                                            await ref
+                                                .read(jwEmailServiceProvider)
+                                                .sendEmail(
+                                                  host: selectedAccount!
+                                                      .outgoingHost,
+                                                  port: selectedAccount!
+                                                      .outgoingPort,
+                                                  username:
+                                                      selectedAccount!.username,
+                                                  password: pass,
+                                                  message: msgToSend,
+                                                  securityMode: selectedAccount!
+                                                      .outgoingSecurity,
+                                                  draftId: existingDraft?.id,
+                                                );
+
+                                            for (final rcpt in [
+                                              ...JwSmtpClient.parseRecipients(
+                                                to,
+                                              ),
+                                              ...ccList,
+                                              ...bccList,
+                                            ]) {
+                                              await EmailContactsManager.saveContact(
+                                                db,
+                                                email: rcpt,
+                                                source: 'sent_recipient',
+                                              );
+                                            }
+
+                                            if (ctx.mounted) Navigator.pop(ctx);
+                                            if (mounted) {
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
+                                                SnackBar(
+                                                  content: Text(
+                                                    'E-mail enviado com sucesso via SMTP (${selectedAccount!.outgoingHost}:${selectedAccount!.outgoingPort}) e arquivado!',
+                                                  ),
+                                                  backgroundColor: Colors.green,
+                                                ),
+                                              );
+                                            }
+                                            return;
+                                          }
+                                        }
+
+                                        final protocol =
+                                            await (db.select(db.appKvStore)
+                                                  ..where(
+                                                    (t) => t.key.equals(
+                                                      'jw_mail_protocol',
+                                                    ),
+                                                  ))
+                                                .getSingleOrNull();
 
                                         if (protocol?.value == 'exchange') {
                                           final accounts =
