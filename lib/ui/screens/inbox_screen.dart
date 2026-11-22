@@ -15,12 +15,15 @@ import 'package:file_picker/file_picker.dart';
 
 import '../../core/app_logger.dart';
 import '../../core/app_theme.dart';
+import '../../core/sync_timestamp.dart';
 import '../../database/app_database.dart';
 import '../../inbox/inbox_manager.dart';
 import '../../inbox/exchange_service.dart';
 import '../../inbox/jw_email_service.dart';
 import '../../inbox/email_account_model.dart';
 import '../../inbox/email_contacts_manager.dart';
+import '../../inbox/gmail_oauth_service.dart';
+import '../../inbox/microsoft_oauth_service.dart';
 import '../../research/research_manager.dart';
 import '../../sync/supabase_sync_service.dart';
 import '../../voice_notes/audio_recording_service.dart';
@@ -110,6 +113,71 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
     }
   }
 
+  Future<int> _persistSyncedMessages(
+    AppDatabase db,
+    List<JwEmailMessage> messages,
+    String protocol,
+  ) async {
+    var savedCount = 0;
+    final now = DateTime.now().toUtc();
+    for (final msg in messages) {
+      final entryId = msg.id.startsWith('email_') ? msg.id : 'email_${msg.id}';
+      final existing = await (db.select(
+        db.inboxEntries,
+      )..where((t) => t.id.equals(entryId))).getSingleOrNull();
+
+      if (existing != null) continue;
+
+      final metadata = {
+        'permanentRetention': true,
+        'retentionDate': now.toIso8601String(),
+        'email': msg.toJson(),
+        'protocol': protocol,
+      };
+
+      await db
+          .into(db.inboxEntries)
+          .insert(
+            InboxEntriesCompanion.insert(
+              id: entryId,
+              content: '${msg.subject}\n\n${msg.bodyText}',
+              sourceType: const drift.Value('email'),
+              suggestedCategory: const drift.Value('email_jw'),
+              attachments: drift.Value(jsonEncode(msg.attachments)),
+              capturedAt: msg.date.toUtc(),
+              metadata: drift.Value(jsonEncode(metadata)),
+              createdAt: now,
+              updatedAt: now,
+              revision: const drift.Value(1),
+            ),
+          );
+
+      try {
+        final inserted = await (db.select(
+          db.inboxEntries,
+        )..where((t) => t.id.equals(entryId))).getSingle();
+        await db
+            .into(db.syncQueue)
+            .insert(
+              SyncQueueCompanion.insert(
+                id: const Uuid().v4(),
+                entityType: 'inbox_entries',
+                entityId: entryId,
+                operation: 'INSERT',
+                payload: jsonEncode(
+                  SyncTimestamp.normalizeMapDates(inserted.toJson()),
+                ),
+                createdAt: now,
+              ),
+            );
+      } catch (_) {}
+
+      await EmailContactsManager.recordSender(db, msg.from);
+      savedCount++;
+    }
+    return savedCount;
+  }
+
   String _friendlySyncError(Object e, [EmailAccount? acc]) {
     final msg = e.toString().toLowerCase();
     final isAuthError =
@@ -171,26 +239,6 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
   Future<void> _syncEmails() async {
     setState(() => _isSyncingEmails = true);
     try {
-      if (kIsWeb) {
-        // Na Web: navegadores não abrem sockets TCP brutos para IMAP nem EAS direto.
-        // Sincroniza com o Supabase, baixando mensagens e anexos já sincronizados do iOS / iPad.
-        final syncResult = await ref.read(supabaseSyncServiceProvider).sync();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Sincronização direta IMAP/Exchange não é suportada no navegador web. '
-                'Mensagens sincronizam via Supabase: ${syncResult.message}',
-              ),
-              backgroundColor: syncResult.success
-                  ? Colors.green
-                  : Colors.orange,
-            ),
-          );
-        }
-        return;
-      }
-
       final db = ref.read(repositoryProvider).db;
       final accounts = await EmailAccountsManager.loadAccounts(db);
 
@@ -202,50 +250,86 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
         for (final acc in accounts) {
           if (!acc.isActive) continue;
           try {
-            final pass = await EmailAccountsManager.getAccountPassword(
-              acc.id,
-              db,
-            );
-            if (pass == null || pass.trim().isEmpty) {
-              failedDetails.add('${acc.name}: senha não configurada');
-              continue;
-            }
-
-            if (acc.incomingProtocol == 'exchange') {
-              final storage = const FlutterSecureStorage();
-              final deviceId =
-                  (await storage.read(key: 'jw_eas_device_id')) ??
-                  const Uuid().v4();
-              final session = ExchangeProtocolSession(
-                host: acc.incomingHost,
-                username: acc.username,
-                password: pass,
-                deviceId: deviceId,
+            if (acc.incomingProtocol == 'gmail_api') {
+              final service = GmailOAuthService();
+              final messages = await service.fetchMessages(
+                accountId: acc.id,
+                accountEmail: acc.email,
               );
-              final res = await ExchangeReadService(db).sync(
-                session: session,
-                host: acc.incomingHost,
-                account: acc.email,
-                deviceId: deviceId,
-                allMailFolders: true,
+              final saved = await _persistSyncedMessages(
+                db,
+                messages,
+                'gmail_api',
               );
-              totalSavedAcrossAccounts += res.saved;
-              accountsSynced++;
-            } else {
-              final saved = await ref
-                  .read(jwEmailServiceProvider)
-                  .syncEmails(
-                    host: acc.incomingHost,
-                    port: acc.incomingPort,
-                    username: acc.username,
-                    password: pass,
-                    accountEmail: acc.email,
-                  );
               totalSavedAcrossAccounts += saved;
               accountsSynced++;
+            } else if (acc.incomingProtocol == 'microsoft_graph') {
+              final service = MicrosoftOAuthService();
+              final messages = await service.fetchMessages(
+                accountId: acc.id,
+                accountEmail: acc.email,
+              );
+              final saved = await _persistSyncedMessages(
+                db,
+                messages,
+                'microsoft_graph',
+              );
+              totalSavedAcrossAccounts += saved;
+              accountsSynced++;
+            } else if (kIsWeb) {
+              failedDetails.add(
+                '${acc.name}: Conexão direta IMAP/Exchange indisponível na Web; sincronize via app nativo.',
+              );
+            } else {
+              final pass = await EmailAccountsManager.getAccountPassword(
+                acc.id,
+                db,
+              );
+              if (pass == null || pass.trim().isEmpty) {
+                failedDetails.add('${acc.name}: senha não configurada');
+                continue;
+              }
+
+              if (acc.incomingProtocol == 'exchange') {
+                final storage = const FlutterSecureStorage();
+                final deviceId =
+                    (await storage.read(key: 'jw_eas_device_id')) ??
+                    const Uuid().v4();
+                final session = ExchangeProtocolSession(
+                  host: acc.incomingHost,
+                  username: acc.username,
+                  password: pass,
+                  deviceId: deviceId,
+                );
+                final res = await ExchangeReadService(db).sync(
+                  session: session,
+                  host: acc.incomingHost,
+                  account: acc.email,
+                  deviceId: deviceId,
+                  allMailFolders: true,
+                );
+                totalSavedAcrossAccounts += res.saved;
+                accountsSynced++;
+              } else {
+                final saved = await ref
+                    .read(jwEmailServiceProvider)
+                    .syncEmails(
+                      host: acc.incomingHost,
+                      port: acc.incomingPort,
+                      username: acc.username,
+                      password: pass,
+                      accountEmail: acc.email,
+                    );
+                totalSavedAcrossAccounts += saved;
+                accountsSynced++;
+              }
             }
-          } catch (e) {
-            AppLogger.warning('Falha ao sincronizar conta ${acc.name}: $e');
+          } catch (e, st) {
+            AppLogger.warning(
+              'Falha ao sincronizar conta ${acc.name}: $e',
+              e,
+              st,
+            );
             failedDetails.add('${acc.name}: ${_friendlySyncError(e, acc)}');
           }
         }
@@ -294,6 +378,25 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
               ),
             );
           }
+        }
+        return;
+      }
+
+      if (kIsWeb) {
+        // Na Web sem contas configuradas: sincroniza com o Supabase
+        final syncResult = await ref.read(supabaseSyncServiceProvider).sync();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Sincronização direta IMAP/Exchange não é suportada no navegador web. '
+                'Mensagens sincronizam via Supabase: ${syncResult.message}',
+              ),
+              backgroundColor: syncResult.success
+                  ? Colors.green
+                  : Colors.orange,
+            ),
+          );
         }
         return;
       }
@@ -3159,9 +3262,68 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                             }
                             final sizeVal = att['size'];
                             final sizeNum = sizeVal is num ? sizeVal : null;
-                            void openAttachment() {
+                            Future<void> openAttachment() async {
                               if (rawBytes == null && !hasPath) {
-                                ScaffoldMessenger.of(context).showSnackBar(
+                                final attachmentId =
+                                    att['attachmentId'] as String?;
+                                if (attachmentId != null &&
+                                    attachmentId.isNotEmpty) {
+                                  try {
+                                    final db = ref.read(repositoryProvider).db;
+                                    final accounts =
+                                        await EmailAccountsManager.loadAccounts(
+                                          db,
+                                        );
+                                    final acc = accounts
+                                        .cast<EmailAccount?>()
+                                        .firstWhere(
+                                          (a) =>
+                                              a?.email.toLowerCase() ==
+                                              (msg.accountEmail ?? '')
+                                                  .toLowerCase(),
+                                          orElse: () => accounts
+                                              .cast<EmailAccount?>()
+                                              .firstWhere(
+                                                (a) => a?.isOAuth == true,
+                                                orElse: () => null,
+                                              ),
+                                        );
+                                    if (acc != null) {
+                                      Uint8List? downloaded;
+                                      if (acc.incomingProtocol == 'gmail_api') {
+                                        downloaded = await GmailOAuthService()
+                                            .downloadAttachment(
+                                              accountId: acc.id,
+                                              messageId: msg.id,
+                                              attachmentId: attachmentId,
+                                            );
+                                      } else if (acc.incomingProtocol ==
+                                          'microsoft_graph') {
+                                        downloaded =
+                                            await MicrosoftOAuthService()
+                                                .downloadAttachment(
+                                                  accountId: acc.id,
+                                                  messageId: msg.id,
+                                                  attachmentId: attachmentId,
+                                                );
+                                      }
+                                      if (downloaded != null &&
+                                          downloaded.isNotEmpty) {
+                                        rawBytes = downloaded;
+                                        att['rawBytes'] = downloaded;
+                                      }
+                                    }
+                                  } catch (e) {
+                                    AppLogger.warning(
+                                      'Falha ao baixar anexo sob demanda: $e',
+                                    );
+                                  }
+                                }
+                              }
+
+                              if (!ctx.mounted) return;
+                              if (rawBytes == null && !hasPath) {
+                                ScaffoldMessenger.of(ctx).showSnackBar(
                                   const SnackBar(
                                     content: Text(
                                       'Anexo indisponível para abrir.',
@@ -3171,7 +3333,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                 return;
                               }
                               showUniversalAttachmentViewer(
-                                context,
+                                ctx,
                                 filePath: hasPath ? rawPath : name,
                                 title: name,
                                 fileType: type,
@@ -4251,7 +4413,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                       });
 
                                       try {
-                                        if (kIsWeb) {
+                                        if (kIsWeb &&
+                                            (selectedAccount == null ||
+                                                !selectedAccount!.isOAuth)) {
                                           setSheetState(() {
                                             isSending = false;
                                             needsConfig = false;
@@ -4270,6 +4434,228 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                             .toList();
 
                                         if (selectedAccount != null) {
+                                          if (selectedAccount!
+                                                      .outgoingProtocol ==
+                                                  'gmail_api' ||
+                                              selectedAccount!
+                                                      .incomingProtocol ==
+                                                  'gmail_api') {
+                                            final service = GmailOAuthService();
+                                            await service.sendEmail(
+                                              accountId: selectedAccount!.id,
+                                              from: selectedAccount!.email,
+                                              to: JwSmtpClient.parseRecipients(
+                                                to,
+                                              ),
+                                              cc: ccList,
+                                              bcc: bccList,
+                                              subject: subject,
+                                              bodyText: bodyText,
+                                              bodyHtml: null,
+                                              attachments: attachments,
+                                            );
+
+                                            final now = DateTime.now().toUtc();
+                                            final sentMsg = JwEmailMessage(
+                                              id:
+                                                  existingDraft?.id ??
+                                                  const Uuid().v4(),
+                                              accountEmail:
+                                                  selectedAccount!.email,
+                                              folderName: 'Enviadas',
+                                              subject: subject,
+                                              from: selectedAccount!.email,
+                                              to: to,
+                                              cc: ccList,
+                                              bcc: bccList,
+                                              date: now,
+                                              bodyText: bodyText,
+                                              attachments: attachments,
+                                              isDraft: false,
+                                              isPermanentRetained: true,
+                                              tags: tags,
+                                            );
+
+                                            final metadata = {
+                                              'permanentRetention': true,
+                                              'isDraft': false,
+                                              'sentAt': now.toIso8601String(),
+                                              'protocol': 'gmail_api',
+                                              'email': sentMsg.toJson(),
+                                            };
+
+                                            final entryId =
+                                                'email_${sentMsg.id}';
+                                            await db
+                                                .into(db.inboxEntries)
+                                                .insertOnConflictUpdate(
+                                                  InboxEntriesCompanion.insert(
+                                                    id: entryId,
+                                                    content:
+                                                        '${sentMsg.subject}\n\n${sentMsg.bodyText}',
+                                                    sourceType:
+                                                        const drift.Value(
+                                                          'email',
+                                                        ),
+                                                    suggestedCategory:
+                                                        const drift.Value(
+                                                          'email_jw',
+                                                        ),
+                                                    attachments: drift.Value(
+                                                      jsonEncode(
+                                                        sentMsg.attachments,
+                                                      ),
+                                                    ),
+                                                    capturedAt: now,
+                                                    metadata: drift.Value(
+                                                      jsonEncode(metadata),
+                                                    ),
+                                                    createdAt: now,
+                                                    updatedAt: now,
+                                                  ),
+                                                );
+
+                                            for (final rcpt in [
+                                              ...JwSmtpClient.parseRecipients(
+                                                to,
+                                              ),
+                                              ...ccList,
+                                              ...bccList,
+                                            ]) {
+                                              await EmailContactsManager.saveContact(
+                                                db,
+                                                email: rcpt,
+                                                source: 'sent_recipient',
+                                              );
+                                            }
+
+                                            if (ctx.mounted) Navigator.pop(ctx);
+                                            if (mounted) {
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
+                                                const SnackBar(
+                                                  content: Text(
+                                                    'E-mail enviado via Gmail REST API e arquivado na pasta Enviadas!',
+                                                  ),
+                                                  backgroundColor: Colors.green,
+                                                ),
+                                              );
+                                            }
+                                            return;
+                                          }
+
+                                          if (selectedAccount!
+                                                      .outgoingProtocol ==
+                                                  'microsoft_graph' ||
+                                              selectedAccount!
+                                                      .incomingProtocol ==
+                                                  'microsoft_graph') {
+                                            final service =
+                                                MicrosoftOAuthService();
+                                            await service.sendEmail(
+                                              accountId: selectedAccount!.id,
+                                              to: JwSmtpClient.parseRecipients(
+                                                to,
+                                              ),
+                                              cc: ccList,
+                                              bcc: bccList,
+                                              subject: subject,
+                                              bodyText: bodyText,
+                                              bodyHtml: null,
+                                              attachments: attachments,
+                                            );
+
+                                            final now = DateTime.now().toUtc();
+                                            final sentMsg = JwEmailMessage(
+                                              id:
+                                                  existingDraft?.id ??
+                                                  const Uuid().v4(),
+                                              accountEmail:
+                                                  selectedAccount!.email,
+                                              folderName: 'Enviadas',
+                                              subject: subject,
+                                              from: selectedAccount!.email,
+                                              to: to,
+                                              cc: ccList,
+                                              bcc: bccList,
+                                              date: now,
+                                              bodyText: bodyText,
+                                              attachments: attachments,
+                                              isDraft: false,
+                                              isPermanentRetained: true,
+                                              tags: tags,
+                                            );
+
+                                            final metadata = {
+                                              'permanentRetention': true,
+                                              'isDraft': false,
+                                              'sentAt': now.toIso8601String(),
+                                              'protocol': 'microsoft_graph',
+                                              'email': sentMsg.toJson(),
+                                            };
+
+                                            final entryId =
+                                                'email_${sentMsg.id}';
+                                            await db
+                                                .into(db.inboxEntries)
+                                                .insertOnConflictUpdate(
+                                                  InboxEntriesCompanion.insert(
+                                                    id: entryId,
+                                                    content:
+                                                        '${sentMsg.subject}\n\n${sentMsg.bodyText}',
+                                                    sourceType:
+                                                        const drift.Value(
+                                                          'email',
+                                                        ),
+                                                    suggestedCategory:
+                                                        const drift.Value(
+                                                          'email_jw',
+                                                        ),
+                                                    attachments: drift.Value(
+                                                      jsonEncode(
+                                                        sentMsg.attachments,
+                                                      ),
+                                                    ),
+                                                    capturedAt: now,
+                                                    metadata: drift.Value(
+                                                      jsonEncode(metadata),
+                                                    ),
+                                                    createdAt: now,
+                                                    updatedAt: now,
+                                                  ),
+                                                );
+
+                                            for (final rcpt in [
+                                              ...JwSmtpClient.parseRecipients(
+                                                to,
+                                              ),
+                                              ...ccList,
+                                              ...bccList,
+                                            ]) {
+                                              await EmailContactsManager.saveContact(
+                                                db,
+                                                email: rcpt,
+                                                source: 'sent_recipient',
+                                              );
+                                            }
+
+                                            if (ctx.mounted) Navigator.pop(ctx);
+                                            if (mounted) {
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
+                                                const SnackBar(
+                                                  content: Text(
+                                                    'E-mail enviado via Microsoft Graph API e arquivado na pasta Enviadas!',
+                                                  ),
+                                                  backgroundColor: Colors.green,
+                                                ),
+                                              );
+                                            }
+                                            return;
+                                          }
+
                                           final pass =
                                               await EmailAccountsManager.getAccountPassword(
                                                 selectedAccount!.id,

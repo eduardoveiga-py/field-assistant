@@ -5,6 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:uuid/uuid.dart';
 
 import '../database/app_database.dart';
+import 'oauth_token_store.dart';
 
 /// Tipo de provedor de correio suportado
 enum EmailProviderType {
@@ -27,10 +28,13 @@ class EmailAccount {
   final EmailProviderType providerType;
   final String incomingHost;
   final int incomingPort;
-  final String incomingProtocol; // 'imap' ou 'exchange'
+  final String
+  incomingProtocol; // 'imap', 'exchange', 'gmail_api' ou 'microsoft_graph'
   final String outgoingHost;
   final int outgoingPort;
   final String outgoingSecurity; // 'starttls' ou 'ssl'
+  final String
+  outgoingProtocol; // 'smtp', 'exchange', 'gmail_api' ou 'microsoft_graph'
   final String username;
   final bool isActive;
   final DateTime createdAt;
@@ -46,10 +50,26 @@ class EmailAccount {
     required this.outgoingHost,
     this.outgoingPort = 587,
     this.outgoingSecurity = 'starttls',
+    String? outgoingProtocol,
     required this.username,
     this.isActive = true,
     required this.createdAt,
-  });
+  }) : outgoingProtocol =
+           outgoingProtocol ??
+           (incomingProtocol == 'exchange'
+               ? 'exchange'
+               : (incomingProtocol == 'gmail_api'
+                     ? 'gmail_api'
+                     : (incomingProtocol == 'microsoft_graph'
+                           ? 'microsoft_graph'
+                           : 'smtp')));
+
+  bool get isOAuth =>
+      incomingProtocol == 'gmail_api' || incomingProtocol == 'microsoft_graph';
+  bool get isGmailApi => incomingProtocol == 'gmail_api';
+  bool get isMicrosoftGraph => incomingProtocol == 'microsoft_graph';
+  bool get isExchange => incomingProtocol == 'exchange';
+  bool get isImap => incomingProtocol == 'imap';
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -62,6 +82,7 @@ class EmailAccount {
     'outgoingHost': outgoingHost,
     'outgoingPort': outgoingPort,
     'outgoingSecurity': outgoingSecurity,
+    'outgoingProtocol': outgoingProtocol,
     'username': username,
     'isActive': isActive,
     'createdAt': createdAt.toIso8601String(),
@@ -77,6 +98,17 @@ class EmailAccount {
       }
     }
 
+    final incomingProtocol = json['incomingProtocol'] as String? ?? 'imap';
+    final outgoingProtocol =
+        json['outgoingProtocol'] as String? ??
+        (incomingProtocol == 'exchange'
+            ? 'exchange'
+            : (incomingProtocol == 'gmail_api'
+                  ? 'gmail_api'
+                  : (incomingProtocol == 'microsoft_graph'
+                        ? 'microsoft_graph'
+                        : 'smtp')));
+
     return EmailAccount(
       id: json['id'] as String? ?? const Uuid().v4(),
       name: json['name'] as String? ?? 'Conta de E-mail',
@@ -84,10 +116,11 @@ class EmailAccount {
       providerType: prov,
       incomingHost: json['incomingHost'] as String? ?? '',
       incomingPort: json['incomingPort'] as int? ?? 993,
-      incomingProtocol: json['incomingProtocol'] as String? ?? 'imap',
+      incomingProtocol: incomingProtocol,
       outgoingHost: json['outgoingHost'] as String? ?? '',
       outgoingPort: json['outgoingPort'] as int? ?? 587,
       outgoingSecurity: json['outgoingSecurity'] as String? ?? 'starttls',
+      outgoingProtocol: outgoingProtocol,
       username: json['username'] as String? ?? '',
       isActive: json['isActive'] as bool? ?? true,
       createdAt: json['createdAt'] != null
@@ -359,6 +392,10 @@ class EmailAccountsManager {
 
     try {
       await _secureStorage.delete(key: _passwordKey(accountId));
+    } catch (_) {}
+    try {
+      await OAuthTokenStore(secureStorage: _secureStorage)
+          .deleteTokenBundle(accountId);
     } catch (_) {}
   }
 }
