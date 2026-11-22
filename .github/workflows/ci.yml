@@ -709,10 +709,16 @@ jobs:
         uses: actions/upload-pages-artifact@v5
         with:
           path: build/web
+          name: github-pages-${{ github.run_attempt }}
+
+      - name: Wait for Pages artifact metadata propagation
+        run: sleep 5
 
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
+        with:
+          artifact_name: github-pages-${{ github.run_attempt }}
 
 
 
