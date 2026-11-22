@@ -18,7 +18,7 @@ updates:
           - "*"
         update-types:
           - "minor"
-          - "patch"  
+          - "patch"
   - package-ecosystem: "pub"
     directory: "/"
     schedule:
@@ -30,4 +30,4 @@ updates:
           - "*"
         update-types:
           - "minor"
-          - "patch"  
+          - "patch"
