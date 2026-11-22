@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 
+import '../core/app_logger.dart';
 import 'jw_email_service.dart';
 import 'oauth_token_store.dart';
 
@@ -303,6 +304,8 @@ class GmailOAuthService {
     );
     final seenMessageIds = <String>{};
     final messages = <JwEmailMessage>[];
+    String? lastError;
+    var successCalls = 0;
 
     for (final labelId in labelsToSync) {
       try {
@@ -310,7 +313,14 @@ class GmailOAuthService {
           'https://gmail.googleapis.com/gmail/v1/users/me/messages?labelIds=$labelId&maxResults=$perLabelLimit',
         );
         final listResp = await _httpClient.get(listUri, headers: authHeaders);
-        if (listResp.statusCode != 200) continue;
+        if (listResp.statusCode != 200) {
+          lastError = 'Gmail API HTTP ${listResp.statusCode}: ${listResp.body}';
+          AppLogger.warning(
+            'Falha ao listar mensagens da label $labelId: $lastError',
+          );
+          continue;
+        }
+        successCalls++;
 
         final listData = jsonDecode(listResp.body) as Map<String, dynamic>;
         final messageRefs = listData['messages'] as List<dynamic>? ?? [];
@@ -335,10 +345,43 @@ class GmailOAuthService {
               if (parsed != null) {
                 messages.add(parsed);
               }
+            } else {
+              AppLogger.warning(
+                'Falha ao buscar mensagem $id: HTTP ${msgResp.statusCode}',
+              );
             }
-          } catch (_) {}
+          } catch (e, st) {
+            AppLogger.warning(
+              'Erro ao processar mensagem Gmail $id: $e',
+              e,
+              st,
+            );
+          }
         }
-      } catch (_) {}
+      } catch (e, st) {
+        lastError = e.toString();
+        AppLogger.warning(
+          'Erro na chamada da label $labelId do Gmail: $e',
+          e,
+          st,
+        );
+      }
+    }
+
+    if (successCalls == 0 && lastError != null) {
+      if (lastError.contains('403') ||
+          lastError.contains('PERMISSION_DENIED') ||
+          lastError.contains('has not been used')) {
+        throw Exception(
+          'Acesso à Gmail API negado (403). Certifique-se de ativar a "Gmail API" no Google Cloud Console e de que o usuário está cadastrado em Usuários de Teste.',
+        );
+      }
+      if (lastError.contains('401') || lastError.contains('UNAUTHENTICATED')) {
+        throw Exception(
+          'Sessão do Gmail expirada ou não autorizada (401). Reconecte a conta nas Configurações.',
+        );
+      }
+      throw Exception('Falha ao sincronizar Gmail: $lastError');
     }
 
     return messages;

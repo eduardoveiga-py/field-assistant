@@ -1,16 +1,18 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
-import 'dart:typed_data';
 
 import 'package:app_links/app_links.dart';
 import 'package:crypto/crypto.dart' as crypto;
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
 
+import '../core/app_logger.dart';
 import 'jw_email_service.dart';
 import 'oauth_token_store.dart';
+import 'web_url_cleaner.dart';
 
 /// Resultado do fluxo de autenticação do Microsoft Graph
 class MicrosoftAuthResult {
@@ -34,10 +36,24 @@ class MicrosoftOAuthService {
 
   static const String defaultMicrosoftClientId = String.fromEnvironment(
     'MICROSOFT_CLIENT_ID',
-    defaultValue: '',
+    defaultValue: '15f221b3-c233-4f70-96b0-2b2a62229222',
   );
 
   static const String redirectUri = 'ministeriopessoal://oauth2redirect';
+
+  /// Retorna o URI de redirecionamento apropriado para a plataforma (Web ou nativo)
+  static String getEffectiveRedirectUri() {
+    if (kIsWeb) {
+      final base = Uri.base;
+      var path = base.path;
+      if (!path.endsWith('/')) {
+        path = '$path/';
+      }
+      return '${base.origin}$path';
+    }
+    return redirectUri;
+  }
+
   static const String authorizationEndpoint =
       'https://login.microsoftonline.com/common/oauth2/v2.0/authorize';
   static const String tokenEndpoint =
@@ -100,12 +116,13 @@ class MicrosoftOAuthService {
     final verifier = generateCodeVerifier();
     final challenge = generateCodeChallenge(verifier);
     final state = const Uuid().v4();
+    final effectiveRedirect = getEffectiveRedirectUri();
 
     final authUri = Uri.parse(authorizationEndpoint).replace(
       queryParameters: {
         'client_id': clientId,
         'response_type': 'code',
-        'redirect_uri': redirectUri,
+        'redirect_uri': effectiveRedirect,
         'response_mode': 'query',
         'scope': defaultScopes.join(' '),
         'state': state,
@@ -113,6 +130,18 @@ class MicrosoftOAuthService {
         'code_challenge_method': 'S256',
       },
     );
+
+    if (kIsWeb) {
+      // Na Web, salva verifier e state para conferência no retorno e redireciona no mesmo contexto
+      await _tokenStore.savePendingWebAuth(state: state, verifier: verifier);
+      final launched = await launchUrl(authUri, webOnlyWindowName: '_self');
+      if (!launched) {
+        throw Exception(
+          'Não foi possível redirecionar para a autenticação da Microsoft.',
+        );
+      }
+      return null;
+    }
 
     final completer = Completer<Uri>();
     final linkSub = _appLinks.uriLinkStream.listen((uri) {
@@ -171,7 +200,7 @@ class MicrosoftOAuthService {
         'client_id': clientId,
         'grant_type': 'authorization_code',
         'code': code,
-        'redirect_uri': redirectUri,
+        'redirect_uri': effectiveRedirect,
         'code_verifier': verifier,
       },
     );
@@ -224,6 +253,97 @@ class MicrosoftOAuthService {
       displayName: displayName,
       tokenBundle: tokenBundle,
     );
+  }
+
+  /// Verifica se a aplicação foi aberta com retorno OAuth da Microsoft via Web Redirect
+  Future<MicrosoftAuthResult?> checkAndCompleteWebRedirect() async {
+    if (!kIsWeb) return null;
+    final query = Uri.base.queryParameters;
+    final code = query['code'];
+    final state = query['state'];
+    if (code == null || code.isEmpty) return null;
+
+    final pending = await _tokenStore.readPendingWebAuth();
+    if (pending == null) return null;
+
+    final savedState = pending['state'];
+    final verifier = pending['verifier'];
+
+    if (savedState == null || verifier == null || savedState != state) {
+      await _tokenStore.clearPendingWebAuth();
+      cleanWebUrlQuery();
+      AppLogger.warning(
+        'Falha de integridade CSRF no retorno da Microsoft: state divergente.',
+      );
+      return null;
+    }
+
+    try {
+      final effectiveRedirect = getEffectiveRedirectUri();
+      final tokenResp = await _httpClient.post(
+        Uri.parse(tokenEndpoint),
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: {
+          'client_id': clientId,
+          'grant_type': 'authorization_code',
+          'code': code,
+          'redirect_uri': effectiveRedirect,
+          'code_verifier': verifier,
+        },
+      );
+
+      if (tokenResp.statusCode != 200) {
+        AppLogger.warning(
+          'Falha ao trocar código por token Microsoft na Web (HTTP ${tokenResp.statusCode}): ${tokenResp.body}',
+        );
+        return null;
+      }
+
+      final tokenData = jsonDecode(tokenResp.body) as Map<String, dynamic>;
+      final accessToken = tokenData['access_token'] as String;
+      final refreshToken = tokenData['refresh_token'] as String?;
+      final expiresIn = tokenData['expires_in'] as int? ?? 3600;
+      final expiresAt = DateTime.now().add(Duration(seconds: expiresIn));
+      final scopesReturned =
+          (tokenData['scope'] as String?)?.split(' ') ?? defaultScopes;
+
+      final tokenBundle = OAuthTokenBundle(
+        accessToken: accessToken,
+        refreshToken: refreshToken,
+        expiresAt: expiresAt,
+        scopes: scopesReturned,
+      );
+
+      String email = '';
+      String? displayName;
+      try {
+        final profileResp = await _httpClient.get(
+          Uri.parse('$graphBaseUrl/me'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Accept': 'application/json',
+          },
+        );
+        if (profileResp.statusCode == 200) {
+          final profileData =
+              jsonDecode(profileResp.body) as Map<String, dynamic>;
+          email =
+              (profileData['mail'] as String?)?.trim() ??
+              (profileData['userPrincipalName'] as String?)?.trim() ??
+              '';
+          displayName = profileData['displayName'] as String?;
+        }
+      } catch (_) {}
+
+      return MicrosoftAuthResult(
+        email: email,
+        displayName: displayName,
+        tokenBundle: tokenBundle,
+      );
+    } finally {
+      await _tokenStore.clearPendingWebAuth();
+      cleanWebUrlQuery();
+    }
   }
 
   /// Conveniência: autentica e retorna o bundle de tokens
@@ -315,6 +435,8 @@ class MicrosoftOAuthService {
     final perFolderLimit = (maxResults / folders.length).ceil().clamp(5, 30);
     final messages = <JwEmailMessage>[];
     final seenIds = <String>{};
+    String? lastError;
+    var successCalls = 0;
 
     for (final folderKey in folders) {
       try {
@@ -325,7 +447,14 @@ class MicrosoftOAuthService {
         );
 
         final resp = await _httpClient.get(uri, headers: headers);
-        if (resp.statusCode != 200) continue;
+        if (resp.statusCode != 200) {
+          lastError = 'Microsoft Graph HTTP ${resp.statusCode}: ${resp.body}';
+          AppLogger.warning(
+            'Falha ao listar mensagens da pasta $folderKey do Graph: $lastError',
+          );
+          continue;
+        }
+        successCalls++;
 
         final data = jsonDecode(resp.body) as Map<String, dynamic>;
         final list = data['value'] as List<dynamic>? ?? [];
@@ -354,7 +483,28 @@ class MicrosoftOAuthService {
             messages.add(parsed);
           }
         }
-      } catch (_) {}
+      } catch (e, st) {
+        lastError = e.toString();
+        AppLogger.warning(
+          'Erro ao consultar pasta $folderKey no Microsoft Graph: $e',
+          e,
+          st,
+        );
+      }
+    }
+
+    if (successCalls == 0 && lastError != null) {
+      if (lastError.contains('403') || lastError.contains('Forbidden')) {
+        throw Exception(
+          'Acesso ao Microsoft Graph negado (403). Verifique se as permissões Mail.ReadWrite e Mail.Send foram concedidas no Azure.',
+        );
+      }
+      if (lastError.contains('401') || lastError.contains('Unauthorized')) {
+        throw Exception(
+          'Sessão da Microsoft expirada ou não autorizada (401). Reconecte a conta nas Configurações.',
+        );
+      }
+      throw Exception('Falha ao sincronizar Microsoft: $lastError');
     }
 
     return messages;

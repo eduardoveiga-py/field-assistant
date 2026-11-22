@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,6 +13,7 @@ import '../../ticuna/ticuna_providers.dart';
 import '../../inbox/exchange_service.dart';
 import '../../inbox/email_account_model.dart';
 import '../../inbox/email_contacts_manager.dart';
+import '../../inbox/email_sync_coordinator.dart';
 import '../../inbox/gmail_oauth_service.dart';
 import '../../inbox/microsoft_oauth_service.dart';
 import '../../inbox/oauth_token_store.dart';

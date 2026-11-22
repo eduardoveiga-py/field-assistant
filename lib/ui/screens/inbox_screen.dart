@@ -15,9 +15,9 @@ import 'package:file_picker/file_picker.dart';
 
 import '../../core/app_logger.dart';
 import '../../core/app_theme.dart';
-import '../../core/sync_timestamp.dart';
 import '../../database/app_database.dart';
 import '../../inbox/inbox_manager.dart';
+import '../../inbox/email_sync_coordinator.dart';
 import '../../inbox/exchange_service.dart';
 import '../../inbox/jw_email_service.dart';
 import '../../inbox/email_account_model.dart';
@@ -94,6 +94,22 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
         }());
       });
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_syncEmailsSilently());
+    });
+  }
+
+  Future<void> _syncEmailsSilently() async {
+    if (_isSyncingEmails) return;
+    try {
+      final db = ref.read(repositoryProvider).db;
+      final coordinator = EmailSyncCoordinator(
+        db,
+        jwEmailService: ref.read(jwEmailServiceProvider),
+      );
+      await coordinator.syncAll();
+      if (mounted) setState(() {});
+    } catch (_) {}
   }
 
   @override
@@ -111,71 +127,6 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
       _currentlyPlayingPath = path;
       await _playerService.play(path);
     }
-  }
-
-  Future<int> _persistSyncedMessages(
-    AppDatabase db,
-    List<JwEmailMessage> messages,
-    String protocol,
-  ) async {
-    var savedCount = 0;
-    final now = DateTime.now().toUtc();
-    for (final msg in messages) {
-      final entryId = msg.id.startsWith('email_') ? msg.id : 'email_${msg.id}';
-      final existing = await (db.select(
-        db.inboxEntries,
-      )..where((t) => t.id.equals(entryId))).getSingleOrNull();
-
-      if (existing != null) continue;
-
-      final metadata = {
-        'permanentRetention': true,
-        'retentionDate': now.toIso8601String(),
-        'email': msg.toJson(),
-        'protocol': protocol,
-      };
-
-      await db
-          .into(db.inboxEntries)
-          .insert(
-            InboxEntriesCompanion.insert(
-              id: entryId,
-              content: '${msg.subject}\n\n${msg.bodyText}',
-              sourceType: const drift.Value('email'),
-              suggestedCategory: const drift.Value('email_jw'),
-              attachments: drift.Value(jsonEncode(msg.attachments)),
-              capturedAt: msg.date.toUtc(),
-              metadata: drift.Value(jsonEncode(metadata)),
-              createdAt: now,
-              updatedAt: now,
-              revision: const drift.Value(1),
-            ),
-          );
-
-      try {
-        final inserted = await (db.select(
-          db.inboxEntries,
-        )..where((t) => t.id.equals(entryId))).getSingle();
-        await db
-            .into(db.syncQueue)
-            .insert(
-              SyncQueueCompanion.insert(
-                id: const Uuid().v4(),
-                entityType: 'inbox_entries',
-                entityId: entryId,
-                operation: 'INSERT',
-                payload: jsonEncode(
-                  SyncTimestamp.normalizeMapDates(inserted.toJson()),
-                ),
-                createdAt: now,
-              ),
-            );
-      } catch (_) {}
-
-      await EmailContactsManager.recordSender(db, msg.from);
-      savedCount++;
-    }
-    return savedCount;
   }
 
   String _friendlySyncError(Object e, [EmailAccount? acc]) {
@@ -240,135 +191,58 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
     setState(() => _isSyncingEmails = true);
     try {
       final db = ref.read(repositoryProvider).db;
-      final accounts = await EmailAccountsManager.loadAccounts(db);
+      final coordinator = EmailSyncCoordinator(
+        db,
+        jwEmailService: ref.read(jwEmailServiceProvider),
+      );
+      final res = await coordinator.syncAll();
 
-      if (accounts.isNotEmpty) {
-        var totalSavedAcrossAccounts = 0;
-        var accountsSynced = 0;
-        final failedDetails = <String>[];
+      unawaited(() async {
+        try {
+          await ref.read(supabaseSyncServiceProvider).sync();
+        } catch (_) {}
+      }());
 
-        for (final acc in accounts) {
-          if (!acc.isActive) continue;
-          try {
-            if (acc.incomingProtocol == 'gmail_api') {
-              final service = GmailOAuthService();
-              final messages = await service.fetchMessages(
-                accountId: acc.id,
-                accountEmail: acc.email,
-              );
-              final saved = await _persistSyncedMessages(
-                db,
-                messages,
-                'gmail_api',
-              );
-              totalSavedAcrossAccounts += saved;
-              accountsSynced++;
-            } else if (acc.incomingProtocol == 'microsoft_graph') {
-              final service = MicrosoftOAuthService();
-              final messages = await service.fetchMessages(
-                accountId: acc.id,
-                accountEmail: acc.email,
-              );
-              final saved = await _persistSyncedMessages(
-                db,
-                messages,
-                'microsoft_graph',
-              );
-              totalSavedAcrossAccounts += saved;
-              accountsSynced++;
-            } else if (kIsWeb) {
-              failedDetails.add(
-                '${acc.name}: Conexão direta IMAP/Exchange indisponível na Web; sincronize via app nativo.',
-              );
-            } else {
-              final pass = await EmailAccountsManager.getAccountPassword(
-                acc.id,
-                db,
-              );
-              if (pass == null || pass.trim().isEmpty) {
-                failedDetails.add('${acc.name}: senha não configurada');
-                continue;
-              }
-
-              if (acc.incomingProtocol == 'exchange') {
-                final storage = const FlutterSecureStorage();
-                final deviceId =
-                    (await storage.read(key: 'jw_eas_device_id')) ??
-                    const Uuid().v4();
-                final session = ExchangeProtocolSession(
-                  host: acc.incomingHost,
-                  username: acc.username,
-                  password: pass,
-                  deviceId: deviceId,
-                );
-                final res = await ExchangeReadService(db).sync(
-                  session: session,
-                  host: acc.incomingHost,
-                  account: acc.email,
-                  deviceId: deviceId,
-                  allMailFolders: true,
-                );
-                totalSavedAcrossAccounts += res.saved;
-                accountsSynced++;
-              } else {
-                final saved = await ref
-                    .read(jwEmailServiceProvider)
-                    .syncEmails(
-                      host: acc.incomingHost,
-                      port: acc.incomingPort,
-                      username: acc.username,
-                      password: pass,
-                      accountEmail: acc.email,
-                    );
-                totalSavedAcrossAccounts += saved;
-                accountsSynced++;
-              }
-            }
-          } catch (e, st) {
-            AppLogger.warning(
-              'Falha ao sincronizar conta ${acc.name}: $e',
-              e,
-              st,
-            );
-            failedDetails.add('${acc.name}: ${_friendlySyncError(e, acc)}');
-          }
-        }
-
-        unawaited(() async {
-          try {
-            await ref.read(supabaseSyncServiceProvider).sync();
-          } catch (_) {}
-        }());
-
-        if (mounted) {
-          if (failedDetails.isNotEmpty && accountsSynced == 0) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  'Falha na sincronização de e-mail:\n${failedDetails.join('\n')}',
-                ),
-                backgroundColor: Theme.of(context).colorScheme.error,
-                duration: const Duration(seconds: 6),
+      if (mounted) {
+        if (res.failedDetails.isNotEmpty && res.accountsSynced == 0) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Falha na sincronização de e-mail:\n${res.failedDetails.join('\n')}',
               ),
-            );
-          } else if (accountsSynced > 0 && failedDetails.isNotEmpty) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  'Sincronização parcial: $totalSavedAcrossAccounts nova(s) mensagem(ns) de $accountsSynced conta(s). '
-                  'Falhas:\n${failedDetails.join('\n')}',
-                ),
-                backgroundColor: Colors.orange.shade800,
-                duration: const Duration(seconds: 6),
+              backgroundColor: Theme.of(context).colorScheme.error,
+              duration: const Duration(seconds: 6),
+            ),
+          );
+        } else if (res.accountsSynced > 0 && res.failedDetails.isNotEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Sincronização parcial: ${res.totalMessagesSaved} nova(s) mensagem(ns) de ${res.accountsSynced} conta(s). '
+                'Falhas:\n${res.failedDetails.join('\n')}',
               ),
-            );
-          } else if (accountsSynced > 0) {
+              backgroundColor: Colors.orange.shade800,
+              duration: const Duration(seconds: 6),
+            ),
+          );
+        } else if (res.accountsSynced > 0) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Sincronização global concluída: ${res.totalMessagesSaved} nova(s) mensagem(ns) de ${res.accountsSynced} conta(s) e todas as pastas.',
+              ),
+              backgroundColor: AppTheme.successGreen,
+            ),
+          );
+        } else {
+          final accounts = await EmailAccountsManager.loadAccounts(db);
+          if (!mounted) return;
+          if (accounts.isEmpty) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
+              const SnackBar(
                 content: Text(
-                  'Sincronização global concluída: $totalSavedAcrossAccounts nova(s) mensagem(ns) de $accountsSynced conta(s) e todas as pastas.',
+                  'Nenhuma conta de e-mail cadastrada. Adicione uma em Configurações.',
                 ),
-                backgroundColor: AppTheme.successGreen,
               ),
             );
           } else {
@@ -379,189 +253,24 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
             );
           }
         }
-        return;
       }
-
-      if (kIsWeb) {
-        // Na Web sem contas configuradas: sincroniza com o Supabase
-        final syncResult = await ref.read(supabaseSyncServiceProvider).sync();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Sincronização direta IMAP/Exchange não é suportada no navegador web. '
-                'Mensagens sincronizam via Supabase: ${syncResult.message}',
-              ),
-              backgroundColor: syncResult.success
-                  ? Colors.green
-                  : Colors.orange,
-            ),
-          );
-        }
-        return;
-      }
-
-      final protocol = await (db.select(
-        db.appKvStore,
-      )..where((t) => t.key.equals('jw_mail_protocol'))).getSingleOrNull();
-      if (protocol?.value == 'exchange') {
-        final email = await (db.select(
-          db.appKvStore,
-        )..where((t) => t.key.equals('jw_eas_email'))).getSingleOrNull();
-        final host = await (db.select(
-          db.appKvStore,
-        )..where((t) => t.key.equals('jw_eas_host'))).getSingleOrNull();
-        const storage = FlutterSecureStorage();
-        final password = await storage.read(key: 'jw_eas_password');
-        final deviceId = await storage.read(key: 'jw_eas_device_id');
-        if (email == null ||
-            host == null ||
-            password == null ||
-            password.isEmpty ||
-            deviceId == null ||
-            deviceId.isEmpty) {
-          throw const ExchangeException(
-            'Configure novamente a conta Exchange em Configurações.',
-          );
-        }
-        final session = ExchangeProtocolSession(
-          host: host.value,
-          username: email.value,
-          password: password,
-          deviceId: deviceId,
-        );
-        final result = await ExchangeReadService(db).sync(
-          session: session,
-          host: host.value,
-          account: email.value,
-          deviceId: deviceId,
-          allMailFolders: true,
-        );
-
-        // Envia imediatamente novas mensagens salvas para o Supabase
-        unawaited(() async {
-          try {
-            await ref.read(supabaseSyncServiceProvider).sync();
-          } catch (e, st) {
-            AppLogger.warning(
-              'Falha ao enviar mensagens Exchange ao Supabase',
-              e,
-              st,
-            );
-          }
-        }());
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                '${result.saved} mensagem(ns) Exchange sincronizada(s) em ${result.foldersRead} pasta(s). '
-                '${result.moreAvailable ? 'Há mais mensagens disponíveis no servidor; sincronize novamente.' : ''}',
-              ),
-            ),
-          );
-        }
-        return;
-      }
-      final emailEntry = await (db.select(
-        db.appKvStore,
-      )..where((t) => t.key.equals('jw_imap_email'))).getSingleOrNull();
-      const secureStorage = FlutterSecureStorage();
-      String? password = await secureStorage.read(key: 'jw_imap_password');
-      if (password == null || password.isEmpty) {
-        final legacyPass = await (db.select(
-          db.appKvStore,
-        )..where((t) => t.key.equals('jw_imap_password'))).getSingleOrNull();
-        password = legacyPass?.value;
-      }
-      final hostEntry = await (db.select(
-        db.appKvStore,
-      )..where((t) => t.key.equals('jw_imap_host'))).getSingleOrNull();
-      final portEntry = await (db.select(
-        db.appKvStore,
-      )..where((t) => t.key.equals('jw_imap_port'))).getSingleOrNull();
-
-      final host = (hostEntry?.value.trim().isNotEmpty == true)
-          ? hostEntry!.value.trim()
-          : 'mail.jw.org';
-      final port = int.tryParse(portEntry?.value ?? '') ?? 993;
-      final username = emailEntry?.value.trim();
-
-      // Se a conta não estiver configurada, tenta sincronizar mensagens da nuvem Supabase antes
-      if (username == null ||
-          username.isEmpty ||
-          password == null ||
-          password.isEmpty) {
-        final syncResult = await ref.read(supabaseSyncServiceProvider).sync();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                syncResult.success && syncResult.totalProcessed > 0
-                    ? 'Sincronizado da nuvem: ${syncResult.message}'
-                    : 'Configure sua conta de e-mail teocrático em Configurações para sincronizar.',
-              ),
-              action: SnackBarAction(
-                label: 'Configurar',
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
-                  );
-                },
-              ),
-            ),
-          );
-        }
-        return;
-      }
-
-      final emailService = ref.read(jwEmailServiceProvider);
-      final count = await emailService.syncEmails(
-        host: host,
-        port: port,
-        username: username,
-        password: password,
-        accountEmail: username,
-      );
-
-      // Envia imediatamente novas mensagens importadas para o Supabase
-      unawaited(() async {
-        try {
-          await ref.read(supabaseSyncServiceProvider).sync();
-        } catch (e, st) {
-          AppLogger.warning(
-            'Falha ao enviar mensagens IMAP ao Supabase',
-            e,
-            st,
-          );
-        }
-      }());
-
+      return;
+    } catch (e, st) {
+      AppLogger.warning('Erro ao sincronizar e-mails: $e', e, st);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              count > 0
-                  ? '$count mensagem(ns) importada(s) e sincronizada(s) para a nuvem.'
-                  : 'Nenhuma mensagem nova na caixa de entrada.',
-            ),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Erro na sincronização de e-mail: ${_friendlySyncError(e)}. Páginas já salvas foram preservadas; sincronize novamente.',
+              'Erro ao sincronizar e-mails: ${_friendlySyncError(e)}',
             ),
             backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
       }
     } finally {
-      if (mounted) setState(() => _isSyncingEmails = false);
+      if (mounted) {
+        setState(() => _isSyncingEmails = false);
+      }
     }
   }
 

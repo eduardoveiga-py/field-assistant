@@ -82,6 +82,37 @@ class OAuthTokenStore {
     } catch (_) {}
   }
 
+  static const String _pendingMsStateKey = 'ms_oauth_pending_state';
+  static const String _pendingMsVerifierKey = 'ms_oauth_pending_verifier';
+
+  Future<void> savePendingWebAuth({
+    required String state,
+    required String verifier,
+  }) async {
+    await _secureStorage.write(key: _pendingMsStateKey, value: state);
+    await _secureStorage.write(key: _pendingMsVerifierKey, value: verifier);
+  }
+
+  Future<Map<String, String>?> readPendingWebAuth() async {
+    try {
+      final state = await _secureStorage.read(key: _pendingMsStateKey);
+      final verifier = await _secureStorage.read(key: _pendingMsVerifierKey);
+      if (state != null && verifier != null) {
+        return {'state': state, 'verifier': verifier};
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> clearPendingWebAuth() async {
+    try {
+      await _secureStorage.delete(key: _pendingMsStateKey);
+      await _secureStorage.delete(key: _pendingMsVerifierKey);
+    } catch (_) {}
+  }
+
   // Aliases de conveniência
   Future<void> save(String accountId, OAuthTokenBundle bundle) =>
       saveTokenBundle(accountId, bundle);
