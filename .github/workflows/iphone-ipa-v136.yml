@@ -60,6 +60,7 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
           GOOGLE_IOS_CLIENT_ID: ${{ secrets.GOOGLE_IOS_CLIENT_ID }}
+          MICROSOFT_CLIENT_ID: ${{ secrets.MICROSOFT_CLIENT_ID }}
         run: |
           set -euo pipefail
           python3 - <<'PY'
@@ -76,6 +77,7 @@ jobs:
           PY
           args=("--dart-define=SUPABASE_URL=$SUPABASE_URL" "--dart-define=SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY" "--dart-define=AUTH_NATIVE_CALLBACK=false" "--dart-define=ENABLE_E2EE_SYNC=true")
           if [ -n "${GOOGLE_WEB_CLIENT_ID:-}" ]; then args+=("--dart-define=GOOGLE_WEB_CLIENT_ID=$GOOGLE_WEB_CLIENT_ID"); fi
+          if [ -n "${MICROSOFT_CLIENT_ID:-}" ]; then args+=("--dart-define=MICROSOFT_CLIENT_ID=$MICROSOFT_CLIENT_ID"); fi
           flutter build ios --no-codesign --release "${args[@]}"
           mkdir -p dist-ios/Payload
           cp -R build/ios/iphoneos/Runner.app dist-ios/Payload/

@@ -237,6 +237,7 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
+          MICROSOFT_CLIENT_ID: ${{ secrets.MICROSOFT_CLIENT_ID }}
           AUTH_NATIVE_CALLBACK: ${{ vars.AUTH_NATIVE_CALLBACK }}
         run: |
           python3 - <<'PY'
@@ -254,7 +255,7 @@ jobs:
               )
 
           defines = []
-          for key in ("SUPABASE_URL", "SUPABASE_ANON_KEY", "GOOGLE_WEB_CLIENT_ID"):
+          for key in ("SUPABASE_URL", "SUPABASE_ANON_KEY", "GOOGLE_WEB_CLIENT_ID", "MICROSOFT_CLIENT_ID"):
               val = os.environ.get(key, "").strip()
               if val:
                   defines.append(f"--dart-define={key}={val}")
@@ -354,6 +355,7 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
           GOOGLE_IOS_CLIENT_ID: ${{ secrets.GOOGLE_IOS_CLIENT_ID }}
+          MICROSOFT_CLIENT_ID: ${{ secrets.MICROSOFT_CLIENT_ID }}
           AUTH_NATIVE_CALLBACK: ${{ vars.AUTH_NATIVE_CALLBACK }}
         run: |
           python3 - <<'PY'
@@ -371,7 +373,7 @@ jobs:
               plist.write_text(text, encoding="utf-8")
 
           defines = []
-          for key in ("SUPABASE_URL", "SUPABASE_ANON_KEY", "GOOGLE_WEB_CLIENT_ID"):
+          for key in ("SUPABASE_URL", "SUPABASE_ANON_KEY", "GOOGLE_WEB_CLIENT_ID", "MICROSOFT_CLIENT_ID"):
               val = os.environ.get(key, "").strip()
               if val:
                   defines.append(f"--dart-define={key}={val}")
@@ -431,10 +433,11 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
+          MICROSOFT_CLIENT_ID: ${{ secrets.MICROSOFT_CLIENT_ID }}
         run: |
           $ErrorActionPreference = 'Continue'
           $defines = @()
-          foreach ($k in @('SUPABASE_URL', 'SUPABASE_ANON_KEY', 'GOOGLE_WEB_CLIENT_ID')) {
+          foreach ($k in @('SUPABASE_URL', 'SUPABASE_ANON_KEY', 'GOOGLE_WEB_CLIENT_ID', 'MICROSOFT_CLIENT_ID')) {
             $v = [Environment]::GetEnvironmentVariable($k)
             if (-not [string]::IsNullOrWhiteSpace($v)) {
               $defines += "--dart-define=$k=$($v.Trim())"
@@ -498,9 +501,10 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
+          MICROSOFT_CLIENT_ID: ${{ secrets.MICROSOFT_CLIENT_ID }}
         run: |
           DART_DEFINES=""
-          for k in SUPABASE_URL SUPABASE_ANON_KEY GOOGLE_WEB_CLIENT_ID; do
+          for k in SUPABASE_URL SUPABASE_ANON_KEY GOOGLE_WEB_CLIENT_ID MICROSOFT_CLIENT_ID; do
             v="$(eval echo "\$$k")"
             if [ -n "$v" ]; then
               DART_DEFINES="$DART_DEFINES --dart-define=$k=$v"
@@ -553,9 +557,10 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
+          MICROSOFT_CLIENT_ID: ${{ secrets.MICROSOFT_CLIENT_ID }}
         run: |
           DART_DEFINES=""
-          for k in SUPABASE_URL SUPABASE_ANON_KEY GOOGLE_WEB_CLIENT_ID; do
+          for k in SUPABASE_URL SUPABASE_ANON_KEY GOOGLE_WEB_CLIENT_ID MICROSOFT_CLIENT_ID; do
             v="$(eval echo "\$$k")"
             if [ -n "$v" ]; then
               DART_DEFINES="$DART_DEFINES --dart-define=$k=$v"

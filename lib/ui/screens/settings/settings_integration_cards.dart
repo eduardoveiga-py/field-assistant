@@ -1197,38 +1197,111 @@ extension _SettingsIntegrationCards on _SettingsScreenState {
                             backgroundColor: iconColor.withValues(alpha: 0.15),
                             child: Icon(icon, color: iconColor, size: 20),
                           ),
-                          title: Text(
-                            acc.name,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                            ),
+                          title: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  acc.name,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                              if (acc.isOAuth)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.green.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(
+                                      color: Colors.green.withValues(
+                                        alpha: 0.5,
+                                      ),
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    'OAuth 2.0 Conectado',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.green,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
                           subtitle: Text(
                             '${acc.email} (${acc.providerType.label})',
                             style: const TextStyle(fontSize: 12),
                           ),
-                          trailing: IconButton(
-                            icon: const Icon(
-                              Icons.delete_outline,
-                              color: Colors.redAccent,
-                              size: 20,
-                            ),
-                            onPressed: () async {
-                              await EmailAccountsManager.deleteAccount(
-                                db,
-                                acc.id,
-                              );
-                              if (mounted) _updateState(() {});
-                            },
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (acc.isOAuth)
+                                IconButton(
+                                  tooltip: 'Reconectar conta',
+                                  icon: const Icon(
+                                    Icons.refresh,
+                                    color: AppTheme.primaryBlue,
+                                    size: 20,
+                                  ),
+                                  onPressed: () =>
+                                      _reconnectOAuthAccount(db, acc),
+                                ),
+                              IconButton(
+                                tooltip: 'Remover conta',
+                                icon: const Icon(
+                                  Icons.delete_outline,
+                                  color: Colors.redAccent,
+                                  size: 20,
+                                ),
+                                onPressed: () async {
+                                  await EmailAccountsManager.deleteAccount(
+                                    db,
+                                    acc.id,
+                                  );
+                                  if (mounted) _updateState(() {});
+                                },
+                              ),
+                            ],
                           ),
                         );
                       }),
                     const SizedBox(height: 12),
-                    ElevatedButton.icon(
-                      icon: const Icon(Icons.add, size: 18),
-                      label: const Text('Adicionar Conta de E-mail'),
-                      onPressed: () => _showAddEmailAccountDialog(db),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red.shade700,
+                            foregroundColor: Colors.white,
+                          ),
+                          icon: const Icon(Icons.mail, size: 18),
+                          label: const Text('Conectar Gmail (OAuth 2.0)'),
+                          onPressed: () => _connectGmailOAuth(db),
+                        ),
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue.shade700,
+                            foregroundColor: Colors.white,
+                          ),
+                          icon: const Icon(Icons.email, size: 18),
+                          label: const Text(
+                            'Conectar Hotmail / Outlook (OAuth 2.0)',
+                          ),
+                          onPressed: () => _connectMicrosoftOAuth(db),
+                        ),
+                        OutlinedButton.icon(
+                          icon: const Icon(Icons.add, size: 18),
+                          label: const Text('Conta Manual (IMAP/Exchange)'),
+                          onPressed: () => _showAddEmailAccountDialog(db),
+                        ),
+                      ],
                     ),
                   ],
                 );
@@ -1360,6 +1433,112 @@ extension _SettingsIntegrationCards on _SettingsScreenState {
         ),
       ),
     );
+  }
+
+  Future<void> _connectGmailOAuth(AppDatabase db) async {
+    try {
+      final service = GmailOAuthService();
+      final res = await service.authenticateUser();
+      if (res == null) return;
+
+      final acc = EmailAccount(
+        id: const Uuid().v4(),
+        name: res.displayName?.isNotEmpty == true
+            ? 'Gmail (${res.displayName})'
+            : (res.email.isNotEmpty ? res.email : 'Google Gmail'),
+        email: res.email,
+        providerType: EmailProviderType.google,
+        incomingHost: 'gmail.googleapis.com',
+        incomingPort: 443,
+        incomingProtocol: 'gmail_api',
+        outgoingHost: 'gmail.googleapis.com',
+        outgoingPort: 443,
+        outgoingSecurity: 'ssl',
+        outgoingProtocol: 'gmail_api',
+        username: res.email,
+        createdAt: DateTime.now(),
+      );
+
+      await EmailAccountsManager.saveAccount(db, acc);
+      await const OAuthTokenStore().saveTokenBundle(acc.id, res.tokenBundle);
+
+      if (mounted) {
+        _updateState(() {});
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Conta Gmail (${res.email}) conectada com sucesso!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao conectar Gmail: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _connectMicrosoftOAuth(AppDatabase db) async {
+    try {
+      final service = MicrosoftOAuthService();
+      final res = await service.authenticateUser();
+      if (res == null) return;
+
+      final acc = EmailAccount(
+        id: const Uuid().v4(),
+        name: res.displayName?.isNotEmpty == true
+            ? 'Outlook (${res.displayName})'
+            : (res.email.isNotEmpty ? res.email : 'Outlook / Hotmail'),
+        email: res.email,
+        providerType: EmailProviderType.hotmail,
+        incomingHost: 'graph.microsoft.com',
+        incomingPort: 443,
+        incomingProtocol: 'microsoft_graph',
+        outgoingHost: 'graph.microsoft.com',
+        outgoingPort: 443,
+        outgoingSecurity: 'ssl',
+        outgoingProtocol: 'microsoft_graph',
+        username: res.email,
+        createdAt: DateTime.now(),
+      );
+
+      await EmailAccountsManager.saveAccount(db, acc);
+      await const OAuthTokenStore().saveTokenBundle(acc.id, res.tokenBundle);
+
+      if (mounted) {
+        _updateState(() {});
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Conta Microsoft (${res.email}) conectada com sucesso!',
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao conectar Microsoft: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _reconnectOAuthAccount(AppDatabase db, EmailAccount acc) async {
+    if (acc.isGmailApi) {
+      await _connectGmailOAuth(db);
+    } else if (acc.isMicrosoftGraph) {
+      await _connectMicrosoftOAuth(db);
+    }
   }
 
   Widget _buildEmailContactsRegistryCard(bool isDark) {
