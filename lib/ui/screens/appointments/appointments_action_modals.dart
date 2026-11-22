@@ -92,11 +92,19 @@ extension _AppointmentsActionModals on _AppointmentsScreenState {
               }
 
               return AlertDialog(
+                insetPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 16,
+                ),
+                titlePadding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                contentPadding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                actionsPadding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+                actionsOverflowButtonSpacing: 4,
                 title: const Row(
                   children: [
                     Icon(Icons.event, color: AppTheme.primaryBlue),
                     SizedBox(width: 8),
-                    Text('Novo Compromisso'),
+                    Expanded(child: Text('Novo Compromisso')),
                   ],
                 ),
                 content: SingleChildScrollView(
@@ -105,6 +113,7 @@ extension _AppointmentsActionModals on _AppointmentsScreenState {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       DropdownButtonFormField<String>(
+                        isExpanded: true,
                         initialValue: appointmentCategory,
                         decoration: const InputDecoration(
                           labelText: 'Tipo de Compromisso',
@@ -194,6 +203,7 @@ extension _AppointmentsActionModals on _AppointmentsScreenState {
                       const SizedBox(height: 12),
                       if (people.isNotEmpty) ...[
                         DropdownButtonFormField<String?>(
+                          isExpanded: true,
                           initialValue: selectedPersonId,
                           decoration: const InputDecoration(
                             labelText: 'Contato Cadastrado (opcional)',
@@ -230,7 +240,9 @@ extension _AppointmentsActionModals on _AppointmentsScreenState {
                         ),
                         const SizedBox(height: 12),
                       ],
-                      Row(
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
                         children: [
                           OutlinedButton.icon(
                             icon: const Icon(Icons.date_range, size: 16),
@@ -251,7 +263,6 @@ extension _AppointmentsActionModals on _AppointmentsScreenState {
                               }
                             },
                           ),
-                          const SizedBox(width: 8),
                           OutlinedButton.icon(
                             icon: const Icon(Icons.access_time, size: 16),
                             label: Text(
@@ -271,6 +282,7 @@ extension _AppointmentsActionModals on _AppointmentsScreenState {
                       ),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<int>(
+                        isExpanded: true,
                         initialValue: durationMinutes,
                         decoration: const InputDecoration(
                           labelText: 'Duração estimada',
@@ -306,6 +318,7 @@ extension _AppointmentsActionModals on _AppointmentsScreenState {
                       ),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
+                        isExpanded: true,
                         initialValue: recurrence,
                         decoration: const InputDecoration(
                           labelText: 'Repetição / Recorrência',
@@ -345,6 +358,7 @@ extension _AppointmentsActionModals on _AppointmentsScreenState {
                       if (recurrence != 'Único') ...[
                         const SizedBox(height: 12),
                         DropdownButtonFormField<int>(
+                          isExpanded: true,
                           initialValue: recurrenceCount,
                           decoration: const InputDecoration(
                             labelText: 'Quantidade de ocorrências',
@@ -941,6 +955,14 @@ extension _AppointmentsActionModals on _AppointmentsScreenState {
           );
 
           return AlertDialog(
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 16,
+            ),
+            titlePadding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            contentPadding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            actionsPadding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+            actionsOverflowButtonSpacing: 4,
             title: const Row(
               children: [
                 Icon(Icons.sync_alt, color: AppTheme.primaryBlue),
@@ -1141,11 +1163,19 @@ extension _AppointmentsActionModals on _AppointmentsScreenState {
               }
 
               return AlertDialog(
+                insetPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 16,
+                ),
+                titlePadding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                contentPadding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                actionsPadding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+                actionsOverflowButtonSpacing: 4,
                 title: const Row(
                   children: [
                     Icon(Icons.alarm_add, color: AppTheme.primaryBlue),
                     SizedBox(width: 8),
-                    Text('Programar Serviço de Campo'),
+                    Expanded(child: Text('Programar Serviço de Campo')),
                   ],
                 ),
                 content: SingleChildScrollView(
@@ -1154,6 +1184,7 @@ extension _AppointmentsActionModals on _AppointmentsScreenState {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       DropdownButtonFormField<String>(
+                        isExpanded: true,
                         initialValue: modality,
                         decoration: const InputDecoration(
                           labelText: 'Modalidade de Testemunho',
@@ -1185,7 +1216,9 @@ extension _AppointmentsActionModals on _AppointmentsScreenState {
                         },
                       ),
                       const SizedBox(height: 12),
-                      Row(
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
                         children: [
                           OutlinedButton.icon(
                             icon: const Icon(Icons.date_range, size: 16),
@@ -1206,7 +1239,6 @@ extension _AppointmentsActionModals on _AppointmentsScreenState {
                               }
                             },
                           ),
-                          const SizedBox(width: 8),
                           OutlinedButton.icon(
                             icon: const Icon(Icons.access_time, size: 16),
                             label: Text(
@@ -1226,6 +1258,7 @@ extension _AppointmentsActionModals on _AppointmentsScreenState {
                       ),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<int>(
+                        isExpanded: true,
                         initialValue: durationMinutes,
                         decoration: const InputDecoration(
                           labelText: 'Duração Prevista',
@@ -1260,6 +1293,7 @@ extension _AppointmentsActionModals on _AppointmentsScreenState {
                       ),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
+                        isExpanded: true,
                         initialValue: recurrence,
                         decoration: const InputDecoration(
                           labelText: 'Repetição / Recorrência',
@@ -1291,6 +1325,7 @@ extension _AppointmentsActionModals on _AppointmentsScreenState {
                       if (recurrence != 'Único') ...[
                         const SizedBox(height: 12),
                         DropdownButtonFormField<int>(
+                          isExpanded: true,
                           initialValue: recurrenceCount,
                           decoration: const InputDecoration(
                             labelText: 'Quantidade de ocorrências',

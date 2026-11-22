@@ -317,15 +317,33 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
         excludeSemantics: true,
         label: 'Novo Compromisso - Agendar novo compromisso no ministério',
         hint: 'Abre formulário para agendar compromisso',
-        child: FloatingActionButton.extended(
-          heroTag: 'fab_novo_compromisso',
-          backgroundColor: isDark
-              ? const Color(0xFF3B82F6)
-              : AppTheme.primaryBlue,
-          foregroundColor: Colors.white,
-          icon: const Icon(Icons.add),
-          label: const Text('Novo Compromisso'),
-          onPressed: () => _showNewAppointmentModal(context),
+        child: Builder(
+          builder: (context) {
+            final textScale = MediaQuery.textScalerOf(context).scale(1.0);
+            final isCompact = textScale >= 1.5;
+            if (isCompact) {
+              return FloatingActionButton(
+                heroTag: 'fab_novo_compromisso',
+                backgroundColor: isDark
+                    ? const Color(0xFF3B82F6)
+                    : AppTheme.primaryBlue,
+                foregroundColor: Colors.white,
+                tooltip: 'Novo Compromisso',
+                child: const Icon(Icons.add),
+                onPressed: () => _showNewAppointmentModal(context),
+              );
+            }
+            return FloatingActionButton.extended(
+              heroTag: 'fab_novo_compromisso',
+              backgroundColor: isDark
+                  ? const Color(0xFF3B82F6)
+                  : AppTheme.primaryBlue,
+              foregroundColor: Colors.white,
+              icon: const Icon(Icons.add),
+              label: const Text('Novo Compromisso'),
+              onPressed: () => _showNewAppointmentModal(context),
+            );
+          },
         ),
       ),
       body: Column(
