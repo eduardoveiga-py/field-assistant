@@ -141,7 +141,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
             InboxEntriesCompanion.insert(
               id: entryId,
               content: '${msg.subject}\n\n${msg.bodyText}',
-              sourceType: const drift.Value('email'),
+              sourceType: drift.Value(msg.isDraft ? 'email_draft' : 'email'),
               suggestedCategory: const drift.Value('email_jw'),
               attachments: drift.Value(jsonEncode(msg.attachments)),
               capturedAt: msg.date.toUtc(),
@@ -178,6 +178,108 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
     return savedCount;
   }
 
+  Future<void> _persistSentMessage({
+    required AppDatabase db,
+    required JwEmailMessage sentMsg,
+    required String protocol,
+    String? draftId,
+  }) async {
+    final now = DateTime.now().toUtc();
+    final metadata = {
+      'permanentRetention': true,
+      'isDraft': false,
+      'sentAt': now.toIso8601String(),
+      'protocol': protocol,
+      'email': sentMsg.toJson(),
+    };
+
+    final entryId = 'email_${sentMsg.id}';
+
+    await db.transaction(() async {
+      if (draftId != null && draftId.isNotEmpty) {
+        final draftEntryId = 'email_draft_$draftId';
+        if (draftEntryId != entryId) {
+          final existingDraftEntry = await (db.select(
+            db.inboxEntries,
+          )..where((t) => t.id.equals(draftEntryId))).getSingleOrNull();
+
+          if (existingDraftEntry != null) {
+            await (db.delete(
+              db.inboxEntries,
+            )..where((t) => t.id.equals(draftEntryId))).go();
+
+            await db
+                .into(db.syncQueue)
+                .insert(
+                  SyncQueueCompanion.insert(
+                    id: const Uuid().v4(),
+                    entityType: 'inbox_entries',
+                    entityId: draftEntryId,
+                    operation: 'DELETE',
+                    payload: jsonEncode(
+                      SyncTimestamp.normalizeMapDates(
+                        existingDraftEntry.toJson(),
+                      ),
+                    ),
+                    createdAt: now,
+                  ),
+                );
+          }
+        }
+      }
+
+      final existingEntry = await (db.select(
+        db.inboxEntries,
+      )..where((t) => t.id.equals(entryId))).getSingleOrNull();
+      final isUpdate = existingEntry != null;
+      final nextRevision = isUpdate ? existingEntry.revision + 1 : 1;
+
+      final companion = InboxEntriesCompanion.insert(
+        id: entryId,
+        content: '${sentMsg.subject}\n\n${sentMsg.bodyText}',
+        sourceType: const drift.Value('email'),
+        suggestedCategory: const drift.Value('email_jw'),
+        attachments: drift.Value(jsonEncode(sentMsg.attachments)),
+        capturedAt: now,
+        metadata: drift.Value(jsonEncode(metadata)),
+        createdAt: isUpdate ? existingEntry.createdAt : now,
+        updatedAt: now,
+        revision: drift.Value(nextRevision),
+      );
+
+      await db.into(db.inboxEntries).insertOnConflictUpdate(companion);
+      final persisted = await (db.select(
+        db.inboxEntries,
+      )..where((t) => t.id.equals(entryId))).getSingle();
+
+      final payload = SyncTimestamp.normalizeMapDates(persisted.toJson());
+      if (isUpdate) {
+        payload['_base'] = SyncTimestamp.normalizeMapDates(
+          existingEntry.toJson(),
+        );
+      }
+
+      await db
+          .into(db.syncQueue)
+          .insert(
+            SyncQueueCompanion.insert(
+              id: const Uuid().v4(),
+              entityType: 'inbox_entries',
+              entityId: entryId,
+              operation: isUpdate ? 'UPDATE' : 'INSERT',
+              payload: jsonEncode(payload),
+              createdAt: now,
+            ),
+          );
+    });
+
+    unawaited(() async {
+      try {
+        await ref.read(supabaseSyncServiceProvider).sync();
+      } catch (_) {}
+    }());
+  }
+
   String _friendlySyncError(Object e, [EmailAccount? acc]) {
     final msg = e.toString().toLowerCase();
     final isAuthError =
@@ -186,12 +288,17 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
         msg.contains('auth') ||
         msg.contains('autenticação') ||
         msg.contains('senha') ||
-        msg.contains('credencia');
+        msg.contains('credencia') ||
+        msg.contains('invalid_grant') ||
+        msg.contains('unauthorized') ||
+        msg.contains('token expirado');
 
     final isGmail =
         (acc != null &&
             (acc.email.toLowerCase().contains('gmail') ||
-                acc.incomingHost.toLowerCase().contains('gmail'))) ||
+                acc.incomingHost.toLowerCase().contains('gmail') ||
+                acc.incomingProtocol == 'gmail_api' ||
+                acc.outgoingProtocol == 'gmail_api')) ||
         msg.contains('gmail');
 
     final isMicrosoft =
@@ -199,12 +306,27 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
             (acc.email.toLowerCase().contains('outlook') ||
                 acc.email.toLowerCase().contains('hotmail') ||
                 acc.incomingHost.toLowerCase().contains('outlook') ||
-                acc.incomingHost.toLowerCase().contains('office365'))) ||
+                acc.incomingHost.toLowerCase().contains('office365') ||
+                acc.incomingHost.toLowerCase().contains('microsoft') ||
+                acc.incomingHost.toLowerCase().contains('graph') ||
+                acc.incomingProtocol == 'microsoft_graph' ||
+                acc.outgoingProtocol == 'microsoft_graph')) ||
         msg.contains('outlook') ||
         msg.contains('hotmail') ||
-        msg.contains('office365');
+        msg.contains('office365') ||
+        msg.contains('microsoft') ||
+        msg.contains('graph');
 
     if (isAuthError) {
+      if (acc != null && acc.isOAuth) {
+        if (isGmail || acc.incomingProtocol == 'gmail_api') {
+          return 'Falha de autenticação OAuth no Gmail (token expirado ou revogado). Reconecte sua conta Google em Configurações.';
+        }
+        if (isMicrosoft || acc.incomingProtocol == 'microsoft_graph') {
+          return 'Falha de autenticação OAuth na Microsoft (token expirado ou revogado). Reconecte sua conta Microsoft em Configurações.';
+        }
+        return 'Falha de autenticação OAuth. Reconecte sua conta em Configurações.';
+      }
       if (isGmail) {
         return 'Falha de autenticação (401). No Gmail, use uma Senha de App de 16 dígitos ou OAuth2 se a verificação em duas etapas estiver ativa.';
       }
@@ -3652,6 +3774,11 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
         (a) => a.email.toLowerCase() == _selectedEmailAccount!.toLowerCase(),
       );
     }
+    if (kIsWeb) {
+      selectedAccount ??=
+          accounts.firstWhereOrNull((a) => a.isActive && a.isOAuth) ??
+          accounts.firstWhereOrNull((a) => a.isOAuth);
+    }
     selectedAccount ??=
         accounts.where((a) => a.isActive).firstOrNull ?? accounts.firstOrNull;
 
@@ -4476,44 +4603,12 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                               tags: tags,
                                             );
 
-                                            final metadata = {
-                                              'permanentRetention': true,
-                                              'isDraft': false,
-                                              'sentAt': now.toIso8601String(),
-                                              'protocol': 'gmail_api',
-                                              'email': sentMsg.toJson(),
-                                            };
-
-                                            final entryId =
-                                                'email_${sentMsg.id}';
-                                            await db
-                                                .into(db.inboxEntries)
-                                                .insertOnConflictUpdate(
-                                                  InboxEntriesCompanion.insert(
-                                                    id: entryId,
-                                                    content:
-                                                        '${sentMsg.subject}\n\n${sentMsg.bodyText}',
-                                                    sourceType:
-                                                        const drift.Value(
-                                                          'email',
-                                                        ),
-                                                    suggestedCategory:
-                                                        const drift.Value(
-                                                          'email_jw',
-                                                        ),
-                                                    attachments: drift.Value(
-                                                      jsonEncode(
-                                                        sentMsg.attachments,
-                                                      ),
-                                                    ),
-                                                    capturedAt: now,
-                                                    metadata: drift.Value(
-                                                      jsonEncode(metadata),
-                                                    ),
-                                                    createdAt: now,
-                                                    updatedAt: now,
-                                                  ),
-                                                );
+                                            await _persistSentMessage(
+                                              db: db,
+                                              sentMsg: sentMsg,
+                                              protocol: 'gmail_api',
+                                              draftId: existingDraft?.id,
+                                            );
 
                                             for (final rcpt in [
                                               ...JwSmtpClient.parseRecipients(
@@ -4587,44 +4682,12 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                               tags: tags,
                                             );
 
-                                            final metadata = {
-                                              'permanentRetention': true,
-                                              'isDraft': false,
-                                              'sentAt': now.toIso8601String(),
-                                              'protocol': 'microsoft_graph',
-                                              'email': sentMsg.toJson(),
-                                            };
-
-                                            final entryId =
-                                                'email_${sentMsg.id}';
-                                            await db
-                                                .into(db.inboxEntries)
-                                                .insertOnConflictUpdate(
-                                                  InboxEntriesCompanion.insert(
-                                                    id: entryId,
-                                                    content:
-                                                        '${sentMsg.subject}\n\n${sentMsg.bodyText}',
-                                                    sourceType:
-                                                        const drift.Value(
-                                                          'email',
-                                                        ),
-                                                    suggestedCategory:
-                                                        const drift.Value(
-                                                          'email_jw',
-                                                        ),
-                                                    attachments: drift.Value(
-                                                      jsonEncode(
-                                                        sentMsg.attachments,
-                                                      ),
-                                                    ),
-                                                    capturedAt: now,
-                                                    metadata: drift.Value(
-                                                      jsonEncode(metadata),
-                                                    ),
-                                                    createdAt: now,
-                                                    updatedAt: now,
-                                                  ),
-                                                );
+                                            await _persistSentMessage(
+                                              db: db,
+                                              sentMsg: sentMsg,
+                                              protocol: 'microsoft_graph',
+                                              draftId: existingDraft?.id,
+                                            );
 
                                             for (final rcpt in [
                                               ...JwSmtpClient.parseRecipients(
@@ -4725,44 +4788,12 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                               tags: tags,
                                             );
 
-                                            final metadata = {
-                                              'permanentRetention': true,
-                                              'isDraft': false,
-                                              'sentAt': now.toIso8601String(),
-                                              'exchangeMail': true,
-                                              'email': sentMsg.toJson(),
-                                            };
-
-                                            final entryId =
-                                                'email_${sentMsg.id}';
-                                            await db
-                                                .into(db.inboxEntries)
-                                                .insertOnConflictUpdate(
-                                                  InboxEntriesCompanion.insert(
-                                                    id: entryId,
-                                                    content:
-                                                        '${sentMsg.subject}\n\n${sentMsg.bodyText}',
-                                                    sourceType:
-                                                        const drift.Value(
-                                                          'email',
-                                                        ),
-                                                    suggestedCategory:
-                                                        const drift.Value(
-                                                          'email_jw',
-                                                        ),
-                                                    attachments: drift.Value(
-                                                      jsonEncode(
-                                                        sentMsg.attachments,
-                                                      ),
-                                                    ),
-                                                    capturedAt: now,
-                                                    metadata: drift.Value(
-                                                      jsonEncode(metadata),
-                                                    ),
-                                                    createdAt: now,
-                                                    updatedAt: now,
-                                                  ),
-                                                );
+                                            await _persistSentMessage(
+                                              db: db,
+                                              sentMsg: sentMsg,
+                                              protocol: 'exchange',
+                                              draftId: existingDraft?.id,
+                                            );
 
                                             for (final rcpt in [
                                               ...JwSmtpClient.parseRecipients(
@@ -5006,42 +5037,12 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                             tags: tags,
                                           );
 
-                                          final metadata = {
-                                            'permanentRetention': true,
-                                            'isDraft': false,
-                                            'sentAt': now.toIso8601String(),
-                                            'exchangeMail': true,
-                                            'email': sentMsg.toJson(),
-                                          };
-
-                                          final entryId = 'email_${sentMsg.id}';
-                                          await db
-                                              .into(db.inboxEntries)
-                                              .insertOnConflictUpdate(
-                                                InboxEntriesCompanion.insert(
-                                                  id: entryId,
-                                                  content:
-                                                      '${sentMsg.subject}\n\n${sentMsg.bodyText}',
-                                                  sourceType: const drift.Value(
-                                                    'email',
-                                                  ),
-                                                  suggestedCategory:
-                                                      const drift.Value(
-                                                        'email_jw',
-                                                      ),
-                                                  attachments: drift.Value(
-                                                    jsonEncode(
-                                                      sentMsg.attachments,
-                                                    ),
-                                                  ),
-                                                  capturedAt: now,
-                                                  metadata: drift.Value(
-                                                    jsonEncode(metadata),
-                                                  ),
-                                                  createdAt: now,
-                                                  updatedAt: now,
-                                                ),
-                                              );
+                                          await _persistSentMessage(
+                                            db: db,
+                                            sentMsg: sentMsg,
+                                            protocol: 'exchange',
+                                            draftId: existingDraft?.id,
+                                          );
 
                                           for (final rcpt in [
                                             ...JwSmtpClient.parseRecipients(to),

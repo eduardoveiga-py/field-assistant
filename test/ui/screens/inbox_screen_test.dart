@@ -450,6 +450,70 @@ void main() {
         await tester.pump(const Duration(milliseconds: 100));
       },
     );
+
+    testWidgets(
+      'TC-INBOX-SYNC-06: Exibe dica clara de reconexão OAuth quando conta Google ou Microsoft falha autenticação',
+      (tester) async {
+        final db = AppDatabase.forTesting(NativeDatabase.memory());
+        final repo = AppRepository(db);
+
+        final account = EmailAccount(
+          id: 'acc_oauth_gmail_01',
+          name: 'Conta Google OAuth',
+          email: 'usuario@gmail.com',
+          providerType: EmailProviderType.google,
+          incomingHost: 'gmail.googleapis.com',
+          incomingProtocol: 'gmail_api',
+          outgoingHost: 'gmail.googleapis.com',
+          outgoingProtocol: 'gmail_api',
+          username: 'usuario@gmail.com',
+          createdAt: DateTime.now(),
+        );
+        await EmailAccountsManager.saveAccount(db, account);
+
+        final emailService = _TestJwEmailService(
+          db: db,
+          biometricAuth: _AlwaysUnlockedBiometricService(),
+        );
+
+        tester.view.physicalSize = const Size(800, 1000);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              databaseProvider.overrideWithValue(db),
+              repositoryProvider.overrideWithValue(repo),
+              jwEmailServiceProvider.overrideWithValue(emailService),
+              biometricAuthServiceProvider.overrideWithValue(
+                _AlwaysUnlockedBiometricService(),
+              ),
+            ],
+            child: const MaterialApp(home: InboxScreen()),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byTooltip('Sincronizar E-mails / Hub'));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(SnackBar), findsOneWidget);
+        expect(
+          find.textContaining(
+            'Falha de autenticação OAuth no Gmail (token expirado ou revogado). Reconecte sua conta Google em Configurações.',
+          ),
+          findsOneWidget,
+        );
+
+        await tester.pump(const Duration(seconds: 7));
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+        await db.close();
+        await tester.pump(const Duration(milliseconds: 100));
+      },
+    );
   });
 
   group('R3: Dedicated Folder Selector & Filtering in InboxScreen', () {

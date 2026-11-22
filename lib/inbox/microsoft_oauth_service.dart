@@ -508,8 +508,9 @@ class MicrosoftOAuthService {
       throw Exception('Conta Microsoft não autenticada.');
     }
 
+    final cleanMessageId = messageId.replaceFirst(RegExp(r'^email_'), '');
     final uri = Uri.parse(
-      '$graphBaseUrl/me/messages/$messageId/attachments/$attachmentId',
+      '$graphBaseUrl/me/messages/$cleanMessageId/attachments/$attachmentId',
     );
     final resp = await _httpClient.get(
       uri,

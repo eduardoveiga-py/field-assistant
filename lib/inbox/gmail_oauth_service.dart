@@ -510,8 +510,9 @@ class GmailOAuthService {
       throw Exception('Conta Gmail não autenticada.');
     }
 
+    final cleanMessageId = messageId.replaceFirst(RegExp(r'^email_'), '');
     final uri = Uri.parse(
-      'https://gmail.googleapis.com/gmail/v1/users/me/messages/$messageId/attachments/$attachmentId',
+      'https://gmail.googleapis.com/gmail/v1/users/me/messages/$cleanMessageId/attachments/$attachmentId',
     );
     final resp = await _httpClient.get(
       uri,

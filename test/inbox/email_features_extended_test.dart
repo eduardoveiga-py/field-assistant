@@ -136,6 +136,44 @@ void main() {
       },
     );
 
+    test('EmailAccount implements value equality and hashCode based on ID', () {
+      final now = DateTime.now();
+      final acc1 = EmailAccount(
+        id: 'acc_fixed_id',
+        name: 'Google 1',
+        email: 'user@gmail.com',
+        providerType: EmailProviderType.google,
+        incomingHost: 'gmail.googleapis.com',
+        outgoingHost: 'gmail.googleapis.com',
+        username: 'user@gmail.com',
+        createdAt: now,
+      );
+      final acc2 = EmailAccount(
+        id: 'acc_fixed_id',
+        name: 'Google 1 (Updated)',
+        email: 'user@gmail.com',
+        providerType: EmailProviderType.google,
+        incomingHost: 'gmail.googleapis.com',
+        outgoingHost: 'gmail.googleapis.com',
+        username: 'user@gmail.com',
+        createdAt: now,
+      );
+      final acc3 = EmailAccount(
+        id: 'acc_other_id',
+        name: 'Google 2',
+        email: 'user2@gmail.com',
+        providerType: EmailProviderType.google,
+        incomingHost: 'gmail.googleapis.com',
+        outgoingHost: 'gmail.googleapis.com',
+        username: 'user2@gmail.com',
+        createdAt: now,
+      );
+
+      expect(acc1, equals(acc2));
+      expect(acc1.hashCode, equals(acc2.hashCode));
+      expect(acc1 == acc3, isFalse);
+    });
+
     test('EmailAccount presets generate valid configurations for hotmail and jwpub', () {
       final hotmail = EmailAccount.createPreset(
         providerType: EmailProviderType.hotmail,

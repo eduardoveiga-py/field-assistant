@@ -129,6 +129,16 @@ class EmailAccount {
     );
   }
 
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is EmailAccount &&
+          runtimeType == other.runtimeType &&
+          id == other.id;
+
+  @override
+  int get hashCode => id.hashCode;
+
   /// Gera predefinição de configuração recomendada baseada no provedor
   static EmailAccount createPreset({
     String? id,
