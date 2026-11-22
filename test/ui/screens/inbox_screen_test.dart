@@ -49,6 +49,30 @@ class _TestJwEmailService extends JwEmailService {
     }
     return 0;
   }
+
+  JwEmailMessage? lastSentMessage;
+  String? lastSentHost;
+  int? lastSentPort;
+  String? lastSentUser;
+  String? lastSentPass;
+
+  @override
+  Future<JwEmailMessage> sendEmail({
+    required String host,
+    required int port,
+    required String username,
+    required String password,
+    required JwEmailMessage message,
+    String securityMode = 'starttls',
+    String? draftId,
+  }) async {
+    lastSentHost = host;
+    lastSentPort = port;
+    lastSentUser = username;
+    lastSentPass = password;
+    lastSentMessage = message;
+    return message;
+  }
 }
 
 void main() {
@@ -628,6 +652,214 @@ void main() {
         expect(find.text('Boas Novas de Hoje'), findsOneWidget);
         expect(find.text('Relatório Mensal de Campo'), findsNothing);
         expect(find.text('Aviso Antigo Deletado'), findsNothing);
+
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+        await db.close();
+        await tester.pump(const Duration(milliseconds: 100));
+      },
+    );
+  });
+
+  group('R6: Compose & Send Email Multi-Account Integration Tests', () {
+    testWidgets(
+      'TC-INBOX-COMPOSE-01: Modal exibe seletor de conta com contas configuradas e envia via SMTP da conta',
+      (tester) async {
+        final db = AppDatabase.forTesting(NativeDatabase.memory());
+        final repo = AppRepository(db);
+
+        final account = EmailAccount.createPreset(
+          providerType: EmailProviderType.google,
+          name: 'Gmail Trabalho',
+          email: 'trabalho@gmail.com',
+          username: 'trabalho@gmail.com',
+        );
+        await EmailAccountsManager.saveAccount(
+          db,
+          account,
+          password: 'app_password_123',
+        );
+
+        final emailService = _TestJwEmailService(
+          db: db,
+          biometricAuth: _AlwaysUnlockedBiometricService(),
+        );
+
+        tester.view.physicalSize = const Size(800, 1200);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              databaseProvider.overrideWithValue(db),
+              repositoryProvider.overrideWithValue(repo),
+              jwEmailServiceProvider.overrideWithValue(emailService),
+              biometricAuthServiceProvider.overrideWithValue(
+                _AlwaysUnlockedBiometricService(),
+              ),
+            ],
+            child: const MaterialApp(home: InboxScreen()),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // 1. Muda para a aba de E-mail
+        final emailTab = find.text('JW Mail');
+        await tester.tap(emailTab);
+        await tester.pumpAndSettle();
+
+        // 2. Toca no FAB de Compor / Novo E-mail
+        final fab = find.widgetWithText(FloatingActionButton, 'Novo Rascunho');
+        expect(fab, findsOneWidget);
+        await tester.tap(fab);
+        await tester.pumpAndSettle();
+
+        // 3. Verifica que o seletor de conta de envio está presente e selecionou trabalho@gmail.com
+        expect(
+          find.byKey(const Key('compose_account_selector')),
+          findsOneWidget,
+        );
+        expect(
+          find.textContaining('Gmail Trabalho <trabalho@gmail.com>'),
+          findsOneWidget,
+        );
+
+        // 4. Preenche destinatário, assunto e conteúdo
+        final toField = find.widgetWithText(TextField, 'Para *');
+        await tester.enterText(toField, 'destinatario@exemplo.com');
+
+        final subjectField = find.widgetWithText(TextField, 'Assunto *');
+        await tester.enterText(subjectField, 'Assunto do Teste');
+
+        final contentField = find.widgetWithText(
+          TextField,
+          'Conteúdo da Mensagem *',
+        );
+        await tester.enterText(contentField, 'Olá, este é um e-mail de teste.');
+        await tester.pumpAndSettle();
+
+        // 5. Toca em Enviar E-mail
+        final sendButton = find.widgetWithText(FilledButton, 'Enviar E-mail');
+        await tester.tap(sendButton);
+        await tester.pumpAndSettle();
+
+        // 6. Verifica que o serviço SMTP foi invocado com a configuração da conta multi-contas
+        expect(emailService.lastSentHost, equals('smtp.gmail.com'));
+        expect(emailService.lastSentPort, equals(587));
+        expect(emailService.lastSentUser, equals('trabalho@gmail.com'));
+        expect(emailService.lastSentPass, equals('app_password_123'));
+        expect(
+          emailService.lastSentMessage?.to,
+          equals('destinatario@exemplo.com'),
+        );
+        expect(
+          emailService.lastSentMessage?.accountEmail,
+          equals('trabalho@gmail.com'),
+        );
+        expect(emailService.lastSentMessage?.folderName, equals('Enviados'));
+
+        // 7. Confirma exibição do SnackBar de sucesso
+        expect(find.byType(SnackBar), findsOneWidget);
+        expect(
+          find.textContaining('E-mail enviado com sucesso via SMTP'),
+          findsOneWidget,
+        );
+
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+        await db.close();
+        await tester.pump(const Duration(milliseconds: 100));
+      },
+    );
+
+    testWidgets(
+      'TC-INBOX-COMPOSE-02: Salva rascunho vinculando accountEmail da conta selecionada',
+      (tester) async {
+        final db = AppDatabase.forTesting(NativeDatabase.memory());
+        final repo = AppRepository(db);
+
+        final account = EmailAccount.createPreset(
+          providerType: EmailProviderType.hotmail,
+          name: 'Hotmail Teste',
+          email: 'irmao@hotmail.com',
+          username: 'irmao@hotmail.com',
+        );
+        await EmailAccountsManager.saveAccount(
+          db,
+          account,
+          password: 'pass_hotmail_123',
+        );
+
+        final emailService = _TestJwEmailService(
+          db: db,
+          biometricAuth: _AlwaysUnlockedBiometricService(),
+        );
+
+        tester.view.physicalSize = const Size(800, 1200);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              databaseProvider.overrideWithValue(db),
+              repositoryProvider.overrideWithValue(repo),
+              jwEmailServiceProvider.overrideWithValue(emailService),
+              biometricAuthServiceProvider.overrideWithValue(
+                _AlwaysUnlockedBiometricService(),
+              ),
+            ],
+            child: const MaterialApp(home: InboxScreen()),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // 1. Muda para a aba de E-mail
+        final emailTab = find.text('JW Mail');
+        await tester.tap(emailTab);
+        await tester.pumpAndSettle();
+
+        // 2. Toca no FAB de Compor
+        final fab = find.widgetWithText(FloatingActionButton, 'Novo Rascunho');
+        await tester.tap(fab);
+        await tester.pumpAndSettle();
+
+        // 3. Preenche assunto e conteúdo
+        final subjectField = find.widgetWithText(TextField, 'Assunto *');
+        await tester.enterText(subjectField, 'Meu Rascunho Hotmail');
+
+        final contentField = find.widgetWithText(
+          TextField,
+          'Conteúdo da Mensagem *',
+        );
+        await tester.enterText(contentField, 'Texto do rascunho');
+        await tester.pumpAndSettle();
+
+        // 4. Toca em Salvar Rascunho
+        final draftButton = find.widgetWithText(
+          OutlinedButton,
+          'Salvar Rascunho',
+        );
+        await tester.tap(draftButton);
+        await tester.pumpAndSettle();
+
+        // 5. Verifica que o rascunho foi salvo no banco com accountEmail e folderName
+        final entries = await db.select(db.inboxEntries).get();
+        expect(
+          entries.any((e) => e.content.contains('Meu Rascunho Hotmail')),
+          isTrue,
+        );
+        final entry = entries.firstWhere(
+          (e) => e.content.contains('Meu Rascunho Hotmail'),
+        );
+        final meta = jsonDecode(entry.metadata) as Map<String, dynamic>;
+        final emailJson = meta['email'] as Map<String, dynamic>;
+        expect(emailJson['accountEmail'], equals('irmao@hotmail.com'));
+        expect(emailJson['folderName'], equals('Rascunhos'));
+        expect(emailJson['isDraft'], isTrue);
 
         await tester.pumpWidget(const SizedBox.shrink());
         await tester.pumpAndSettle();

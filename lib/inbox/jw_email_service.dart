@@ -690,6 +690,8 @@ class JwImapClient {
                   uidValidity: validity,
                   uid: item.remoteUid!,
                 ),
+                accountEmail: username.trim(),
+                folderName: item.folderName ?? 'Caixa de Entrada',
               ),
             )
             .toList();
@@ -1784,6 +1786,8 @@ class JwEmailService {
 
     final now = DateTime.now().toUtc();
     final sentMsg = message.copyWith(
+      accountEmail: message.accountEmail ?? username.trim(),
+      folderName: message.folderName ?? 'Enviados',
       from:
           message.from.trim().isNotEmpty && message.from != 'local@dispositivo'
           ? message.from

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:collection/collection.dart';
 import 'package:drift/drift.dart' as drift;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -201,7 +202,10 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
         for (final acc in accounts) {
           if (!acc.isActive) continue;
           try {
-            final pass = await EmailAccountsManager.getAccountPassword(acc.id);
+            final pass = await EmailAccountsManager.getAccountPassword(
+              acc.id,
+              db,
+            );
             if (pass == null || pass.trim().isEmpty) {
               failedDetails.add('${acc.name}: senha não configurada');
               continue;
@@ -3229,6 +3233,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                           _showNewDraftDialog(
                             initialTo: replyTo,
                             initialSubject: replySubj,
+                            initialAccountEmail: msg.accountEmail,
                           );
                         },
                       ),
@@ -3457,11 +3462,37 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
   // COMPOR / EDITAR / ENVIAR E-MAIL TEOCRÁTICO
   // ==========================================
 
-  void _showNewDraftDialog({
+  Future<void> _showNewDraftDialog({
     JwEmailMessage? existingDraft,
     String? initialTo,
     String? initialSubject,
-  }) {
+    String? initialAccountEmail,
+  }) async {
+    final db = ref.read(repositoryProvider).db;
+    final accounts = await EmailAccountsManager.loadAccounts(db);
+
+    EmailAccount? selectedAccount;
+    if (existingDraft?.accountEmail != null &&
+        existingDraft!.accountEmail!.isNotEmpty) {
+      selectedAccount = accounts.firstWhereOrNull(
+        (a) =>
+            a.email.toLowerCase() == existingDraft.accountEmail!.toLowerCase(),
+      );
+    } else if (initialAccountEmail != null && initialAccountEmail.isNotEmpty) {
+      selectedAccount = accounts.firstWhereOrNull(
+        (a) => a.email.toLowerCase() == initialAccountEmail.toLowerCase(),
+      );
+    } else if (_selectedEmailAccount != null &&
+        _selectedEmailAccount!.isNotEmpty) {
+      selectedAccount = accounts.firstWhereOrNull(
+        (a) => a.email.toLowerCase() == _selectedEmailAccount!.toLowerCase(),
+      );
+    }
+    selectedAccount ??=
+        accounts.where((a) => a.isActive).firstOrNull ?? accounts.firstOrNull;
+
+    if (!mounted) return;
+
     final initTo = existingDraft?.to ?? initialTo ?? '';
     final initCc = existingDraft?.cc.join(', ') ?? '';
     final initBcc = existingDraft?.bcc.join(', ') ?? '';
@@ -3469,7 +3500,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
     final initBody = existingDraft?.bodyText ?? '';
     final initTags = existingDraft?.tags.join(', ') ?? '';
 
-    showModalBottomSheet(
+    await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
@@ -3620,6 +3651,41 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                 ],
                               ],
                             ),
+                          ),
+                        ],
+                        if (accounts.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          DropdownButtonFormField<EmailAccount>(
+                            key: const ValueKey('compose_account_selector'),
+                            initialValue: selectedAccount,
+                            decoration: const InputDecoration(
+                              labelText: 'De (Conta de Envio) *',
+                              isDense: true,
+                              prefixIcon: Icon(
+                                Icons.alternate_email,
+                                color: AppTheme.primaryBlue,
+                                size: 20,
+                              ),
+                            ),
+                            items: accounts.map((acc) {
+                              return DropdownMenuItem(
+                                value: acc,
+                                child: Text(
+                                  '${acc.name} <${acc.email}>',
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 13),
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: isSending
+                                ? null
+                                : (val) {
+                                    if (val != null) {
+                                      setSheetState(
+                                        () => selectedAccount = val,
+                                      );
+                                    }
+                                  },
                           ),
                         ],
                         const SizedBox(height: 12),
@@ -4092,12 +4158,15 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                                 ))
                                               .getSingleOrNull();
                                       final userEmail =
-                                          emailEntry?.value.trim() ?? '';
+                                          selectedAccount?.email ??
+                                          emailEntry?.value.trim() ??
+                                          '';
 
                                       final draft = JwEmailMessage(
                                         id:
                                             existingDraft?.id ??
                                             const Uuid().v4(),
+                                        accountEmail: selectedAccount?.email,
                                         folderName: 'Rascunhos',
                                         subject: subject,
                                         from: userEmail.isNotEmpty
@@ -4180,14 +4249,14 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                       });
 
                                       try {
-                                        final protocol =
-                                            await (db.select(db.appKvStore)
-                                                  ..where(
-                                                    (t) => t.key.equals(
-                                                      'jw_mail_protocol',
-                                                    ),
-                                                  ))
-                                                .getSingleOrNull();
+                                        if (kIsWeb) {
+                                          setSheetState(() {
+                                            isSending = false;
+                                            needsConfig = false;
+                                            inlineError = 'Envio direto via socket SMTP/Exchange não é suportado no navegador Web. Utilize o aplicativo Desktop ou Mobile.';
+                                          });
+                                          return;
+                                        }
 
                                         final tags = tagsCtrl.text
                                             .split(',')
@@ -4197,6 +4266,220 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                             )
                                             .where((t) => t.isNotEmpty)
                                             .toList();
+
+                                        if (selectedAccount != null) {
+                                          final pass =
+                                              await EmailAccountsManager.getAccountPassword(
+                                                selectedAccount!.id,
+                                                db,
+                                              );
+                                          if (pass == null ||
+                                              pass.trim().isEmpty) {
+                                            if (ctx.mounted) {
+                                              setSheetState(() {
+                                                isSending = false;
+                                                needsConfig = true;
+                                                inlineError =
+                                                    'Senha não configurada para a conta ${selectedAccount!.name}. Acesse Configurações para validar seu acesso.';
+                                              });
+                                            }
+                                            return;
+                                          }
+
+                                          if (selectedAccount!
+                                                  .incomingProtocol ==
+                                              'exchange') {
+                                            final storage =
+                                                const FlutterSecureStorage();
+                                            final deviceId =
+                                                (await storage.read(
+                                                  key: 'jw_eas_device_id',
+                                                )) ??
+                                                const Uuid().v4();
+                                            final session =
+                                                ExchangeProtocolSession(
+                                                  host: selectedAccount!
+                                                      .incomingHost,
+                                                  username:
+                                                      selectedAccount!.username,
+                                                  password: pass,
+                                                  deviceId: deviceId,
+                                                );
+
+                                            await session.sendMail(
+                                              to: to,
+                                              subject: subject,
+                                              body: bodyText,
+                                              from: selectedAccount!.email,
+                                              cc: ccList,
+                                              bcc: bccList,
+                                              attachments: attachments,
+                                            );
+
+                                            final now = DateTime.now().toUtc();
+                                            final sentMsg = JwEmailMessage(
+                                              id:
+                                                  existingDraft?.id ??
+                                                  const Uuid().v4(),
+                                              accountEmail:
+                                                  selectedAccount!.email,
+                                              folderName: 'Enviados',
+                                              subject: subject,
+                                              from: selectedAccount!.email,
+                                              to: to,
+                                              cc: ccList,
+                                              bcc: bccList,
+                                              date: now,
+                                              bodyText: bodyText,
+                                              attachments: attachments,
+                                              isDraft: false,
+                                              isPermanentRetained: true,
+                                              tags: tags,
+                                            );
+
+                                            final metadata = {
+                                              'permanentRetention': true,
+                                              'isDraft': false,
+                                              'sentAt': now.toIso8601String(),
+                                              'exchangeMail': true,
+                                              'email': sentMsg.toJson(),
+                                            };
+
+                                            final entryId =
+                                                'email_${sentMsg.id}';
+                                            await db
+                                                .into(db.inboxEntries)
+                                                .insertOnConflictUpdate(
+                                                  InboxEntriesCompanion.insert(
+                                                    id: entryId,
+                                                    content:
+                                                        '${sentMsg.subject}\n\n${sentMsg.bodyText}',
+                                                    sourceType:
+                                                        const drift.Value(
+                                                          'email',
+                                                        ),
+                                                    suggestedCategory:
+                                                        const drift.Value(
+                                                          'email_jw',
+                                                        ),
+                                                    attachments: drift.Value(
+                                                      jsonEncode(
+                                                        sentMsg.attachments,
+                                                      ),
+                                                    ),
+                                                    capturedAt: now,
+                                                    metadata: drift.Value(
+                                                      jsonEncode(metadata),
+                                                    ),
+                                                    createdAt: now,
+                                                    updatedAt: now,
+                                                  ),
+                                                );
+
+                                            for (final rcpt in [
+                                              ...JwSmtpClient.parseRecipients(
+                                                to,
+                                              ),
+                                              ...ccList,
+                                              ...bccList,
+                                            ]) {
+                                              await EmailContactsManager.saveContact(
+                                                db,
+                                                email: rcpt,
+                                                source: 'sent_recipient',
+                                              );
+                                            }
+
+                                            if (ctx.mounted) Navigator.pop(ctx);
+                                            if (mounted) {
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
+                                                SnackBar(
+                                                  content: Text(
+                                                    'E-mail enviado via Exchange (${selectedAccount!.name}) e arquivado na pasta Enviados!',
+                                                  ),
+                                                  backgroundColor: Colors.green,
+                                                ),
+                                              );
+                                            }
+                                            return;
+                                          } else {
+                                            // Envio via SMTP
+                                            final msgToSend = JwEmailMessage(
+                                              id:
+                                                  existingDraft?.id ??
+                                                  const Uuid().v4(),
+                                              accountEmail:
+                                                  selectedAccount!.email,
+                                              folderName: 'Enviados',
+                                              subject: subject,
+                                              from: selectedAccount!.email,
+                                              to: to,
+                                              cc: ccList,
+                                              bcc: bccList,
+                                              date: DateTime.now(),
+                                              bodyText: bodyText,
+                                              attachments: attachments,
+                                              isDraft: false,
+                                              tags: tags,
+                                            );
+
+                                            await ref
+                                                .read(jwEmailServiceProvider)
+                                                .sendEmail(
+                                                  host: selectedAccount!
+                                                      .outgoingHost,
+                                                  port: selectedAccount!
+                                                      .outgoingPort,
+                                                  username:
+                                                      selectedAccount!.username,
+                                                  password: pass,
+                                                  message: msgToSend,
+                                                  securityMode: selectedAccount!
+                                                      .outgoingSecurity,
+                                                  draftId: existingDraft?.id,
+                                                );
+
+                                            for (final rcpt in [
+                                              ...JwSmtpClient.parseRecipients(
+                                                to,
+                                              ),
+                                              ...ccList,
+                                              ...bccList,
+                                            ]) {
+                                              await EmailContactsManager.saveContact(
+                                                db,
+                                                email: rcpt,
+                                                source: 'sent_recipient',
+                                              );
+                                            }
+
+                                            if (ctx.mounted) Navigator.pop(ctx);
+                                            if (mounted) {
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
+                                                SnackBar(
+                                                  content: Text(
+                                                    'E-mail enviado com sucesso via SMTP (${selectedAccount!.outgoingHost}:${selectedAccount!.outgoingPort}) e arquivado!',
+                                                  ),
+                                                  backgroundColor: Colors.green,
+                                                ),
+                                              );
+                                            }
+                                            return;
+                                          }
+                                        }
+
+                                        final protocol =
+                                            await (db.select(db.appKvStore)
+                                                  ..where(
+                                                    (t) => t.key.equals(
+                                                      'jw_mail_protocol',
+                                                    ),
+                                                  ))
+                                                .getSingleOrNull();
 
                                         if (protocol?.value == 'exchange') {
                                           final accounts =

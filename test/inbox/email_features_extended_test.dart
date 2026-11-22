@@ -1,3 +1,4 @@
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:drift/native.dart';
 
@@ -149,6 +150,43 @@ void main() {
       );
       expect(jwpub.incomingHost, equals('mail.jw.org'));
       expect(jwpub.outgoingHost, equals('mail.jw.org'));
+    });
+
+    test('loadAccounts synthesizes deterministic legacy accounts and resolves passwords', () async {
+      FlutterSecureStorage.setMockInitialValues({
+        'jw_imap_password': 'legacy_imap_secret_pass',
+      });
+      final db = AppDatabase.forTesting(NativeDatabase.memory());
+      addTearDown(db.close);
+
+      await db
+          .into(db.appKvStore)
+          .insert(
+            AppKvStoreCompanion.insert(
+              key: 'jw_imap_email',
+              value: 'antigo@jw.org',
+            ),
+          );
+      await db
+          .into(db.appKvStore)
+          .insert(
+            AppKvStoreCompanion.insert(
+              key: 'jw_imap_host',
+              value: 'mail.jw.org',
+            ),
+          );
+
+      final accounts = await EmailAccountsManager.loadAccounts(db);
+      expect(accounts.length, equals(1));
+      final legacyAcc = accounts.first;
+      expect(legacyAcc.id, equals(EmailAccountsManager.legacyImapAccountId));
+      expect(legacyAcc.email, equals('antigo@jw.org'));
+
+      final recoveredPass = await EmailAccountsManager.getAccountPassword(
+        legacyAcc.id,
+        db,
+      );
+      expect(recoveredPass, equals('legacy_imap_secret_pass'));
     });
   });
 

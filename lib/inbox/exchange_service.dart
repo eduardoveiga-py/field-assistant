@@ -432,6 +432,7 @@ class ExchangeReadService {
                 subject: item.subject.isEmpty ? '(Sem assunto)' : item.subject,
                 from: item.from,
                 to: item.to,
+                accountEmail: account.toLowerCase(),
                 date: item.dateReceived ?? now,
                 bodyText: body,
                 attachments: attachmentsList,
