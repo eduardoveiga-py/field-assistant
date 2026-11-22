@@ -461,6 +461,13 @@ void main() {
                   'Vertical overflow detected in month view at $viewport under ${scale}x scale',
             );
 
+            // Garantir que a célula mensal do dia esteja visível e desobstruída do FAB antes de tocar
+            final scrollFinder = find.byType(SingleChildScrollView);
+            if (scrollFinder.evaluate().isNotEmpty) {
+              await tester.drag(scrollFinder.first, const Offset(0, -140));
+              await tester.pumpAndSettle();
+            }
+
             // Tocar no número do dia para verificar o painel inferior de detalhes
             final dayFinder = find.text('${today.day}');
             expect(dayFinder, findsWidgets);
