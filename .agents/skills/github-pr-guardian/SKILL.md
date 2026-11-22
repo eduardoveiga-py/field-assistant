@@ -51,3 +51,7 @@ Antes de abrir ou atualizar qualquer PR:
 ## 6. Pós-abertura do PR
 - **Comunicação com o usuário:** Sempre informar claramente ao usuário que as mudanças só entram no IPA/Web após o merge do PR na `master` e conclusão do workflow de build.
 - **Auto-merge e status checks:** Confirmar se o auto-merge foi ativado (`gh pr merge <PR> --auto --squash` ou via UI) ou se algum check precisa de ação manual.
+## 7. Ferramentas de CI e Release (actionlint, Codecov, Release Please)
+- **actionlint:** Validação automática de workflows em `.github/workflows/` a cada PR.
+- **Codecov:** Cobertura informativa (`coverage/lcov.info`) em PRs sem bloquear o CI.
+- **Release Please:** Uso obrigatório de Conventional Commits (`feat:`, `fix:`, `chore:`, etc.) para geração automática de releases, mantendo consistência de versão com o check `Check Version Consistency` ao revisar PRs de release.

@@ -177,6 +177,13 @@ jobs:
       - name: Enforce Crypto/Guard Coverage Gate (>=90%) & Report Breakdown
         run: python3 tool/ci_coverage_check.py coverage/lcov.info --enforce-crypto-min=90
 
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage/lcov.info
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+          
   integration_test_headless:
     name: Headless Integration Tests (Linux xvfb)
     runs-on: ubuntu-latest
