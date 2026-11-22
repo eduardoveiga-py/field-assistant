@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:clock/clock.dart';
+import 'package:drift/drift.dart' as drift show Value;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -195,6 +196,9 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
             }
           });
     _highlightPersonId = widget.highlightPersonId;
+    if (widget.highlightPersonId == null) {
+      _initGpsCameraPosition();
+    }
     MBTilesService.instance
         .init()
         .then((_) => _handleTilesRevisionChanged())
@@ -224,9 +228,13 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
     if (oldWidget.highlightPersonId != widget.highlightPersonId) {
       _highlightPersonId = widget.highlightPersonId;
       _hasCenteredHighlightPerson = false;
-      final current = ref.read(peopleStreamProvider).value;
-      if (current != null) {
-        _syncHighlightSideEffects(current);
+      if (widget.highlightPersonId == null) {
+        _initGpsCameraPosition();
+      } else {
+        final current = ref.read(peopleStreamProvider).value;
+        if (current != null) {
+          _syncHighlightSideEffects(current);
+        }
       }
     }
   }
@@ -842,16 +850,143 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
     return 'Geral';
   }
 
-  void _centerMapOnCoordinates(double lat, double lng) {
+  static const String _kvLastKnownUserLat = 'last_known_user_lat';
+  static const String _kvLastKnownUserLng = 'last_known_user_lng';
+
+  Future<GeoCoordinates?> _loadCachedLocation() async {
+    try {
+      final db = ref.read(databaseProvider);
+      final rows =
+          await (db.select(db.appKvStore)..where(
+                (t) => t.key.isIn([_kvLastKnownUserLat, _kvLastKnownUserLng]),
+              ))
+              .get();
+      String? latStr;
+      String? lngStr;
+      for (final r in rows) {
+        if (r.key == _kvLastKnownUserLat) latStr = r.value;
+        if (r.key == _kvLastKnownUserLng) lngStr = r.value;
+      }
+      if (latStr != null && lngStr != null) {
+        final lat = double.tryParse(latStr);
+        final lng = double.tryParse(lngStr);
+        if (lat != null &&
+            lng != null &&
+            lat.isFinite &&
+            lng.isFinite &&
+            lat.abs() <= 90 &&
+            lng.abs() <= 180 &&
+            (lat != 0.0 || lng != 0.0)) {
+          return (latitude: lat, longitude: lng);
+        }
+      }
+    } catch (e, st) {
+      AppLogger.warning(
+        'Erro ao ler coordenadas em cache no AppKvStore',
+        e,
+        st,
+      );
+    }
+    return null;
+  }
+
+  Future<void> _saveLastKnownLocation(double lat, double lng) async {
+    if (!lat.isFinite || !lng.isFinite || lat.abs() > 90 || lng.abs() > 180) {
+      return;
+    }
+    try {
+      final db = ref.read(databaseProvider);
+      final now = drift.Value(DateTime.now().toUtc());
+      await db
+          .into(db.appKvStore)
+          .insertOnConflictUpdate(
+            AppKvStoreCompanion.insert(
+              key: _kvLastKnownUserLat,
+              value: lat.toString(),
+              updatedAt: now,
+            ),
+          );
+      await db
+          .into(db.appKvStore)
+          .insertOnConflictUpdate(
+            AppKvStoreCompanion.insert(
+              key: _kvLastKnownUserLng,
+              value: lng.toString(),
+              updatedAt: now,
+            ),
+          );
+    } catch (e, st) {
+      AppLogger.warning(
+        'Erro ao persistir localização GPS no AppKvStore',
+        e,
+        st,
+      );
+    }
+  }
+
+  void _updateCameraToCoordinates(double lat, double lng) {
+    if (!mounted) return;
     setState(() {
       _activeCenterLat = lat;
       _activeCenterLng = lng;
     });
     try {
       _mapEngineAdapter.moveCamera(
-        MapViewportState(latitude: lat, longitude: lng, zoom: _zoom.toDouble()),
+        MapViewportState(
+          latitude: lat,
+          longitude: lng,
+          zoom: _zoom.toDouble(),
+          bearingDegrees: _rotationNotifier.value * (180.0 / math.pi),
+        ),
       );
     } catch (_) {}
+
+    final size = _lastConstraintsSize;
+    if (size != null && size.width > 0 && size.height > 0) {
+      _centerOnCoords(
+        lat,
+        lng,
+        size.width,
+        size.height,
+        gridHalfSize: _lastGridHalfSize,
+      );
+    }
+  }
+
+  void _initGpsCameraPosition() {
+    _loadCachedLocation()
+        .then((cached) {
+          if (!mounted || _highlightPersonId != null) return;
+          if (cached != null) {
+            _updateCameraToCoordinates(cached.latitude, cached.longitude);
+          }
+          _fetchCurrentLocationAndUpdateCamera();
+        })
+        .catchError((Object e, StackTrace st) {
+          AppLogger.warning('Falha ao carregar cache de localização', e, st);
+          if (mounted && _highlightPersonId == null) {
+            _fetchCurrentLocationAndUpdateCamera();
+          }
+        });
+  }
+
+  void _fetchCurrentLocationAndUpdateCamera() {
+    GeolocationHelper.getCurrentLocation()
+        .then((pos) {
+          if (!mounted || _highlightPersonId != null || pos == null) return;
+          _updateState(() {
+            _userGpsLocation = pos;
+          });
+          _updateCameraToCoordinates(pos.latitude, pos.longitude);
+          _saveLastKnownLocation(pos.latitude, pos.longitude);
+        })
+        .catchError((Object e, StackTrace st) {
+          AppLogger.debug('GPS atual indisponível no startup: $e', st);
+        });
+  }
+
+  void _centerMapOnCoordinates(double lat, double lng) {
+    _updateCameraToCoordinates(lat, lng);
   }
 
   void _showOfflineSearchModal(BuildContext context) {
