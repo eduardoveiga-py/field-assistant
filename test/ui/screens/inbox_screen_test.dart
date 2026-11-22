@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:drift/drift.dart' as drift;
@@ -336,6 +337,79 @@ void main() {
         expect(
           find.textContaining('Conta Sem Senha: senha não configurada'),
           findsOneWidget,
+        );
+
+        await tester.pump(const Duration(seconds: 7));
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+        await db.close();
+        await tester.pump(const Duration(milliseconds: 100));
+      },
+    );
+
+    testWidgets(
+      'TC-INBOX-SYNC-05: TimeoutException com mensagem contendo connection mapeia para Tempo limite de conexão esgotado',
+      (tester) async {
+        final db = AppDatabase.forTesting(NativeDatabase.memory());
+        final repo = AppRepository(db);
+
+        final account = EmailAccount.createPreset(
+          providerType: EmailProviderType.jwpub,
+          name: 'TimeoutAcc',
+          email: 'timeout@jwpub.org',
+          username: 'timeout@jwpub.org',
+        );
+        await EmailAccountsManager.saveAccount(
+          db,
+          account,
+          password: 'test_password',
+        );
+
+        final emailService = _TestJwEmailService(
+          db: db,
+          biometricAuth: _AlwaysUnlockedBiometricService(),
+        );
+        emailService.onSyncEmails = ({host, password, port, username}) async {
+          throw TimeoutException('Connection timed out after 10000ms');
+        };
+
+        tester.view.physicalSize = const Size(800, 1000);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              databaseProvider.overrideWithValue(db),
+              repositoryProvider.overrideWithValue(repo),
+              jwEmailServiceProvider.overrideWithValue(emailService),
+              biometricAuthServiceProvider.overrideWithValue(
+                _AlwaysUnlockedBiometricService(),
+              ),
+            ],
+            child: const MaterialApp(home: InboxScreen()),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byTooltip('Sincronizar E-mails / Hub'));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(SnackBar), findsOneWidget);
+        expect(
+          find.textContaining('Falha na sincronização de e-mail:'),
+          findsOneWidget,
+        );
+        expect(
+          find.textContaining('TimeoutAcc: Tempo limite de conexão esgotado.'),
+          findsOneWidget,
+        );
+        expect(
+          find.textContaining(
+            'Falha de conexão. Servidor inacessível ou rede indisponível.',
+          ),
+          findsNothing,
         );
 
         await tester.pump(const Duration(seconds: 7));

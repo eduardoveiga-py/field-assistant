@@ -145,12 +145,8 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
       return 'Falha de autenticação (verifique usuário e senha).';
     }
 
-    if (e is JwEmailConnectionException ||
-        (!kIsWeb && e is SocketException) ||
-        msg.contains('socket') ||
-        msg.contains('conexão') ||
-        msg.contains('connection')) {
-      return 'Falha de conexão. Servidor inacessível ou rede indisponível.';
+    if (e is ExchangeException) {
+      return e.message;
     }
 
     if (e is TimeoutException ||
@@ -159,8 +155,12 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
       return 'Tempo limite de conexão esgotado.';
     }
 
-    if (e is ExchangeException) {
-      return e.message;
+    if (e is JwEmailConnectionException ||
+        (!kIsWeb && e is SocketException) ||
+        msg.contains('socket') ||
+        msg.contains('conexão') ||
+        msg.contains('connection')) {
+      return 'Falha de conexão. Servidor inacessível ou rede indisponível.';
     }
 
     final clean = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
