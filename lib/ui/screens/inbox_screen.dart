@@ -215,6 +215,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
       },
     );
   }
+
   Future<void> _toggleAudio(String path) async {
     if (_currentlyPlayingPath == path && _isPlaying) {
       await _playerService.pause();
@@ -556,7 +557,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
               statusFilter: _selectedFilter == 'all' ? null : _selectedFilter,
             ),
             builder: (context, snapshot) {
-             if (snapshot.hasData) {
+              if (snapshot.hasData) {
                 _cachedCaptures = snapshot.data!;
               }
               if (snapshot.connectionState == ConnectionState.waiting &&
@@ -584,8 +585,8 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                   }
 
                   final listWidget = ListView.separated(
-                   key: const PageStorageKey<String>('inbox_captures_list'),
-                  controller: _capturesScrollController,
+                    key: const PageStorageKey<String>('inbox_captures_list'),
+                    controller: _capturesScrollController,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 16,
                       vertical: 12,
@@ -2080,7 +2081,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                   _cachedEmails.isEmpty) {
                 return const Center(child: CircularProgressIndicator());
               }
-              final emails = snapshot.data ?? _cachedEmails;         
+              final emails = snapshot.data ?? _cachedEmails;
               if (emails.isEmpty) {
                 return Center(
                   child: SingleChildScrollView(
@@ -2518,8 +2519,8 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
 
                             final listWidget = ListView.separated(
                               key: const PageStorageKey('inbox_emails_list'),
-                            controller: _emailsScrollController,
-                             padding: const EdgeInsets.symmetric(
+                              controller: _emailsScrollController,
+                              padding: const EdgeInsets.symmetric(
                                 horizontal: 16,
                                 vertical: 4,
                               ),
@@ -3712,7 +3713,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                           text: msg.bodyText,
                           html: msg.bodyHtml,
                           isDark: isDark,
-                        attachments: msg.attachments,
+                          attachments: msg.attachments,
                         ),
                         if (msg.attachments.isNotEmpty) ...[
                           const SizedBox(height: 20),
@@ -5903,7 +5904,7 @@ class _ProfessionalEmailBodyView extends StatelessWidget {
         attachments,
       );
       if (cleanHtml.isNotEmpty) {
-       return Theme(
+        return Theme(
           data: ThemeData.light(),
           child: Container(
             width: double.infinity,

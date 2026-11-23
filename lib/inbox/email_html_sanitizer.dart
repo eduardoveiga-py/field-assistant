@@ -31,7 +31,7 @@ class EmailHtmlSanitizer {
   static final RegExp _decimalEntityRegex = RegExp(r'&#([0-9]+);');
   static final RegExp _multiSpaceRegex = RegExp(r'[ \t]+');
   static final RegExp _multiNewlineRegex = RegExp(r'\n{3,}');
-static final RegExp _msoConditionalBlockRegex = RegExp(
+  static final RegExp _msoConditionalBlockRegex = RegExp(
     r'<!\[if[^\]]*\][\s\S]*?<!\[endif\]>',
     caseSensitive: false,
   );
@@ -48,6 +48,7 @@ static final RegExp _msoConditionalBlockRegex = RegExp(
     r'^\s*-->\s*$',
     multiLine: true,
   );
+
   /// Mapeamento de entidades HTML nomeadas comuns
   static const Map<String, String> _namedEntities = {
     '&nbsp;': ' ',
@@ -274,22 +275,16 @@ static final RegExp _msoConditionalBlockRegex = RegExp(
     if (html.isEmpty || attachments.isEmpty) return html;
     final cidMap = <String, String>{};
     for (final att in attachments) {
-      final rawCid =
-          (att['contentId'] ?? att['content_id'] ?? att['cid'])
-              ?.toString()
-              .trim();
-      final b64 =
-          (att['base64'] ?? att['data'] ?? att['content'])
-              ?.toString()
-              .trim();
-      if (rawCid == null ||
-          rawCid.isEmpty ||
-          b64 == null ||
-          b64.isEmpty) {
+      final rawCid = (att['contentId'] ?? att['content_id'] ?? att['cid'])
+          ?.toString()
+          .trim();
+      final b64 = (att['base64'] ?? att['data'] ?? att['content'])
+          ?.toString()
+          .trim();
+      if (rawCid == null || rawCid.isEmpty || b64 == null || b64.isEmpty) {
         continue;
       }
-      final cleanCid =
-          rawCid.replaceAll(RegExp(r'^<|>$'), '').toLowerCase();
+      final cleanCid = rawCid.replaceAll(RegExp(r'^<|>$'), '').toLowerCase();
       final mime =
           (att['mimeType'] ??
                   att['mime_type'] ??
@@ -304,10 +299,7 @@ static final RegExp _msoConditionalBlockRegex = RegExp(
     }
     if (cidMap.isEmpty) return html;
     return html.replaceAllMapped(
-      RegExp(
-        r'''src\s*=\s*(['"])cid:([^'"]+)\1''',
-        caseSensitive: false,
-      ),
+      RegExp(r'''src\s*=\s*(['"])cid:([^'"]+)\1''', caseSensitive: false),
       (match) {
         final quote = match.group(1)!;
         final cid = match.group(2)!.trim().toLowerCase();
