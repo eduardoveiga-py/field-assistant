@@ -337,5 +337,117 @@ void main() {
         expect(msgs.first.folderName, equals('Caixa de Entrada'));
       },
     );
+
+    test('getValidAccessToken returns null when token is expired and renewal fails', () async {
+      const accountId = 'expired_acc';
+      await tokenStore.saveTokenBundle(
+        accountId,
+        OAuthTokenBundle(
+          accessToken: 'expired_token',
+          expiresAt: DateTime.now().subtract(const Duration(minutes: 10)),
+        ),
+      );
+
+      final mockClient = MockClient((request) async => http.Response('', 400));
+      final service = GmailOAuthService(
+        httpClient: mockClient,
+        tokenStore: tokenStore,
+      );
+
+      final token = await service.getValidAccessToken(accountId);
+      expect(token, isNull);
+    });
+
+    test(
+      'fetchMessages throws immediately when INBOX returns 401 or 403',
+      () async {
+        const accountId = 'inbox_401_acc';
+        await tokenStore.saveTokenBundle(
+          accountId,
+          OAuthTokenBundle(
+            accessToken: 'valid_token',
+            expiresAt: DateTime.now().add(const Duration(hours: 1)),
+          ),
+        );
+
+        final mockClient = MockClient((request) async {
+          if (request.url.toString().contains('labelIds=INBOX')) {
+            return http.Response(
+              jsonEncode({
+                'error': {'code': 401, 'message': 'UNAUTHENTICATED'},
+              }),
+              401,
+              headers: {'content-type': 'application/json'},
+            );
+          }
+          return http.Response(jsonEncode({'messages': []}), 200);
+        });
+
+        final service = GmailOAuthService(
+          httpClient: mockClient,
+          tokenStore: tokenStore,
+        );
+
+        expect(
+          () => service.fetchMessages(
+            accountId: accountId,
+            accountEmail: 'user@gmail.com',
+          ),
+          throwsA(
+            isA<Exception>().having(
+              (e) => e.toString(),
+              'message',
+              contains('Sessão do Gmail expirada ou não autorizada (401)'),
+            ),
+          ),
+        );
+      },
+    );
+
+    test('fetchMessages throws when messageRefs is not empty but all messages fail to download', () async {
+      const accountId = 'fetch_fail_acc';
+      await tokenStore.saveTokenBundle(
+        accountId,
+        OAuthTokenBundle(
+          accessToken: 'valid_token',
+          expiresAt: DateTime.now().add(const Duration(hours: 1)),
+        ),
+      );
+
+      final mockClient = MockClient((request) async {
+        final url = request.url.toString();
+        if (url.contains('labelIds=INBOX')) {
+          return http.Response(
+            jsonEncode({
+              'messages': [
+                {'id': 'msg_err_1'},
+              ],
+            }),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        } else if (url.contains('/messages/msg_err_1')) {
+          return http.Response(
+            jsonEncode({'error': 'Internal server error'}),
+            500,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        return http.Response(jsonEncode({'messages': []}), 200);
+      });
+
+      final service = GmailOAuthService(
+        httpClient: mockClient,
+        tokenStore: tokenStore,
+      );
+
+      expect(
+        () => service.fetchMessages(
+          accountId: accountId,
+          accountEmail: 'user@gmail.com',
+        ),
+        throwsA(isA<Exception>()),
+      );
+    });
   });
 }

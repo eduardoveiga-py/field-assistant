@@ -159,10 +159,17 @@ class GmailOAuthService {
       try {
         final headers = await account.authorizationClient.authorizationHeaders(
           defaultScopes,
-          promptIfNecessary: false,
+          promptIfNecessary: true,
         );
         token = _extractBearerToken(headers);
-      } catch (_) {}
+      } catch (e, st) {
+        AppLogger.warning(
+          'Falha ao obter credenciais/escopos do Google: $e',
+          e,
+          st,
+        );
+        throw Exception('Falha ao autorizar escopos do Gmail com o Google: $e');
+      }
 
       if (token != null && token.isNotEmpty) {
         _lastAuthenticatedEmail = account.email;
@@ -179,8 +186,9 @@ class GmailOAuthService {
         );
       }
       return null;
-    } catch (e) {
-      return null;
+    } catch (e, st) {
+      AppLogger.warning('Falha na autenticação do Google/Gmail: $e', e, st);
+      rethrow;
     }
   }
 
@@ -202,6 +210,28 @@ class GmailOAuthService {
     await _ensureInitialized();
     try {
       if (kIsWeb) {
+        try {
+          final account = await _googleSignIn
+              .attemptLightweightAuthentication();
+          if (account != null) {
+            final headers = await account.authorizationClient
+                .authorizationHeaders(defaultScopes, promptIfNecessary: false);
+            final newToken = _extractBearerToken(headers);
+            if (newToken != null && newToken.isNotEmpty) {
+              final updated = OAuthTokenBundle(
+                accessToken: newToken,
+                refreshToken: bundle.refreshToken,
+                expiresAt: DateTime.now().add(const Duration(hours: 1)),
+                scopes: bundle.scopes.isNotEmpty
+                    ? bundle.scopes
+                    : defaultScopes,
+              );
+              await _tokenStore.saveTokenBundle(accountId, updated);
+              return newToken;
+            }
+          }
+        } catch (_) {}
+
         final headers = await _googleSignIn.authorizationClient
             .authorizationHeaders(defaultScopes, promptIfNecessary: false);
         final authHeader =
@@ -249,6 +279,9 @@ class GmailOAuthService {
         bundle.accessToken.isNotEmpty) {
       return bundle.accessToken;
     }
+    if (bundle.isExpired) {
+      return null;
+    }
     return bundle.accessToken.isNotEmpty ? bundle.accessToken : null;
   }
 
@@ -279,6 +312,22 @@ class GmailOAuthService {
     if (labelIds.contains('TRASH')) return 'Lixeira';
     if (labelIds.contains('SPAM')) return 'Spam';
     return 'Caixa de Entrada';
+  }
+
+  static Never _throwDescriptiveGmailError(String error) {
+    if (error.contains('403') ||
+        error.contains('PERMISSION_DENIED') ||
+        error.contains('has not been used')) {
+      throw Exception(
+        'Acesso à Gmail API negado (403). Certifique-se de ativar a "Gmail API" no Google Cloud Console e de que o usuário está cadastrado em Usuários de Teste.',
+      );
+    }
+    if (error.contains('401') || error.contains('UNAUTHENTICATED')) {
+      throw Exception(
+        'Sessão do Gmail expirada ou não autorizada (401). Reconecte a conta nas Configurações.',
+      );
+    }
+    throw Exception('Falha ao sincronizar Gmail: $error');
   }
 
   /// Sincroniza e busca mensagens de e-mail do Gmail
@@ -318,12 +367,17 @@ class GmailOAuthService {
           AppLogger.warning(
             'Falha ao listar mensagens da label $labelId: $lastError',
           );
+          if (labelId == 'INBOX') {
+            _throwDescriptiveGmailError(lastError);
+          }
           continue;
         }
         successCalls++;
 
         final listData = jsonDecode(listResp.body) as Map<String, dynamic>;
         final messageRefs = listData['messages'] as List<dynamic>? ?? [];
+        var fetchedForLabel = 0;
+        String? lastMessageError;
 
         for (final ref in messageRefs) {
           final id = ref['id'] as String?;
@@ -344,13 +398,16 @@ class GmailOAuthService {
               );
               if (parsed != null) {
                 messages.add(parsed);
+                fetchedForLabel++;
               }
             } else {
+              lastMessageError = 'HTTP ${msgResp.statusCode}: ${msgResp.body}';
               AppLogger.warning(
                 'Falha ao buscar mensagem $id: HTTP ${msgResp.statusCode}',
               );
             }
           } catch (e, st) {
+            lastMessageError = e.toString();
             AppLogger.warning(
               'Erro ao processar mensagem Gmail $id: $e',
               e,
@@ -358,7 +415,17 @@ class GmailOAuthService {
             );
           }
         }
+
+        if (messageRefs.isNotEmpty &&
+            fetchedForLabel == 0 &&
+            lastMessageError != null) {
+          AppLogger.error(
+            'Todas as mensagens listadas para a label $labelId falharam ao baixar: $lastMessageError',
+          );
+          _throwDescriptiveGmailError(lastMessageError);
+        }
       } catch (e, st) {
+        if (labelId == 'INBOX') rethrow;
         lastError = e.toString();
         AppLogger.warning(
           'Erro na chamada da label $labelId do Gmail: $e',
@@ -369,19 +436,7 @@ class GmailOAuthService {
     }
 
     if (successCalls == 0 && lastError != null) {
-      if (lastError.contains('403') ||
-          lastError.contains('PERMISSION_DENIED') ||
-          lastError.contains('has not been used')) {
-        throw Exception(
-          'Acesso à Gmail API negado (403). Certifique-se de ativar a "Gmail API" no Google Cloud Console e de que o usuário está cadastrado em Usuários de Teste.',
-        );
-      }
-      if (lastError.contains('401') || lastError.contains('UNAUTHENTICATED')) {
-        throw Exception(
-          'Sessão do Gmail expirada ou não autorizada (401). Reconecte a conta nas Configurações.',
-        );
-      }
-      throw Exception('Falha ao sincronizar Gmail: $lastError');
+      _throwDescriptiveGmailError(lastError);
     }
 
     return messages;

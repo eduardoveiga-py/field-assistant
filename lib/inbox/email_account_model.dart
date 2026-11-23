@@ -307,17 +307,49 @@ class EmailAccountsManager {
     return accounts;
   }
 
-  /// Salva uma conta e sua senha de forma segura
+  /// Salva uma conta e sua senha de forma segura, deduplicando por (username, incomingProtocol)
   static Future<void> saveAccount(
     AppDatabase db,
     EmailAccount account, {
     String? password,
   }) async {
     final existing = await loadAccounts(db);
-    final map = {for (final a in existing) a.id: a};
-    map[account.id] = account;
+    final targetUser =
+        (account.username.trim().isNotEmpty
+                ? account.username.trim()
+                : account.email.trim())
+            .toLowerCase();
+    final targetProtocol = account.incomingProtocol;
 
-    final encoded = jsonEncode(map.values.map((a) => a.toJson()).toList());
+    final result = <EmailAccount>[];
+    final seenKeys = <String>{};
+
+    // Insere ou atualiza a conta atual com prioridade
+    result.add(account);
+    if (targetUser.isNotEmpty) {
+      seenKeys.add('$targetUser::$targetProtocol');
+    }
+
+    // Filtra e deduplica contas existentes
+    for (final a in existing) {
+      if (a.id == account.id) continue;
+      final u =
+          (a.username.trim().isNotEmpty ? a.username.trim() : a.email.trim())
+              .toLowerCase();
+      final p = a.incomingProtocol;
+      final key = '$u::$p';
+
+      if (u.isNotEmpty && seenKeys.contains(key)) {
+        // Ignora duplicata idêntica
+        continue;
+      }
+      if (u.isNotEmpty) {
+        seenKeys.add(key);
+      }
+      result.add(a);
+    }
+
+    final encoded = jsonEncode(result.map((a) => a.toJson()).toList());
     await db
         .into(db.appKvStore)
         .insertOnConflictUpdate(
