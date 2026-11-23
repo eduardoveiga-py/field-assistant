@@ -415,11 +415,11 @@ class MicrosoftOAuthService {
     return null;
   }
 
-  /// Busca mensagens de e-mail das principais pastas do Microsoft Graph
+  /// Busca mensagens de e-mail das principais pastas do Microsoft Graph com paginação real
   Future<List<JwEmailMessage>> fetchMessages({
     required String accountId,
     required String accountEmail,
-    int maxResults = 30,
+    int maxResults = 200,
   }) async {
     final token = await getValidAccessToken(accountId);
     if (token == null || token.isEmpty) {
@@ -432,55 +432,95 @@ class MicrosoftOAuthService {
     };
 
     final folders = wellKnownFolderMap.keys.toList();
-    final perFolderLimit = (maxResults / folders.length).ceil().clamp(5, 30);
     final messages = <JwEmailMessage>[];
     final seenIds = <String>{};
     String? lastError;
     var successCalls = 0;
 
+    int getFolderQuota(String folderKey) {
+      if (maxResults <= 30) {
+        return (maxResults / folders.length).ceil().clamp(1, 30);
+      }
+      switch (folderKey) {
+        case 'inbox':
+        case 'sentitems':
+          return ((maxResults * 60) / 195).round().clamp(5, 100);
+        default:
+          return ((maxResults * 25) / 195).round().clamp(5, 50);
+      }
+    }
+
     for (final folderKey in folders) {
       try {
-        final uri = Uri.parse(
-          '$graphBaseUrl/me/mailFolders/$folderKey/messages'
-          '?\$top=$perFolderLimit'
-          '&\$select=id,subject,body,from,toRecipients,ccRecipients,bccRecipients,receivedDateTime,sentDateTime,isRead,hasAttachments',
-        );
+        final folderQuota = getFolderQuota(folderKey);
+        var fetchedForFolder = 0;
+        final topParam = folderQuota < 50 ? folderQuota : 50;
 
-        final resp = await _httpClient.get(uri, headers: headers);
-        if (resp.statusCode != 200) {
-          lastError = 'Microsoft Graph HTTP ${resp.statusCode}: ${resp.body}';
-          AppLogger.warning(
-            'Falha ao listar mensagens da pasta $folderKey do Graph: $lastError',
-          );
-          continue;
-        }
-        successCalls++;
+        String? nextUrl =
+            '$graphBaseUrl/me/mailFolders/$folderKey/messages'
+            '?\$top=$topParam'
+            '&\$select=id,subject,body,from,toRecipients,ccRecipients,bccRecipients,receivedDateTime,sentDateTime,isRead,hasAttachments';
 
-        final data = jsonDecode(resp.body) as Map<String, dynamic>;
-        final list = data['value'] as List<dynamic>? ?? [];
+        const maxPagesPerFolder = 10;
+        var pageCount = 0;
 
-        for (final item in list) {
-          if (item is! Map) continue;
-          final msgMap = Map<String, dynamic>.from(item);
-          final id = msgMap['id'] as String?;
-          if (id == null || seenIds.contains(id)) continue;
-          seenIds.add(id);
-
-          final parsed = parseGraphMessage(
-            msgMap,
-            accountEmail: accountEmail,
-            folderKey: folderKey,
-          );
-
-          // Se tem anexos, busca metadados
-          if (parsed != null && (msgMap['hasAttachments'] as bool? ?? false)) {
-            final attachments = await _fetchAttachmentMetadata(
-              messageId: id,
-              headers: headers,
+        while (nextUrl != null &&
+            nextUrl.isNotEmpty &&
+            fetchedForFolder < folderQuota &&
+            pageCount < maxPagesPerFolder) {
+          pageCount++;
+          final uri = Uri.parse(nextUrl);
+          final resp = await _httpClient.get(uri, headers: headers);
+          if (resp.statusCode != 200) {
+            lastError = 'Microsoft Graph HTTP ${resp.statusCode}: ${resp.body}';
+            AppLogger.warning(
+              'Falha ao listar mensagens da pasta $folderKey do Graph: $lastError',
             );
-            messages.add(parsed.copyWith(attachments: attachments));
-          } else if (parsed != null) {
-            messages.add(parsed);
+            break;
+          }
+          successCalls++;
+
+          final data = jsonDecode(resp.body) as Map<String, dynamic>;
+          final list = data['value'] as List<dynamic>? ?? [];
+          if (list.isEmpty) break;
+
+          for (final item in list) {
+            if (item is! Map) continue;
+            final msgMap = Map<String, dynamic>.from(item);
+            final id = msgMap['id'] as String?;
+            if (id == null || seenIds.contains(id)) continue;
+            seenIds.add(id);
+
+            final parsed = parseGraphMessage(
+              msgMap,
+              accountEmail: accountEmail,
+              folderKey: folderKey,
+            );
+
+            // Se tem anexos, busca metadados
+            if (parsed != null &&
+                (msgMap['hasAttachments'] as bool? ?? false)) {
+              final attachments = await _fetchAttachmentMetadata(
+                messageId: id,
+                headers: headers,
+              );
+              messages.add(parsed.copyWith(attachments: attachments));
+              fetchedForFolder++;
+            } else if (parsed != null) {
+              messages.add(parsed);
+              fetchedForFolder++;
+            }
+
+            if (fetchedForFolder >= folderQuota) break;
+          }
+
+          final nextLink = data['@odata.nextLink'] as String?;
+          if (fetchedForFolder < folderQuota &&
+              nextLink != null &&
+              nextLink.isNotEmpty) {
+            nextUrl = nextLink;
+          } else {
+            nextUrl = null;
           }
         }
       } catch (e, st) {

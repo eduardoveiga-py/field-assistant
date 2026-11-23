@@ -330,11 +330,11 @@ class GmailOAuthService {
     throw Exception('Falha ao sincronizar Gmail: $error');
   }
 
-  /// Sincroniza e busca mensagens de e-mail do Gmail
+  /// Sincroniza e busca mensagens de e-mail do Gmail com paginação real
   Future<List<JwEmailMessage>> fetchMessages({
     required String accountId,
     required String accountEmail,
-    int maxResults = 30,
+    int maxResults = 200,
   }) async {
     final token = await getValidAccessToken(accountId);
     if (token == null || token.isEmpty) {
@@ -347,82 +347,142 @@ class GmailOAuthService {
     };
 
     final labelsToSync = ['INBOX', 'SENT', 'DRAFT', 'SPAM', 'TRASH'];
-    final perLabelLimit = (maxResults / labelsToSync.length).ceil().clamp(
-      5,
-      30,
-    );
     final seenMessageIds = <String>{};
     final messages = <JwEmailMessage>[];
     String? lastError;
     var successCalls = 0;
 
+    int getLabelQuota(String labelId) {
+      if (maxResults <= 30) {
+        return (maxResults / labelsToSync.length).ceil().clamp(1, 30);
+      }
+      switch (labelId) {
+        case 'INBOX':
+        case 'SENT':
+          return ((maxResults * 60) / 195).round().clamp(5, 100);
+        default:
+          return ((maxResults * 25) / 195).round().clamp(5, 50);
+      }
+    }
+
     for (final labelId in labelsToSync) {
       try {
-        final listUri = Uri.parse(
-          'https://gmail.googleapis.com/gmail/v1/users/me/messages?labelIds=$labelId&maxResults=$perLabelLimit',
-        );
-        final listResp = await _httpClient.get(listUri, headers: authHeaders);
-        if (listResp.statusCode != 200) {
-          lastError = 'Gmail API HTTP ${listResp.statusCode}: ${listResp.body}';
-          AppLogger.warning(
-            'Falha ao listar mensagens da label $labelId: $lastError',
-          );
-          if (labelId == 'INBOX') {
-            _throwDescriptiveGmailError(lastError);
-          }
-          continue;
-        }
-        successCalls++;
+        final labelQuota = getLabelQuota(labelId);
+        final allMessageRefs = <Map<String, dynamic>>[];
+        String? pageToken;
+        var pageCount = 0;
+        const maxPagesPerLabel = 10;
 
-        final listData = jsonDecode(listResp.body) as Map<String, dynamic>;
-        final messageRefs = listData['messages'] as List<dynamic>? ?? [];
+        do {
+          pageCount++;
+          final remaining = labelQuota - allMessageRefs.length;
+          final pageSize = remaining.clamp(1, 50);
+          var listUrl =
+              'https://gmail.googleapis.com/gmail/v1/users/me/messages?labelIds=$labelId&maxResults=$pageSize';
+          if (pageToken != null && pageToken.isNotEmpty) {
+            listUrl += '&pageToken=$pageToken';
+          }
+          final listResp = await _httpClient.get(
+            Uri.parse(listUrl),
+            headers: authHeaders,
+          );
+          if (listResp.statusCode != 200) {
+            lastError =
+                'Gmail API HTTP ${listResp.statusCode}: ${listResp.body}';
+            AppLogger.warning(
+              'Falha ao listar mensagens da label $labelId: $lastError',
+            );
+            if (labelId == 'INBOX' && allMessageRefs.isEmpty) {
+              _throwDescriptiveGmailError(lastError);
+            }
+            break;
+          }
+          successCalls++;
+
+          final listData = jsonDecode(listResp.body) as Map<String, dynamic>;
+          final refs = listData['messages'] as List<dynamic>? ?? [];
+          for (final r in refs) {
+            if (r is Map) {
+              allMessageRefs.add(Map<String, dynamic>.from(r));
+            }
+          }
+          pageToken = listData['nextPageToken'] as String?;
+        } while (pageToken != null &&
+            pageToken.isNotEmpty &&
+            allMessageRefs.length < labelQuota &&
+            pageCount < maxPagesPerLabel);
+
         var fetchedForLabel = 0;
         String? lastMessageError;
 
-        for (final ref in messageRefs) {
-          final id = ref['id'] as String?;
-          if (id == null || seenMessageIds.contains(id)) continue;
-          seenMessageIds.add(id);
+        // Processa os detalhes das mensagens em lotes paralelos controlados de 6
+        const batchSize = 6;
+        for (var i = 0; i < allMessageRefs.length; i += batchSize) {
+          final batch = allMessageRefs.sublist(
+            i,
+            (i + batchSize > allMessageRefs.length)
+                ? allMessageRefs.length
+                : i + batchSize,
+          );
 
-          try {
-            final msgUri = Uri.parse(
-              'https://gmail.googleapis.com/gmail/v1/users/me/messages/$id?format=full',
-            );
-            final msgResp = await _httpClient.get(msgUri, headers: authHeaders);
-            if (msgResp.statusCode == 200) {
-              final msgData = jsonDecode(msgResp.body) as Map<String, dynamic>;
-              final parsed = parseGmailMessage(
-                msgData,
-                accountEmail: accountEmail,
-                preferredFolder: mapLabelToFolderName([labelId]),
+          final batchFutures = batch.map((ref) async {
+            final id = ref['id'] as String?;
+            if (id == null) return null;
+            if (seenMessageIds.contains(id)) return null;
+            seenMessageIds.add(id);
+
+            try {
+              final msgUri = Uri.parse(
+                'https://gmail.googleapis.com/gmail/v1/users/me/messages/$id?format=full',
               );
-              if (parsed != null) {
-                messages.add(parsed);
-                fetchedForLabel++;
+              final msgResp = await _httpClient.get(
+                msgUri,
+                headers: authHeaders,
+              );
+              if (msgResp.statusCode == 200) {
+                final msgData =
+                    jsonDecode(msgResp.body) as Map<String, dynamic>;
+                final parsed = parseGmailMessage(
+                  msgData,
+                  accountEmail: accountEmail,
+                  preferredFolder: mapLabelToFolderName([labelId]),
+                );
+                return parsed;
+              } else {
+                lastMessageError =
+                    'HTTP ${msgResp.statusCode}: ${msgResp.body}';
+                AppLogger.warning(
+                  'Falha ao buscar mensagem $id: HTTP ${msgResp.statusCode}',
+                );
               }
-            } else {
-              lastMessageError = 'HTTP ${msgResp.statusCode}: ${msgResp.body}';
+            } catch (e, st) {
+              lastMessageError = e.toString();
               AppLogger.warning(
-                'Falha ao buscar mensagem $id: HTTP ${msgResp.statusCode}',
+                'Erro ao processar mensagem Gmail $id: $e',
+                e,
+                st,
               );
             }
-          } catch (e, st) {
-            lastMessageError = e.toString();
-            AppLogger.warning(
-              'Erro ao processar mensagem Gmail $id: $e',
-              e,
-              st,
-            );
+            return null;
+          });
+
+          final results = await Future.wait(batchFutures);
+          for (final parsed in results) {
+            if (parsed != null) {
+              messages.add(parsed);
+              fetchedForLabel++;
+            }
           }
         }
 
-        if (messageRefs.isNotEmpty &&
+        final currentMsgError = lastMessageError;
+        if (allMessageRefs.isNotEmpty &&
             fetchedForLabel == 0 &&
-            lastMessageError != null) {
+            currentMsgError != null) {
           AppLogger.error(
-            'Todas as mensagens listadas para a label $labelId falharam ao baixar: $lastMessageError',
+            'Todas as mensagens listadas para a label $labelId falharam ao baixar: $currentMsgError',
           );
-          _throwDescriptiveGmailError(lastMessageError);
+          _throwDescriptiveGmailError(currentMsgError);
         }
       } catch (e, st) {
         if (labelId == 'INBOX') rethrow;

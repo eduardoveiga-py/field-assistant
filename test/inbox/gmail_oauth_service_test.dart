@@ -449,5 +449,122 @@ void main() {
         throwsA(isA<Exception>()),
       );
     });
+
+    test('fetchMessages follows nextPageToken pagination and downloads details in parallel', () async {
+      const accountId = 'gmail_acc_pagination';
+      await tokenStore.saveTokenBundle(
+        accountId,
+        OAuthTokenBundle(
+          accessToken: 'valid_pag_token',
+          expiresAt: DateTime.now().add(const Duration(hours: 1)),
+        ),
+      );
+
+      var listPage1Called = false;
+      var listPage2Called = false;
+      final downloadedIds = <String>[];
+
+      final textData1 = base64Url
+          .encode(utf8.encode('Conteudo da pagina 1'))
+          .replaceAll('=', '');
+      final textData2 = base64Url
+          .encode(utf8.encode('Conteudo da pagina 2'))
+          .replaceAll('=', '');
+
+      final mockClient = MockClient((request) async {
+        final url = request.url.toString();
+        if (url.contains('/messages?') && url.contains('labelIds=INBOX')) {
+          if (url.contains('pageToken=page2_token')) {
+            listPage2Called = true;
+            return http.Response(
+              jsonEncode({
+                'messages': [
+                  {'id': 'msg_pag_2', 'threadId': 't2'},
+                ],
+              }),
+              200,
+              headers: {'content-type': 'application/json'},
+            );
+          } else {
+            listPage1Called = true;
+            return http.Response(
+              jsonEncode({
+                'nextPageToken': 'page2_token',
+                'messages': [
+                  {'id': 'msg_pag_1', 'threadId': 't1'},
+                ],
+              }),
+              200,
+              headers: {'content-type': 'application/json'},
+            );
+          }
+        } else if (url.contains('/messages/msg_pag_1')) {
+          downloadedIds.add('msg_pag_1');
+          return http.Response(
+            jsonEncode({
+              'id': 'msg_pag_1',
+              'labelIds': ['INBOX'],
+              'internalDate': '1700000000000',
+              'payload': {
+                'mimeType': 'text/plain',
+                'headers': [
+                  {'name': 'Subject', 'value': 'Página 1 Sucesso'},
+                  {'name': 'From', 'value': 'contato@jw.org'},
+                ],
+                'body': {'data': textData1},
+              },
+            }),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        } else if (url.contains('/messages/msg_pag_2')) {
+          downloadedIds.add('msg_pag_2');
+          return http.Response(
+            jsonEncode({
+              'id': 'msg_pag_2',
+              'labelIds': ['INBOX'],
+              'internalDate': '1700000001000',
+              'payload': {
+                'mimeType': 'text/plain',
+                'headers': [
+                  {'name': 'Subject', 'value': 'Página 2 Sucesso'},
+                  {'name': 'From', 'value': 'contato2@jw.org'},
+                ],
+                'body': {'data': textData2},
+              },
+            }),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+
+        return http.Response(
+          jsonEncode({'messages': []}),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+
+      final service = GmailOAuthService(
+        httpClient: mockClient,
+        tokenStore: tokenStore,
+      );
+
+      final result = await service.fetchMessages(
+        accountId: accountId,
+        accountEmail: 'user@gmail.com',
+        maxResults: 60,
+      );
+
+      expect(listPage1Called, isTrue);
+      expect(listPage2Called, isTrue);
+      expect(downloadedIds, containsAll(['msg_pag_1', 'msg_pag_2']));
+      expect(result.length, equals(2));
+      expect(result.map((m) => m.id), containsAll(['msg_pag_1', 'msg_pag_2']));
+      expect(
+        result.firstWhere((m) => m.id == 'msg_pag_2').subject,
+        equals('Página 2 Sucesso'),
+      );
+    });
   });
 }

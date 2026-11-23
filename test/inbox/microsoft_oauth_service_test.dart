@@ -372,5 +372,119 @@ void main() {
         expect(sendMailCalled, isTrue);
       },
     );
+
+    test('fetchMessages follows @odata.nextLink pagination and returns all accumulated messages', () async {
+      const accountId = 'ms_acc_pagination';
+      await tokenStore.saveTokenBundle(
+        accountId,
+        OAuthTokenBundle(
+          accessToken: 'graph_pagination_token',
+          expiresAt: DateTime.now().add(const Duration(hours: 1)),
+        ),
+      );
+
+      var page1Called = false;
+      var page2Called = false;
+
+      final mockClient = MockClient((request) async {
+        final url = request.url.toString();
+        if (url.contains('/me/mailFolders/inbox/messages')) {
+          if (url.contains('\$skip=2')) {
+            page2Called = true;
+            return http.Response(
+              jsonEncode({
+                'value': [
+                  {
+                    'id': 'msg_ms_3',
+                    'subject': 'Mensagem Página 2',
+                    'from': {
+                      'emailAddress': {
+                        'name': 'Autor 3',
+                        'address': 'autor3@ms.com',
+                      },
+                    },
+                    'receivedDateTime': '2026-11-22T12:00:00Z',
+                    'isRead': true,
+                    'hasAttachments': false,
+                    'body': {'contentType': 'text', 'content': 'Corpo 3'},
+                  },
+                ],
+              }),
+              200,
+              headers: {'content-type': 'application/json'},
+            );
+          } else {
+            page1Called = true;
+            return http.Response(
+              jsonEncode({
+                '@odata.nextLink': 'https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?\$top=50&\$skip=2',
+                'value': [
+                  {
+                    'id': 'msg_ms_1',
+                    'subject': 'Mensagem Página 1 A',
+                    'from': {
+                      'emailAddress': {
+                        'name': 'Autor 1',
+                        'address': 'autor1@ms.com',
+                      },
+                    },
+                    'receivedDateTime': '2026-11-22T10:00:00Z',
+                    'isRead': false,
+                    'hasAttachments': false,
+                    'body': {'contentType': 'text', 'content': 'Corpo 1'},
+                  },
+                  {
+                    'id': 'msg_ms_2',
+                    'subject': 'Mensagem Página 1 B',
+                    'from': {
+                      'emailAddress': {
+                        'name': 'Autor 2',
+                        'address': 'autor2@ms.com',
+                      },
+                    },
+                    'receivedDateTime': '2026-11-22T11:00:00Z',
+                    'isRead': true,
+                    'hasAttachments': true,
+                    'body': {'contentType': 'text', 'content': 'Corpo 2'},
+                  },
+                ],
+              }),
+              200,
+              headers: {'content-type': 'application/json'},
+            );
+          }
+        }
+
+        // Outras pastas retornam vazio
+        return http.Response(
+          jsonEncode({'value': []}),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+
+      final service = MicrosoftOAuthService(
+        httpClient: mockClient,
+        tokenStore: tokenStore,
+      );
+
+      final result = await service.fetchMessages(
+        accountId: accountId,
+        accountEmail: 'user@outlook.com',
+        maxResults: 60,
+      );
+
+      expect(page1Called, isTrue);
+      expect(page2Called, isTrue);
+      expect(result.length, equals(3));
+      expect(
+        result.map((m) => m.id),
+        containsAll(['msg_ms_1', 'msg_ms_2', 'msg_ms_3']),
+      );
+      expect(
+        result.firstWhere((m) => m.id == 'msg_ms_3').subject,
+        equals('Mensagem Página 2'),
+      );
+    });
   });
 }

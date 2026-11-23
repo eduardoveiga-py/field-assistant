@@ -339,16 +339,55 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
           ],
         ],
         bottom: isUnlocked
-            ? TabBar(
-                controller: _tabController,
-                tabs: const [
-                  Tab(icon: Icon(Icons.inbox), text: 'Capturas'),
-                  Tab(
-                    icon: Icon(Icons.mark_email_unread_outlined),
-                    text: 'JW Mail',
-                  ),
-                  Tab(icon: Icon(Icons.shield_outlined), text: 'Hub Restrito'),
-                ],
+            ? PreferredSize(
+                preferredSize: const Size.fromHeight(42),
+                child: TabBar(
+                  controller: _tabController,
+                  tabs: const [
+                    Tab(
+                      height: 38,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.inbox, size: 18),
+                            SizedBox(width: 4),
+                            Text('Capturas'),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Tab(
+                      height: 38,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.mark_email_unread_outlined, size: 18),
+                            SizedBox(width: 4),
+                            Text('JW Mail'),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Tab(
+                      height: 38,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.shield_outlined, size: 18),
+                            SizedBox(width: 4),
+                            Text('Hub Restrito'),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               )
             : null,
       ),
@@ -1779,52 +1818,61 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
 
     return Column(
       children: [
-        // Informa limitações das cópias locais e prévias
-        Container(
-          margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isDark ? const Color(0xFF334155) : const Color(0xFFBFDBFE),
-            ),
-          ),
+        // Barra de Busca + Botão Sincronizar
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
           child: Row(
             children: [
-              const Icon(
-                Icons.security_rounded,
-                size: 24,
-                color: Color(0xFF2563EB),
-              ),
-              const SizedBox(width: 10),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Sincronização Segura e Armazenamento Local',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                        color: Color(0xFF1D4ED8),
+              Expanded(
+                child: SizedBox(
+                  height: 36,
+                  child: TextField(
+                    controller: _emailSearchController,
+                    decoration: InputDecoration(
+                      hintText:
+                          'Pesquisar e-mails, assuntos, remetente ou tags...',
+                      hintStyle: const TextStyle(fontSize: 12),
+                      prefixIcon: const Icon(Icons.search, size: 18),
+                      suffixIcon: _emailSearchController.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear, size: 16),
+                              padding: EdgeInsets.zero,
+                              onPressed: () {
+                                _emailSearchController.clear();
+                                setState(() {});
+                              },
+                            )
+                          : null,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 8,
                       ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      isDense: true,
                     ),
-                    SizedBox(height: 2),
-                    Text(
-                      'Mensagens e anexos sincronizados permanecem salvos com segurança local mesmo após remoção no servidor.',
-                      style: TextStyle(fontSize: 11, color: Colors.blueGrey),
-                    ),
-                  ],
+                    style: const TextStyle(fontSize: 12),
+                    onChanged: (val) => setState(() {}),
+                  ),
                 ),
               ),
-              FilledButton.tonal(
+              const SizedBox(width: 8),
+              FilledButton.tonalIcon(
                 style: FilledButton.styleFrom(
                   visualDensity: VisualDensity.compact,
                   padding: const EdgeInsets.symmetric(horizontal: 10),
+                  minimumSize: const Size(0, 36),
                 ),
                 onPressed: _isSyncingEmails ? null : _syncEmails,
-                child: Text(
+                icon: _isSyncingEmails
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.sync, size: 16),
+                label: Text(
                   _isSyncingEmails ? '...' : 'Sincronizar',
                   style: const TextStyle(fontSize: 12),
                 ),
@@ -1833,80 +1881,10 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
           ),
         ),
 
-        // Barra de Busca
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          child: TextField(
-            controller: _emailSearchController,
-            decoration: InputDecoration(
-              hintText: 'Pesquisar e-mails, assuntos, remetente ou tags...',
-              prefixIcon: const Icon(Icons.search, size: 20),
-              suffixIcon: _emailSearchController.text.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear, size: 18),
-                      onPressed: () {
-                        _emailSearchController.clear();
-                        setState(() {});
-                      },
-                    )
-                  : null,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 10,
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-              isDense: true,
-            ),
-            onChanged: (val) => setState(() {}),
-          ),
-        ),
-
-        // Chips de Filtro por Tag
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                FilterChip(
-                  label: const Text('Todos'),
-                  selected: _selectedEmailTag == null,
-                  onSelected: (sel) {
-                    if (sel) setState(() => _selectedEmailTag = null);
-                  },
-                ),
-                const SizedBox(width: 6),
-                ...[
-                  'assembleia',
-                  'circuito',
-                  'cartas',
-                  'broadcasting',
-                  'notícias',
-                ].map((tag) {
-                  final isSel = _selectedEmailTag == tag;
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 6),
-                    child: FilterChip(
-                      label: Text('#$tag'),
-                      selected: isSel,
-                      onSelected: (sel) {
-                        setState(() => _selectedEmailTag = sel ? tag : null);
-                      },
-                    ),
-                  );
-                }),
-              ],
-            ),
-          ),
-        ),
-        const Divider(height: 1),
-
-        // Barra Dedicada de Pastas
+        // Barra Dedicada de Pastas (Compacta)
         Container(
           key: const Key('email_folder_selector_bar'),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
@@ -1949,9 +1927,15 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                     padding: const EdgeInsets.only(right: 6),
                     child: ChoiceChip(
                       key: Key(chipKey),
-                      avatar: Icon(icon, size: 16),
-                      label: Text(folder, style: const TextStyle(fontSize: 12)),
+                      avatar: Icon(icon, size: 14),
+                      label: Text(folder, style: const TextStyle(fontSize: 11)),
                       selected: isSelected,
+                      visualDensity: VisualDensity.compact,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 0,
+                      ),
                       selectedColor: AppTheme.primaryBlue.withValues(
                         alpha: 0.2,
                       ),
@@ -2113,12 +2097,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
 
               return Column(
                 children: [
-                  // Barra de Seleção de Conta e Não Lidos
+                  // Barra de Seleção de Conta, Tags, Não Lidos e Contador
                   Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 4,
-                    ),
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
                     child: Row(
                       children: [
                         // Seletor de Conta (Todas as Caixas ou Conta Específica)
@@ -2133,9 +2114,10 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                               tooltip: 'Selecionar Caixa de E-mail',
                               initialValue: _selectedEmailAccount ?? '',
                               child: Container(
+                                height: 32,
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 6,
+                                  horizontal: 8,
+                                  vertical: 4,
                                 ),
                                 decoration: BoxDecoration(
                                   color: AppTheme.primaryBlue.withValues(
@@ -2148,19 +2130,27 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                   children: [
                                     const Icon(
                                       Icons.account_tree_outlined,
-                                      size: 16,
+                                      size: 15,
                                       color: AppTheme.primaryBlue,
                                     ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      _selectedEmailAccount != null &&
-                                              _selectedEmailAccount!.isNotEmpty
-                                          ? _selectedEmailAccount!
-                                          : 'Todas as Caixas',
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                        color: AppTheme.primaryBlue,
+                                    const SizedBox(width: 4),
+                                    ConstrainedBox(
+                                      constraints: const BoxConstraints(
+                                        maxWidth: 130,
+                                      ),
+                                      child: Text(
+                                        _selectedEmailAccount != null &&
+                                                _selectedEmailAccount!
+                                                    .isNotEmpty
+                                            ? _selectedEmailAccount!
+                                            : 'Todas as Caixas',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppTheme.primaryBlue,
+                                        ),
                                       ),
                                     ),
                                     const Icon(Icons.arrow_drop_down, size: 16),
@@ -2189,18 +2179,25 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                             );
                           },
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 6),
                         FilterChip(
                           key: const Key('filter_unread_chip'),
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 0,
+                          ),
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
                           avatar: Icon(
                             _unreadOnly
                                 ? Icons.mark_email_unread
                                 : Icons.mark_email_unread_outlined,
-                            size: 16,
+                            size: 14,
                           ),
                           label: const Text(
                             'Não lidos',
-                            style: TextStyle(fontSize: 12),
+                            style: TextStyle(fontSize: 11),
                           ),
                           selected: _unreadOnly,
                           selectedColor: AppTheme.primaryBlue.withValues(
@@ -2212,12 +2209,104 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                             });
                           },
                         ),
+                        const SizedBox(width: 6),
+                        // Botão / Menu compacto de Tags
+                        PopupMenuButton<String>(
+                          tooltip: 'Filtrar por Tag',
+                          child: Container(
+                            height: 32,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _selectedEmailTag != null
+                                  ? AppTheme.primaryBlue.withValues(alpha: 0.15)
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: _selectedEmailTag != null
+                                    ? AppTheme.primaryBlue
+                                    : (isDark
+                                          ? const Color(0xFF334155)
+                                          : const Color(0xFFCBD5E1)),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.tag,
+                                  size: 14,
+                                  color: _selectedEmailTag != null
+                                      ? AppTheme.primaryBlue
+                                      : (isDark
+                                            ? Colors.white70
+                                            : Colors.black87),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  _selectedEmailTag != null
+                                      ? '#$_selectedEmailTag'
+                                      : 'Tags',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: _selectedEmailTag != null
+                                        ? FontWeight.bold
+                                        : FontWeight.normal,
+                                    color: _selectedEmailTag != null
+                                        ? AppTheme.primaryBlue
+                                        : (isDark
+                                              ? Colors.white70
+                                              : Colors.black87),
+                                  ),
+                                ),
+                                if (_selectedEmailTag != null) ...[
+                                  const SizedBox(width: 4),
+                                  InkWell(
+                                    onTap: () => setState(
+                                      () => _selectedEmailTag = null,
+                                    ),
+                                    child: const Icon(
+                                      Icons.close,
+                                      size: 13,
+                                      color: AppTheme.primaryBlue,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          onSelected: (val) {
+                            setState(() {
+                              _selectedEmailTag = val.isEmpty ? null : val;
+                            });
+                          },
+                          itemBuilder: (ctx) => [
+                            const PopupMenuItem(
+                              value: '',
+                              child: Text('Todas as tags'),
+                            ),
+                            ...[
+                              'assembleia',
+                              'circuito',
+                              'cartas',
+                              'broadcasting',
+                              'notícias',
+                            ].map(
+                              (tag) => PopupMenuItem(
+                                value: tag,
+                                child: Text('#$tag'),
+                              ),
+                            ),
+                          ],
+                        ),
                         const Spacer(),
                         // Contador de Mensagens
                         Text(
                           '${visible.length} mensagem(ns)',
                           style: const TextStyle(
-                            fontSize: 12,
+                            fontSize: 11,
                             color: Colors.grey,
                           ),
                         ),
@@ -2225,7 +2314,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                     ),
                   ),
 
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 2),
 
                   Expanded(
                     child: visible.isEmpty
@@ -2252,11 +2341,11 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                         : ListView.separated(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 16,
-                              vertical: 10,
+                              vertical: 4,
                             ),
                             itemCount: visible.length,
                             separatorBuilder: (c, i) =>
-                                const SizedBox(height: 10),
+                                const SizedBox(height: 4),
                             itemBuilder: (c, i) => _buildEmailCard(
                               visible[i],
                               isDark,
@@ -2437,10 +2526,10 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
               return ListView.separated(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
-                  vertical: 12,
+                  vertical: 4,
                 ),
                 itemCount: letters.length,
-                separatorBuilder: (c, i) => const SizedBox(height: 10),
+                separatorBuilder: (c, i) => const SizedBox(height: 4),
                 itemBuilder: (c, i) =>
                     _buildEmailCard(letters[i], isDark, isHub: true),
               );
@@ -2460,53 +2549,37 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
     bool isDark, {
     bool isHub = false,
   }) {
-    final badgeColor = isHub
-        ? (msg.hubType == 'form'
-              ? const Color(0xFF8B5CF6)
-              : const Color(0xFFEF4444))
-        : (msg.isDraft ? Colors.amber : const Color(0xFF3B82F6));
-    final badgeLabel = isHub
-        ? (msg.hubType == 'form' ? 'FORMULÁRIO HUB' : 'CARTA DO CORPO')
-        : (msg.isDraft ? 'RASCUNHO' : 'JW MAIL');
+    final cleanPreview = MarkdownPreviewText.cleanMarkdown(msg.bodyText)
+        .replaceAll('\n', ' ')
+        .trim();
+    final isUnread = !msg.isRead;
 
     return InkWell(
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(10),
       onTap: () => _showEmailDetailsModal(context, msg),
       child: Container(
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF1E293B) : Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(
             color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
         ),
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Topo: Badge + De + Data + Menu
-            Row(
+            // Indicador não lido + Avatar
+            Stack(
+              clipBehavior: Clip.none,
               children: [
-                if (!msg.isRead)
-                  Container(
-                    width: 8,
-                    height: 8,
-                    margin: const EdgeInsets.only(right: 6),
-                    decoration: const BoxDecoration(
-                      color: AppTheme.primaryBlue,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
                 CircleAvatar(
-                  radius: 15,
-                  backgroundColor: badgeColor.withValues(alpha: 0.16),
+                  radius: 16,
+                  backgroundColor: isHub
+                      ? const Color(0xFF8B5CF6).withValues(alpha: 0.16)
+                      : (msg.isDraft
+                            ? Colors.amber.withValues(alpha: 0.16)
+                            : AppTheme.primaryBlue.withValues(alpha: 0.12)),
                   child: Text(
                     msg.from.trim().isEmpty
                         ? '?'
@@ -2519,243 +2592,270 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
-                      color: badgeColor,
+                      color: isHub
+                          ? const Color(0xFF8B5CF6)
+                          : (msg.isDraft
+                                ? Colors.amber.shade800
+                                : AppTheme.primaryBlue),
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: badgeColor.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    badgeLabel,
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: badgeColor,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Tooltip(
-                  message: msg.isPermanentRetained
-                      ? 'Cópia local salva'
-                      : 'E-mail sincronizado',
-                  child: const Icon(
-                    Icons.shield_rounded,
-                    size: 14,
-                    color: Color(0xFF10B981),
-                  ),
-                ),
-                const Spacer(),
-                Text(
-                  _formatDate(msg.date),
-                  style: const TextStyle(fontSize: 11, color: Colors.grey),
-                ),
-                PopupMenuButton<String>(
-                  icon: const Icon(Icons.more_vert, size: 18),
-                  onSelected: (val) async {
-                    if (val == 'export') {
-                      _showExportEmailModal(msg);
-                    } else if (val == 'to_task') {
-                      _convertEmailToTask(msg);
-                    } else if (val == 'to_research') {
-                      _convertEmailToResearch(msg);
-                    } else if (val == 'delete') {
-                      await ref
-                          .read(jwEmailServiceProvider)
-                          .deleteEmail(msg.id);
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('E-mail excluído.')),
-                        );
-                      }
-                    }
-                  },
-                  itemBuilder: (ctx) => const [
-                    PopupMenuItem(
-                      value: 'export',
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.download_rounded,
-                            size: 18,
-                            color: Colors.blueAccent,
-                          ),
-                          SizedBox(width: 8),
-                          Text('Exportar (.md / .eml)'),
-                        ],
+                if (isUnread)
+                  Positioned(
+                    top: -2,
+                    left: -2,
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: AppTheme.primaryBlue,
+                        shape: BoxShape.circle,
                       ),
                     ),
-                    PopupMenuItem(
-                      value: 'to_task',
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.check_circle_outline,
-                            size: 18,
-                            color: Colors.green,
-                          ),
-                          SizedBox(width: 8),
-                          Text('Virar Tarefa'),
-                        ],
-                      ),
-                    ),
-                    PopupMenuItem(
-                      value: 'to_research',
-                      child: Row(
-                        children: [
-                          Icon(Icons.menu_book, size: 18, color: Colors.purple),
-                          SizedBox(width: 8),
-                          Text('Virar Artigo de Pesquisa'),
-                        ],
-                      ),
-                    ),
-                    PopupMenuItem(
-                      value: 'delete',
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.delete_outline,
-                            size: 18,
-                            color: Colors.redAccent,
-                          ),
-                          SizedBox(width: 8),
-                          Text('Excluir'),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(width: 10),
 
-            // Remetente
-            Text(
-              'De: ${msg.from}',
-              style: TextStyle(
-                fontSize: 12,
-                color: isDark
-                    ? const Color(0xFF94A3B8)
-                    : const Color(0xFF64748B),
-              ),
-            ),
-            const SizedBox(height: 4),
-
-            // Assunto
-            Text(
-              msg.subject,
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-                color: isDark
-                    ? const Color(0xFFF1F5F9)
-                    : const Color(0xFF1E293B),
-              ),
-            ),
-            const SizedBox(height: 6),
-
-            // Trecho do Corpo limpo sem tags cruas de markdown
-            Text(
-              MarkdownPreviewText.cleanMarkdown(msg.bodyText),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 13,
-                height: 1.35,
-                color: isDark
-                    ? const Color(0xFFCBD5E1)
-                    : const Color(0xFF475569),
-              ),
-            ),
-            const SizedBox(height: 10),
-
-            // Tags e Anexos
-            Row(
-              children: [
-                if (msg.attachments.isNotEmpty)
-                  Container(
-                    margin: const EdgeInsets.only(right: 8),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
+            // Conteúdo principal
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Linha 1: Remetente + Pills + Anexo + Data + Menu
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                msg.from.trim().isEmpty
+                                    ? '(Sem remetente)'
+                                    : msg.from,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: isUnread
+                                      ? FontWeight.w700
+                                      : FontWeight.w600,
+                                  color: isDark
+                                      ? (isUnread
+                                            ? Colors.white
+                                            : const Color(0xFFCBD5E1))
+                                      : (isUnread
+                                            ? Colors.black87
+                                            : const Color(0xFF334155)),
+                                ),
+                              ),
+                            ),
+                            if (msg.isDraft) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 5,
+                                  vertical: 1,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.amber.withValues(alpha: 0.18),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: const Text(
+                                  'Rascunho',
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.amber,
+                                  ),
+                                ),
+                              ),
+                            ],
+                            if (isHub) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 5,
+                                  vertical: 1,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF8B5CF6)
+                                      .withValues(alpha: 0.18),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  msg.hubType == 'form'
+                                      ? 'Formulário'
+                                      : 'Carta',
+                                  style: const TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF8B5CF6),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      if (msg.attachments.isNotEmpty) ...[
+                        const SizedBox(width: 4),
                         const Icon(
                           Icons.attach_file,
-                          size: 12,
+                          size: 14,
                           color: Colors.blueGrey,
                         ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${msg.attachments.length} anexo(s)',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: Colors.blueGrey,
+                      ],
+                      const SizedBox(width: 6),
+                      Text(
+                        _formatDate(msg.date),
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: isUnread
+                              ? FontWeight.w600
+                              : FontWeight.normal,
+                          color: isUnread
+                              ? (isDark
+                                    ? Colors.blue.shade300
+                                    : AppTheme.primaryBlue)
+                              : Colors.grey,
+                        ),
+                      ),
+                      PopupMenuButton<String>(
+                        icon: const Icon(Icons.more_vert, size: 16),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        tooltip: 'Mais opções',
+                        onSelected: (val) async {
+                          if (val == 'export') {
+                            _showExportEmailModal(msg);
+                          } else if (val == 'to_task') {
+                            _convertEmailToTask(msg);
+                          } else if (val == 'to_research') {
+                            _convertEmailToResearch(msg);
+                          } else if (val == 'delete') {
+                            await ref
+                                .read(jwEmailServiceProvider)
+                                .deleteEmail(msg.id);
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('E-mail excluído.'),
+                                ),
+                              );
+                            }
+                          }
+                        },
+                        itemBuilder: (ctx) => const [
+                          PopupMenuItem(
+                            value: 'export',
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.download_rounded,
+                                  size: 18,
+                                  color: Colors.blueAccent,
+                                ),
+                                SizedBox(width: 8),
+                                Text('Exportar (.md / .eml)'),
+                              ],
+                            ),
+                          ),
+                          PopupMenuItem(
+                            value: 'to_task',
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.check_circle_outline,
+                                  size: 18,
+                                  color: Colors.green,
+                                ),
+                                SizedBox(width: 8),
+                                Text('Virar Tarefa'),
+                              ],
+                            ),
+                          ),
+                          PopupMenuItem(
+                            value: 'to_research',
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.menu_book,
+                                  size: 18,
+                                  color: Colors.purple,
+                                ),
+                                SizedBox(width: 8),
+                                Text('Virar Artigo de Pesquisa'),
+                              ],
+                            ),
+                          ),
+                          PopupMenuItem(
+                            value: 'delete',
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.delete_outline,
+                                  size: 18,
+                                  color: Colors.redAccent,
+                                ),
+                                SizedBox(width: 8),
+                                Text('Excluir'),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 2),
+
+                  // Linha 2: Assunto (destaque) + prévia
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          msg.subject.trim().isEmpty
+                              ? '(Sem assunto)'
+                              : msg.subject,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: isUnread
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                            color: isDark
+                                ? (isUnread
+                                      ? const Color(0xFFF1F5F9)
+                                      : const Color(0xFFCBD5E1))
+                                : (isUnread
+                                      ? const Color(0xFF0F172A)
+                                      : const Color(0xFF334155)),
+                          ),
+                        ),
+                      ),
+                      if (cleanPreview.isNotEmpty) ...[
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            '— $cleanPreview',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isDark
+                                  ? const Color(0xFF94A3B8)
+                                  : const Color(0xFF64748B),
+                            ),
                           ),
                         ),
                       ],
-                    ),
+                    ],
                   ),
-                ...msg.tags
-                    .take(3)
-                    .map(
-                      (tag) => Container(
-                        margin: const EdgeInsets.only(right: 6),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppTheme.primaryBlue.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          '#$tag',
-                          style: const TextStyle(
-                            fontSize: 10,
-                            color: AppTheme.primaryBlue,
-                          ),
-                        ),
-                      ),
-                    ),
-                const Spacer(),
-                IconButton(
-                  icon: const Icon(
-                    Icons.delete_outline,
-                    size: 18,
-                    color: Colors.redAccent,
-                  ),
-                  tooltip: 'Excluir e-mail',
-                  visualDensity: VisualDensity.compact,
-                  onPressed: () => _confirmDeleteEmail(msg),
-                ),
-                const SizedBox(width: 4),
-                TextButton(
-                  style: TextButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                  ),
-                  onPressed: () => _showEmailDetailsModal(context, msg),
-                  child: const Text(
-                    'Ler Detalhes',
-                    style: TextStyle(fontSize: 12),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ],
         ),
