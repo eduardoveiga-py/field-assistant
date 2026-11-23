@@ -32,22 +32,36 @@ class EmailHtmlSanitizer {
   static final RegExp _multiSpaceRegex = RegExp(r'[ \t]+');
   static final RegExp _multiNewlineRegex = RegExp(r'\n{3,}');
   static final RegExp _msoConditionalBlockRegex = RegExp(
-    r'<!\[if[^\]]*\][\s\S]*?<!\[endif\]>',
+    r'<!\[if[^\]]*\]>[\s\S]*?<!\[endif\]>|<!\[if[^\]]*\][\s\S]*?<!\[endif\]>',
     caseSensitive: false,
   );
   static final RegExp _msoConditionalTagRegex = RegExp(
-    r'<!--\[if[^\]]*\]>|<!\[endif\]-->|<!\[if[^\]]*\]>|<!\[endif\]>',
+    r'<!--\[if[^\]]*\]>|<!\[endif\]-->|<!\[if[^\]]*\]>|<!\[endif\]>|<!--\[if[^\]]*\]|\[endif\]-->',
     caseSensitive: false,
   );
-  static final RegExp _looseCssBlockRegex = RegExp(
-    r'[^{}\n]*\{[^{}]*(?:background|mix-blend-mode|font-size|display|color)'
-    r'\s*:[^}]*\}',
+  static final RegExp _looseCssPropertyBlockRegex = RegExp(
+    r"""(?:^|[\n;}])\s*[a-zA-Z0-9_\-\.\# \t\+\>\:\*\,\~\[\]\=\^"'()]+\s*\{[^{}]*(?:background|mix-blend-mode|font-size|display|color|margin|padding|border|width|height)\s*:[^}]*\}""",
     caseSensitive: false,
   );
-  static final RegExp _looseCommentEndLineRegex = RegExp(
+  static final RegExp _emptyCssBlockRegex = RegExp(
+    r"""(?:^|[\n;}])\s*[a-zA-Z0-9_\-\.\# \t\+\>\:\*\,\~\[\]\=\^"'()]+\s*\{\s*\}""",
+    caseSensitive: false,
+  );
+  static final RegExp _strayHtmlCommentEndRegex = RegExp(
     r'^\s*-->\s*$',
     multiLine: true,
   );
+
+  static final RegExp _markdownTableDividerRegex = RegExp(
+    r'^\s*\|(?:\s*:?-+:?\s*\|)+\s*$',
+    multiLine: true,
+  );
+  static final RegExp _markdownHeadingRegex = RegExp(
+    r'^\s*#{1,6}\s+',
+    multiLine: true,
+  );
+  static final RegExp _markdownLinkRegex = RegExp(r'\[([^\]]+)\]\([^\)]+\)');
+  static final RegExp _markdownImageRegex = RegExp(r'!\[([^\]]*)\]\([^\)]+\)');
 
   /// Mapeamento de entidades HTML nomeadas comuns
   static const Map<String, String> _namedEntities = {
@@ -76,10 +90,14 @@ class EmailHtmlSanitizer {
   /// Converte código HTML em texto puro legível:
   /// 1. Remove blocos inteiros `<style>`, `<script>`, `<head>` e comentários `<!-- -->`
   /// 2. Converte tags de quebra (`<br>`, `</p>`, `</div>`, `</tr>`, `</li>`, etc.) em `\n`
-  /// 3. Remove todas as demais tags HTML
+  /// 3. Remove todas as demais tags HTML e vazamentos de regras CSS
   /// 4. Decodifica entidades nomeadas, decimais e hexadecimais
-  /// 5. Normaliza espaços múltiplos e quebras de linha excessivas
-  static String extractPlainText(String? htmlOrText) {
+  /// 5. Opcionalmente limpa sintaxe de Markdown se [cleanMarkdown] for true
+  /// 6. Normaliza espaços múltiplos e quebras de linha excessivas
+  static String extractPlainText(
+    String? htmlOrText, {
+    bool cleanMarkdown = false,
+  }) {
     if (htmlOrText == null || htmlOrText.trim().isEmpty) {
       return '';
     }
@@ -97,12 +115,21 @@ class EmailHtmlSanitizer {
     // 2. Converte quebras de bloco para nova linha
     text = text.replaceAll(_lineBreakTagRegex, '\n');
 
-    // 3. Remove todas as outras tags restantes
+    // 3. Remove todas as outras tags restantes e regras CSS residuais
     text = text.replaceAll(_anyHtmlTagRegex, '');
-    text = text.replaceAll(_looseCssBlockRegex, ' ');
-    text = text.replaceAll(_looseCommentEndLineRegex, '');
+    text = text.replaceAll(_looseCssPropertyBlockRegex, ' ');
+    text = text.replaceAll(_emptyCssBlockRegex, ' ');
+    text = text.replaceAll(_strayHtmlCommentEndRegex, '');
 
-    // 4. Decodifica entidades nomeadas
+    // 4. Limpeza opcional de sintaxe Markdown
+    if (cleanMarkdown) {
+      text = text.replaceAll(_markdownTableDividerRegex, '');
+      text = text.replaceAll(_markdownImageRegex, '');
+      text = text.replaceAllMapped(_markdownLinkRegex, (m) => m.group(1) ?? '');
+      text = text.replaceAll(_markdownHeadingRegex, '');
+    }
+
+    // 5. Decodifica entidades nomeadas
     _namedEntities.forEach((entity, replacement) {
       text = text.replaceAll(entity, replacement);
     });

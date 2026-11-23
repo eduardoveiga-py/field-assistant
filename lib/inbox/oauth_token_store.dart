@@ -85,6 +85,37 @@ class OAuthTokenStore {
     } catch (_) {}
   }
 
+  /// Salva um bundle sob uma chave arbitrária (ex.: integrações globais como Google Calendar)
+  Future<void> saveNamedTokenBundle(String key, OAuthTokenBundle bundle) async {
+    final raw = jsonEncode(bundle.toJson());
+    await _secureStorage.write(key: key, value: raw);
+  }
+
+  /// Lê um bundle sob uma chave arbitrária
+  Future<OAuthTokenBundle?> readNamedTokenBundle(String key) async {
+    try {
+      final raw = await _secureStorage.read(key: key);
+      if (raw == null || raw.trim().isEmpty) return null;
+      final map = jsonDecode(raw);
+      if (map is Map<String, dynamic>) {
+        return OAuthTokenBundle.fromJson(map);
+      }
+      if (map is Map) {
+        return OAuthTokenBundle.fromJson(Map<String, dynamic>.from(map));
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Exclui um bundle sob uma chave arbitrária
+  Future<void> deleteNamedTokenBundle(String key) async {
+    try {
+      await _secureStorage.delete(key: key);
+    } catch (_) {}
+  }
+
   static const String _pendingMsStateKey = 'ms_oauth_pending_state';
   static const String _pendingMsVerifierKey = 'ms_oauth_pending_verifier';
 

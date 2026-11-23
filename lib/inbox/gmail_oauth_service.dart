@@ -199,8 +199,11 @@ class GmailOAuthService {
     return result?.tokenBundle;
   }
 
-  /// Retorna um token de acesso válido, renovando silenciosamente se necessário
-  Future<String?> getValidAccessToken(String accountId) async {
+  /// Retorna um token de acesso válido, renovando silenciosamente ou interativamente (se permitido)
+  Future<String?> getValidAccessToken(
+    String accountId, {
+    bool allowInteractiveRefresh = false,
+  }) async {
     final bundle = await _tokenStore.readTokenBundle(accountId);
     if (bundle == null) return null;
 
@@ -211,6 +214,7 @@ class GmailOAuthService {
     await _ensureInitialized();
     try {
       if (kIsWeb) {
+        // 1. Tentativa silenciosa via lightweight
         try {
           final account = await _googleSignIn
               .attemptLightweightAuthentication();
@@ -233,15 +237,12 @@ class GmailOAuthService {
           }
         } catch (_) {}
 
-        final headers = await _googleSignIn.authorizationClient
-            .authorizationHeaders(defaultScopes, promptIfNecessary: false);
-        final authHeader =
-            headers?['Authorization'] ?? headers?['authorization'];
-        if (authHeader != null) {
-          final newToken = authHeader
-              .replaceFirst(RegExp(r'^Bearer\s+', caseSensitive: false), '')
-              .trim();
-          if (newToken.isNotEmpty) {
+        // 2. Tentativa silenciosa via authorizationHeaders promptIfNecessary: false
+        try {
+          final headers = await _googleSignIn.authorizationClient
+              .authorizationHeaders(defaultScopes, promptIfNecessary: false);
+          final newToken = _extractBearerToken(headers);
+          if (newToken != null && newToken.isNotEmpty) {
             final updated = OAuthTokenBundle(
               accessToken: newToken,
               refreshToken: bundle.refreshToken,
@@ -251,8 +252,30 @@ class GmailOAuthService {
             await _tokenStore.saveTokenBundle(accountId, updated);
             return newToken;
           }
+        } catch (_) {}
+
+        // 3. Interativo (apenas quando permitido)
+        if (allowInteractiveRefresh) {
+          try {
+            final headers = await _googleSignIn.authorizationClient
+                .authorizationHeaders(defaultScopes, promptIfNecessary: true);
+            final newToken = _extractBearerToken(headers);
+            if (newToken != null && newToken.isNotEmpty) {
+              final updated = OAuthTokenBundle(
+                accessToken: newToken,
+                refreshToken: bundle.refreshToken,
+                expiresAt: DateTime.now().add(const Duration(hours: 1)),
+                scopes: bundle.scopes.isNotEmpty
+                    ? bundle.scopes
+                    : defaultScopes,
+              );
+              await _tokenStore.saveTokenBundle(accountId, updated);
+              return newToken;
+            }
+          } catch (_) {}
         }
       } else {
+        // Mobile silencioso
         final account = await _googleSignIn.attemptLightweightAuthentication();
         if (account != null) {
           String? newToken;
@@ -271,6 +294,30 @@ class GmailOAuthService {
             await _tokenStore.saveTokenBundle(accountId, updated);
             return newToken;
           }
+        }
+
+        // Mobile interativo se permitido
+        if (allowInteractiveRefresh) {
+          try {
+            final authenticated = await _googleSignIn.authenticate(
+              scopeHint: defaultScopes,
+            );
+            final headers = await authenticated.authorizationClient
+                .authorizationHeaders(defaultScopes, promptIfNecessary: true);
+            final newToken = _extractBearerToken(headers);
+            if (newToken != null && newToken.isNotEmpty) {
+              final updated = OAuthTokenBundle(
+                accessToken: newToken,
+                refreshToken: bundle.refreshToken,
+                expiresAt: DateTime.now().add(const Duration(hours: 1)),
+                scopes: bundle.scopes.isNotEmpty
+                    ? bundle.scopes
+                    : defaultScopes,
+              );
+              await _tokenStore.saveTokenBundle(accountId, updated);
+              return newToken;
+            }
+          } catch (_) {}
         }
       }
     } catch (_) {}
@@ -336,8 +383,12 @@ class GmailOAuthService {
     required String accountId,
     required String accountEmail,
     int maxResults = 200,
+    bool allowInteractiveRefresh = false,
   }) async {
-    final token = await getValidAccessToken(accountId);
+    final token = await getValidAccessToken(
+      accountId,
+      allowInteractiveRefresh: allowInteractiveRefresh,
+    );
     if (token == null || token.isEmpty) {
       throw Exception('Conta Gmail não autenticada ou token expirado.');
     }
@@ -443,10 +494,12 @@ class GmailOAuthService {
               if (msgResp.statusCode == 200) {
                 final msgData =
                     jsonDecode(msgResp.body) as Map<String, dynamic>;
-                final parsed = parseGmailMessage(
+                final parsed = await parseGmailMessageAsync(
                   msgData,
                   accountEmail: accountEmail,
                   preferredFolder: mapLabelToFolderName([labelId]),
+                  authHeaders: authHeaders,
+                  httpClient: _httpClient,
                 );
                 return parsed;
               } else {
@@ -574,17 +627,48 @@ class GmailOAuthService {
       final size = body['size'] as int? ?? 0;
       final data = body['data'] as String?;
 
-      if (filename.isNotEmpty || attachmentId != null) {
+      final partHeadersList = part['headers'] as List<dynamic>? ?? [];
+      String? contentId;
+      var isInline = false;
+      for (final ph in partHeadersList) {
+        if (ph is Map && ph['name'] != null && ph['value'] != null) {
+          final hName = ph['name'].toString().toLowerCase().trim();
+          final hVal = ph['value'].toString().trim();
+          if (hName == 'content-id') {
+            contentId = hVal.replaceAll(RegExp(r'^<|>$'), '').trim();
+          } else if (hName == 'content-disposition') {
+            if (hVal.toLowerCase().contains('inline')) {
+              isInline = true;
+            }
+          }
+        }
+      }
+      if (contentId != null && contentId.isNotEmpty) {
+        isInline = true;
+      }
+
+      if (filename.isNotEmpty || attachmentId != null || contentId != null) {
+        Uint8List? rawBytes;
+        String? base64Str;
+        if (data != null && data.isNotEmpty) {
+          rawBytes = decodeBase64UrlBytes(data);
+          base64Str = base64.encode(rawBytes);
+        }
         attachments.add({
-          'name': filename.isNotEmpty ? filename : 'anexo',
+          'name': filename.isNotEmpty ? filename : (contentId ?? 'anexo'),
           'attachmentId': attachmentId ?? '',
-          'size': size,
+          'size': size > 0 ? size : (rawBytes?.length ?? 0),
           'contentType': mimeType.isNotEmpty
               ? mimeType
               : 'application/octet-stream',
-          'isInline': false,
+          'mimeType': mimeType.isNotEmpty
+              ? mimeType
+              : 'application/octet-stream',
+          'isInline': isInline,
+          'contentId': contentId,
+          'base64': base64Str,
           'type': _determineFileType(filename, mimeType),
-          'rawBytes': data != null ? decodeBase64UrlBytes(data) : null,
+          'rawBytes': rawBytes,
         });
       } else if (mimeType == 'text/plain' && data != null) {
         bodyTexts.add(decodeBase64UrlString(data));
@@ -639,6 +723,95 @@ class GmailOAuthService {
       attachments: attachments,
       isRead: isRead,
       isDraft: isDraft,
+    );
+  }
+
+  /// Faz o parsing de um payload JSON de mensagem do Gmail e baixa automaticamente anexos inline ou pequenos (<= 2MB)
+  static Future<JwEmailMessage?> parseGmailMessageAsync(
+    Map<String, dynamic> msgData, {
+    required String accountEmail,
+    String? preferredFolder,
+    Map<String, String>? authHeaders,
+    http.Client? httpClient,
+  }) async {
+    final msg = parseGmailMessage(
+      msgData,
+      accountEmail: accountEmail,
+      preferredFolder: preferredFolder,
+    );
+    if (msg == null) return null;
+    if (authHeaders == null || httpClient == null || msg.attachments.isEmpty) {
+      return msg;
+    }
+
+    const maxSingleBytes = 2 * 1024 * 1024; // 2 MB
+    const maxCumulativeBytes = 5 * 1024 * 1024; // 5 MB
+    var cumulative = 0;
+
+    for (final att in msg.attachments) {
+      final size = att['size'] as int? ?? 0;
+      if (att['rawBytes'] != null) {
+        cumulative += size;
+      }
+    }
+
+    final enrichedAttachments = <Map<String, dynamic>>[];
+    for (final att in msg.attachments) {
+      final copy = Map<String, dynamic>.from(att);
+      final isInline = copy['isInline'] as bool? ?? false;
+      final size = copy['size'] as int? ?? 0;
+      final attId = copy['attachmentId'] as String? ?? '';
+      final hasBytes = copy['rawBytes'] != null;
+
+      if (!hasBytes &&
+          attId.isNotEmpty &&
+          (isInline || size <= maxSingleBytes) &&
+          (cumulative + size <= maxCumulativeBytes)) {
+        try {
+          final uri = Uri.parse(
+            'https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}/attachments/$attId',
+          );
+          final resp = await httpClient.get(uri, headers: authHeaders);
+          if (resp.statusCode == 200) {
+            final dataMap = jsonDecode(resp.body) as Map<String, dynamic>;
+            final rawData = dataMap['data'] as String?;
+            if (rawData != null && rawData.isNotEmpty) {
+              final bytes = decodeBase64UrlBytes(rawData);
+              copy['rawBytes'] = bytes;
+              copy['base64'] = base64.encode(bytes);
+              cumulative += bytes.length;
+            }
+          }
+        } catch (e, st) {
+          AppLogger.warning(
+            'Falha ao baixar anexo inline/pequeno Gmail $attId: $e',
+            e,
+            st,
+          );
+        }
+      }
+      enrichedAttachments.add(copy);
+    }
+
+    return JwEmailMessage(
+      id: msg.id,
+      remoteUid: msg.remoteUid,
+      folderId: msg.folderId,
+      folderName: msg.folderName,
+      subject: msg.subject,
+      from: msg.from,
+      to: msg.to,
+      cc: msg.cc,
+      bcc: msg.bcc,
+      accountEmail: msg.accountEmail,
+      date: msg.date,
+      bodyText: msg.bodyText,
+      bodyHtml: msg.bodyHtml,
+      attachments: enrichedAttachments,
+      isRead: msg.isRead,
+      isDraft: msg.isDraft,
+      isHubCommunication: msg.isHubCommunication,
+      hubType: msg.hubType,
     );
   }
 

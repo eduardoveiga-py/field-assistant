@@ -67,6 +67,50 @@ void main() {
         expect(EmailHtmlSanitizer.extractPlainText(''), '');
         expect(EmailHtmlSanitizer.extractPlainText('   '), '');
       });
+
+      test(
+        'removes loose multi-line CSS rules and stray HTML comment ends',
+        () {
+          const raw = '''
+Suas lembranças desse dia
+a, u + div center > a > span > span
+{}
+u + div center > a > span
+{background:#000000;
+mix-blend-mode:screen}
+u + div center > a > span > span
+{background:#000000;
+mix-blend-mode:difference}
+-->
+novembro 23 Ao longo dos anos
+''';
+          final text = EmailHtmlSanitizer.extractPlainText(raw);
+          expect(text, isNot(contains('mix-blend-mode')));
+          expect(text, isNot(contains('background:#000000')));
+          expect(text, isNot(contains('-->')));
+          expect(text, contains('Suas lembranças desse dia'));
+          expect(text, contains('novembro 23 Ao longo dos anos'));
+        },
+      );
+
+      test('cleans Markdown syntax when cleanMarkdown is true', () {
+        const markdown = '''
+# Título da Captura
+| Coluna 1 | Coluna 2 |
+| --- | --- |
+| Dado A | Dado B |
+Veja o [link para o site](https://jw.org).
+''';
+        final cleaned = EmailHtmlSanitizer.extractPlainText(
+          markdown,
+          cleanMarkdown: true,
+        );
+        expect(cleaned, isNot(contains('# Título')));
+        expect(cleaned, isNot(contains('| --- |')));
+        expect(cleaned, isNot(contains('[link para o site]')));
+        expect(cleaned, contains('link para o site'));
+        expect(cleaned, contains('Título da Captura'));
+      });
     });
 
     group('displaySenderName', () {

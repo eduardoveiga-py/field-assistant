@@ -557,29 +557,62 @@ class MicrosoftOAuthService {
   }) async {
     try {
       final uri = Uri.parse(
-        '$graphBaseUrl/me/messages/$messageId/attachments?\$select=id,name,contentType,size,isInline',
+        '$graphBaseUrl/me/messages/$messageId/attachments?\$select=id,name,contentType,size,isInline,contentId,contentBytes',
       );
       final resp = await _httpClient.get(uri, headers: headers);
       if (resp.statusCode == 200) {
         final data = jsonDecode(resp.body) as Map<String, dynamic>;
         final list = data['value'] as List<dynamic>? ?? [];
+        var cumulativeBytes = 0;
+        const maxCumulativeBytes = 5 * 1024 * 1024; // 5 MB teto cumulativo
+        const maxSingleAutoBytes = 2 * 1024 * 1024; // 2 MB para auto-download
+
         return list.map((a) {
           final m = Map<String, dynamic>.from(a as Map);
           final name = m['name'] as String? ?? 'anexo';
           final mime =
               m['contentType'] as String? ?? 'application/octet-stream';
+          final size = m['size'] as int? ?? 0;
+          final isInline = m['isInline'] as bool? ?? false;
+          final rawCid = m['contentId'] as String?;
+          final contentId = rawCid?.replaceAll(RegExp(r'^<|>$'), '').trim();
+          final contentBytes = m['contentBytes'] as String?;
+
+          String? base64Data;
+          Uint8List? rawBytes;
+
+          if (contentBytes != null &&
+              contentBytes.isNotEmpty &&
+              (isInline || size <= maxSingleAutoBytes) &&
+              (cumulativeBytes + size <= maxCumulativeBytes)) {
+            base64Data = contentBytes;
+            try {
+              rawBytes = base64.decode(contentBytes);
+              cumulativeBytes += size;
+            } catch (_) {}
+          }
+
           return {
             'name': name,
             'attachmentId': m['id'] ?? '',
-            'size': m['size'] as int? ?? 0,
+            'size': size,
             'contentType': mime,
-            'isInline': m['isInline'] as bool? ?? false,
+            'mimeType': mime,
+            'isInline': isInline,
+            'contentId': contentId,
+            'base64': base64Data,
             'type': _determineFileType(name, mime),
-            'rawBytes': null, // Download sob demanda
+            'rawBytes': rawBytes,
           };
         }).toList();
       }
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.warning(
+        'Erro ao buscar anexos da mensagem $messageId no Microsoft Graph: $e',
+        e,
+        st,
+      );
+    }
     return [];
   }
 
