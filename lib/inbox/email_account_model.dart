@@ -38,6 +38,7 @@ class EmailAccount {
   final String username;
   final bool isActive;
   final DateTime createdAt;
+  final String signatureHtml;
 
   const EmailAccount({
     required this.id,
@@ -54,6 +55,7 @@ class EmailAccount {
     required this.username,
     this.isActive = true,
     required this.createdAt,
+    this.signatureHtml = '',
   }) : outgoingProtocol =
            outgoingProtocol ??
            (incomingProtocol == 'exchange'
@@ -86,7 +88,44 @@ class EmailAccount {
     'username': username,
     'isActive': isActive,
     'createdAt': createdAt.toIso8601String(),
+    'signatureHtml': signatureHtml,
   };
+
+  EmailAccount copyWith({
+    String? id,
+    String? name,
+    String? email,
+    EmailProviderType? providerType,
+    String? incomingHost,
+    int? incomingPort,
+    String? incomingProtocol,
+    String? outgoingHost,
+    int? outgoingPort,
+    String? outgoingSecurity,
+    String? outgoingProtocol,
+    String? username,
+    bool? isActive,
+    DateTime? createdAt,
+    String? signatureHtml,
+  }) {
+    return EmailAccount(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      email: email ?? this.email,
+      providerType: providerType ?? this.providerType,
+      incomingHost: incomingHost ?? this.incomingHost,
+      incomingPort: incomingPort ?? this.incomingPort,
+      incomingProtocol: incomingProtocol ?? this.incomingProtocol,
+      outgoingHost: outgoingHost ?? this.outgoingHost,
+      outgoingPort: outgoingPort ?? this.outgoingPort,
+      outgoingSecurity: outgoingSecurity ?? this.outgoingSecurity,
+      outgoingProtocol: outgoingProtocol ?? this.outgoingProtocol,
+      username: username ?? this.username,
+      isActive: isActive ?? this.isActive,
+      createdAt: createdAt ?? this.createdAt,
+      signatureHtml: signatureHtml ?? this.signatureHtml,
+    );
+  }
 
   factory EmailAccount.fromJson(Map<String, dynamic> json) {
     EmailProviderType prov = EmailProviderType.custom;
@@ -126,6 +165,7 @@ class EmailAccount {
       createdAt: json['createdAt'] != null
           ? DateTime.tryParse(json['createdAt'] as String) ?? DateTime.now()
           : DateTime.now(),
+      signatureHtml: (json['signatureHtml'] as String?) ?? '',
     );
   }
 

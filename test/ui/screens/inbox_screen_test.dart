@@ -717,8 +717,8 @@ void main() {
         await tester.tap(emailTab);
         await tester.pumpAndSettle();
 
-        // 2. Toca no FAB de Compor / Novo E-mail
-        final fab = find.widgetWithText(FloatingActionButton, 'Novo Rascunho');
+        // 2. Toca no botão de Compor / Novo E-mail
+        final fab = find.text('Novo Rascunho');
         expect(fab, findsOneWidget);
         await tester.tap(fab);
         await tester.pumpAndSettle();
@@ -829,8 +829,8 @@ void main() {
         await tester.tap(emailTab);
         await tester.pumpAndSettle();
 
-        // 2. Toca no FAB de Compor
-        final fab = find.widgetWithText(FloatingActionButton, 'Novo Rascunho');
+        // 2. Toca no botão de Compor
+        final fab = find.text('Novo Rascunho');
         await tester.tap(fab);
         await tester.pumpAndSettle();
 

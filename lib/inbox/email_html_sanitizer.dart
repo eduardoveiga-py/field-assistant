@@ -127,6 +127,22 @@ class EmailHtmlSanitizer {
       text = text.replaceAll(_markdownImageRegex, '');
       text = text.replaceAllMapped(_markdownLinkRegex, (m) => m.group(1) ?? '');
       text = text.replaceAll(_markdownHeadingRegex, '');
+      text = text.replaceAllMapped(
+        RegExp(r'\*\*([^\*\n]+)\*\*'),
+        (m) => m.group(1) ?? '',
+      );
+      text = text.replaceAllMapped(
+        RegExp(r'(?<!\*)\*([^\*\n]+)\*(?!\*)'),
+        (m) => m.group(1) ?? '',
+      );
+      text = text.replaceAllMapped(
+        RegExp(r'__([^_\n]+)__'),
+        (m) => m.group(1) ?? '',
+      );
+      text = text.replaceAllMapped(
+        RegExp(r'~~([^~\n]+)~~'),
+        (m) => m.group(1) ?? '',
+      );
     }
 
     // 5. Decodifica entidades nomeadas
@@ -335,5 +351,53 @@ class EmailHtmlSanitizer {
         return 'src=$quote$dataUri$quote';
       },
     );
+  }
+
+  /// Converte texto formatado do compositor (com **negrito**, *itálico*, __sublinhado__, etc.)
+  /// para HTML limpo bem-formatado para envio de e-mails.
+  static String markdownToCleanHtml(String text) {
+    if (text.trim().isEmpty) return '';
+
+    final lower = text.trim().toLowerCase();
+    if (lower.startsWith('<html') || lower.startsWith('<!doctype')) {
+      return sanitizeHtmlForDisplay(text);
+    }
+
+    var s = text;
+
+    // Negrito: **texto**
+    s = s.replaceAllMapped(
+      RegExp(r'\*\*([^\*\n]+)\*\*'),
+      (m) => '<b>${m.group(1)}</b>',
+    );
+
+    // Itálico: *texto* (não adjacente a outro *)
+    s = s.replaceAllMapped(
+      RegExp(r'(?<!\*)\*([^\*\n]+)\*(?!\*)'),
+      (m) => '<i>${m.group(1)}</i>',
+    );
+
+    // Sublinhado: __texto__
+    s = s.replaceAllMapped(
+      RegExp(r'__([^_\n]+)__'),
+      (m) => '<u>${m.group(1)}</u>',
+    );
+
+    // Links: [texto](url)
+    s = s.replaceAllMapped(
+      RegExp(r'\[([^\]]+)\]\((https?://[^\)]+)\)'),
+      (m) => '<a href="${m.group(2)}">${m.group(1)}</a>',
+    );
+
+    // Quebras de linha
+    s = s.replaceAll('\r\n', '\n');
+    s = s.replaceAll('\n', '<br>');
+
+    return s;
+  }
+
+  /// Remove marcadores Markdown do texto sem deixar asteriscos crus
+  static String markdownToCleanPlainText(String text) {
+    return extractPlainText(text, cleanMarkdown: true);
   }
 }

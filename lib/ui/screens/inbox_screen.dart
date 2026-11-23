@@ -34,9 +34,11 @@ import '../../voice_notes/audio_recording_service.dart';
 import '../providers.dart';
 import 'settings_screen.dart';
 import '../widgets/adaptive_ministry_sheet.dart';
+import '../widgets/email_remote_image.dart';
 import '../widgets/managed_text_controllers.dart';
 import '../widgets/markdown_preview_text.dart';
 import '../widgets/quick_capture_sheet.dart';
+import '../widgets/rich_email_editing_controller.dart';
 import '../widgets/rich_markdown_toolbar.dart';
 import '../widgets/universal_attachment_viewer.dart';
 
@@ -133,26 +135,69 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
   }
 
   String? _extractCaptureAccountEmail(InboxEntry entry) {
-    if (entry.sourceType != 'email' || entry.attachments.isEmpty) {
+    if (entry.sourceType != 'email') {
       return null;
     }
-    try {
-      final decoded = jsonDecode(entry.attachments);
-      if (decoded is Map<String, dynamic>) {
-        final direct = decoded['accountEmail'];
-        if (direct is String && direct.trim().isNotEmpty) {
-          return direct.trim().toLowerCase();
+    // 1. Tenta extrair de metadata (padrão gravado por EmailSyncCoordinator)
+    if (entry.metadata.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(entry.metadata);
+        if (decoded is Map<String, dynamic>) {
+          final emailMap = decoded['email'];
+          if (emailMap is Map<String, dynamic>) {
+            final acc = emailMap['accountEmail'];
+            if (acc is String && acc.trim().isNotEmpty) {
+              return acc.trim().toLowerCase();
+            }
+          }
+          final direct = decoded['accountEmail'];
+          if (direct is String && direct.trim().isNotEmpty) {
+            return direct.trim().toLowerCase();
+          }
         }
+      } catch (_) {}
+    }
+
+    // 2. Fallback legado em attachments
+    if (entry.attachments.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(entry.attachments);
+        if (decoded is Map<String, dynamic>) {
+          final direct = decoded['accountEmail'];
+          if (direct is String && direct.trim().isNotEmpty) {
+            return direct.trim().toLowerCase();
+          }
+          final emailMap = decoded['email'];
+          if (emailMap is Map<String, dynamic>) {
+            final nested = emailMap['accountEmail'];
+            if (nested is String && nested.trim().isNotEmpty) {
+              return nested.trim().toLowerCase();
+            }
+          }
+        }
+      } catch (_) {}
+    }
+    return null;
+  }
+
+  ({String? from, String? subject}) _extractCaptureEmailHeader(
+    InboxEntry entry,
+  ) {
+    if (entry.sourceType != 'email' || entry.metadata.isEmpty) {
+      return (from: null, subject: null);
+    }
+    try {
+      final decoded = jsonDecode(entry.metadata);
+      if (decoded is Map<String, dynamic>) {
         final emailMap = decoded['email'];
         if (emailMap is Map<String, dynamic>) {
-          final nested = emailMap['accountEmail'];
-          if (nested is String && nested.trim().isNotEmpty) {
-            return nested.trim().toLowerCase();
-          }
+          final from = emailMap['from'] as String?;
+          final subject = emailMap['subject'] as String?;
+          return (from: from, subject: subject);
         }
       }
     } catch (_) {}
-    return null;
+    return (from: null, subject: null);
   }
 
   List<InboxEntry> _filterCapturesByAccount(List<InboxEntry> entries) {
@@ -160,9 +205,11 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
     if (_selectedCaptureAccount == '__none__') {
       return entries.where((e) => e.sourceType != 'email').toList();
     }
-    final target = _selectedCaptureAccount.toLowerCase();
+    final target = _selectedCaptureAccount.trim().toLowerCase();
     return entries
-        .where((e) => _extractCaptureAccountEmail(e) == target)
+        .where(
+          (e) => _extractCaptureAccountEmail(e)?.trim().toLowerCase() == target,
+        )
         .toList();
   }
 
@@ -502,6 +549,10 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
   }
 
   Widget? _buildFab() {
+    final isLargeScreen = MediaQuery.sizeOf(context).width >= 700;
+    if (_tabController.index == 1 && isLargeScreen) {
+      return null;
+    }
     return FloatingActionButton.extended(
       onPressed: () {
         if (_tabController.index == 1) {
@@ -979,20 +1030,100 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
             ),
             const SizedBox(height: 10),
 
-            // Conteúdo textual
-            MarkdownPreviewText(
-              text: EmailHtmlSanitizer.extractPlainText(
-                entry.content,
-                cleanMarkdown: true,
+            // Conteúdo textual ou Cabeçalho de E-mail
+            if (entry.sourceType == 'email') ...[
+              Builder(
+                builder: (context) {
+                  final header = _extractCaptureEmailHeader(entry);
+                  final senderName =
+                      header.from != null && header.from!.isNotEmpty
+                      ? EmailHtmlSanitizer.displaySenderName(header.from)
+                      : null;
+                  final subject =
+                      header.subject != null &&
+                          header.subject!.trim().isNotEmpty
+                      ? header.subject!.trim()
+                      : null;
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (senderName != null) ...[
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.person_outline,
+                              size: 13,
+                              color: isDark
+                                  ? const Color(0xFF94A3B8)
+                                  : const Color(0xFF64748B),
+                            ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                senderName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  color: isDark
+                                      ? const Color(0xFF94A3B8)
+                                      : const Color(0xFF64748B),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                      ],
+                      if (subject != null) ...[
+                        Text(
+                          subject,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w600,
+                            color: isDark
+                                ? Colors.white
+                                : const Color(0xFF0F172A),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                      ],
+                      Text(
+                        EmailHtmlSanitizer.extractPlainText(
+                          entry.content,
+                          cleanMarkdown: true,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          color: isDark
+                              ? const Color(0xFFCBD5E1)
+                              : const Color(0xFF475569),
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: isDark
-                    ? const Color(0xFFF1F5F9)
-                    : const Color(0xFF1E293B),
+            ] else ...[
+              MarkdownPreviewText(
+                text: EmailHtmlSanitizer.extractPlainText(
+                  entry.content,
+                  cleanMarkdown: true,
+                ),
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: isDark
+                      ? const Color(0xFFF1F5F9)
+                      : const Color(0xFF1E293B),
+                ),
               ),
-            ),
+            ],
 
             // Player de Áudio incorporado
             if (isAudio) ...[
@@ -2005,6 +2136,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
 
   Widget _buildJwMailTab(bool isDark) {
     final emailService = ref.watch(jwEmailServiceProvider);
+    final isLargeScreen = MediaQuery.sizeOf(context).width >= 700;
 
     return Column(
       children: [
@@ -2067,6 +2199,25 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                   style: const TextStyle(fontSize: 12),
                 ),
               ),
+              if (isLargeScreen) ...[
+                const SizedBox(width: 8),
+                FilledButton.icon(
+                  key: const Key('btn_new_draft_header'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppTheme.primaryBlue,
+                    foregroundColor: Colors.white,
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    minimumSize: const Size(0, 36),
+                  ),
+                  onPressed: _showNewDraftDialog,
+                  icon: const Icon(Icons.edit_note, size: 16),
+                  label: const Text(
+                    'Novo Rascunho',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -3378,14 +3529,55 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Assunto
-                SelectableText(
-                  msg.subject.trim().isEmpty ? '(Sem assunto)' : msg.subject,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white : const Color(0xFF0F172A),
-                  ),
+                // Assunto + Botão Maximizar Tela Cheia
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: SelectableText(
+                        msg.subject.trim().isEmpty
+                            ? '(Sem assunto)'
+                            : msg.subject,
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: isDark
+                              ? Colors.white
+                              : const Color(0xFF0F172A),
+                        ),
+                      ),
+                    ),
+                    if (!isFullScreen)
+                      IconButton(
+                        key: const Key('btn_maximize_email'),
+                        tooltip: 'Maximizar tela cheia',
+                        icon: const Icon(Icons.open_in_full, size: 20),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (ctx) => Scaffold(
+                                appBar: AppBar(
+                                  title: Text(
+                                    msg.subject.trim().isEmpty
+                                        ? '(Sem assunto)'
+                                        : msg.subject,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                body: _buildOutlookDetailPane(
+                                  msg,
+                                  isDark,
+                                  accounts,
+                                  isFullScreen: true,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                  ],
                 ),
                 const SizedBox(height: 12),
 
@@ -4154,6 +4346,14 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
           initBody,
           initTags,
         ],
+        customFactories: [
+          null,
+          null,
+          null,
+          null,
+          (text) => RichEmailEditingController(text: text),
+          null,
+        ],
         builder: (ctx, ctrls) {
           final toCtrl = ctrls[0];
           final ccCtrl = ctrls[1];
@@ -4162,6 +4362,8 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
           final contentCtrl = ctrls[4];
           final tagsCtrl = ctrls[5];
           bool showCcBcc = initCc.isNotEmpty || initBcc.isNotEmpty;
+          bool isHtmlPreview = false;
+          bool includeSignature = true;
           final attachments = List<Map<String, dynamic>>.from(
             existingDraft?.attachments ?? [],
           );
@@ -4214,6 +4416,8 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                   AppLogger.warning('Falha ao selecionar arquivo', e);
                 }
               }
+
+              final isDark = Theme.of(ctx).brightness == Brightness.dark;
 
               return SafeArea(
                 child: Padding(
@@ -4680,17 +4884,184 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                           ),
                         ),
                         const SizedBox(height: 12),
-                        RichMarkdownToolbar(controller: contentCtrl),
-                        const SizedBox(height: 6),
-                        TextField(
-                          controller: contentCtrl,
-                          enabled: !isSending,
-                          maxLines: 5,
-                          decoration: const InputDecoration(
-                            labelText: 'Conteúdo da Mensagem *',
-                            hintText: 'Escreva a mensagem ou nota que deseja enviar ou salvar permanentemente...',
-                          ),
+                        Wrap(
+                          alignment: WrapAlignment.spaceBetween,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 8,
+                          runSpacing: 4,
+                          children: [
+                            const Text(
+                              'Editor Rico / Prévia',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                            ),
+                            SegmentedButton<bool>(
+                              segments: const [
+                                ButtonSegment(
+                                  value: false,
+                                  label: Text(
+                                    'Editar',
+                                    style: TextStyle(fontSize: 11),
+                                  ),
+                                  icon: Icon(Icons.edit_note, size: 14),
+                                ),
+                                ButtonSegment(
+                                  value: true,
+                                  label: Text(
+                                    'Prévia HTML',
+                                    style: TextStyle(fontSize: 11),
+                                  ),
+                                  icon: Icon(Icons.visibility, size: 14),
+                                ),
+                              ],
+                              selected: {isHtmlPreview},
+                              onSelectionChanged: (val) {
+                                setSheetState(() => isHtmlPreview = val.first);
+                              },
+                              style: const ButtonStyle(
+                                visualDensity: VisualDensity.compact,
+                              ),
+                            ),
+                          ],
                         ),
+                        const SizedBox(height: 6),
+                        if (!isHtmlPreview) ...[
+                          RichMarkdownToolbar(controller: contentCtrl),
+                          const SizedBox(height: 6),
+                          TextField(
+                            key: const ValueKey('compose_content_field'),
+                            controller: contentCtrl,
+                            enabled: !isSending,
+                            maxLines: 5,
+                            decoration: const InputDecoration(
+                              labelText: 'Conteúdo da Mensagem *',
+                              hintText: 'Escreva a mensagem ou nota que deseja enviar ou salvar permanentemente...',
+                            ),
+                          ),
+                        ] else ...[
+                          Theme(
+                            data: ThemeData.light(),
+                            child: Container(
+                              width: double.infinity,
+                              constraints: const BoxConstraints(minHeight: 120),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: const Color(0xFFCBD5E1),
+                                ),
+                              ),
+                              child: contentCtrl.text.trim().isEmpty
+                                  ? const Text(
+                                      '(Nenhum conteúdo digitado)',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: Colors.grey,
+                                        fontStyle: FontStyle.italic,
+                                      ),
+                                    )
+                                  : HtmlWidget(
+                                      EmailHtmlSanitizer.markdownToCleanHtml(
+                                        contentCtrl.text.trim(),
+                                      ),
+                                      textStyle: const TextStyle(
+                                        fontSize: 13,
+                                        color: Color(0xFF1E293B),
+                                      ),
+                                    ),
+                            ),
+                          ),
+                        ],
+                        if (selectedAccount?.signatureHtml.trim().isNotEmpty ==
+                            true) ...[
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? const Color(0xFF1E293B)
+                                  : const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: isDark
+                                    ? const Color(0xFF334155)
+                                    : const Color(0xFFCBD5E1),
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Expanded(
+                                      child: Row(
+                                        children: [
+                                          const Icon(
+                                            Icons.draw_outlined,
+                                            size: 16,
+                                            color: AppTheme.primaryBlue,
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Flexible(
+                                            child: Text(
+                                              'Assinatura ativa (${selectedAccount!.name})',
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Switch.adaptive(
+                                      value: includeSignature,
+                                      activeTrackColor: AppTheme.primaryBlue,
+                                      onChanged: (val) => setSheetState(
+                                        () => includeSignature = val,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                if (includeSignature) ...[
+                                  const SizedBox(height: 6),
+                                  Theme(
+                                    data: ThemeData.light(),
+                                    child: Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(
+                                          color: const Color(0xFFE2E8F0),
+                                        ),
+                                      ),
+                                      child: HtmlWidget(
+                                        selectedAccount!.signatureHtml,
+                                        textStyle: const TextStyle(
+                                          fontSize: 12,
+                                          color: Color(0xFF1E293B),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 12),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -4779,7 +5150,31 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                           JwSmtpClient.parseRecipients(
                                             bccCtrl.text,
                                           );
-                                      final bodyText = contentCtrl.text.trim();
+                                      final rawText = contentCtrl.text.trim();
+                                      final baseCleanHtml =
+                                          EmailHtmlSanitizer.markdownToCleanHtml(
+                                            rawText,
+                                          );
+                                      final baseCleanPlain =
+                                          EmailHtmlSanitizer.markdownToCleanPlainText(
+                                            rawText,
+                                          );
+                                      final String finalHtmlBody;
+                                      final String finalPlainBody;
+                                      if (includeSignature &&
+                                          selectedAccount?.signatureHtml
+                                                  .trim()
+                                                  .isNotEmpty ==
+                                              true) {
+                                        finalHtmlBody =
+                                            '$baseCleanHtml<br><br>--<br>${selectedAccount!.signatureHtml}';
+                                        finalPlainBody =
+                                            '$baseCleanPlain\n\n--\n${EmailHtmlSanitizer.extractPlainText(selectedAccount!.signatureHtml)}';
+                                      } else {
+                                        finalHtmlBody = baseCleanHtml;
+                                        finalPlainBody = baseCleanPlain;
+                                      }
+
                                       final tags = tagsCtrl.text
                                           .split(',')
                                           .map(
@@ -4815,7 +5210,10 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                         cc: ccList,
                                         bcc: bccList,
                                         date: DateTime.now(),
-                                        bodyText: bodyText,
+                                        bodyText: finalPlainBody,
+                                        bodyHtml: finalHtmlBody.isNotEmpty
+                                            ? finalHtmlBody
+                                            : null,
                                         attachments: attachments,
                                         isDraft: true,
                                         tags: tags,
@@ -4855,7 +5253,31 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                   : () async {
                                       final to = toCtrl.text.trim();
                                       final subject = subjectCtrl.text.trim();
-                                      final bodyText = contentCtrl.text.trim();
+                                      final rawText = contentCtrl.text.trim();
+                                      final baseCleanHtml =
+                                          EmailHtmlSanitizer.markdownToCleanHtml(
+                                            rawText,
+                                          );
+                                      final baseCleanPlain =
+                                          EmailHtmlSanitizer.markdownToCleanPlainText(
+                                            rawText,
+                                          );
+                                      final String finalHtmlBody;
+                                      final String finalPlainBody;
+                                      if (includeSignature &&
+                                          selectedAccount?.signatureHtml
+                                                  .trim()
+                                                  .isNotEmpty ==
+                                              true) {
+                                        finalHtmlBody =
+                                            '$baseCleanHtml<br><br>--<br>${selectedAccount!.signatureHtml}';
+                                        finalPlainBody =
+                                            '$baseCleanPlain\n\n--\n${EmailHtmlSanitizer.extractPlainText(selectedAccount!.signatureHtml)}';
+                                      } else {
+                                        finalHtmlBody = baseCleanHtml;
+                                        finalPlainBody = baseCleanPlain;
+                                      }
+                                      final bodyText = finalPlainBody;
                                       final ccList =
                                           JwSmtpClient.parseRecipients(
                                             ccCtrl.text,
@@ -4926,7 +5348,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                               bcc: bccList,
                                               subject: subject,
                                               bodyText: bodyText,
-                                              bodyHtml: null,
+                                              bodyHtml: finalHtmlBody.isNotEmpty
+                                                  ? finalHtmlBody
+                                                  : null,
                                               attachments: attachments,
                                             );
 
@@ -4945,6 +5369,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                               bcc: bccList,
                                               date: now,
                                               bodyText: bodyText,
+                                              bodyHtml: finalHtmlBody.isNotEmpty
+                                                  ? finalHtmlBody
+                                                  : null,
                                               attachments: attachments,
                                               isDraft: false,
                                               isPermanentRetained: true,
@@ -5037,7 +5464,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                               bcc: bccList,
                                               subject: subject,
                                               bodyText: bodyText,
-                                              bodyHtml: null,
+                                              bodyHtml: finalHtmlBody.isNotEmpty
+                                                  ? finalHtmlBody
+                                                  : null,
                                               attachments: attachments,
                                             );
 
@@ -5056,6 +5485,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                               bcc: bccList,
                                               date: now,
                                               bodyText: bodyText,
+                                              bodyHtml: finalHtmlBody.isNotEmpty
+                                                  ? finalHtmlBody
+                                                  : null,
                                               attachments: attachments,
                                               isDraft: false,
                                               isPermanentRetained: true,
@@ -5172,7 +5604,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                             await session.sendMail(
                                               to: to,
                                               subject: subject,
-                                              body: bodyText,
+                                              body: finalHtmlBody.isNotEmpty
+                                                  ? finalHtmlBody
+                                                  : bodyText,
                                               from: selectedAccount!.email,
                                               cc: ccList,
                                               bcc: bccList,
@@ -5194,6 +5628,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                               bcc: bccList,
                                               date: now,
                                               bodyText: bodyText,
+                                              bodyHtml: finalHtmlBody.isNotEmpty
+                                                  ? finalHtmlBody
+                                                  : null,
                                               attachments: attachments,
                                               isDraft: false,
                                               isPermanentRetained: true,
@@ -5283,6 +5720,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                               bcc: bccList,
                                               date: DateTime.now(),
                                               bodyText: bodyText,
+                                              bodyHtml: finalHtmlBody.isNotEmpty
+                                                  ? finalHtmlBody
+                                                  : null,
                                               attachments: attachments,
                                               isDraft: false,
                                               tags: tags,
@@ -5997,6 +6437,35 @@ class _ProfessionalEmailBodyView extends StatelessWidget {
               child: HtmlWidget(
                 resolvedHtml,
                 textStyle: baseStyle.copyWith(color: const Color(0xFF1E293B)),
+                customWidgetBuilder: (element) {
+                  if (element.localName == 'img') {
+                    final src = element.attributes['src'] ?? '';
+                    if (src.startsWith('data:image/')) {
+                      final commaIndex = src.indexOf(',');
+                      if (commaIndex != -1) {
+                        try {
+                          final base64Data = src.substring(commaIndex + 1);
+                          final bytes = base64Decode(base64Data);
+                          return ConstrainedBox(
+                            constraints: const BoxConstraints(maxHeight: 600),
+                            child: Image.memory(bytes, fit: BoxFit.contain),
+                          );
+                        } catch (_) {}
+                      }
+                    } else if (kIsWeb &&
+                        (src.startsWith('http://') ||
+                            src.startsWith('https://'))) {
+                      return ConstrainedBox(
+                        constraints: const BoxConstraints(maxHeight: 600),
+                        child: EmailRemoteImage(
+                          url: src,
+                          alt: element.attributes['alt'],
+                        ),
+                      );
+                    }
+                  }
+                  return null;
+                },
                 onTapUrl: (url) async {
                   final uri = Uri.tryParse(url);
                   if (uri != null && await canLaunchUrl(uri)) {
