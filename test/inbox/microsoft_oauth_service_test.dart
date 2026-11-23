@@ -489,5 +489,102 @@ void main() {
         equals('Mensagem Página 2'),
       );
     });
+
+    test('fetchMessages automatically downloads small and inline attachments with base64 and contentId', () async {
+      const accountId = 'ms_auto_attach_acc';
+      final bundle = OAuthTokenBundle(
+        accessToken: 'valid_token_auto_attach',
+        expiresAt: DateTime.now().add(const Duration(hours: 1)),
+      );
+      await tokenStore.saveTokenBundle(accountId, bundle);
+
+      final dummyImageBytes = Uint8List.fromList([
+        137,
+        80,
+        78,
+        71,
+        13,
+        10,
+        26,
+        10,
+      ]);
+      final dummyBase64 = base64.encode(dummyImageBytes);
+
+      final mockClient = MockClient((request) async {
+        final url = request.url.toString();
+
+        if (url.contains('/me/mailFolders/inbox/messages')) {
+          return http.Response(
+            jsonEncode({
+              'value': [
+                {
+                  'id': 'msg_with_inline',
+                  'subject': 'E-mail com Imagem Inline',
+                  'from': {
+                    'emailAddress': {
+                      'name': 'Fotos OneDrive',
+                      'address': 'photos@onedrive.com',
+                    },
+                  },
+                  'receivedDateTime': '2026-11-22T10:00:00Z',
+                  'isRead': true,
+                  'hasAttachments': true,
+                  'body': {
+                    'contentType': 'html',
+                    'content': '<img src="cid:image001.png" />',
+                  },
+                },
+              ],
+            }),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        } else if (url.contains('/me/messages/msg_with_inline/attachments')) {
+          return http.Response(
+            jsonEncode({
+              'value': [
+                {
+                  'id': 'att_inline_1',
+                  'name': 'image001.png',
+                  'contentType': 'image/png',
+                  'size': dummyImageBytes.length,
+                  'isInline': true,
+                  'contentId': '<image001.png>',
+                  'contentBytes': dummyBase64,
+                },
+              ],
+            }),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+
+        return http.Response(
+          jsonEncode({'value': []}),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+
+      final service = MicrosoftOAuthService(
+        httpClient: mockClient,
+        tokenStore: tokenStore,
+      );
+
+      final result = await service.fetchMessages(
+        accountId: accountId,
+        accountEmail: 'user@outlook.com',
+        maxResults: 10,
+      );
+
+      expect(result.length, equals(1));
+      final msg = result.first;
+      expect(msg.attachments.length, equals(1));
+      final att = msg.attachments.first;
+      expect(att['isInline'], isTrue);
+      expect(att['contentId'], equals('image001.png'));
+      expect(att['base64'], equals(dummyBase64));
+      expect(att['rawBytes'], equals(dummyImageBytes));
+    });
   });
 }

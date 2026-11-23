@@ -566,5 +566,133 @@ void main() {
         equals('Página 2 Sucesso'),
       );
     });
+
+    test('getValidAccessToken returns cached token if valid and null if expired with allowInteractiveRefresh false', () async {
+      const accountId = 'gmail_refresh_test';
+      final validBundle = OAuthTokenBundle(
+        accessToken: 'valid_token_xyz',
+        expiresAt: DateTime.now().add(const Duration(hours: 1)),
+      );
+      await tokenStore.saveTokenBundle(accountId, validBundle);
+
+      final service = GmailOAuthService(tokenStore: tokenStore);
+      final token = await service.getValidAccessToken(
+        accountId,
+        allowInteractiveRefresh: false,
+      );
+      expect(token, equals('valid_token_xyz'));
+
+      // Salvar token expirado
+      final expiredBundle = OAuthTokenBundle(
+        accessToken: 'expired_token_xyz',
+        expiresAt: DateTime.now().subtract(const Duration(hours: 2)),
+      );
+      await tokenStore.saveTokenBundle(accountId, expiredBundle);
+
+      final expiredResult = await service.getValidAccessToken(
+        accountId,
+        allowInteractiveRefresh: false,
+      );
+      expect(expiredResult, isNull);
+    });
+
+    test('fetchMessages auto-downloads small and inline attachments with base64 and contentId', () async {
+      const accountId = 'gmail_inline_attach_acc';
+      final bundle = OAuthTokenBundle(
+        accessToken: 'token_gmail_inline',
+        expiresAt: DateTime.now().add(const Duration(hours: 1)),
+      );
+      await tokenStore.saveTokenBundle(accountId, bundle);
+
+      final dummyBytes = Uint8List.fromList([1, 2, 3, 4, 5, 6, 7, 8]);
+      final dummyBase64Url = base64Url.encode(dummyBytes);
+      final dummyBase64Standard = base64.encode(dummyBytes);
+
+      final mockClient = MockClient((request) async {
+        final url = request.url.toString();
+
+        if (url.contains('/users/me/messages?labelIds=INBOX')) {
+          return http.Response(
+            jsonEncode({
+              'messages': [
+                {'id': 'msg_inline_gmail'},
+              ],
+            }),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        } else if (url.contains(
+          '/users/me/messages/msg_inline_gmail?format=full',
+        )) {
+          return http.Response(
+            jsonEncode({
+              'id': 'msg_inline_gmail',
+              'labelIds': ['INBOX'],
+              'internalDate': '1700000000000',
+              'payload': {
+                'mimeType': 'multipart/mixed',
+                'headers': [
+                  {'name': 'Subject', 'value': 'Gmail com anexo inline'},
+                  {'name': 'From', 'value': 'contato@gmail.com'},
+                ],
+                'parts': [
+                  {
+                    'mimeType': 'image/png',
+                    'filename': 'logo.png',
+                    'headers': [
+                      {'name': 'Content-ID', 'value': '<logo.png>'},
+                      {
+                        'name': 'Content-Disposition',
+                        'value': 'inline; filename="logo.png"',
+                      },
+                    ],
+                    'body': {
+                      'attachmentId': 'att_gmail_123',
+                      'size': dummyBytes.length,
+                    },
+                  },
+                ],
+              },
+            }),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        } else if (url.contains(
+          '/users/me/messages/msg_inline_gmail/attachments/att_gmail_123',
+        )) {
+          return http.Response(
+            jsonEncode({'size': dummyBytes.length, 'data': dummyBase64Url}),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+
+        return http.Response(
+          jsonEncode({'messages': []}),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+
+      final service = GmailOAuthService(
+        httpClient: mockClient,
+        tokenStore: tokenStore,
+      );
+
+      final result = await service.fetchMessages(
+        accountId: accountId,
+        accountEmail: 'user@gmail.com',
+        maxResults: 10,
+      );
+
+      expect(result.length, equals(1));
+      final msg = result.first;
+      expect(msg.attachments.length, equals(1));
+      final att = msg.attachments.first;
+      expect(att['isInline'], isTrue);
+      expect(att['contentId'], equals('logo.png'));
+      expect(att['base64'], equals(dummyBase64Standard));
+      expect(att['rawBytes'], equals(dummyBytes));
+    });
   });
 }

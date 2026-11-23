@@ -117,7 +117,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
         db,
         jwEmailService: ref.read(jwEmailServiceProvider),
       );
-      await coordinator.syncAll();
+      await coordinator.syncAll(interactive: false);
       if (mounted) setState(() {});
     } catch (_) {}
   }
@@ -197,7 +197,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           child: DropdownButtonFormField<String>(
-            value: currentValue,
+            initialValue: currentValue,
             isDense: true,
             isExpanded: true,
             decoration: const InputDecoration(
@@ -237,7 +237,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
         db,
         jwEmailService: ref.read(jwEmailServiceProvider),
       );
-      final res = await coordinator.syncAll();
+      final res = await coordinator.syncAll(interactive: true);
 
       unawaited(() async {
         try {
@@ -679,12 +679,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                       ),
                                     ),
                                     const Divider(height: 24),
-                                    SelectableText(
-                                      selectedEntry.content,
-                                      style: const TextStyle(
-                                        fontSize: 15,
-                                        height: 1.5,
-                                      ),
+                                    _buildCaptureDetailContent(
+                                      selectedEntry,
+                                      isDark,
                                     ),
                                   ],
                                 ),
@@ -698,6 +695,86 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildCaptureDetailContent(InboxEntry entry, bool isDark) {
+    Map<String, dynamic>? emailMetadata;
+    List<Map<String, dynamic>> attachments = [];
+    if (entry.metadata.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(entry.metadata);
+        if (decoded is Map<String, dynamic> && decoded['email'] is Map) {
+          emailMetadata = Map<String, dynamic>.from(decoded['email'] as Map);
+        }
+      } catch (_) {}
+    }
+
+    if (entry.attachments.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(entry.attachments);
+        if (decoded is List) {
+          attachments = decoded
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList();
+        }
+      } catch (_) {}
+    }
+
+    final isEmailSource = entry.sourceType == 'email' || emailMetadata != null;
+    final lowerContent = entry.content.toLowerCase();
+    final hasHtmlTags =
+        lowerContent.contains('<html') ||
+        lowerContent.contains('<div') ||
+        lowerContent.contains('<p') ||
+        lowerContent.contains('<table') ||
+        lowerContent.contains('<span') ||
+        lowerContent.contains('<br');
+
+    if (isEmailSource || hasHtmlTags) {
+      final htmlBody =
+          emailMetadata?['bodyHtml'] as String? ??
+          (hasHtmlTags ? entry.content : null);
+      final textBody = emailMetadata?['bodyText'] as String? ?? entry.content;
+
+      return _ProfessionalEmailBodyView(
+        text: textBody,
+        html: htmlBody,
+        isDark: isDark,
+        attachments: attachments,
+      );
+    }
+
+    final hasMarkdown =
+        entry.content.contains('##') ||
+        entry.content.contains('| ---') ||
+        entry.content.contains('|:---') ||
+        entry.content.contains('**') ||
+        entry.content.contains('* ') ||
+        entry.content.contains('- ') ||
+        entry.content.contains('[');
+
+    if (hasMarkdown) {
+      return SelectionArea(
+        child: MarkdownPreviewText(
+          text: entry.content,
+          style: TextStyle(
+            fontSize: 15,
+            height: 1.55,
+            color: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF1E293B),
+          ),
+        ),
+      );
+    }
+
+    return SelectableText(
+      entry.content,
+      style: TextStyle(
+        fontSize: 15,
+        height: 1.5,
+        color: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF1E293B),
+      ),
     );
   }
 
@@ -904,7 +981,10 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
 
             // Conteúdo textual
             MarkdownPreviewText(
-              text: EmailHtmlSanitizer.extractPlainText(entry.content),
+              text: EmailHtmlSanitizer.extractPlainText(
+                entry.content,
+                cleanMarkdown: true,
+              ),
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,

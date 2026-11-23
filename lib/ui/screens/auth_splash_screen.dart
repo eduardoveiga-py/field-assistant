@@ -297,7 +297,7 @@ class _AuthGateShellState extends ConsumerState<AuthGateShell>
             db,
             jwEmailService: ref.read(jwEmailServiceProvider),
           );
-          final emailRes = await emailCoordinator.syncAll();
+          final emailRes = await emailCoordinator.syncAll(interactive: false);
           if (emailRes.totalMessagesSaved > 0) {
             AppLogger.info(
               'Splash Screen: ${emailRes.totalMessagesSaved} nova(s) mensagem(ns) de e-mail sincronizada(s)',

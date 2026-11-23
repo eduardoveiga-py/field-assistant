@@ -178,8 +178,9 @@ class EmailSyncCoordinator {
     return savedCount;
   }
 
-  /// Executa a sincronização de todas as contas ativas cadastradas
-  Future<EmailSyncResult> syncAll() async {
+  /// Executa a sincronização de todas as contas ativas cadastradas.
+  /// Se [interactive] for true, permite solicitar autenticação/renovação ao usuário se a renovação silenciosa falhar.
+  Future<EmailSyncResult> syncAll({bool interactive = false}) async {
     final accounts = await EmailAccountsManager.loadAccounts(db);
     if (accounts.isEmpty) {
       return const EmailSyncResult(
@@ -202,6 +203,7 @@ class EmailSyncCoordinator {
             accountId: acc.id,
             accountEmail: acc.email,
             maxResults: 200,
+            allowInteractiveRefresh: interactive,
           );
           final saved = await persistSyncedMessages(messages, 'gmail_api');
           totalSaved += saved;
