@@ -23,6 +23,7 @@ import '../core/sync_timestamp.dart';
 import '../database/app_database.dart';
 import '../reports/web_downloader.dart';
 import 'email_contacts_manager.dart';
+import 'email_html_sanitizer.dart';
 
 /// Modelo de mensagem de e-mail teocrático (JW.org Mail e Comunicações Restritas do Hub)
 class JwEmailMessage {
@@ -1590,16 +1591,27 @@ class JwEmailService {
             'retentionDate': now.toIso8601String(),
             'email': msg.toJson(),
           };
+          final isJwAccount =
+              (accountEmail?.toLowerCase().contains('jwpub') == true) ||
+              (host?.toLowerCase().contains('jwpub') == true);
+          final category = msg.isHubCommunication
+              ? (msg.hubType == 'form'
+                    ? 'hub_form'
+                    : (msg.hubType == 'letter' ? 'hub_letter' : 'hub_comms'))
+              : (isJwAccount ? 'email_jw' : 'email');
+          final cleanBody = msg.bodyText.isNotEmpty
+              ? EmailHtmlSanitizer.extractPlainText(msg.bodyText)
+              : (msg.bodyHtml != null
+                    ? EmailHtmlSanitizer.extractPlainText(msg.bodyHtml!)
+                    : '');
           await db
               .into(db.inboxEntries)
               .insert(
                 InboxEntriesCompanion.insert(
                   id: entryId,
-                  content: '${msg.subject}\n\n${msg.bodyText}',
+                  content: '${msg.subject}\n\n$cleanBody'.trim(),
                   sourceType: drift.Value(sourceType),
-                  suggestedCategory: drift.Value(
-                    msg.isHubCommunication ? 'hub_comms' : 'email_jw',
-                  ),
+                  suggestedCategory: drift.Value(category),
                   attachments: drift.Value(jsonEncode(msg.attachments)),
                   capturedAt: msg.date.toUtc(),
                   metadata: drift.Value(jsonEncode(metadata)),
@@ -1739,11 +1751,19 @@ class JwEmailService {
       final isUpdate = existingDraft != null;
       final nextRevision = isUpdate ? existingDraft.revision + 1 : 1;
 
+      final isJwAccount =
+          draft.accountEmail?.toLowerCase().contains('jwpub') == true;
+      final cleanBody = draft.bodyText.isNotEmpty
+          ? EmailHtmlSanitizer.extractPlainText(draft.bodyText)
+          : (draft.bodyHtml != null
+                ? EmailHtmlSanitizer.extractPlainText(draft.bodyHtml!)
+                : '');
+
       final companion = InboxEntriesCompanion.insert(
         id: entryId,
-        content: '${draft.subject}\n\n${draft.bodyText}',
+        content: '${draft.subject}\n\n$cleanBody'.trim(),
         sourceType: const drift.Value('email_draft'),
-        suggestedCategory: const drift.Value('email_jw'),
+        suggestedCategory: drift.Value(isJwAccount ? 'email_jw' : 'email'),
         attachments: drift.Value(jsonEncode(draft.attachments)),
         capturedAt: isUpdate ? existingDraft.capturedAt : now,
         metadata: drift.Value(jsonEncode(metadata)),
@@ -1843,11 +1863,19 @@ class JwEmailService {
       final isUpdate = existingSent != null;
       final nextRevision = isUpdate ? existingSent.revision + 1 : 1;
 
+      final isJwAccount =
+          sentMsg.accountEmail?.toLowerCase().contains('jwpub') == true;
+      final cleanBody = sentMsg.bodyText.isNotEmpty
+          ? EmailHtmlSanitizer.extractPlainText(sentMsg.bodyText)
+          : (sentMsg.bodyHtml != null
+                ? EmailHtmlSanitizer.extractPlainText(sentMsg.bodyHtml!)
+                : '');
+
       final companion = InboxEntriesCompanion.insert(
         id: resolvedEntryId,
-        content: '${sentMsg.subject}\n\n${sentMsg.bodyText}',
+        content: '${sentMsg.subject}\n\n$cleanBody'.trim(),
         sourceType: const drift.Value('email'),
-        suggestedCategory: const drift.Value('email_jw'),
+        suggestedCategory: drift.Value(isJwAccount ? 'email_jw' : 'email'),
         attachments: drift.Value(jsonEncode(sentMsg.attachments)),
         capturedAt: now,
         metadata: drift.Value(jsonEncode(metadata)),

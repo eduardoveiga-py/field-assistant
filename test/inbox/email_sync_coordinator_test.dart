@@ -198,6 +198,26 @@ void main() {
         expect(entries.length, equals(1));
         expect(entries.first.id, equals('email_test_msg_001'));
         expect(entries.first.content, contains('Boletim do Campo'));
+        expect(entries.first.suggestedCategory, equals('email'));
+
+        // Verifica se protocolo exchange grava categoria email_jw
+        final exchangeMsg = [
+          JwEmailMessage(
+            id: 'test_exchange_001',
+            subject: 'Carta Teocrática',
+            from: 'betel@jw.org',
+            to: 'corpo@jwpub.org',
+            date: DateTime.now(),
+            bodyText: 'Mensagem de Betel',
+            folderName: 'Caixa de Entrada',
+          ),
+        ];
+        await coordinator.persistSyncedMessages(exchangeMsg, 'exchange');
+        final exchangeEntry =
+            await (db.select(db.inboxEntries)
+                  ..where((tbl) => tbl.id.equals('email_test_exchange_001')))
+                .getSingle();
+        expect(exchangeEntry.suggestedCategory, equals('email_jw'));
 
         // Verifica se o remetente foi registrado nos contatos
         final contacts = await EmailContactsManager.getAllSuggestions(db);

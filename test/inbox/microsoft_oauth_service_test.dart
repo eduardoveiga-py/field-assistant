@@ -100,7 +100,10 @@ void main() {
         expect(parsed, isNotNull);
         expect(parsed!.id, equals('AAMkAGI2AAAt1234'));
         expect(parsed.subject, equals('Informativo Mensal de Campo'));
-        expect(parsed.from, equals('superintendente@outlook.com'));
+        expect(
+          parsed.from,
+          equals('Superintendente <superintendente@outlook.com>'),
+        );
         expect(parsed.to, equals('pioneiro@outlook.com'));
         expect(parsed.cc, equals(['ajudante@outlook.com']));
         expect(parsed.folderName, equals('Caixa de Entrada'));

@@ -67,15 +67,32 @@ class _UniversalAttachmentViewerDialogState
   Uint8List? _imageBytes;
 
   String get _effectiveFileType {
-    if (widget.fileType != null && widget.fileType!.isNotEmpty) {
-      return widget.fileType!.toLowerCase().replaceAll('.', '');
+    final rawType = widget.fileType?.toLowerCase().replaceAll('.', '').trim();
+    if (rawType != null &&
+        rawType.isNotEmpty &&
+        rawType != 'file' &&
+        rawType != 'attachment') {
+      if (rawType.contains('pdf')) return 'pdf';
+      if (rawType.contains('image') ||
+          rawType.contains('png') ||
+          rawType.contains('jpg') ||
+          rawType.contains('jpeg')) {
+        return 'jpg';
+      }
+      return rawType;
     }
-    final path = widget.filePath.toLowerCase();
-    final dot = path.lastIndexOf('.');
-    if (dot != -1 && dot < path.length - 1) {
-      return path.substring(dot + 1);
+    final candidateNames = [widget.title, widget.filePath];
+    for (final cand in candidateNames) {
+      if (cand != null && cand.isNotEmpty) {
+        final lower = cand.toLowerCase();
+        final dot = lower.lastIndexOf('.');
+        if (dot != -1 && dot < lower.length - 1) {
+          final ext = lower.substring(dot + 1).split('?').first;
+          if (ext.isNotEmpty) return ext;
+        }
+      }
     }
-    return 'unknown';
+    return rawType ?? 'unknown';
   }
 
   bool get _isPdf => _effectiveFileType == 'pdf';

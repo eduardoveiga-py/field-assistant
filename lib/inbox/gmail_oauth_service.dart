@@ -5,6 +5,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 
 import '../core/app_logger.dart';
+import 'email_html_sanitizer.dart';
 import 'jw_email_service.dart';
 import 'oauth_token_store.dart';
 
@@ -605,8 +606,13 @@ class GmailOAuthService {
 
     parsePart(payload);
 
-    final bodyText = bodyTexts.join('\n\n').trim();
+    final rawBodyText = bodyTexts.join('\n\n').trim();
     final bodyHtml = bodyHtmls.isNotEmpty ? bodyHtmls.join('\n') : null;
+    final bodyText = rawBodyText.isNotEmpty
+        ? rawBodyText
+        : (bodyHtml != null
+              ? EmailHtmlSanitizer.extractPlainText(bodyHtml)
+              : '');
 
     final numericUid =
         int.tryParse(id.replaceAll(RegExp(r'\D'), '')) ??
