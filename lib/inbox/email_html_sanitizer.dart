@@ -31,6 +31,23 @@ class EmailHtmlSanitizer {
   static final RegExp _decimalEntityRegex = RegExp(r'&#([0-9]+);');
   static final RegExp _multiSpaceRegex = RegExp(r'[ \t]+');
   static final RegExp _multiNewlineRegex = RegExp(r'\n{3,}');
+  static final RegExp _msoConditionalBlockRegex = RegExp(
+    r'<!\[if[^\]]*\][\s\S]*?<!\[endif\]>',
+    caseSensitive: false,
+  );
+  static final RegExp _msoConditionalTagRegex = RegExp(
+    r'<!--\[if[^\]]*\]>|<!\[endif\]-->|<!\[if[^\]]*\]>|<!\[endif\]>',
+    caseSensitive: false,
+  );
+  static final RegExp _looseCssBlockRegex = RegExp(
+    r'[^{}\n]*\{[^{}]*(?:background|mix-blend-mode|font-size|display|color)'
+    r'\s*:[^}]*\}',
+    caseSensitive: false,
+  );
+  static final RegExp _looseCommentEndLineRegex = RegExp(
+    r'^\s*-->\s*$',
+    multiLine: true,
+  );
 
   /// Mapeamento de entidades HTML nomeadas comuns
   static const Map<String, String> _namedEntities = {
@@ -74,12 +91,16 @@ class EmailHtmlSanitizer {
     text = text.replaceAll(_styleTagRegex, ' ');
     text = text.replaceAll(_scriptTagRegex, ' ');
     text = text.replaceAll(_htmlCommentRegex, ' ');
+    text = text.replaceAll(_msoConditionalBlockRegex, ' ');
+    text = text.replaceAll(_msoConditionalTagRegex, ' ');
 
     // 2. Converte quebras de bloco para nova linha
     text = text.replaceAll(_lineBreakTagRegex, '\n');
 
     // 3. Remove todas as outras tags restantes
     text = text.replaceAll(_anyHtmlTagRegex, '');
+    text = text.replaceAll(_looseCssBlockRegex, ' ');
+    text = text.replaceAll(_looseCommentEndLineRegex, '');
 
     // 4. Decodifica entidades nomeadas
     _namedEntities.forEach((entity, replacement) {
@@ -243,5 +264,49 @@ class EmailHtmlSanitizer {
     );
 
     return html;
+  }
+
+  /// Substitui referências `src="cid:..."` por `data:<mime>;base64,...`
+  /// quando o anexo correspondente tiver base64/contentId disponível.
+  static String resolveInlineCidImages(
+    String html,
+    List<Map<String, dynamic>> attachments,
+  ) {
+    if (html.isEmpty || attachments.isEmpty) return html;
+    final cidMap = <String, String>{};
+    for (final att in attachments) {
+      final rawCid = (att['contentId'] ?? att['content_id'] ?? att['cid'])
+          ?.toString()
+          .trim();
+      final b64 = (att['base64'] ?? att['data'] ?? att['content'])
+          ?.toString()
+          .trim();
+      if (rawCid == null || rawCid.isEmpty || b64 == null || b64.isEmpty) {
+        continue;
+      }
+      final cleanCid = rawCid.replaceAll(RegExp(r'^<|>$'), '').toLowerCase();
+      final mime =
+          (att['mimeType'] ??
+                  att['mime_type'] ??
+                  att['contentType'] ??
+                  att['content_type'] ??
+                  att['mime'] ??
+                  'image/png')
+              .toString()
+              .trim();
+      final cleanB64 = b64.replaceAll(RegExp(r'\s+'), '');
+      cidMap[cleanCid] = 'data:$mime;base64,$cleanB64';
+    }
+    if (cidMap.isEmpty) return html;
+    return html.replaceAllMapped(
+      RegExp(r'''src\s*=\s*(['"])cid:([^'"]+)\1''', caseSensitive: false),
+      (match) {
+        final quote = match.group(1)!;
+        final cid = match.group(2)!.trim().toLowerCase();
+        final dataUri = cidMap[cid];
+        if (dataUri == null) return match.group(0)!;
+        return 'src=$quote$dataUri$quote';
+      },
+    );
   }
 }
