@@ -133,11 +133,11 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
   }
 
   String? _extractCaptureAccountEmail(InboxEntry entry) {
-    if (entry.sourceType != 'email' || entry.attachments == null) {
+    if (entry.sourceType != 'email' || entry.attachments.isEmpty) {
       return null;
     }
     try {
-      final decoded = jsonDecode(entry.attachments!);
+      final decoded = jsonDecode(entry.attachments);
       if (decoded is Map<String, dynamic>) {
         final direct = decoded['accountEmail'];
         if (direct is String && direct.trim().isNotEmpty) {
@@ -203,10 +203,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
             decoration: const InputDecoration(
               labelText: 'Caixa de captura',
               border: OutlineInputBorder(),
-              contentPadding: EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 8,
-              ),
+              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             ),
             items: items,
             onChanged: (value) {
@@ -5922,10 +5919,7 @@ class _ProfessionalEmailBodyView extends StatelessWidget {
                 onTapUrl: (url) async {
                   final uri = Uri.tryParse(url);
                   if (uri != null && await canLaunchUrl(uri)) {
-                    await launchUrl(
-                      uri,
-                      mode: LaunchMode.externalApplication,
-                    );
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
                     return true;
                   }
                   return false;
