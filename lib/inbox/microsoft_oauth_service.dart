@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
 
 import '../core/app_logger.dart';
+import 'email_html_sanitizer.dart';
 import 'jw_email_service.dart';
 import 'oauth_token_store.dart';
 import 'web_url_cleaner.dart';
@@ -593,8 +594,15 @@ class MicrosoftOAuthService {
 
     final subject = msg['subject'] as String? ?? '(Sem assunto)';
     final fromMap = msg['from'] as Map<String, dynamic>?;
+    final emailObj = fromMap?['emailAddress'] as Map<String, dynamic>?;
+    final address = emailObj?['address'] as String? ?? accountEmail;
+    final name = emailObj?['name'] as String?;
     final from =
-        fromMap?['emailAddress']?['address'] as String? ?? accountEmail;
+        (name != null &&
+            name.trim().isNotEmpty &&
+            name.trim().toLowerCase() != address.trim().toLowerCase())
+        ? '${name.trim()} <${address.trim()}>'
+        : address.trim();
 
     String? extractAddress(dynamic recipient) {
       if (recipient is Map) {
@@ -636,7 +644,7 @@ class MicrosoftOAuthService {
 
     if (contentType == 'html') {
       bodyHtml = content;
-      bodyText = content.replaceAll(RegExp(r'<[^>]*>'), '').trim();
+      bodyText = EmailHtmlSanitizer.extractPlainText(content);
     } else {
       bodyText = content.trim();
       bodyHtml = null;

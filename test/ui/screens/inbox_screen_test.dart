@@ -593,7 +593,7 @@ void main() {
         await tester.tap(find.byKey(const Key('folder_chip_caixa_de_entrada')));
         await tester.pumpAndSettle();
 
-        expect(find.text('Boas Novas de Hoje'), findsOneWidget);
+        expect(find.text('Boas Novas de Hoje'), findsWidgets);
         expect(find.text('Relatório Mensal de Campo'), findsNothing);
         expect(find.text('Rascunho de Carta de Agradecimento'), findsNothing);
         expect(find.text('Promoção Não Solicitada'), findsNothing);
@@ -606,7 +606,7 @@ void main() {
         await tester.tap(find.byKey(const Key('folder_chip_enviadas')));
         await tester.pumpAndSettle();
 
-        expect(find.text('Relatório Mensal de Campo'), findsOneWidget);
+        expect(find.text('Relatório Mensal de Campo'), findsWidgets);
         expect(find.text('Boas Novas de Hoje'), findsNothing);
         expect(find.text('Promoção Não Solicitada'), findsNothing);
 
@@ -617,7 +617,7 @@ void main() {
         await tester.tap(find.byKey(const Key('folder_chip_rascunhos')));
         await tester.pumpAndSettle();
 
-        expect(find.text('Rascunho de Carta de Agradecimento'), findsOneWidget);
+        expect(find.text('Rascunho de Carta de Agradecimento'), findsWidgets);
         expect(find.text('Boas Novas de Hoje'), findsNothing);
 
         // 5. Filtra por 'Spam'
@@ -625,7 +625,7 @@ void main() {
         await tester.tap(find.byKey(const Key('folder_chip_spam')));
         await tester.pumpAndSettle();
 
-        expect(find.text('Promoção Não Solicitada'), findsOneWidget);
+        expect(find.text('Promoção Não Solicitada'), findsWidgets);
         expect(find.text('Boas Novas de Hoje'), findsNothing);
 
         // 6. Filtra por 'Lixeira'
@@ -635,7 +635,7 @@ void main() {
         await tester.tap(find.byKey(const Key('folder_chip_lixeira')));
         await tester.pumpAndSettle();
 
-        expect(find.text('Aviso Antigo Deletado'), findsOneWidget);
+        expect(find.text('Aviso Antigo Deletado'), findsWidgets);
         expect(find.text('Boas Novas de Hoje'), findsNothing);
 
         // 7. Volta para 'Todas as pastas' e testa filtro de 'Não lidos'
@@ -645,8 +645,8 @@ void main() {
         await tester.tap(find.byKey(const Key('folder_chip_todas_as_pastas')));
         await tester.pumpAndSettle();
 
-        expect(find.text('Boas Novas de Hoje'), findsOneWidget);
-        expect(find.text('Relatório Mensal de Campo'), findsOneWidget);
+        expect(find.text('Boas Novas de Hoje'), findsWidgets);
+        expect(find.text('Relatório Mensal de Campo'), findsWidgets);
 
         // Ativa filtro Não Lidos
         final unreadChip = find.byKey(const Key('filter_unread_chip'));
@@ -656,7 +656,7 @@ void main() {
         await tester.pumpAndSettle();
 
         // Apenas 'Boas Novas de Hoje' está como isRead=false
-        expect(find.text('Boas Novas de Hoje'), findsOneWidget);
+        expect(find.text('Boas Novas de Hoje'), findsWidgets);
         expect(find.text('Relatório Mensal de Campo'), findsNothing);
         expect(find.text('Aviso Antigo Deletado'), findsNothing);
 

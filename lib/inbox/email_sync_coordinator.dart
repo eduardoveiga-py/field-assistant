@@ -12,6 +12,7 @@ import '../core/sync_timestamp.dart';
 import '../database/app_database.dart';
 import 'email_account_model.dart';
 import 'email_contacts_manager.dart';
+import 'email_html_sanitizer.dart';
 import 'exchange_service.dart';
 import 'gmail_oauth_service.dart';
 import 'jw_email_service.dart';
@@ -121,14 +122,27 @@ class EmailSyncCoordinator {
         'protocol': protocol,
       };
 
+      final isExchange = protocol == 'exchange';
+      final category = msg.isHubCommunication
+          ? (msg.hubType == 'form'
+                ? 'hub_form'
+                : (msg.hubType == 'letter' ? 'hub_letter' : 'hub_comms'))
+          : (isExchange ? 'email_jw' : 'email');
+
+      final cleanBody = msg.bodyText.isNotEmpty
+          ? EmailHtmlSanitizer.extractPlainText(msg.bodyText)
+          : (msg.bodyHtml != null
+                ? EmailHtmlSanitizer.extractPlainText(msg.bodyHtml!)
+                : '');
+
       await db
           .into(db.inboxEntries)
           .insert(
             InboxEntriesCompanion.insert(
               id: entryId,
-              content: '${msg.subject}\n\n${msg.bodyText}',
+              content: '${msg.subject}\n\n$cleanBody'.trim(),
               sourceType: const drift.Value('email'),
-              suggestedCategory: const drift.Value('email_jw'),
+              suggestedCategory: drift.Value(category),
               attachments: drift.Value(jsonEncode(msg.attachments)),
               capturedAt: msg.date.toUtc(),
               metadata: drift.Value(jsonEncode(metadata)),
