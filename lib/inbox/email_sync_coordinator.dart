@@ -187,6 +187,7 @@ class EmailSyncCoordinator {
           final messages = await service.fetchMessages(
             accountId: acc.id,
             accountEmail: acc.email,
+            maxResults: 200,
           );
           final saved = await persistSyncedMessages(messages, 'gmail_api');
           totalSaved += saved;
@@ -196,6 +197,7 @@ class EmailSyncCoordinator {
           final messages = await service.fetchMessages(
             accountId: acc.id,
             accountEmail: acc.email,
+            maxResults: 200,
           );
           final saved = await persistSyncedMessages(
             messages,
