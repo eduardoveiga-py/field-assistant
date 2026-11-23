@@ -1462,6 +1462,12 @@ extension _SettingsIntegrationCards on _SettingsScreenState {
       await EmailAccountsManager.saveAccount(db, acc);
       await const OAuthTokenStore().saveTokenBundle(acc.id, res.tokenBundle);
 
+      unawaited(() async {
+        try {
+          await EmailSyncCoordinator(db).syncAll();
+        } catch (_) {}
+      }());
+
       if (mounted) {
         _updateState(() {});
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1509,6 +1515,12 @@ extension _SettingsIntegrationCards on _SettingsScreenState {
 
       await EmailAccountsManager.saveAccount(db, acc);
       await const OAuthTokenStore().saveTokenBundle(acc.id, res.tokenBundle);
+
+      unawaited(() async {
+        try {
+          await EmailSyncCoordinator(db).syncAll();
+        } catch (_) {}
+      }());
 
       if (mounted) {
         _updateState(() {});

@@ -3,9 +3,11 @@ import 'dart:ui';
 
 import 'package:drift/drift.dart' as drift;
 import 'package:app_links/app_links.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../appointments/calendar_provider.dart';
 import '../../appointments/calendar_sync_coordinator.dart';
@@ -13,6 +15,10 @@ import '../../core/app_logger.dart';
 import '../../core/app_theme.dart';
 import '../../core/app_version.dart';
 import '../../database/app_database.dart';
+import '../../inbox/email_account_model.dart';
+import '../../inbox/email_sync_coordinator.dart';
+import '../../inbox/microsoft_oauth_service.dart';
+import '../../inbox/oauth_token_store.dart';
 import '../../sync/supabase_sync_service.dart';
 import '../../sync/sync_owner_guard.dart';
 import '../../sync/native_auth_callback.dart';
@@ -62,6 +68,47 @@ class _AuthGateShellState extends ConsumerState<AuthGateShell>
   }
 
   void _initializeAuthGate() async {
+    if (kIsWeb) {
+      try {
+        final msService = MicrosoftOAuthService();
+        final msRes = await msService.checkAndCompleteWebRedirect();
+        if (msRes != null) {
+          final db = ref.read(databaseProvider);
+          final acc = EmailAccount(
+            id: const Uuid().v4(),
+            name: msRes.displayName?.isNotEmpty == true
+                ? 'Outlook (${msRes.displayName})'
+                : (msRes.email.isNotEmpty ? msRes.email : 'Outlook / Hotmail'),
+            email: msRes.email,
+            providerType: EmailProviderType.hotmail,
+            incomingHost: 'graph.microsoft.com',
+            incomingPort: 443,
+            incomingProtocol: 'microsoft_graph',
+            outgoingHost: 'graph.microsoft.com',
+            outgoingPort: 443,
+            outgoingSecurity: 'ssl',
+            outgoingProtocol: 'microsoft_graph',
+            username: msRes.email,
+            createdAt: DateTime.now(),
+          );
+          await EmailAccountsManager.saveAccount(db, acc);
+          await const OAuthTokenStore().saveTokenBundle(
+            acc.id,
+            msRes.tokenBundle,
+          );
+          AppLogger.info(
+            'Conta Microsoft (${msRes.email}) conectada com sucesso via Web Redirect.',
+          );
+        }
+      } catch (e, st) {
+        AppLogger.warning(
+          'Falha ao processar retorno Microsoft OAuth na Web: $e',
+          e,
+          st,
+        );
+      }
+    }
+
     SupabaseClient? client;
     try {
       client = Supabase.instance.client;
@@ -182,8 +229,10 @@ class _AuthGateShellState extends ConsumerState<AuthGateShell>
     if (mounted) {
       setState(() {
         _statusMessage = hasSession
-            ? 'Sincronizando registros e calendário...'
-            : 'Inicializando Assistente de Campo...';
+            ? 'Sincronizando registros, calendário e e-mails...'
+            : (isOfflineMode
+                  ? 'Carregando dados e sincronizando e-mails...'
+                  : 'Inicializando Assistente de Campo...');
       });
     }
 
@@ -228,15 +277,40 @@ class _AuthGateShellState extends ConsumerState<AuthGateShell>
       );
     }
 
+    if (shouldAuthenticate) {
+      // Sincronização em background de e-mails para contas ativas cadastradas
+      syncTasks.add(() async {
+        try {
+          final db = ref.read(databaseProvider);
+          final emailCoordinator = EmailSyncCoordinator(
+            db,
+            jwEmailService: ref.read(jwEmailServiceProvider),
+          );
+          final emailRes = await emailCoordinator.syncAll();
+          if (emailRes.totalMessagesSaved > 0) {
+            AppLogger.info(
+              'Splash Screen: ${emailRes.totalMessagesSaved} nova(s) mensagem(ns) de e-mail sincronizada(s)',
+            );
+          }
+        } catch (e, st) {
+          AppLogger.warning(
+            'Falha na sincronização de e-mails durante a Splash Screen',
+            e,
+            st,
+          );
+        }
+      }());
+    }
+
     // Mínimo de 1800ms de exibição visual da Splash Screen (1500ms - 2000ms agradável)
     const minSplashDurationMs = 1800;
     final minTimerFuture = Future<void>.delayed(
       const Duration(milliseconds: minSplashDurationMs),
     );
 
-    if (hasSession) {
-      // Usuário autenticado (ex.: abertura em outro dispositivo): aguarda a sincronização na Splash Screen
-      // com timeout de resiliência (5s) para garantir atualização antes de navegar
+    if (shouldAuthenticate && syncTasks.isNotEmpty) {
+      // Usuário autenticado ou em modo offline local:
+      // aguarda a sincronização na Splash Screen com timeout de resiliência (5s) para garantir atualização antes de navegar
       try {
         await Future.wait([minTimerFuture, Future.wait(syncTasks)])
             .timeout(const Duration(milliseconds: 5000), onTimeout: () => []);
@@ -255,8 +329,7 @@ class _AuthGateShellState extends ConsumerState<AuthGateShell>
         await Future<void>.delayed(const Duration(milliseconds: 150));
       }
     } else {
-      // Usuário não autenticado ou em modo offline local:
-      // aguarda a duração agradável mínima da Splash antes de seguir
+      // Usuário não autenticado: aguarda a duração agradável mínima da Splash antes de seguir
       await minTimerFuture;
     }
 
