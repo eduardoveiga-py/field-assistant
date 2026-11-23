@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:drift/native.dart';
@@ -7,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
 import 'package:ministerio_pessoal/database/app_database.dart';
+import 'package:ministerio_pessoal/inbox/email_account_model.dart';
 import 'package:ministerio_pessoal/inbox/email_contacts_manager.dart';
 import 'package:ministerio_pessoal/inbox/email_sync_coordinator.dart';
 import 'package:ministerio_pessoal/inbox/gmail_oauth_service.dart';
@@ -202,5 +204,63 @@ void main() {
         expect(contacts.any((c) => c.email == 'irmao@exemplo.com'), isTrue);
       },
     );
+
+    test('friendlyErrorMessage maps Gmail 401 with App Password hint', () {
+      final acc = EmailAccount.createPreset(
+        providerType: EmailProviderType.google,
+        name: 'Gmail Conta',
+        email: 'user@gmail.com',
+        username: 'user@gmail.com',
+      );
+      final msg = EmailSyncCoordinator.friendlyErrorMessage(
+        const JwEmailAuthException('401 Unauthorized'),
+        acc,
+      );
+      expect(msg, contains('Senha de App de 16 dígitos'));
+    });
+
+    test(
+      'friendlyErrorMessage maps Hotmail/Outlook 401 with modern auth hint',
+      () {
+        final acc = EmailAccount.createPreset(
+          providerType: EmailProviderType.hotmail,
+          name: 'Outlook Pessoal',
+          email: 'user@outlook.com',
+          username: 'user@outlook.com',
+        );
+        final msg = EmailSyncCoordinator.friendlyErrorMessage(
+          const JwEmailAuthException('401 Authentication failure'),
+          acc,
+        );
+        expect(msg, contains('autenticação moderna'));
+      },
+    );
+
+    test(
+      'friendlyErrorMessage maps TimeoutException to connection timeout',
+      () {
+        final acc = EmailAccount.createPreset(
+          providerType: EmailProviderType.jwpub,
+          name: 'TimeoutAcc',
+          email: 'timeout@jwpub.org',
+          username: 'timeout@jwpub.org',
+        );
+        final msg = EmailSyncCoordinator.friendlyErrorMessage(
+          TimeoutException('Connection timed out after 10000ms'),
+          acc,
+        );
+        expect(msg, equals('Tempo limite de conexão esgotado.'));
+      },
+    );
+
+    test('friendlyErrorMessage maps connection failure', () {
+      final msg = EmailSyncCoordinator.friendlyErrorMessage(
+        Exception('Connection refused / host unreachable'),
+      );
+      expect(
+        msg,
+        equals('Falha de conexão. Servidor inacessível ou rede indisponível.'),
+      );
+    });
   });
 }

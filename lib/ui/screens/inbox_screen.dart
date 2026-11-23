@@ -130,61 +130,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
   }
 
   String _friendlySyncError(Object e, [EmailAccount? acc]) {
-    final msg = e.toString().toLowerCase();
-    final isAuthError =
-        e is JwEmailAuthException ||
-        msg.contains('401') ||
-        msg.contains('auth') ||
-        msg.contains('autenticação') ||
-        msg.contains('senha') ||
-        msg.contains('credencia');
-
-    final isGmail =
-        (acc != null &&
-            (acc.email.toLowerCase().contains('gmail') ||
-                acc.incomingHost.toLowerCase().contains('gmail'))) ||
-        msg.contains('gmail');
-
-    final isMicrosoft =
-        (acc != null &&
-            (acc.email.toLowerCase().contains('outlook') ||
-                acc.email.toLowerCase().contains('hotmail') ||
-                acc.incomingHost.toLowerCase().contains('outlook') ||
-                acc.incomingHost.toLowerCase().contains('office365'))) ||
-        msg.contains('outlook') ||
-        msg.contains('hotmail') ||
-        msg.contains('office365');
-
-    if (isAuthError) {
-      if (isGmail) {
-        return 'Falha de autenticação (401). No Gmail, use uma Senha de App de 16 dígitos ou OAuth2 se a verificação em duas etapas estiver ativa.';
-      }
-      if (isMicrosoft) {
-        return 'Falha de autenticação (401). No Hotmail/Outlook, configure uma Senha de Aplicativo ou habilite OAuth2/autenticação moderna.';
-      }
-      return 'Falha de autenticação (verifique usuário e senha).';
-    }
-
-    if (e is ExchangeException) {
-      return e.message;
-    }
-
-    if (e is TimeoutException ||
-        msg.contains('timeout') ||
-        msg.contains('tempo esgotado')) {
-      return 'Tempo limite de conexão esgotado.';
-    }
-
-    if (e is JwEmailConnectionException ||
-        (!kIsWeb && e is SocketException) ||
-        msg.contains('socket') ||
-        msg.contains('conexão') ||
-        msg.contains('connection')) {
-      return 'Falha de conexão. Servidor inacessível ou rede indisponível.';
-    }
-
-    final clean = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
-    return clean.isNotEmpty ? clean : 'Erro desconhecido ao sincronizar.';
+    return EmailSyncCoordinator.friendlyErrorMessage(e, acc);
   }
 
   Future<void> _syncEmails() async {
