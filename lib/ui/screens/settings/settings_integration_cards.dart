@@ -1241,6 +1241,16 @@ extension _SettingsIntegrationCards on _SettingsScreenState {
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
+                              IconButton(
+                                key: Key('btn_email_signature_${acc.id}'),
+                                tooltip: 'Assinatura do e-mail',
+                                icon: const Icon(
+                                  Icons.draw_outlined,
+                                  color: AppTheme.primaryBlue,
+                                  size: 20,
+                                ),
+                                onPressed: () => _showSignatureDialog(db, acc),
+                              ),
                               if (acc.isOAuth)
                                 IconButton(
                                   tooltip: 'Reconectar conta',
@@ -1573,6 +1583,425 @@ extension _SettingsIntegrationCards on _SettingsScreenState {
     } else if (acc.isMicrosoftGraph) {
       await _connectMicrosoftOAuth(db);
     }
+  }
+
+  Future<void> _showSignatureDialog(AppDatabase db, EmailAccount acc) async {
+    final sigCtrl = TextEditingController(text: acc.signatureHtml);
+
+    void wrapSelection(
+      String prefix,
+      String suffix, [
+      String defaultText = '',
+    ]) {
+      final text = sigCtrl.text;
+      final sel = sigCtrl.selection;
+      if (!sel.isValid || sel.isCollapsed) {
+        final pos = sel.isValid ? sel.baseOffset : text.length;
+        final newText = text.replaceRange(
+          pos,
+          pos,
+          '$prefix$defaultText$suffix',
+        );
+        sigCtrl.value = TextEditingValue(
+          text: newText,
+          selection: TextSelection.collapsed(
+            offset: pos + prefix.length + defaultText.length,
+          ),
+        );
+      } else {
+        final selected = text.substring(sel.start, sel.end);
+        final newText = text.replaceRange(
+          sel.start,
+          sel.end,
+          '$prefix$selected$suffix',
+        );
+        sigCtrl.value = TextEditingValue(
+          text: newText,
+          selection: TextSelection.collapsed(
+            offset: sel.start + prefix.length + selected.length + suffix.length,
+          ),
+        );
+      }
+    }
+
+    await showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setDlgState) {
+            Future<void> pickImage() async {
+              try {
+                final result = await FilePicker.pickFiles(type: FileType.image);
+                if (result.isNotEmpty) {
+                  final file = result.first;
+                  Uint8List? bytes;
+                  try {
+                    bytes = await file.readAsBytes();
+                  } catch (_) {}
+                  if (bytes == null || bytes.isEmpty) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Não foi possível ler os dados da imagem selecionada.',
+                          ),
+                        ),
+                      );
+                    }
+                    return;
+                  }
+                  if (bytes.length > 200 * 1024) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'A imagem deve ter no máximo 200 KB para assinaturas leves.',
+                          ),
+                          backgroundColor: Colors.orange,
+                        ),
+                      );
+                    }
+                    return;
+                  }
+                  final ext = file.extension?.toLowerCase() ?? 'png';
+                  final mime = ext == 'jpg' || ext == 'jpeg'
+                      ? 'image/jpeg'
+                      : 'image/png';
+                  final b64 = base64Encode(bytes);
+                  final imgTag =
+                      '<img src="data:$mime;base64,$b64" style="max-height:64px; height:auto;" />';
+                  wrapSelection(imgTag, '');
+                  setDlgState(() {});
+                }
+              } catch (e, st) {
+                AppLogger.warning(
+                  'Falha ao inserir imagem na assinatura',
+                  e,
+                  st,
+                );
+              }
+            }
+
+            void showLinkDialog() {
+              final linkCtrl = TextEditingController();
+              final textCtrl = TextEditingController(
+                text:
+                    sigCtrl.selection.isValid && !sigCtrl.selection.isCollapsed
+                    ? sigCtrl.text.substring(
+                        sigCtrl.selection.start,
+                        sigCtrl.selection.end,
+                      )
+                    : '',
+              );
+              showDialog(
+                context: ctx,
+                builder: (lCtx) => AlertDialog(
+                  title: const Text('Inserir Link'),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextField(
+                        controller: textCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Texto do link',
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: linkCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'URL (https://...)',
+                        ),
+                        keyboardType: TextInputType.url,
+                      ),
+                    ],
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(lCtx),
+                      child: const Text('Cancelar'),
+                    ),
+                    ElevatedButton(
+                      onPressed: () {
+                        final url = linkCtrl.text.trim();
+                        final linkText = textCtrl.text.trim().isNotEmpty
+                            ? textCtrl.text.trim()
+                            : url;
+                        if (url.isNotEmpty) {
+                          wrapSelection('<a href="$url">', '</a>', linkText);
+                          setDlgState(() {});
+                        }
+                        Navigator.pop(lCtx);
+                      },
+                      child: const Text('Inserir'),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            return AlertDialog(
+              title: Row(
+                children: [
+                  const Icon(Icons.draw_outlined, color: AppTheme.primaryBlue),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Assinatura — ${acc.name}',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              content: SizedBox(
+                width: 600,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Barra de Ferramentas de Estilo
+                      Wrap(
+                        spacing: 4,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.format_bold, size: 18),
+                            tooltip: 'Negrito',
+                            visualDensity: VisualDensity.compact,
+                            onPressed: () {
+                              wrapSelection('<b>', '</b>');
+                              setDlgState(() {});
+                            },
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.format_italic, size: 18),
+                            tooltip: 'Itálico',
+                            visualDensity: VisualDensity.compact,
+                            onPressed: () {
+                              wrapSelection('<i>', '</i>');
+                              setDlgState(() {});
+                            },
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.format_underlined, size: 18),
+                            tooltip: 'Sublinhado',
+                            visualDensity: VisualDensity.compact,
+                            onPressed: () {
+                              wrapSelection('<u>', '</u>');
+                              setDlgState(() {});
+                            },
+                          ),
+                          PopupMenuButton<String>(
+                            tooltip: 'Tamanho do texto',
+                            icon: const Icon(Icons.format_size, size: 18),
+                            onSelected: (val) {
+                              wrapSelection(
+                                '<span style="font-size: $val;">',
+                                '</span>',
+                              );
+                              setDlgState(() {});
+                            },
+                            itemBuilder: (ctx) => const [
+                              PopupMenuItem(
+                                value: '11px',
+                                child: Text('Pequeno (11px)'),
+                              ),
+                              PopupMenuItem(
+                                value: '13px',
+                                child: Text('Normal (13px)'),
+                              ),
+                              PopupMenuItem(
+                                value: '16px',
+                                child: Text('Grande (16px)'),
+                              ),
+                            ],
+                          ),
+                          PopupMenuButton<String>(
+                            tooltip: 'Cor do texto',
+                            icon: const Icon(
+                              Icons.color_lens_outlined,
+                              size: 18,
+                            ),
+                            onSelected: (val) {
+                              wrapSelection(
+                                '<span style="color: $val;">',
+                                '</span>',
+                              );
+                              setDlgState(() {});
+                            },
+                            itemBuilder: (ctx) => const [
+                              PopupMenuItem(
+                                value: '#1E40AF',
+                                child: Text('Azul Teocrático'),
+                              ),
+                              PopupMenuItem(
+                                value: '#15803D',
+                                child: Text('Verde'),
+                              ),
+                              PopupMenuItem(
+                                value: '#B91C1C',
+                                child: Text('Vermelho'),
+                              ),
+                              PopupMenuItem(
+                                value: '#4B5563',
+                                child: Text('Cinza Suave'),
+                              ),
+                              PopupMenuItem(
+                                value: '#0F172A',
+                                child: Text('Preto'),
+                              ),
+                            ],
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.link, size: 18),
+                            tooltip: 'Inserir Link',
+                            visualDensity: VisualDensity.compact,
+                            onPressed: showLinkDialog,
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.image_outlined, size: 18),
+                            tooltip: 'Inserir Imagem (<= 200 KB)',
+                            visualDensity: VisualDensity.compact,
+                            onPressed: pickImage,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+
+                      // Campo de Edição
+                      TextField(
+                        controller: sigCtrl,
+                        maxLines: 4,
+                        decoration: const InputDecoration(
+                          hintText: 'Escreva a assinatura ou use os botões acima...\nEx: Atenciosamente,\n<b>Nome</b> | Pioneiro',
+                          border: OutlineInputBorder(),
+                          contentPadding: EdgeInsets.all(10),
+                        ),
+                        onChanged: (_) => setDlgState(() {}),
+                      ),
+                      const SizedBox(height: 14),
+
+                      const Text(
+                        'Pré-visualização ao vivo:',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+
+                      // Superfície Branca para Pré-Visualização
+                      Theme(
+                        data: ThemeData.light(),
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                          ),
+                          child: sigCtrl.text.trim().isEmpty
+                              ? const Text(
+                                  '(Nenhuma assinatura configurada)',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey,
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                )
+                              : HtmlWidget(
+                                  sigCtrl.text,
+                                  textStyle: const TextStyle(
+                                    fontSize: 13,
+                                    color: Color(0xFF1E293B),
+                                  ),
+                                  customWidgetBuilder: (element) {
+                                    if (element.localName == 'img') {
+                                      final src =
+                                          element.attributes['src'] ?? '';
+                                      if (src.startsWith('data:image/')) {
+                                        final commaIndex = src.indexOf(',');
+                                        if (commaIndex != -1) {
+                                          try {
+                                            final bytes = base64Decode(
+                                              src.substring(commaIndex + 1),
+                                            );
+                                            return ConstrainedBox(
+                                              constraints: const BoxConstraints(
+                                                maxHeight: 64,
+                                              ),
+                                              child: Image.memory(
+                                                bytes,
+                                                fit: BoxFit.contain,
+                                              ),
+                                            );
+                                          } catch (_) {}
+                                        }
+                                      } else if (kIsWeb &&
+                                          (src.startsWith('http://') ||
+                                              src.startsWith('https://'))) {
+                                        return ConstrainedBox(
+                                          constraints: const BoxConstraints(
+                                            maxHeight: 64,
+                                          ),
+                                          child: EmailRemoteImage(
+                                            url: src,
+                                            alt: element.attributes['alt'],
+                                          ),
+                                        );
+                                      }
+                                    }
+                                    return null;
+                                  },
+                                ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryBlue,
+                    foregroundColor: Colors.white,
+                  ),
+                  icon: const Icon(Icons.check, size: 16),
+                  label: const Text('Salvar'),
+                  onPressed: () async {
+                    final updated = acc.copyWith(
+                      signatureHtml: sigCtrl.text.trim(),
+                    );
+                    await EmailAccountsManager.saveAccount(db, updated);
+                    if (mounted) _updateState(() {});
+                    if (ctx.mounted) Navigator.pop(ctx);
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Assinatura salva com sucesso!'),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                    }
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   Widget _buildEmailContactsRegistryCard(bool isDark) {

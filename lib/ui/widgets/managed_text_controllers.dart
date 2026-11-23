@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 /// somente após o término completo da animação de fechamento da rota.
 class ManagedTextControllers extends StatefulWidget {
   final List<String> initialTexts;
+  final List<TextEditingController Function(String text)?>? customFactories;
   final Widget Function(
     BuildContext context,
     List<TextEditingController> controllers,
@@ -14,6 +15,7 @@ class ManagedTextControllers extends StatefulWidget {
   const ManagedTextControllers({
     super.key,
     required this.initialTexts,
+    this.customFactories,
     required this.builder,
   });
 
@@ -27,9 +29,16 @@ class _ManagedTextControllersState extends State<ManagedTextControllers> {
   @override
   void initState() {
     super.initState();
-    _controllers = widget.initialTexts
-        .map((text) => TextEditingController(text: text))
-        .toList();
+    _controllers = List.generate(widget.initialTexts.length, (i) {
+      final text = widget.initialTexts[i];
+      final factory =
+          widget.customFactories != null && i < widget.customFactories!.length
+          ? widget.customFactories![i]
+          : null;
+      return factory != null
+          ? factory(text)
+          : TextEditingController(text: text);
+    });
   }
 
   @override
