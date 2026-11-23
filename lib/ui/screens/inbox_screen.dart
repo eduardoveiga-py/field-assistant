@@ -68,6 +68,11 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
   String? _selectedEmailAccount;
   String? _selectedEmailId;
   bool _isSyncingEmails = false;
+  final ScrollController _emailsScrollController = ScrollController();
+  final ScrollController _capturesScrollController = ScrollController();
+  List<InboxEntry> _cachedCaptures = const [];
+  List<JwEmailMessage> _cachedEmails = const [];
+  String _selectedCaptureAccount = '__all__';
 
   @override
   void initState() {
@@ -121,10 +126,98 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
   void dispose() {
     _tabController.dispose();
     _emailSearchController.dispose();
+    _emailsScrollController.dispose();
+    _capturesScrollController.dispose();
     _playerService.dispose();
     super.dispose();
   }
 
+  String? _extractCaptureAccountEmail(InboxEntry entry) {
+    if (entry.sourceType != 'email' || entry.attachments == null) {
+      return null;
+    }
+    try {
+      final decoded = jsonDecode(entry.attachments!);
+      if (decoded is Map<String, dynamic>) {
+        final direct = decoded['accountEmail'];
+        if (direct is String && direct.trim().isNotEmpty) {
+          return direct.trim().toLowerCase();
+        }
+        final emailMap = decoded['email'];
+        if (emailMap is Map<String, dynamic>) {
+          final nested = emailMap['accountEmail'];
+          if (nested is String && nested.trim().isNotEmpty) {
+            return nested.trim().toLowerCase();
+          }
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  List<InboxEntry> _filterCapturesByAccount(List<InboxEntry> entries) {
+    if (_selectedCaptureAccount == '__all__') return entries;
+    if (_selectedCaptureAccount == '__none__') {
+      return entries.where((e) => e.sourceType != 'email').toList();
+    }
+    final target = _selectedCaptureAccount.toLowerCase();
+    return entries
+        .where((e) => _extractCaptureAccountEmail(e) == target)
+        .toList();
+  }
+
+  Widget _buildCaptureAccountFilterBar(bool isDark) {
+    final db = ref.read(repositoryProvider).db;
+    return FutureBuilder<List<EmailAccount>>(
+      future: EmailAccountsManager.loadAccounts(db),
+      builder: (context, snapshot) {
+        final accounts = snapshot.data ?? const <EmailAccount>[];
+        final items = <DropdownMenuItem<String>>[
+          const DropdownMenuItem(
+            value: '__all__',
+            child: Text('Todas as caixas'),
+          ),
+          const DropdownMenuItem(
+            value: '__none__',
+            child: Text('Nenhuma (só manuais)'),
+          ),
+          for (final acc in accounts)
+            DropdownMenuItem(
+              value: acc.email.toLowerCase(),
+              child: Text(
+                acc.name.trim().isNotEmpty ? acc.name : acc.email,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+        ];
+        final validValues = items.map((e) => e.value).toSet();
+        final currentValue = validValues.contains(_selectedCaptureAccount)
+            ? _selectedCaptureAccount
+            : '__all__';
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          child: DropdownButtonFormField<String>(
+            value: currentValue,
+            isDense: true,
+            isExpanded: true,
+            decoration: const InputDecoration(
+              labelText: 'Caixa de captura',
+              border: OutlineInputBorder(),
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 8,
+              ),
+            ),
+            items: items,
+            onChanged: (value) {
+              if (value == null) return;
+              setState(() => _selectedCaptureAccount = value);
+            },
+          ),
+        );
+      },
+    );
+  }
   Future<void> _toggleAudio(String path) async {
     if (_currentlyPlayingPath == path && _isPlaying) {
       await _playerService.pause();
@@ -456,6 +549,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
             ),
           ),
         ),
+        _buildCaptureAccountFilterBar(isDark),
         const Divider(height: 1),
 
         // Lista de Entradas Reativa
@@ -465,11 +559,16 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
               statusFilter: _selectedFilter == 'all' ? null : _selectedFilter,
             ),
             builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
+             if (snapshot.hasData) {
+                _cachedCaptures = snapshot.data!;
+              }
+              if (snapshot.connectionState == ConnectionState.waiting &&
+                  _cachedCaptures.isEmpty) {
                 return const Center(child: CircularProgressIndicator());
               }
 
-              final entries = snapshot.data ?? [];
+              final allEntries = snapshot.data ?? _cachedCaptures;
+              final entries = _filterCapturesByAccount(allEntries);
               if (entries.isEmpty) {
                 return _buildEmptyState(isDark);
               }
@@ -488,6 +587,8 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                   }
 
                   final listWidget = ListView.separated(
+                   key: const PageStorageKey<String>('inbox_captures_list'),
+                  controller: _capturesScrollController,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 16,
                       vertical: 12,
@@ -1975,10 +2076,14 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
               searchQuery: _emailSearchController.text,
             ),
             builder: (ctx, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
+              if (snapshot.hasData) {
+                _cachedEmails = snapshot.data!;
+              }
+              if (snapshot.connectionState == ConnectionState.waiting &&
+                  _cachedEmails.isEmpty) {
                 return const Center(child: CircularProgressIndicator());
               }
-              final emails = snapshot.data ?? [];
+              final emails = snapshot.data ?? _cachedEmails;         
               if (emails.isEmpty) {
                 return Center(
                   child: SingleChildScrollView(
@@ -2415,7 +2520,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                             );
 
                             final listWidget = ListView.separated(
-                              padding: const EdgeInsets.symmetric(
+                              key: const PageStorageKey('inbox_emails_list'),
+                            controller: _emailsScrollController,
+                             padding: const EdgeInsets.symmetric(
                                 horizontal: 16,
                                 vertical: 4,
                               ),
@@ -3608,6 +3715,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                           text: msg.bodyText,
                           html: msg.bodyHtml,
                           isDark: isDark,
+                        attachments: msg.attachments,
                         ),
                         if (msg.attachments.isNotEmpty) ...[
                           const SizedBox(height: 20),
@@ -5666,11 +5774,13 @@ class _ProfessionalEmailBodyView extends StatelessWidget {
   final String text;
   final String? html;
   final bool isDark;
+  final List<Map<String, dynamic>> attachments;
 
   const _ProfessionalEmailBodyView({
     required this.text,
     this.html,
     required this.isDark,
+    this.attachments = const [],
   });
 
   static String _cleanHtmlAndEntities(String raw) {
@@ -5791,19 +5901,37 @@ class _ProfessionalEmailBodyView extends StatelessWidget {
 
     if (html != null && html!.trim().isNotEmpty) {
       final cleanHtml = EmailHtmlSanitizer.sanitizeHtmlForDisplay(html!);
+      final resolvedHtml = EmailHtmlSanitizer.resolveInlineCidImages(
+        cleanHtml,
+        attachments,
+      );
       if (cleanHtml.isNotEmpty) {
-        return SelectionArea(
-          child: HtmlWidget(
-            cleanHtml,
-            textStyle: baseStyle,
-            onTapUrl: (url) async {
-              final uri = Uri.tryParse(url);
-              if (uri != null && await canLaunchUrl(uri)) {
-                await launchUrl(uri, mode: LaunchMode.externalApplication);
-                return true;
-              }
-              return false;
-            },
+       return Theme(
+          data: ThemeData.light(),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFFFFF),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: SelectionArea(
+              child: HtmlWidget(
+                resolvedHtml,
+                textStyle: baseStyle.copyWith(color: const Color(0xFF1E293B)),
+                onTapUrl: (url) async {
+                  final uri = Uri.tryParse(url);
+                  if (uri != null && await canLaunchUrl(uri)) {
+                    await launchUrl(
+                      uri,
+                      mode: LaunchMode.externalApplication,
+                    );
+                    return true;
+                  }
+                  return false;
+                },
+              ),
+            ),
           ),
         );
       }
