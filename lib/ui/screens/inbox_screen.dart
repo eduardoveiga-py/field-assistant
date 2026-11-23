@@ -346,35 +346,44 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                   tabs: const [
                     Tab(
                       height: 38,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.inbox, size: 18),
-                          SizedBox(width: 6),
-                          Text('Capturas'),
-                        ],
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.inbox, size: 18),
+                            SizedBox(width: 4),
+                            Text('Capturas'),
+                          ],
+                        ),
                       ),
                     ),
                     Tab(
                       height: 38,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.mark_email_unread_outlined, size: 18),
-                          SizedBox(width: 6),
-                          Text('JW Mail'),
-                        ],
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.mark_email_unread_outlined, size: 18),
+                            SizedBox(width: 4),
+                            Text('JW Mail'),
+                          ],
+                        ),
                       ),
                     ),
                     Tab(
                       height: 38,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.shield_outlined, size: 18),
-                          SizedBox(width: 6),
-                          Text('Hub Restrito'),
-                        ],
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.shield_outlined, size: 18),
+                            SizedBox(width: 4),
+                            Text('Hub Restrito'),
+                          ],
+                        ),
                       ),
                     ),
                   ],
