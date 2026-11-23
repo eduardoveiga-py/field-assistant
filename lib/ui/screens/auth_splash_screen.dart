@@ -74,8 +74,19 @@ class _AuthGateShellState extends ConsumerState<AuthGateShell>
         final msRes = await msService.checkAndCompleteWebRedirect();
         if (msRes != null) {
           final db = ref.read(databaseProvider);
+          final existingAccounts = await EmailAccountsManager.loadAccounts(db);
+          final normalizedEmail = msRes.email.trim().toLowerCase();
+          final existing = existingAccounts
+              .where(
+                (a) =>
+                    (a.email.trim().toLowerCase() == normalizedEmail ||
+                        a.username.trim().toLowerCase() == normalizedEmail) &&
+                    a.incomingProtocol == 'microsoft_graph',
+              )
+              .firstOrNull;
+
           final acc = EmailAccount(
-            id: const Uuid().v4(),
+            id: existing?.id ?? const Uuid().v4(),
             name: msRes.displayName?.isNotEmpty == true
                 ? 'Outlook (${msRes.displayName})'
                 : (msRes.email.isNotEmpty ? msRes.email : 'Outlook / Hotmail'),
@@ -89,7 +100,7 @@ class _AuthGateShellState extends ConsumerState<AuthGateShell>
             outgoingSecurity: 'ssl',
             outgoingProtocol: 'microsoft_graph',
             username: msRes.email,
-            createdAt: DateTime.now(),
+            createdAt: existing?.createdAt ?? DateTime.now(),
           );
           await EmailAccountsManager.saveAccount(db, acc);
           await const OAuthTokenStore().saveTokenBundle(

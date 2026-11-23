@@ -51,6 +51,20 @@ void main() {
       },
     );
 
+    test('isExpired returns true only when current time is strictly after expiresAt', () {
+      final futureBundle = OAuthTokenBundle(
+        accessToken: 'valid_token',
+        expiresAt: DateTime.now().add(const Duration(minutes: 2)),
+      );
+      expect(futureBundle.isExpired, isFalse);
+
+      final pastBundle = OAuthTokenBundle(
+        accessToken: 'expired_token',
+        expiresAt: DateTime.now().subtract(const Duration(seconds: 10)),
+      );
+      expect(pastBundle.isExpired, isTrue);
+    });
+
     test('serialization roundtrip preserves all fields', () {
       final now = DateTime.now();
       final bundle = OAuthTokenBundle(
@@ -171,5 +185,59 @@ void main() {
         await db.close();
       }
     });
+
+    test(
+      'saveAccount deduplicates accounts with same username and protocol',
+      () async {
+        final db = AppDatabase.forTesting(NativeDatabase.memory());
+        try {
+          final acc1 = EmailAccount(
+            id: 'uuid-1',
+            name: 'Gmail Conta',
+            email: 'usuario@gmail.com',
+            providerType: EmailProviderType.google,
+            incomingHost: 'gmail.googleapis.com',
+            incomingPort: 443,
+            incomingProtocol: 'gmail_api',
+            outgoingHost: 'gmail.googleapis.com',
+            outgoingPort: 443,
+            outgoingSecurity: 'ssl',
+            outgoingProtocol: 'gmail_api',
+            username: 'usuario@gmail.com',
+            createdAt: DateTime.now(),
+          );
+
+          await EmailAccountsManager.saveAccount(db, acc1);
+          var accounts = await EmailAccountsManager.loadAccounts(db);
+          expect(accounts.length, equals(1));
+          expect(accounts.first.id, equals('uuid-1'));
+
+          // Reconexão gerando novo ID para mesmo e-mail e protocolo
+          final acc2 = EmailAccount(
+            id: 'uuid-2',
+            name: 'Gmail Reconectado',
+            email: 'USUARIO@GMAIL.COM ',
+            providerType: EmailProviderType.google,
+            incomingHost: 'gmail.googleapis.com',
+            incomingPort: 443,
+            incomingProtocol: 'gmail_api',
+            outgoingHost: 'gmail.googleapis.com',
+            outgoingPort: 443,
+            outgoingSecurity: 'ssl',
+            outgoingProtocol: 'gmail_api',
+            username: 'usuario@gmail.com',
+            createdAt: DateTime.now(),
+          );
+
+          await EmailAccountsManager.saveAccount(db, acc2);
+          accounts = await EmailAccountsManager.loadAccounts(db);
+          expect(accounts.length, equals(1));
+          expect(accounts.first.id, equals('uuid-2'));
+          expect(accounts.first.name, equals('Gmail Reconectado'));
+        } finally {
+          await db.close();
+        }
+      },
+    );
   });
 }

@@ -1441,8 +1441,19 @@ extension _SettingsIntegrationCards on _SettingsScreenState {
       final res = await service.authenticateUser();
       if (res == null) return;
 
+      final existingAccounts = await EmailAccountsManager.loadAccounts(db);
+      final normalizedEmail = res.email.trim().toLowerCase();
+      final existing = existingAccounts
+          .where(
+            (a) =>
+                (a.email.trim().toLowerCase() == normalizedEmail ||
+                    a.username.trim().toLowerCase() == normalizedEmail) &&
+                a.incomingProtocol == 'gmail_api',
+          )
+          .firstOrNull;
+
       final acc = EmailAccount(
-        id: const Uuid().v4(),
+        id: existing?.id ?? const Uuid().v4(),
         name: res.displayName?.isNotEmpty == true
             ? 'Gmail (${res.displayName})'
             : (res.email.isNotEmpty ? res.email : 'Google Gmail'),
@@ -1456,7 +1467,7 @@ extension _SettingsIntegrationCards on _SettingsScreenState {
         outgoingSecurity: 'ssl',
         outgoingProtocol: 'gmail_api',
         username: res.email,
-        createdAt: DateTime.now(),
+        createdAt: existing?.createdAt ?? DateTime.now(),
       );
 
       await EmailAccountsManager.saveAccount(db, acc);
@@ -1495,8 +1506,19 @@ extension _SettingsIntegrationCards on _SettingsScreenState {
       final res = await service.authenticateUser();
       if (res == null) return;
 
+      final existingAccounts = await EmailAccountsManager.loadAccounts(db);
+      final normalizedEmail = res.email.trim().toLowerCase();
+      final existing = existingAccounts
+          .where(
+            (a) =>
+                (a.email.trim().toLowerCase() == normalizedEmail ||
+                    a.username.trim().toLowerCase() == normalizedEmail) &&
+                a.incomingProtocol == 'microsoft_graph',
+          )
+          .firstOrNull;
+
       final acc = EmailAccount(
-        id: const Uuid().v4(),
+        id: existing?.id ?? const Uuid().v4(),
         name: res.displayName?.isNotEmpty == true
             ? 'Outlook (${res.displayName})'
             : (res.email.isNotEmpty ? res.email : 'Outlook / Hotmail'),
@@ -1510,7 +1532,7 @@ extension _SettingsIntegrationCards on _SettingsScreenState {
         outgoingSecurity: 'ssl',
         outgoingProtocol: 'microsoft_graph',
         username: res.email,
-        createdAt: DateTime.now(),
+        createdAt: existing?.createdAt ?? DateTime.now(),
       );
 
       await EmailAccountsManager.saveAccount(db, acc);

@@ -16,6 +16,9 @@ class OAuthTokenBundle {
     this.scopes = const [],
   });
 
+  /// Retorna true se o token já ultrapassou a sua data de expiração
+  bool get isExpired => DateTime.now().isAfter(expiresAt);
+
   /// Retorna true se o token já expirou ou se expira dentro da margem de segurança de 5 minutos
   bool get isExpiredOrExpiringSoon =>
       DateTime.now().isAfter(expiresAt.subtract(const Duration(minutes: 5)));
