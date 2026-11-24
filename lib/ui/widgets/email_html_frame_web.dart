@@ -33,13 +33,18 @@ class EmailHtmlFrame extends StatelessWidget {
     final srcDoc = buildIframeSrcDoc(resolvedHtml);
     return LayoutBuilder(
       builder: (context, constraints) {
-        final fallbackHeight =
-              (MediaQuery.sizeOf(context).height - 260).clamp(440.0, 1000.0);
-        final resolvedHeight =
-          height ??
-          (constraints.hasBoundedHeight && constraints.maxHeight.isFinite
-             ? constraints.maxHeight
-           : fallbackHeight);
+       final viewportHeight = MediaQuery.sizeOf(context).height;
+        final fallbackHeight = (viewportHeight - 260).clamp(440.0, 1000.0);
+        final hasBounded = constraints.hasBoundedHeight;
+        final isFinite = constraints.maxHeight.isFinite;
+        final double resolvedHeight;
+        if (height != null) {
+          resolvedHeight = height!;
+        } else if (hasBounded && isFinite) {
+        resolvedHeight = constraints.maxHeight;
+       } else {
+          resolvedHeight = fallbackHeight;
+        }   
         
         return Container(
           height: resolvedHeight,
