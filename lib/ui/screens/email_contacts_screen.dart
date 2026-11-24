@@ -293,8 +293,7 @@ class _EmailContactsScreenState extends ConsumerState<EmailContactsScreen> {
                   ],
                 ),
               ),         // Lista de Contatos
-          Expand
-ed(
+          Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _filteredContacts.isEmpty
