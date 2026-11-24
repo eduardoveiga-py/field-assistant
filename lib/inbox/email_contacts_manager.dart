@@ -155,6 +155,23 @@ class EmailContactsManager {
         );
   }
 
+  /// Atualiza os dados de um contato existente (permitindo alteração de nome e e-mail)
+  static Future<void> updateContact(
+    AppDatabase db, {
+    required String oldEmail,
+    required String newEmail,
+    required String name,
+  }) async {
+    final oldNorm = oldEmail.trim().toLowerCase();
+    final newNorm = newEmail.trim().toLowerCase();
+    if (newNorm.isEmpty || !newNorm.contains('@')) return;
+
+    if (oldNorm.isNotEmpty && oldNorm != newNorm) {
+      await deleteContact(db, oldNorm);
+    }
+    await saveContact(db, email: newNorm, name: name.trim(), source: 'manual');
+  }
+
   /// Obtém sugestões unificadas combinando o registro de e-mails com as pessoas cadastradas no Field Assistant
   static Future<List<EmailContact>> getAllSuggestions(
     AppDatabase db, {
