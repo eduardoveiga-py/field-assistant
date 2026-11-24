@@ -10,12 +10,14 @@ class EmailContact {
   final String name;
   final String source; // 'auto_sender', 'manual', 'field_contact'
   final DateTime updatedAt;
+  final List<String> tags;
 
   const EmailContact({
     required this.email,
     required this.name,
     this.source = 'auto_sender',
     required this.updatedAt,
+    this.tags = const [],
   });
 
   Map<String, dynamic> toJson() => {
@@ -23,6 +25,7 @@ class EmailContact {
     'name': name,
     'source': source,
     'updatedAt': updatedAt.toIso8601String(),
+    'tags': tags,
   };
 
   factory EmailContact.fromJson(Map<String, dynamic> json) => EmailContact(
@@ -32,6 +35,13 @@ class EmailContact {
     updatedAt: json['updatedAt'] != null
         ? DateTime.tryParse(json['updatedAt'] as String) ?? DateTime.now()
         : DateTime.now(),
+    tags:
+        (json['tags'] as List?)
+            ?.map((e) => e.toString().trim())
+            .where((e) => e.isNotEmpty)
+            .toSet()
+            .toList() ??
+        const [],
   );
 
   String get displayName => name.trim().isNotEmpty ? '$name <$email>' : email;
@@ -72,6 +82,7 @@ class EmailContactsManager {
     required String email,
     String? name,
     String source = 'manual',
+    List<String>? tags,
   }) async {
     final parsed = parseAddress(
       name != null && name.isNotEmpty ? '$name <$email>' : email,
@@ -84,12 +95,16 @@ class EmailContactsManager {
     final effectiveName = parsed.name.isNotEmpty
         ? parsed.name
         : (map[parsed.email]?.name ?? '');
+    final effectiveTags = tags != null
+        ? tags.map((e) => e.trim()).where((e) => e.isNotEmpty).toSet().toList()
+        : (map[parsed.email]?.tags ?? const []);
 
     map[parsed.email] = EmailContact(
       email: parsed.email,
       name: effectiveName,
       source: source,
       updatedAt: DateTime.now(),
+      tags: effectiveTags,
     );
 
     final encoded = jsonEncode(map.values.map((c) => c.toJson()).toList());
@@ -161,15 +176,33 @@ class EmailContactsManager {
     required String oldEmail,
     required String newEmail,
     required String name,
+    List<String>? tags,
   }) async {
     final oldNorm = oldEmail.trim().toLowerCase();
     final newNorm = newEmail.trim().toLowerCase();
     if (newNorm.isEmpty || !newNorm.contains('@')) return;
 
+    List<String>? preservedTags = tags;
+    if (preservedTags == null && oldNorm.isNotEmpty && oldNorm != newNorm) {
+      final existingList = await loadSavedContacts(db);
+      for (final c in existingList) {
+        if (c.email.toLowerCase() == oldNorm) {
+          preservedTags = c.tags;
+          break;
+        }
+      }
+    }
+
     if (oldNorm.isNotEmpty && oldNorm != newNorm) {
       await deleteContact(db, oldNorm);
     }
-    await saveContact(db, email: newNorm, name: name.trim(), source: 'manual');
+    await saveContact(
+      db,
+      email: newNorm,
+      name: name.trim(),
+      source: 'manual',
+      tags: preservedTags,
+    );
   }
 
   /// Obtém sugestões unificadas combinando o registro de e-mails com as pessoas cadastradas no Field Assistant
@@ -208,7 +241,8 @@ class EmailContactsManager {
     if (q.isNotEmpty) {
       list = list.where((c) {
         return c.name.toLowerCase().contains(q) ||
-            c.email.toLowerCase().contains(q);
+            c.email.toLowerCase().contains(q) ||
+            c.tags.any((t) => t.toLowerCase().contains(q));
       }).toList();
     }
 
@@ -219,5 +253,22 @@ class EmailContactsManager {
     });
 
     return list;
+  }
+
+  /// Extrai todas as etiquetas únicas ordenadas alfabeticamente
+  static List<String> extractAllTags(List<EmailContact> contacts) {
+    final unique = <String>{};
+    for (final contact in contacts) {
+      for (final tag in contact.tags) {
+        final trimmed = tag.trim();
+        if (trimmed.isNotEmpty) {
+          unique.add(trimmed);
+        }
+      }
+    }
+    return unique.toList()..sort((a, b) {
+      final cmp = a.toLowerCase().compareTo(b.toLowerCase());
+      return cmp != 0 ? cmp : a.compareTo(b);
+    });
   }
 }
