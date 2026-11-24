@@ -31,34 +31,44 @@ class EmailHtmlFrame extends StatelessWidget {
       attachments,
     );
     final srcDoc = buildIframeSrcDoc(resolvedHtml);
-
-    return Container(
-      constraints: BoxConstraints(minHeight: minHeight),
-      height: height,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFFFFF),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: HtmlElementView.fromTagName(
-          key: ValueKey(srcDoc.hashCode),
-          tagName: 'iframe',
-          onElementCreated: (Object element) {
-            final iframe = element as web.HTMLIFrameElement;
-            iframe.setAttribute('srcdoc', srcDoc);
-            iframe.setAttribute(
-              'sandbox',
-              'allow-popups allow-popups-to-escape-sandbox',
-            );
-            iframe.style.border = 'none';
-            iframe.style.width = '100%';
-            iframe.style.height = '100%';
-            iframe.style.backgroundColor = '#ffffff';
-          },
-        ),
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final fallbackHeight =
+              (MediaQuery.sizeOf(context).height - 260).clamp(440.0, 1000.0);
+        final resolvedHeight =
+          height ??
+          (constraints.hasBoundedHeight && constraints.maxHeight.isFinite
+             ? constraints.maxHeight
+           : fallbackHeight);
+        
+        return Container(
+          height: resolvedHeight,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFFFFF),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: HtmlElementView.fromTagName(
+              key: ValueKey(srcDoc.hashCode),
+              tagName: 'iframe',
+              onElementCreated: (Object element) {
+                final iframe = element as web.HTMLIFrameElement;
+                iframe.setAttribute('srcdoc', srcDoc);
+                iframe.setAttribute(
+                  'sandbox',
+                  'allow-popups allow-popups-to-escape-sandbox',
+                );
+                iframe.style.border = 'none';
+                iframe.style.width = '100%';
+                iframe.style.height = '100%';
+                iframe.style.backgroundColor = '#ffffff';
+              },
+            ),
+          ),
+        );
+      },
     );
   }
 }
