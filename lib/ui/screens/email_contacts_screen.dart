@@ -23,7 +23,8 @@ class _EmailContactsScreenState extends ConsumerState<EmailContactsScreen> {
   List<EmailContact> _allContacts = [];
   List<EmailContact> _filteredContacts = [];
   bool _isLoading = true;
-
+  String? _selectedTag;
+  
   @override
   void initState() {
     super.initState();
@@ -53,6 +54,11 @@ class _EmailContactsScreenState extends ConsumerState<EmailContactsScreen> {
     final db = ref.read(repositoryProvider).db;
     final contacts = await EmailContactsManager.getAllSuggestions(db);
     if (!mounted) return;
+     if (_selectedTag != null &&
+        !EmailContactsManager.extractAllTags(contacts)
+            .contains(_selectedTag)) {
+      _selectedTag = null;
+     }
     setState(() {
       _allContacts = contacts;
       _isLoading = false;
@@ -61,18 +67,21 @@ class _EmailContactsScreenState extends ConsumerState<EmailContactsScreen> {
   }
 
   void _applyFilter() {
-    final query = _normalize(_searchCtrl.text);
-    if (query.isEmpty) {
-      setState(() => _filteredContacts = List.from(_allContacts));
-    } else {
-      setState(() {
-        _filteredContacts = _allContacts.where((c) {
-          final nName = _normalize(c.name);
-          final nEmail = _normalize(c.email);
-          return nName.contains(query) || nEmail.contains(query);
-        }).toList();
-      });
-    }
+     final query = _normalize(_searchCtrl.text);
+    final rawQ = _searchCtrl.text.trim().toLowerCase();
+    setState(() {
+      _filteredContacts = _allContacts.where((c) {
+        if (_selectedTag != null && !c.tags.contains(_selectedTag)) {
+          return false;
+        }
+        if (query.isEmpty) return true;
+        final nName = _normalize(c.name);
+        final nEmail = _normalize(c.email);
+        return nName.contains(query) ||
+            nEmail.contains(query) ||
+            c.tags.any((t) => t.toLowerCase().contains(rawQ));
+      }).toList();
+    });
   }
 
   Future<void> _showAddOrEditDialog({EmailContact? existing}) async {
@@ -82,7 +91,13 @@ class _EmailContactsScreenState extends ConsumerState<EmailContactsScreen> {
       builder: (dialogCtx) => _AddOrEditContactDialog(
         existing: existing,
         allContacts: _allContacts,
-        onSave: ({required String name, required String email}) async {
+         initialTags: existing?.tags ?? const [],
+        availableTags: EmailContactsManager.extractAllTags(_allContacts),
+        onSave: ({
+          required String name,
+          required String email,
+          required List<String> tags,
+        }) async {
           final db = ref.read(repositoryProvider).db;
           if (isEditing) {
             await EmailContactsManager.updateContact(
@@ -90,6 +105,7 @@ class _EmailContactsScreenState extends ConsumerState<EmailContactsScreen> {
               oldEmail: existing.email,
               newEmail: email,
               name: name,
+              tags: tags,
             );
           } else {
             await EmailContactsManager.saveContact(
@@ -97,10 +113,11 @@ class _EmailContactsScreenState extends ConsumerState<EmailContactsScreen> {
               email: email,
               name: name,
               source: 'manual',
+              tags: tags,
             );
           }
         },
-      ),
+      ), 
     );
 
     if (saved == true) {
@@ -178,6 +195,7 @@ class _EmailContactsScreenState extends ConsumerState<EmailContactsScreen> {
         return 'Manual';
     }
   }
+ 
 
   Color _sourceColor(String source) {
     switch (source) {
@@ -194,7 +212,7 @@ class _EmailContactsScreenState extends ConsumerState<EmailContactsScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = AppTheme.isDark(context);
-
+    final allTags = EmailContactsManager.extractAllTags(_allContacts);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Contatos de E-mail'),
@@ -240,8 +258,43 @@ class _EmailContactsScreenState extends ConsumerState<EmailContactsScreen> {
             ),
           ),
 
-          // Lista de Contatos
-          Expanded(
+             if (allTags.isNotEmpty)
+              SizedBox(
+                height: 44,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: FilterChip(
+                        label: const Text('Todas'),
+                        selected: _selectedTag == null,
+                        onSelected: (_) {
+                          _selectedTag = null;
+                          _applyFilter();
+                        },
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ),
+                    for (final tag in allTags)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: FilterChip(
+                          label: Text(tag),
+                          selected: _selectedTag == tag,
+                          onSelected: (selected) {
+                            _selectedTag = selected ? tag : null;
+                            _applyFilter();
+                          },
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ),
+                  ],
+                ),
+              ),         // Lista de Contatos
+          Expand
+ed(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _filteredContacts.isEmpty
@@ -336,17 +389,48 @@ class _EmailContactsScreenState extends ConsumerState<EmailContactsScreen> {
                             ),
                           ],
                         ),
-                        subtitle: Text(
-                          c.email,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isDark
-                                ? const Color(0xFF94A3B8)
-                                : AppTheme.textMuted,
+                       subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            c.email,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isDark
+                                  ? const Color(0xFF94A3B8)
+                                  : AppTheme.textMuted,
+                            ),
                           ),
-                        ),
+                          if (c.tags.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Wrap(
+                              spacing: 4,
+                              runSpacing: 4,
+                              children: [
+                                for (final tag in c.tags)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .surfaceContainerHighest,
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      tag,
+                                      style: const TextStyle(fontSize: 11),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -397,14 +481,22 @@ class _EmailContactsScreenState extends ConsumerState<EmailContactsScreen> {
 class _AddOrEditContactDialog extends StatefulWidget {
   final EmailContact? existing;
   final List<EmailContact> allContacts;
-  final Future<void> Function({required String name, required String email})
-  onSave;
+  final List<String> initialTags;
+  final List<String> availableTags;
+  final Future<void> Function({
+    required String name,
+    required String email,
+    required List<String> tags,
+  }) onSave;
 
   const _AddOrEditContactDialog({
-    this.existing,
+    required this.existing,
     required this.allContacts,
+    required this.initialTags,
+    required this.availableTags,
     required this.onSave,
   });
+    
 
   @override
   State<_AddOrEditContactDialog> createState() =>
@@ -413,6 +505,16 @@ class _AddOrEditContactDialog extends StatefulWidget {
 
 class _AddOrEditContactDialogState extends State<_AddOrEditContactDialog> {
   late final TextEditingController _nameCtrl;
+  late final TextEditingController _customTagCtrl;
+  late final List<String> _selectedTags;
+
+  static const List<String> _defaultTags = [
+    'Congregação',
+    'Família',
+    'Anciãos',
+    'Trabalho',
+    'Pessoal',
+  ];
   late final TextEditingController _emailCtrl;
   String? _errorText;
   bool _isSaving = false;
@@ -422,19 +524,38 @@ class _AddOrEditContactDialogState extends State<_AddOrEditContactDialog> {
     super.initState();
     _nameCtrl = TextEditingController(text: widget.existing?.name ?? '');
     _emailCtrl = TextEditingController(text: widget.existing?.email ?? '');
+    _customTagCtrl = TextEditingController();
+    _selectedTags = List<String>.from(widget.initialTags);
   }
 
   @override
   void dispose() {
     _nameCtrl.dispose();
     _emailCtrl.dispose();
+    _customTagCtrl.dispose();
     super.dispose();
+  }
+
+  void _addCustomTag() {
+    final tag = _customTagCtrl.text.trim();
+    if (tag.isEmpty) return;
+    setState(() {
+      if (!_selectedTags.contains(tag)) {
+        _selectedTags.add(tag);
+      }
+      _customTagCtrl.clear();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final isEditing = widget.existing != null;
 
+    final allTagOptions = <String>{
+      ..._defaultTags,
+      ...widget.availableTags,
+      ..._selectedTags,
+    }.toList();
     return AlertDialog(
       title: Row(
         children: [
@@ -492,6 +613,63 @@ class _AddOrEditContactDialogState extends State<_AddOrEditContactDialog> {
                 isDense: true,
               ),
             ),
+              const SizedBox(height: 12),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Etiquetas',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: allTagOptions.map((tag) {
+                  final selected = _selectedTags.contains(tag);
+                  return FilterChip(
+                    label: Text(tag),
+                    selected: selected,
+                    visualDensity: VisualDensity.compact,
+                    onSelected: (val) {
+                      setState(() {
+                        if (val) {
+                          if (!_selectedTags.contains(tag)) {
+                            _selectedTags.add(tag);
+                          }
+                        } else {
+                          _selectedTags.remove(tag);
+                        }
+                      });
+                    },
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _customTagCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Nova etiqueta',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                      onSubmitted: (_) => _addCustomTag(),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton.filledTonal(
+                    onPressed: _addCustomTag,
+                    tooltip: 'Adicionar etiqueta',
+                    icon: const Icon(Icons.add),
+                  ),
+                ],
+              ),
           ],
         ),
       ),
@@ -541,7 +719,11 @@ class _AddOrEditContactDialogState extends State<_AddOrEditContactDialog> {
                   }
 
                   setState(() => _isSaving = true);
-                  await widget.onSave(name: name, email: rawEmail);
+                  await widget.onSave(
+                    name: name,
+                    email: rawEmail,
+                    tags: List<String>.from(_selectedTags),
+                  );   
                   if (context.mounted) {
                     Navigator.pop(context, true);
                   }
