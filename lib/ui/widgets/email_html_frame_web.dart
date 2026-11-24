@@ -31,34 +31,52 @@ class EmailHtmlFrame extends StatelessWidget {
       attachments,
     );
     final srcDoc = buildIframeSrcDoc(resolvedHtml);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final viewportHeight = MediaQuery.sizeOf(context).height;
+        final fallbackHeight = (viewportHeight - 260).clamp(minHeight, 1000.0);
+        final hasBounded = constraints.hasBoundedHeight;
+        final isFinite = constraints.maxHeight.isFinite;
+        final double resolvedHeight;
+        if (height != null) {
+          resolvedHeight = height!;
+        } else if (hasBounded &&
+            isFinite &&
+            constraints.maxHeight >= minHeight) {
+          resolvedHeight = constraints.maxHeight;
+        } else {
+          resolvedHeight = fallbackHeight;
+        }
 
-    return Container(
-      constraints: BoxConstraints(minHeight: minHeight),
-      height: height,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFFFFF),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: HtmlElementView.fromTagName(
-          key: ValueKey(srcDoc.hashCode),
-          tagName: 'iframe',
-          onElementCreated: (Object element) {
-            final iframe = element as web.HTMLIFrameElement;
-            iframe.setAttribute('srcdoc', srcDoc);
-            iframe.setAttribute(
-              'sandbox',
-              'allow-popups allow-popups-to-escape-sandbox',
-            );
-            iframe.style.border = 'none';
-            iframe.style.width = '100%';
-            iframe.style.height = '100%';
-            iframe.style.backgroundColor = '#ffffff';
-          },
-        ),
-      ),
+        return Container(
+          constraints: BoxConstraints(minHeight: minHeight),
+          height: resolvedHeight,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFFFFF),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: HtmlElementView.fromTagName(
+              key: ValueKey(srcDoc.hashCode),
+              tagName: 'iframe',
+              onElementCreated: (Object element) {
+                final iframe = element as web.HTMLIFrameElement;
+                iframe.setAttribute('srcdoc', srcDoc);
+                iframe.setAttribute(
+                  'sandbox',
+                  'allow-popups allow-popups-to-escape-sandbox',
+                );
+                iframe.style.border = 'none';
+                iframe.style.width = '100%';
+                iframe.style.height = '100%';
+                iframe.style.backgroundColor = '#ffffff';
+              },
+            ),
+          ),
+        );
+      },
     );
   }
 }
