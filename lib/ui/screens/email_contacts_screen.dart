@@ -24,7 +24,7 @@ class _EmailContactsScreenState extends ConsumerState<EmailContactsScreen> {
   List<EmailContact> _filteredContacts = [];
   bool _isLoading = true;
   String? _selectedTag;
-  
+
   @override
   void initState() {
     super.initState();
@@ -54,11 +54,10 @@ class _EmailContactsScreenState extends ConsumerState<EmailContactsScreen> {
     final db = ref.read(repositoryProvider).db;
     final contacts = await EmailContactsManager.getAllSuggestions(db);
     if (!mounted) return;
-     if (_selectedTag != null &&
-        !EmailContactsManager.extractAllTags(contacts)
-            .contains(_selectedTag)) {
+    if (_selectedTag != null &&
+        !EmailContactsManager.extractAllTags(contacts).contains(_selectedTag)) {
       _selectedTag = null;
-     }
+    }
     setState(() {
       _allContacts = contacts;
       _isLoading = false;
@@ -67,7 +66,7 @@ class _EmailContactsScreenState extends ConsumerState<EmailContactsScreen> {
   }
 
   void _applyFilter() {
-     final query = _normalize(_searchCtrl.text);
+    final query = _normalize(_searchCtrl.text);
     final rawQ = _searchCtrl.text.trim().toLowerCase();
     setState(() {
       _filteredContacts = _allContacts.where((c) {
@@ -91,33 +90,34 @@ class _EmailContactsScreenState extends ConsumerState<EmailContactsScreen> {
       builder: (dialogCtx) => _AddOrEditContactDialog(
         existing: existing,
         allContacts: _allContacts,
-         initialTags: existing?.tags ?? const [],
+        initialTags: existing?.tags ?? const [],
         availableTags: EmailContactsManager.extractAllTags(_allContacts),
-        onSave: ({
-          required String name,
-          required String email,
-          required List<String> tags,
-        }) async {
-          final db = ref.read(repositoryProvider).db;
-          if (isEditing) {
-            await EmailContactsManager.updateContact(
-              db,
-              oldEmail: existing.email,
-              newEmail: email,
-              name: name,
-              tags: tags,
-            );
-          } else {
-            await EmailContactsManager.saveContact(
-              db,
-              email: email,
-              name: name,
-              source: 'manual',
-              tags: tags,
-            );
-          }
-        },
-      ), 
+        onSave:
+            ({
+              required String name,
+              required String email,
+              required List<String> tags,
+            }) async {
+              final db = ref.read(repositoryProvider).db;
+              if (isEditing) {
+                await EmailContactsManager.updateContact(
+                  db,
+                  oldEmail: existing.email,
+                  newEmail: email,
+                  name: name,
+                  tags: tags,
+                );
+              } else {
+                await EmailContactsManager.saveContact(
+                  db,
+                  email: email,
+                  name: name,
+                  source: 'manual',
+                  tags: tags,
+                );
+              }
+            },
+      ),
     );
 
     if (saved == true) {
@@ -195,7 +195,6 @@ class _EmailContactsScreenState extends ConsumerState<EmailContactsScreen> {
         return 'Manual';
     }
   }
- 
 
   Color _sourceColor(String source) {
     switch (source) {
@@ -258,41 +257,41 @@ class _EmailContactsScreenState extends ConsumerState<EmailContactsScreen> {
             ),
           ),
 
-             if (allTags.isNotEmpty)
-              SizedBox(
-                height: 44,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  children: [
+          if (allTags.isNotEmpty)
+            SizedBox(
+              height: 44,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: FilterChip(
+                      label: const Text('Todas'),
+                      selected: _selectedTag == null,
+                      onSelected: (_) {
+                        _selectedTag = null;
+                        _applyFilter();
+                      },
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+                  for (final tag in allTags)
                     Padding(
                       padding: const EdgeInsets.only(right: 8),
                       child: FilterChip(
-                        label: const Text('Todas'),
-                        selected: _selectedTag == null,
-                        onSelected: (_) {
-                          _selectedTag = null;
+                        label: Text(tag),
+                        selected: _selectedTag == tag,
+                        onSelected: (selected) {
+                          _selectedTag = selected ? tag : null;
                           _applyFilter();
                         },
                         visualDensity: VisualDensity.compact,
                       ),
                     ),
-                    for (final tag in allTags)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: FilterChip(
-                          label: Text(tag),
-                          selected: _selectedTag == tag,
-                          onSelected: (selected) {
-                            _selectedTag = selected ? tag : null;
-                            _applyFilter();
-                          },
-                          visualDensity: VisualDensity.compact,
-                        ),
-                      ),
-                  ],
-                ),
-              ),         // Lista de Contatos
+                ],
+              ),
+            ), // Lista de Contatos
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
@@ -388,48 +387,48 @@ class _EmailContactsScreenState extends ConsumerState<EmailContactsScreen> {
                             ),
                           ],
                         ),
-                       subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            c.email,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: isDark
-                                  ? const Color(0xFF94A3B8)
-                                  : AppTheme.textMuted,
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              c.email,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isDark
+                                    ? const Color(0xFF94A3B8)
+                                    : AppTheme.textMuted,
+                              ),
                             ),
-                          ),
-                          if (c.tags.isNotEmpty) ...[
-                            const SizedBox(height: 4),
-                            Wrap(
-                              spacing: 4,
-                              runSpacing: 4,
-                              children: [
-                                for (final tag in c.tags)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 6,
-                                      vertical: 2,
+                            if (c.tags.isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Wrap(
+                                spacing: 4,
+                                runSpacing: 4,
+                                children: [
+                                  for (final tag in c.tags)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .surfaceContainerHighest,
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        tag,
+                                        style: const TextStyle(fontSize: 11),
+                                      ),
                                     ),
-                                    decoration: BoxDecoration(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .surfaceContainerHighest,
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Text(
-                                      tag,
-                                      style: const TextStyle(fontSize: 11),
-                                    ),
-                                  ),
-                              ],
-                            ),
+                                ],
+                              ),
+                            ],
                           ],
-                        ],
-                      ),
+                        ),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -486,7 +485,8 @@ class _AddOrEditContactDialog extends StatefulWidget {
     required String name,
     required String email,
     required List<String> tags,
-  }) onSave;
+  })
+  onSave;
 
   const _AddOrEditContactDialog({
     required this.existing,
@@ -495,7 +495,6 @@ class _AddOrEditContactDialog extends StatefulWidget {
     required this.availableTags,
     required this.onSave,
   });
-    
 
   @override
   State<_AddOrEditContactDialog> createState() =>
@@ -612,63 +611,60 @@ class _AddOrEditContactDialogState extends State<_AddOrEditContactDialog> {
                 isDense: true,
               ),
             ),
-              const SizedBox(height: 12),
-              const Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'Etiquetas',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
+            const SizedBox(height: 12),
+            const Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Etiquetas',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: allTagOptions.map((tag) {
+                final selected = _selectedTags.contains(tag);
+                return FilterChip(
+                  label: Text(tag),
+                  selected: selected,
+                  visualDensity: VisualDensity.compact,
+                  onSelected: (val) {
+                    setState(() {
+                      if (val) {
+                        if (!_selectedTags.contains(tag)) {
+                          _selectedTags.add(tag);
+                        }
+                      } else {
+                        _selectedTags.remove(tag);
+                      }
+                    });
+                  },
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _customTagCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Nova etiqueta',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    onSubmitted: (_) => _addCustomTag(),
                   ),
                 ),
-              ),
-              const SizedBox(height: 6),
-              Wrap(
-                spacing: 6,
-                runSpacing: 4,
-                children: allTagOptions.map((tag) {
-                  final selected = _selectedTags.contains(tag);
-                  return FilterChip(
-                    label: Text(tag),
-                    selected: selected,
-                    visualDensity: VisualDensity.compact,
-                    onSelected: (val) {
-                      setState(() {
-                        if (val) {
-                          if (!_selectedTags.contains(tag)) {
-                            _selectedTags.add(tag);
-                          }
-                        } else {
-                          _selectedTags.remove(tag);
-                        }
-                      });
-                    },
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _customTagCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Nova etiqueta',
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                      ),
-                      onSubmitted: (_) => _addCustomTag(),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton.filledTonal(
-                    onPressed: _addCustomTag,
-                    tooltip: 'Adicionar etiqueta',
-                    icon: const Icon(Icons.add),
-                  ),
-                ],
-              ),
+                const SizedBox(width: 8),
+                IconButton.filledTonal(
+                  onPressed: _addCustomTag,
+                  tooltip: 'Adicionar etiqueta',
+                  icon: const Icon(Icons.add),
+                ),
+              ],
+            ),
           ],
         ),
       ),
@@ -722,7 +718,7 @@ class _AddOrEditContactDialogState extends State<_AddOrEditContactDialog> {
                     name: name,
                     email: rawEmail,
                     tags: List<String>.from(_selectedTags),
-                  );   
+                  );
                   if (context.mounted) {
                     Navigator.pop(context, true);
                   }

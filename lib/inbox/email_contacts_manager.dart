@@ -40,7 +40,7 @@ class EmailContact {
             ?.map((e) => e.toString().trim())
             .where((e) => e.isNotEmpty)
             .toList() ??
-            const [],
+        const [],
   );
 
   String get displayName => name.trim().isNotEmpty ? '$name <$email>' : email;
@@ -196,9 +196,9 @@ class EmailContactsManager {
       await deleteContact(db, oldNorm);
     }
     await saveContact(
-      db, 
-      email: newNorm, 
-      name: name.trim(), 
+      db,
+      email: newNorm,
+      name: name.trim(),
       source: 'manual',
       tags: preservedTags,
     );
