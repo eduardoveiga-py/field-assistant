@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -55,15 +58,21 @@ void main() {
         const storage = FlutterSecureStorage();
         final salt = await storage.read(key: 'app_security_pin_salt');
         final hash = await storage.read(key: 'app_security_pin_hash');
+        final kdf = await storage.read(key: 'app_security_pin_kdf');
 
-        expect(salt, isNotNull);
-        expect(salt!.length, equals(32)); // 16 bytes em hex = 32 chars
-        expect(hash, isNotNull);
-        expect(hash!.length, equals(64)); // SHA-256 = 64 hex chars
-        expect(
-          hash,
-          isNot(contains('2580')),
-        ); // O PIN nunca deve estar em texto claro
+        expect(kdf, equals('pbkdf2_hmac_sha256:100000'));
+        expect(salt, matches(RegExp(r'^[0-9a-f]{32}$'))); // 16 bytes em hex
+        expect(hash, matches(RegExp(r'^[0-9a-f]{64}$'))); // 256-bit hex digest
+        expect(hash, isNot(equals('2580')));
+        final legacySha = sha256.convert(utf8.encode('$salt:2580')).toString();
+        expect(hash, isNot(equals(legacySha)));
+
+        // Um novo setPin com o mesmo PIN deve gerar salt e hash distintos
+        await authService.setPin('2580');
+        final secondSalt = await storage.read(key: 'app_security_pin_salt');
+        final secondHash = await storage.read(key: 'app_security_pin_hash');
+        expect(secondSalt, isNot(equals(salt)));
+        expect(secondHash, isNot(equals(hash)));
       },
     );
 

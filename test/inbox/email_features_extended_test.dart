@@ -104,6 +104,84 @@ void main() {
       saved = await EmailContactsManager.loadSavedContacts(db);
       expect(saved.any((c) => c.email == 'remover@jw.org'), isFalse);
     });
+
+    test('EmailContact serializes tags safely and preserves backward compatibility', () {
+      final now = DateTime.utc(2026, 11, 24);
+      final contact = EmailContact(
+        email: 'irmao@congregacao.org',
+        name: 'Irmão Marcos',
+        source: 'manual',
+        updatedAt: now,
+        tags: ['Anciãos', 'Congregação'],
+      );
+
+      final recovered = EmailContact.fromJson(contact.toJson());
+      expect(recovered.tags, equals(['Anciãos', 'Congregação']));
+
+      // Retrocompatibilidade com JSON antigo sem campo tags e deduplicação
+      final legacyRecovered = EmailContact.fromJson({
+        'email': 'antigo@jw.org',
+        'name': 'Antigo',
+      });
+      expect(legacyRecovered.tags, isEmpty);
+
+      final deduped = EmailContact.fromJson({
+        'email': 'dup@jw.org',
+        'name': 'Dup',
+        'tags': [' Família ', '', 'Família', 'Trabalho'],
+      });
+      expect(deduped.tags, equals(['Família', 'Trabalho']));
+    });
+
+    test('saveContact and updateContact persist, preserve, and extract tags', () async {
+      await EmailContactsManager.saveContact(
+        db,
+        email: 'carlos@exemplo.com',
+        name: 'Carlos',
+        tags: ['Anciãos', '  Congregação  ', 'Anciãos', ''],
+      );
+      await EmailContactsManager.saveContact(
+        db,
+        email: 'ana@exemplo.com',
+        name: 'Ana',
+        tags: ['Família', 'vip'],
+      );
+
+      // recordSender sem passar tags preserva as tags já cadastradas
+      await EmailContactsManager.recordSender(
+        db,
+        'Carlos Silva <carlos@exemplo.com>',
+      );
+
+      var saved = await EmailContactsManager.loadSavedContacts(db);
+      final carlos = saved.firstWhere((c) => c.email == 'carlos@exemplo.com');
+      expect(carlos.tags, equals(['Anciãos', 'Congregação']));
+
+      // updateContact alterando e-mail com tags null preserva as tags anteriores
+      await EmailContactsManager.updateContact(
+        db,
+        oldEmail: 'carlos@exemplo.com',
+        newEmail: 'carlos.novo@exemplo.com',
+        name: 'Carlos Silva',
+      );
+      saved = await EmailContactsManager.loadSavedContacts(db);
+      expect(saved.any((c) => c.email == 'carlos@exemplo.com'), isFalse);
+      final carlosNovo = saved.firstWhere(
+        (c) => c.email == 'carlos.novo@exemplo.com',
+      );
+      expect(carlosNovo.tags, equals(['Anciãos', 'Congregação']));
+
+      // extractAllTags ordena alfabeticamente (case-insensitive) sem duplicatas
+      final allTags = EmailContactsManager.extractAllTags(saved);
+      expect(allTags, equals(['Anciãos', 'Congregação', 'Família', 'vip']));
+
+      // getAllSuggestions também encontra por tag
+      final byTag = await EmailContactsManager.getAllSuggestions(
+        db,
+        query: 'família',
+      );
+      expect(byTag.map((c) => c.email), equals(['ana@exemplo.com']));
+    });
   });
 
   group('EmailAccount Multi-Account Model Tests', () {

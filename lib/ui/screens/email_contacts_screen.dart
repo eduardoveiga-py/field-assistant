@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/app_logger.dart';
 import '../../core/app_theme.dart';
 import '../../inbox/email_contacts_manager.dart';
 import '../../inbox/email_html_sanitizer.dart';
@@ -51,23 +52,35 @@ class _EmailContactsScreenState extends ConsumerState<EmailContactsScreen> {
 
   Future<void> _loadContacts() async {
     setState(() => _isLoading = true);
-    final db = ref.read(repositoryProvider).db;
-    final contacts = await EmailContactsManager.getAllSuggestions(db);
-    if (!mounted) return;
-    if (_selectedTag != null &&
-        !EmailContactsManager.extractAllTags(contacts).contains(_selectedTag)) {
-      _selectedTag = null;
+    try {
+      final db = ref.read(repositoryProvider).db;
+      final contacts = await EmailContactsManager.getAllSuggestions(db);
+      if (!mounted) return;
+      if (_selectedTag != null &&
+          !EmailContactsManager.extractAllTags(contacts)
+              .contains(_selectedTag)) {
+        _selectedTag = null;
+      }
+      setState(() {
+        _allContacts = contacts;
+        _isLoading = false;
+      });
+      _applyFilter();
+    } catch (e, st) {
+      AppLogger.warning('Falha ao carregar contatos de e-mail', e, st);
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro ao carregar contatos: $e'),
+          backgroundColor: AppTheme.alertRed,
+        ),
+      );
     }
-    setState(() {
-      _allContacts = contacts;
-      _isLoading = false;
-    });
-    _applyFilter();
   }
 
   void _applyFilter() {
     final query = _normalize(_searchCtrl.text);
-    final rawQ = _searchCtrl.text.trim().toLowerCase();
     setState(() {
       _filteredContacts = _allContacts.where((c) {
         if (_selectedTag != null && !c.tags.contains(_selectedTag)) {
@@ -78,7 +91,7 @@ class _EmailContactsScreenState extends ConsumerState<EmailContactsScreen> {
         final nEmail = _normalize(c.email);
         return nName.contains(query) ||
             nEmail.contains(query) ||
-            c.tags.any((t) => t.toLowerCase().contains(rawQ));
+            c.tags.any((t) => _normalize(t).contains(query));
       }).toList();
     });
   }
@@ -233,7 +246,7 @@ class _EmailContactsScreenState extends ConsumerState<EmailContactsScreen> {
               key: const Key('search_contacts_field'),
               controller: _searchCtrl,
               decoration: InputDecoration(
-                hintText: 'Pesquisar por nome ou e-mail...',
+                hintText: 'Pesquisar por nome, e-mail ou etiqueta...',
                 prefixIcon: const Icon(Icons.search, size: 20),
                 suffixIcon: _searchCtrl.text.isNotEmpty
                     ? IconButton(
@@ -267,6 +280,7 @@ class _EmailContactsScreenState extends ConsumerState<EmailContactsScreen> {
                   Padding(
                     padding: const EdgeInsets.only(right: 8),
                     child: FilterChip(
+                      key: const Key('tag_filter_all'),
                       label: const Text('Todas'),
                       selected: _selectedTag == null,
                       onSelected: (_) {
@@ -280,6 +294,7 @@ class _EmailContactsScreenState extends ConsumerState<EmailContactsScreen> {
                     Padding(
                       padding: const EdgeInsets.only(right: 8),
                       child: FilterChip(
+                        key: ValueKey('tag_filter_$tag'),
                         label: Text(tag),
                         selected: _selectedTag == tag,
                         onSelected: (selected) {
@@ -311,6 +326,8 @@ class _EmailContactsScreenState extends ConsumerState<EmailContactsScreen> {
                         Text(
                           _searchCtrl.text.isNotEmpty
                               ? 'Nenhum contato encontrado para "${_searchCtrl.text}".'
+                              : _selectedTag != null
+                              ? 'Nenhum contato encontrado na etiqueta "$_selectedTag".'
                               : 'Nenhum contato salvo ainda.',
                           style: TextStyle(
                             color: isDark
@@ -319,12 +336,27 @@ class _EmailContactsScreenState extends ConsumerState<EmailContactsScreen> {
                             fontSize: 14,
                           ),
                         ),
-                        if (_searchCtrl.text.isEmpty) ...[
+                        if (_searchCtrl.text.isEmpty &&
+                            _selectedTag == null &&
+                            _allContacts.isEmpty) ...[
                           const SizedBox(height: 12),
                           FilledButton.icon(
                             onPressed: () => _showAddOrEditDialog(),
                             icon: const Icon(Icons.add, size: 18),
                             label: const Text('Cadastrar Primeiro Contato'),
+                          ),
+                        ] else if (_searchCtrl.text.isNotEmpty ||
+                            _selectedTag != null) ...[
+                          const SizedBox(height: 12),
+                          TextButton.icon(
+                            key: const Key('btn_clear_contact_filters'),
+                            onPressed: () {
+                              _searchCtrl.clear();
+                              _selectedTag = null;
+                              _applyFilter();
+                            },
+                            icon: const Icon(Icons.filter_alt_off, size: 18),
+                            label: const Text('Limpar filtros'),
                           ),
                         ],
                       ],
@@ -537,9 +569,18 @@ class _AddOrEditContactDialogState extends State<_AddOrEditContactDialog> {
   void _addCustomTag() {
     final tag = _customTagCtrl.text.trim();
     if (tag.isEmpty) return;
+    final allOptions = <String>{
+      ..._defaultTags,
+      ...widget.availableTags,
+      ..._selectedTags,
+    };
+    final canonical = allOptions.firstWhere(
+      (existing) => existing.toLowerCase() == tag.toLowerCase(),
+      orElse: () => tag,
+    );
     setState(() {
-      if (!_selectedTags.contains(tag)) {
-        _selectedTags.add(tag);
+      if (!_selectedTags.contains(canonical)) {
+        _selectedTags.add(canonical);
       }
       _customTagCtrl.clear();
     });
@@ -626,6 +667,7 @@ class _AddOrEditContactDialogState extends State<_AddOrEditContactDialog> {
               children: allTagOptions.map((tag) {
                 final selected = _selectedTags.contains(tag);
                 return FilterChip(
+                  key: ValueKey('contact_dialog_tag_$tag'),
                   label: Text(tag),
                   selected: selected,
                   visualDensity: VisualDensity.compact,
@@ -648,6 +690,7 @@ class _AddOrEditContactDialogState extends State<_AddOrEditContactDialog> {
               children: [
                 Expanded(
                   child: TextField(
+                    key: const Key('contact_custom_tag_field'),
                     controller: _customTagCtrl,
                     decoration: const InputDecoration(
                       labelText: 'Nova etiqueta',
@@ -659,6 +702,7 @@ class _AddOrEditContactDialogState extends State<_AddOrEditContactDialog> {
                 ),
                 const SizedBox(width: 8),
                 IconButton.filledTonal(
+                  key: const Key('btn_add_custom_tag'),
                   onPressed: _addCustomTag,
                   tooltip: 'Adicionar etiqueta',
                   icon: const Icon(Icons.add),
@@ -713,14 +757,35 @@ class _AddOrEditContactDialogState extends State<_AddOrEditContactDialog> {
                     return;
                   }
 
-                  setState(() => _isSaving = true);
-                  await widget.onSave(
-                    name: name,
-                    email: rawEmail,
-                    tags: List<String>.from(_selectedTags),
-                  );
-                  if (context.mounted) {
-                    Navigator.pop(context, true);
+                  if (_customTagCtrl.text.trim().isNotEmpty) {
+                    _addCustomTag();
+                  }
+
+                  setState(() {
+                    _isSaving = true;
+                    _errorText = null;
+                  });
+                  try {
+                    await widget.onSave(
+                      name: name,
+                      email: rawEmail,
+                      tags: List<String>.from(_selectedTags),
+                    );
+                    if (context.mounted) {
+                      Navigator.pop(context, true);
+                    }
+                  } catch (e, st) {
+                    AppLogger.warning(
+                      'Falha ao salvar contato de e-mail',
+                      e,
+                      st,
+                    );
+                    if (mounted) {
+                      setState(() {
+                        _isSaving = false;
+                        _errorText = 'Erro ao salvar contato: $e';
+                      });
+                    }
                   }
                 },
           child: _isSaving

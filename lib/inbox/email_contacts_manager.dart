@@ -39,6 +39,7 @@ class EmailContact {
         (json['tags'] as List?)
             ?.map((e) => e.toString().trim())
             .where((e) => e.isNotEmpty)
+            .toSet()
             .toList() ??
         const [],
   );
@@ -95,7 +96,7 @@ class EmailContactsManager {
         ? parsed.name
         : (map[parsed.email]?.name ?? '');
     final effectiveTags = tags != null
-        ? tags.map((e) => e.trim()).where((e) => e.isNotEmpty).toList()
+        ? tags.map((e) => e.trim()).where((e) => e.isNotEmpty).toSet().toList()
         : (map[parsed.email]?.tags ?? const []);
 
     map[parsed.email] = EmailContact(
@@ -240,7 +241,8 @@ class EmailContactsManager {
     if (q.isNotEmpty) {
       list = list.where((c) {
         return c.name.toLowerCase().contains(q) ||
-            c.email.toLowerCase().contains(q);
+            c.email.toLowerCase().contains(q) ||
+            c.tags.any((t) => t.toLowerCase().contains(q));
       }).toList();
     }
 
@@ -264,6 +266,9 @@ class EmailContactsManager {
         }
       }
     }
-    return unique.toList()..sort();
+    return unique.toList()..sort((a, b) {
+      final cmp = a.toLowerCase().compareTo(b.toLowerCase());
+      return cmp != 0 ? cmp : a.compareTo(b);
+    });
   }
 }
