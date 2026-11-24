@@ -14,7 +14,6 @@ import 'package:uuid/uuid.dart';
 import 'package:file_picker/file_picker.dart';
 
 import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/app_logger.dart';
 import '../../core/app_theme.dart';
@@ -32,9 +31,10 @@ import '../../research/research_manager.dart';
 import '../../sync/supabase_sync_service.dart';
 import '../../voice_notes/audio_recording_service.dart';
 import '../providers.dart';
+import 'email_contacts_screen.dart';
 import 'settings_screen.dart';
 import '../widgets/adaptive_ministry_sheet.dart';
-import '../widgets/email_remote_image.dart';
+import '../widgets/email_html_frame.dart';
 import '../widgets/managed_text_controllers.dart';
 import '../widgets/markdown_preview_text.dart';
 import '../widgets/quick_capture_sheet.dart';
@@ -75,10 +75,20 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
   List<InboxEntry> _cachedCaptures = const [];
   List<JwEmailMessage> _cachedEmails = const [];
   String _selectedCaptureAccount = '__all__';
+  List<EmailAccount> _cachedAccounts = const [];
+
+  Future<void> _loadCachedAccounts() async {
+    try {
+      final db = ref.read(repositoryProvider).db;
+      final accs = await EmailAccountsManager.loadAccounts(db);
+      if (mounted) setState(() => _cachedAccounts = accs);
+    } catch (_) {}
+  }
 
   @override
   void initState() {
     super.initState();
+    _loadCachedAccounts();
     _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(() {
       if (mounted) setState(() {});
@@ -452,6 +462,29 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
         ),
         actions: [
           if (isUnlocked) ...[
+            IconButton(
+              key: const Key('btn_email_contacts'),
+              tooltip: 'Contatos de E-mail',
+              icon: const Icon(
+                Icons.contacts_outlined,
+                color: AppTheme.primaryBlue,
+              ),
+              onPressed: () async {
+                final selectedEmail = await Navigator.push<String>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => EmailContactsScreen(
+                      onSelectEmail: (email) {
+                        _showNewDraftDialog(initialTo: email);
+                      },
+                    ),
+                  ),
+                );
+                if (selectedEmail != null && mounted) {
+                  _showNewDraftDialog(initialTo: selectedEmail);
+                }
+              },
+            ),
             IconButton(
               tooltip: 'Bloquear Sessão da Inbox',
               icon: const Icon(Icons.lock, color: Colors.orangeAccent),
@@ -937,7 +970,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
-                      _categoryLabel(entry.suggestedCategory!),
+                      _resolveCategoryLabel(entry),
                       style: const TextStyle(
                         fontSize: 11,
                         color: AppTheme.primaryBlue,
@@ -1883,6 +1916,46 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
       AppLogger.debug('Falha ao parsear lista JSON no Inbox: $e', st);
     }
     return [];
+  }
+
+  String _resolveCategoryLabel(InboxEntry entry) {
+    var cat = entry.suggestedCategory ?? '';
+    if (cat == 'email_jw') {
+      final accEmail = _extractCaptureAccountEmail(entry);
+      bool isExchange = false;
+
+      if (entry.metadata.isNotEmpty) {
+        try {
+          final decoded = jsonDecode(entry.metadata);
+          if (decoded is Map) {
+            final proto = decoded['protocol']?.toString().toLowerCase();
+            final isExchangeMail = decoded['exchangeMail'] as bool?;
+            if (proto == 'exchange' || isExchangeMail == true) {
+              isExchange = true;
+            } else if (proto == 'gmail_api' ||
+                proto == 'microsoft_graph' ||
+                proto == 'imap' ||
+                isExchangeMail == false) {
+              isExchange = false;
+            }
+          }
+        } catch (_) {}
+      }
+
+      if (!isExchange && accEmail != null && accEmail.isNotEmpty) {
+        final acc = _cachedAccounts.firstWhereOrNull(
+          (a) => a.email.toLowerCase() == accEmail.toLowerCase(),
+        );
+        if (acc != null) {
+          isExchange = acc.incomingProtocol == 'exchange';
+        }
+      }
+
+      if (!isExchange) {
+        cat = 'email';
+      }
+    }
+    return _categoryLabel(cat);
   }
 
   String _categoryLabel(String cat) {
@@ -3024,17 +3097,25 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
 
     String? accBadge;
     if (!isHub && accounts != null && accounts.isNotEmpty) {
-      final acc = accounts.firstWhere(
+      final acc = accounts.firstWhereOrNull(
         (a) => a.email.toLowerCase() == (msg.accountEmail ?? '').toLowerCase(),
-        orElse: () => accounts.first,
       );
-      if ((msg.accountEmail ?? '').isNotEmpty &&
-          acc.email.toLowerCase() == (msg.accountEmail ?? '').toLowerCase()) {
-        accBadge = acc.name.trim().isNotEmpty
-            ? acc.name.trim()
-            : (acc.providerType == EmailProviderType.jwpub
-                  ? 'JW Mail'
-                  : acc.email);
+      if (acc != null) {
+        final isExchange = acc.incomingProtocol == 'exchange';
+        final rawName = acc.name.trim();
+        if (isExchange) {
+          accBadge = rawName.isNotEmpty ? rawName : 'JW Mail';
+        } else {
+          if (rawName.isNotEmpty && rawName.toLowerCase() != 'jw mail') {
+            accBadge = rawName;
+          } else if (acc.isGmailApi) {
+            accBadge = 'Gmail';
+          } else if (acc.isMicrosoftGraph) {
+            accBadge = 'Outlook';
+          } else {
+            accBadge = 'E-mail';
+          }
+        }
       }
     }
 
@@ -3498,11 +3579,17 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
         orElse: () => null,
       ),
     );
-    final accountName = acc?.name.trim().isNotEmpty == true
-        ? acc!.name.trim()
-        : (acc?.providerType == EmailProviderType.jwpub
+    final isExchange = acc?.incomingProtocol == 'exchange';
+    final rawName = acc?.name.trim() ?? '';
+    final accountName =
+        (rawName.isNotEmpty &&
+            (isExchange || rawName.toLowerCase() != 'jw mail'))
+        ? rawName
+        : (isExchange
               ? 'JW Mail'
-              : (acc?.providerType.name.toUpperCase() ?? 'E-mail'));
+              : (acc?.isGmailApi == true
+                    ? 'Gmail'
+                    : (acc?.isMicrosoftGraph == true ? 'Outlook' : 'E-mail')));
 
     final senderName = EmailHtmlSanitizer.displaySenderName(msg.from);
     final senderEmail = EmailHtmlSanitizer.extractEmailAddress(msg.from);
@@ -5921,12 +6008,20 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                             tags: tags,
                                           );
 
+                                          final isExchange =
+                                              selectedAccount
+                                                  ?.incomingProtocol ==
+                                              'exchange';
                                           final metadata = {
                                             'permanentRetention': true,
                                             'isDraft': false,
                                             'sentAt': now.toIso8601String(),
-                                            'exchangeMail': true,
+                                            'exchangeMail': isExchange,
                                             'email': sentMsg.toJson(),
+                                            'protocol':
+                                                selectedAccount
+                                                    ?.incomingProtocol ??
+                                                'smtp',
                                           };
 
                                           final entryId = 'email_${sentMsg.id}';
@@ -5941,8 +6036,10 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                                     'email',
                                                   ),
                                                   suggestedCategory:
-                                                      const drift.Value(
-                                                        'email_jw',
+                                                      drift.Value(
+                                                        isExchange
+                                                            ? 'email_jw'
+                                                            : 'email',
                                                       ),
                                                   attachments: drift.Value(
                                                     jsonEncode(
@@ -6419,65 +6516,8 @@ class _ProfessionalEmailBodyView extends StatelessWidget {
 
     if (html != null && html!.trim().isNotEmpty) {
       final cleanHtml = EmailHtmlSanitizer.sanitizeHtmlForDisplay(html!);
-      final resolvedHtml = EmailHtmlSanitizer.resolveInlineCidImages(
-        cleanHtml,
-        attachments,
-      );
       if (cleanHtml.isNotEmpty) {
-        return Theme(
-          data: ThemeData.light(),
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFFFFF),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: SelectionArea(
-              child: HtmlWidget(
-                resolvedHtml,
-                textStyle: baseStyle.copyWith(color: const Color(0xFF1E293B)),
-                customWidgetBuilder: (element) {
-                  if (element.localName == 'img') {
-                    final src = element.attributes['src'] ?? '';
-                    if (src.startsWith('data:image/')) {
-                      final commaIndex = src.indexOf(',');
-                      if (commaIndex != -1) {
-                        try {
-                          final base64Data = src.substring(commaIndex + 1);
-                          final bytes = base64Decode(base64Data);
-                          return ConstrainedBox(
-                            constraints: const BoxConstraints(maxHeight: 600),
-                            child: Image.memory(bytes, fit: BoxFit.contain),
-                          );
-                        } catch (_) {}
-                      }
-                    } else if (kIsWeb &&
-                        (src.startsWith('http://') ||
-                            src.startsWith('https://'))) {
-                      return ConstrainedBox(
-                        constraints: const BoxConstraints(maxHeight: 600),
-                        child: EmailRemoteImage(
-                          url: src,
-                          alt: element.attributes['alt'],
-                        ),
-                      );
-                    }
-                  }
-                  return null;
-                },
-                onTapUrl: (url) async {
-                  final uri = Uri.tryParse(url);
-                  if (uri != null && await canLaunchUrl(uri)) {
-                    await launchUrl(uri, mode: LaunchMode.externalApplication);
-                    return true;
-                  }
-                  return false;
-                },
-              ),
-            ),
-          ),
-        );
+        return EmailHtmlFrame(html: html!, attachments: attachments);
       }
     }
 

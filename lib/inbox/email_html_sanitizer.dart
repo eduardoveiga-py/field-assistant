@@ -400,4 +400,35 @@ class EmailHtmlSanitizer {
   static String markdownToCleanPlainText(String text) {
     return extractPlainText(text, cleanMarkdown: true);
   }
+
+  /// Monta o documento HTML completo seguro para exibição isolada em um `<iframe>` sandboxed.
+  /// Contém `<base target="_blank">`, estilos de tipografia limpos, reset de imagens e tabelas,
+  /// e corpo já sanitizado sem scripts.
+  static String buildIframeSrcDoc(String resolvedHtml) {
+    final sanitizedBody = sanitizeHtmlForDisplay(resolvedHtml);
+    return '''<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <base target="_blank" />
+    <style>
+      html, body {
+        margin: 0;
+        padding: 16px;
+        background: #ffffff;
+        color: #1e293b;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-size: 14px;
+        line-height: 1.5;
+        overflow-wrap: break-word;
+      }
+      img { max-width: 100% !important; height: auto !important; }
+      table { max-width: 100% !important; }
+    </style>
+  </head>
+  <body>$sanitizedBody</body>
+</html>'''
+        .trim();
+  }
 }

@@ -14,6 +14,7 @@ import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:drift/drift.dart' as drift;
 import 'package:intl/intl.dart';
 import 'package:crypto/crypto.dart' as crypto;
+import 'package:collection/collection.dart';
 import 'package:enough_mail/imap.dart' as mail;
 import 'package:uuid/uuid.dart';
 
@@ -22,6 +23,7 @@ import '../core/biometric_auth_service.dart';
 import '../core/sync_timestamp.dart';
 import '../database/app_database.dart';
 import '../reports/web_downloader.dart';
+import 'email_account_model.dart';
 import 'email_contacts_manager.dart';
 import 'email_html_sanitizer.dart';
 
@@ -1591,14 +1593,11 @@ class JwEmailService {
             'retentionDate': now.toIso8601String(),
             'email': msg.toJson(),
           };
-          final isJwAccount =
-              (accountEmail?.toLowerCase().contains('jwpub') == true) ||
-              (host?.toLowerCase().contains('jwpub') == true);
           final category = msg.isHubCommunication
               ? (msg.hubType == 'form'
                     ? 'hub_form'
                     : (msg.hubType == 'letter' ? 'hub_letter' : 'hub_comms'))
-              : (isJwAccount ? 'email_jw' : 'email');
+              : 'email';
           final cleanBody = msg.bodyText.isNotEmpty
               ? EmailHtmlSanitizer.extractPlainText(msg.bodyText)
               : (msg.bodyHtml != null
@@ -1751,8 +1750,14 @@ class JwEmailService {
       final isUpdate = existingDraft != null;
       final nextRevision = isUpdate ? existingDraft.revision + 1 : 1;
 
-      final isJwAccount =
-          draft.accountEmail?.toLowerCase().contains('jwpub') == true;
+      bool isExchange = false;
+      if (draft.accountEmail != null && draft.accountEmail!.isNotEmpty) {
+        final accounts = await EmailAccountsManager.loadAccounts(db);
+        final acc = accounts.firstWhereOrNull(
+          (a) => a.email.toLowerCase() == draft.accountEmail!.toLowerCase(),
+        );
+        isExchange = acc?.incomingProtocol == 'exchange';
+      }
       final cleanBody = draft.bodyText.isNotEmpty
           ? EmailHtmlSanitizer.extractPlainText(draft.bodyText)
           : (draft.bodyHtml != null
@@ -1763,7 +1768,7 @@ class JwEmailService {
         id: entryId,
         content: '${draft.subject}\n\n$cleanBody'.trim(),
         sourceType: const drift.Value('email_draft'),
-        suggestedCategory: drift.Value(isJwAccount ? 'email_jw' : 'email'),
+        suggestedCategory: drift.Value(isExchange ? 'email_jw' : 'email'),
         attachments: drift.Value(jsonEncode(draft.attachments)),
         capturedAt: isUpdate ? existingDraft.capturedAt : now,
         metadata: drift.Value(jsonEncode(metadata)),
@@ -1863,8 +1868,14 @@ class JwEmailService {
       final isUpdate = existingSent != null;
       final nextRevision = isUpdate ? existingSent.revision + 1 : 1;
 
-      final isJwAccount =
-          sentMsg.accountEmail?.toLowerCase().contains('jwpub') == true;
+      bool isExchange = false;
+      if (sentMsg.accountEmail != null && sentMsg.accountEmail!.isNotEmpty) {
+        final accounts = await EmailAccountsManager.loadAccounts(db);
+        final acc = accounts.firstWhereOrNull(
+          (a) => a.email.toLowerCase() == sentMsg.accountEmail!.toLowerCase(),
+        );
+        isExchange = acc?.incomingProtocol == 'exchange';
+      }
       final cleanBody = sentMsg.bodyText.isNotEmpty
           ? EmailHtmlSanitizer.extractPlainText(sentMsg.bodyText)
           : (sentMsg.bodyHtml != null
@@ -1875,7 +1886,7 @@ class JwEmailService {
         id: resolvedEntryId,
         content: '${sentMsg.subject}\n\n$cleanBody'.trim(),
         sourceType: const drift.Value('email'),
-        suggestedCategory: drift.Value(isJwAccount ? 'email_jw' : 'email'),
+        suggestedCategory: drift.Value(isExchange ? 'email_jw' : 'email'),
         attachments: drift.Value(jsonEncode(sentMsg.attachments)),
         capturedAt: now,
         metadata: drift.Value(jsonEncode(metadata)),

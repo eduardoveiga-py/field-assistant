@@ -14,6 +14,7 @@ import 'package:ministerio_pessoal/database/repository.dart';
 import 'package:ministerio_pessoal/inbox/email_account_model.dart';
 import 'package:ministerio_pessoal/inbox/jw_email_service.dart';
 import 'package:ministerio_pessoal/ui/providers.dart';
+import 'package:ministerio_pessoal/ui/screens/email_contacts_screen.dart';
 import 'package:ministerio_pessoal/ui/screens/inbox_screen.dart';
 
 class _AlwaysUnlockedBiometricService extends BiometricAuthService {
@@ -867,6 +868,52 @@ void main() {
         expect(emailJson['accountEmail'], equals('irmao@hotmail.com'));
         expect(emailJson['folderName'], equals('Rascunhos'));
         expect(emailJson['isDraft'], isTrue);
+
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+        await db.close();
+        await tester.pump(const Duration(milliseconds: 100));
+      },
+    );
+
+    testWidgets(
+      'TC-INBOX-CONTACTS-01: Botão btn_email_contacts na AppBar navega para EmailContactsScreen',
+      (tester) async {
+        final db = AppDatabase.forTesting(NativeDatabase.memory());
+        final repo = AppRepository(db);
+
+        tester.view.physicalSize = const Size(800, 1000);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              databaseProvider.overrideWithValue(db),
+              repositoryProvider.overrideWithValue(repo),
+              jwEmailServiceProvider.overrideWithValue(
+                _TestJwEmailService(
+                  db: db,
+                  biometricAuth: _AlwaysUnlockedBiometricService(),
+                ),
+              ),
+              biometricAuthServiceProvider.overrideWithValue(
+                _AlwaysUnlockedBiometricService(),
+              ),
+            ],
+            child: const MaterialApp(home: InboxScreen()),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final contactsBtn = find.byKey(const Key('btn_email_contacts'));
+        expect(contactsBtn, findsOneWidget);
+        await tester.tap(contactsBtn);
+        await tester.pumpAndSettle();
+
+        expect(find.byType(EmailContactsScreen), findsOneWidget);
+        expect(find.text('Contatos de E-mail'), findsOneWidget);
 
         await tester.pumpWidget(const SizedBox.shrink());
         await tester.pumpAndSettle();
