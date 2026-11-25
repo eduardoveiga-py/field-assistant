@@ -134,6 +134,63 @@ void main() {
           ctrl.toMarkup(),
           equals('Jeová <u style="color:#EAB308">fortalece</u> seus servos'),
         );
+
+        // Negrito antes de digitar não injeta palavra fictícia 'texto' e não exibe '**'
+        final blankCtrl = RichFormattedEditingController();
+        addTearDown(blankCtrl.dispose);
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: Column(
+                children: [
+                  RichMarkdownToolbar(controller: blankCtrl),
+                  TextField(controller: blankCtrl),
+                ],
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        blankCtrl.value = const TextEditingValue(
+          text: 'Eduardo ',
+          selection: TextSelection.collapsed(offset: 8),
+        );
+        await tester.tap(find.byIcon(Icons.format_bold));
+        await tester.pump();
+        expect(blankCtrl.text, equals('Eduardo '));
+        blankCtrl.value = const TextEditingValue(
+          text: 'Eduardo Veiga',
+          selection: TextSelection.collapsed(offset: 13),
+        );
+        await tester.pump();
+
+        // Seleciona "Veig" e aplica Azul via pílula flutuante
+        blankCtrl.selection = const TextSelection(
+          baseOffset: 8,
+          extentOffset: 12,
+        );
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('btn_editor_hl_blue')));
+        await tester.pumpAndSettle();
+
+        expect(blankCtrl.text, equals('Eduardo Veiga'));
+        expect(blankCtrl.text, isNot(contains('**')));
+        expect(blankCtrl.text, isNot(contains('<u')));
+        final savedMarkup = blankCtrl.toMarkup();
+        expect(
+          savedMarkup,
+          equals('Eduardo <u style="color:#3B82F6">**Veig**</u>**a**'),
+        );
+
+        // Mesmo formato legado `**<u ...>Veig</u>a**` abre limpo no editor e leitor
+        final legacyCtrl = RichFormattedEditingController.fromMarkup(
+          'Eduardo **<u style="color:#3B82F6">Veig</u>a**',
+        );
+        addTearDown(legacyCtrl.dispose);
+        expect(legacyCtrl.text, equals('Eduardo Veiga'));
+        expect(legacyCtrl.text, isNot(contains('**')));
+        expect(legacyCtrl.text, isNot(contains('<u')));
       },
     );
 

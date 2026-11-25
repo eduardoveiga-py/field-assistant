@@ -126,6 +126,39 @@ class RichFormattedEditingController extends TextEditingController {
 
   bool get pendingBold => _pendingBold;
   bool get pendingItalic => _pendingItalic;
+  bool get pendingCode => _pendingCode;
+  String? get pendingHighlightHex => _pendingHighlightHex;
+
+  bool isStyleAtCursor({
+    bool bold = false,
+    bool italic = false,
+    bool code = false,
+  }) {
+    final sel = selection;
+    if (!sel.isValid || sel.isCollapsed) {
+      if (bold) return _pendingBold;
+      if (italic) return _pendingItalic;
+      if (code) return _pendingCode;
+      return false;
+    }
+    return _isStyleActiveInRange(
+      sel.start.clamp(0, text.length),
+      sel.end.clamp(0, text.length),
+      bold: bold,
+      italic: italic,
+      code: code,
+    );
+  }
+
+  bool isBlockStyleAtCursor(RichBlockStyle style) {
+    final sel = selection;
+    final cursor = (sel.isValid ? sel.start : text.length).clamp(
+      0,
+      text.length,
+    );
+    final lineIndex = '\n'.allMatches(text.substring(0, cursor)).length;
+    return _lineStyles[lineIndex] == style;
+  }
 
   /// Constrói o controlador já populado a partir de texto salvo em Markdown/HTML.
   factory RichFormattedEditingController.fromMarkup(String rawMarkup) {

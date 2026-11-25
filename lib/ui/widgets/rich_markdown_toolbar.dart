@@ -93,12 +93,19 @@ class _RichMarkdownToolbarState extends State<RichMarkdownToolbar> {
     }
 
     if (sel.isValid && !sel.isCollapsed && sel.end > sel.start) {
+      final capturedSel = sel;
       _hlFloating.show(
         context: context,
         keyPrefix: 'editor',
         anchorKey: _toolbarAnchorKey,
         onPickColor: (hex) {
-          _richCtrl?.applyHighlightColor(hex);
+          final rich = _richCtrl;
+          if (rich == null) return;
+          if ((rich.selection.isCollapsed || !rich.selection.isValid) &&
+              capturedSel.end <= rich.text.length) {
+            rich.selection = capturedSel;
+          }
+          rich.applyHighlightColor(hex);
           widget.onChanged?.call();
         },
       );
@@ -269,13 +276,15 @@ class _RichMarkdownToolbarState extends State<RichMarkdownToolbar> {
   }
 
   void _showColorPicker(BuildContext context) {
+    final savedSel = widget.controller.selection;
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (ctx) => SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -308,10 +317,14 @@ class _RichMarkdownToolbarState extends State<RichMarkdownToolbar> {
                         Navigator.pop(ctx);
                         final rich = _richCtrl;
                         if (rich != null) {
-                          rich.applyHighlightColor(
-                            item.hex,
-                            defaultText: 'destaque',
-                          );
+                          if ((rich.selection.isCollapsed ||
+                                  !rich.selection.isValid) &&
+                              savedSel.isValid &&
+                              !savedSel.isCollapsed &&
+                              savedSel.end <= rich.text.length) {
+                            rich.selection = savedSel;
+                          }
+                          rich.applyHighlightColor(item.hex);
                           widget.onChanged?.call();
                         } else {
                           _wrapSelection(
@@ -325,6 +338,15 @@ class _RichMarkdownToolbarState extends State<RichMarkdownToolbar> {
                   InkWell(
                     onTap: () {
                       Navigator.pop(ctx);
+                      final rich = _richCtrl;
+                      if (rich != null &&
+                          (rich.selection.isCollapsed ||
+                              !rich.selection.isValid) &&
+                          savedSel.isValid &&
+                          !savedSel.isCollapsed &&
+                          savedSel.end <= rich.text.length) {
+                        rich.selection = savedSel;
+                      }
                       _removeSelectionHighlight();
                     },
                     borderRadius: BorderRadius.circular(8),
@@ -433,12 +455,10 @@ class _RichMarkdownToolbarState extends State<RichMarkdownToolbar> {
                     _toolbarButton(
                       icon: Icons.format_bold,
                       tooltip: 'Negrito',
+                      isActive: rich?.isStyleAtCursor(bold: true) ?? false,
                       onTap: () {
                         if (rich != null) {
-                          rich.toggleInlineStyle(
-                            bold: true,
-                            fallbackText: 'texto',
-                          );
+                          rich.toggleInlineStyle(bold: true);
                           widget.onChanged?.call();
                         } else {
                           _wrapSelection(
@@ -452,12 +472,10 @@ class _RichMarkdownToolbarState extends State<RichMarkdownToolbar> {
                     _toolbarButton(
                       icon: Icons.format_italic,
                       tooltip: 'Itálico',
+                      isActive: rich?.isStyleAtCursor(italic: true) ?? false,
                       onTap: () {
                         if (rich != null) {
-                          rich.toggleInlineStyle(
-                            italic: true,
-                            fallbackText: 'texto',
-                          );
+                          rich.toggleInlineStyle(italic: true);
                           widget.onChanged?.call();
                         } else {
                           _wrapSelection(
@@ -471,6 +489,9 @@ class _RichMarkdownToolbarState extends State<RichMarkdownToolbar> {
                     _toolbarButton(
                       icon: Icons.title,
                       tooltip: 'Título Grande',
+                      isActive:
+                          rich?.isBlockStyleAtCursor(RichBlockStyle.h2) ??
+                          false,
                       onTap: () {
                         if (rich != null) {
                           rich.toggleBlockStyle(RichBlockStyle.h2);
@@ -483,6 +504,9 @@ class _RichMarkdownToolbarState extends State<RichMarkdownToolbar> {
                     _toolbarButton(
                       icon: Icons.text_fields,
                       tooltip: 'Subtítulo',
+                      isActive:
+                          rich?.isBlockStyleAtCursor(RichBlockStyle.h3) ??
+                          false,
                       onTap: () {
                         if (rich != null) {
                           rich.toggleBlockStyle(RichBlockStyle.h3);
@@ -544,6 +568,7 @@ class _RichMarkdownToolbarState extends State<RichMarkdownToolbar> {
                         key: const Key('btn_toolbar_highlight_color'),
                         icon: Icons.border_color_outlined,
                         tooltip: 'Marcar com Cor (JW Library)',
+                        isActive: rich?.pendingHighlightHex != null,
                         onTap: () => _showColorPicker(context),
                       ),
                     const VerticalDivider(width: 16, indent: 8, endIndent: 8),
@@ -561,12 +586,10 @@ class _RichMarkdownToolbarState extends State<RichMarkdownToolbar> {
                     _toolbarButton(
                       icon: Icons.code,
                       tooltip: 'Código',
+                      isActive: rich?.isStyleAtCursor(code: true) ?? false,
                       onTap: () {
                         if (rich != null) {
-                          rich.toggleInlineStyle(
-                            code: true,
-                            fallbackText: 'código',
-                          );
+                          rich.toggleInlineStyle(code: true);
                           widget.onChanged?.call();
                         } else {
                           _wrapSelection(
@@ -1072,12 +1095,16 @@ class _RichMarkdownToolbarState extends State<RichMarkdownToolbar> {
     required IconData icon,
     required String tooltip,
     required VoidCallback onTap,
+    bool isActive = false,
   }) {
     return Tooltip(
       message: tooltip,
       child: Material(
         key: key,
-        color: Colors.transparent,
+        color: isActive
+            ? AppTheme.primaryBlue.withValues(alpha: 0.16)
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(6),
         child: InkWell(
           borderRadius: BorderRadius.circular(6),
           onTap: onTap,
