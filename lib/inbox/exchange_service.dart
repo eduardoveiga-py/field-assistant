@@ -302,6 +302,9 @@ class ExchangeReadService {
             );
           }
           final initial = key == '0';
+          final changedIds = result.changedEmails
+              .map((m) => m.serverId)
+              .toSet();
           final changes = [...result.addedEmails, ...result.changedEmails];
           if (changes.any((m) => m.serverId.isEmpty)) {
             throw const ExchangeException(
@@ -311,6 +314,12 @@ class ExchangeReadService {
           await db.transaction(() async {
             final now = DateTime.now();
             for (final item in changes) {
+              final serverKey = _digest([
+                host.toLowerCase(),
+                account.toLowerCase(),
+                folder,
+                item.serverId,
+              ]);
               // Preserve download references locally even though attachment bytes
               // are not imported yet. A partial Change with no attachment field
               // must never erase known references.
@@ -390,10 +399,77 @@ class ExchangeReadService {
               ];
               final id =
                   'email_eas_${_digest([host.toLowerCase(), account.toLowerCase(), folder, item.serverId, data])}';
+              if (changedIds.contains(item.serverId)) {
+                final matchedByServerKey =
+                    await (db.select(db.inboxEntries)
+                          ..where((t) => t.metadata.like('%$serverKey%')))
+                        .getSingleOrNull();
+                if (matchedByServerKey != null &&
+                    matchedByServerKey.metadata.isNotEmpty) {
+                  try {
+                    final existingMeta = Map<String, dynamic>.from(
+                      jsonDecode(matchedByServerKey.metadata) as Map,
+                    );
+                    final existingEmailRaw = existingMeta['email'];
+                    if (existingEmailRaw is Map) {
+                      final existingEmail = Map<String, dynamic>.from(
+                        existingEmailRaw,
+                      );
+                      if ((existingEmail['isRead'] as bool? ?? false) !=
+                          item.read) {
+                        existingEmail['isRead'] = item.read;
+                        existingMeta['email'] = existingEmail;
+                        await (db.update(
+                              db.inboxEntries,
+                            )..where((t) => t.id.equals(matchedByServerKey.id)))
+                            .write(
+                              InboxEntriesCompanion(
+                                metadata: drift.Value(jsonEncode(existingMeta)),
+                                updatedAt: drift.Value(now),
+                                revision: drift.Value(
+                                  matchedByServerKey.revision + 1,
+                                ),
+                              ),
+                            );
+                      }
+                    }
+                  } catch (_) {}
+                  continue;
+                }
+              }
               final exists = await (db.select(
                 db.inboxEntries,
               )..where((t) => t.id.equals(id))).getSingleOrNull();
-              if (exists != null) continue;
+              if (exists != null) {
+                if (exists.metadata.isNotEmpty) {
+                  try {
+                    final existingMeta = Map<String, dynamic>.from(
+                      jsonDecode(exists.metadata) as Map,
+                    );
+                    final existingEmailRaw = existingMeta['email'];
+                    if (existingEmailRaw is Map) {
+                      final existingEmail = Map<String, dynamic>.from(
+                        existingEmailRaw,
+                      );
+                      if ((existingEmail['isRead'] as bool? ?? false) !=
+                          item.read) {
+                        existingEmail['isRead'] = item.read;
+                        existingMeta['email'] = existingEmail;
+                        await (db.update(
+                          db.inboxEntries,
+                        )..where((t) => t.id.equals(exists.id))).write(
+                          InboxEntriesCompanion(
+                            metadata: drift.Value(jsonEncode(existingMeta)),
+                            updatedAt: drift.Value(now),
+                            revision: drift.Value(exists.revision + 1),
+                          ),
+                        );
+                      }
+                    }
+                  } catch (_) {}
+                }
+                continue;
+              }
               final body = item.body ?? '';
               final attachmentsList = item.attachments.map((att) {
                 final name = att.displayName.isNotEmpty
@@ -444,6 +520,7 @@ class ExchangeReadService {
                 'email': message.toJson(),
                 'exchangePreview': true,
                 'exchangeMail': true,
+                'exchangeServerKey': serverKey,
                 'bodyMayBeIncomplete': item.body == null || item.bodyTruncated,
                 'attachmentCount': item.attachments.length,
               };

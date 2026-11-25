@@ -111,6 +111,30 @@ Veja o [link para o site](https://jw.org).
         expect(cleaned, contains('link para o site'));
         expect(cleaned, contains('Título da Captura'));
       });
+
+      test('stripMarkdown removes **, ***, _, `, ~~ and truncated trailing * markers', () {
+        const sample =
+            'Olá mundo! Sistema **incrível** com ***ênfase***, _itálico_, `código` e ~~risco~~.';
+        final clean = EmailHtmlSanitizer.extractPlainText(
+          sample,
+          cleanMarkdown: true,
+        );
+        expect(clean, isNot(contains('*')));
+        expect(clean, isNot(contains('`')));
+        expect(clean, isNot(contains('~')));
+        expect(
+          clean,
+          equals(
+            'Olá mundo! Sistema incrível com ênfase, itálico, código e risco.',
+          ),
+        );
+
+        const truncated = 'Olá mundo! Sistema *';
+        expect(
+          EmailHtmlSanitizer.extractPlainText(truncated, cleanMarkdown: true),
+          equals('Olá mundo! Sistema'),
+        );
+      });
     });
 
     group('displaySenderName', () {

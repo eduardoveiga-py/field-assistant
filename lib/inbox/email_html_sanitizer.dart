@@ -40,11 +40,11 @@ class EmailHtmlSanitizer {
     caseSensitive: false,
   );
   static final RegExp _looseCssPropertyBlockRegex = RegExp(
-    r"""(?:^|[\n;}])\s*[a-zA-Z0-9_\-\.\# \t\+\>\:\*\,\~\[\]\=\^"'()]+\s*\{[^{}]*(?:background|mix-blend-mode|font-size|display|color|margin|padding|border|width|height)\s*:[^}]*\}""",
+    r"""(?:^|[\n;}])[ \t]*[a-zA-Z0-9_\-\.\#\+\>\:\*\,\~\[\]\=\^"'()]+(?:[ \t]+[a-zA-Z0-9_\-\.\#\+\>\:\*\,\~\[\]\=\^"'()]+)*[ \t\r\n]*\{[^{}]*(?:background|mix-blend-mode|font-size|display|color|margin|padding|border|width|height)\s*:[^}]*\}""",
     caseSensitive: false,
   );
   static final RegExp _emptyCssBlockRegex = RegExp(
-    r"""(?:^|[\n;}])\s*[a-zA-Z0-9_\-\.\# \t\+\>\:\*\,\~\[\]\=\^"'()]+\s*\{\s*\}""",
+    r"""(?:^|[\n;}])[ \t]*[a-zA-Z0-9_\-\.\#\+\>\:\*\,\~\[\]\=\^"'()]+(?:[ \t]+[a-zA-Z0-9_\-\.\#\+\>\:\*\,\~\[\]\=\^"'()]+)*[ \t\r\n]*\{[ \t\r\n]*\}""",
     caseSensitive: false,
   );
   static final RegExp _strayHtmlCommentEndRegex = RegExp(
@@ -123,26 +123,7 @@ class EmailHtmlSanitizer {
 
     // 4. Limpeza opcional de sintaxe Markdown
     if (cleanMarkdown) {
-      text = text.replaceAll(_markdownTableDividerRegex, '');
-      text = text.replaceAll(_markdownImageRegex, '');
-      text = text.replaceAllMapped(_markdownLinkRegex, (m) => m.group(1) ?? '');
-      text = text.replaceAll(_markdownHeadingRegex, '');
-      text = text.replaceAllMapped(
-        RegExp(r'\*\*([^\*\n]+)\*\*'),
-        (m) => m.group(1) ?? '',
-      );
-      text = text.replaceAllMapped(
-        RegExp(r'(?<!\*)\*([^\*\n]+)\*(?!\*)'),
-        (m) => m.group(1) ?? '',
-      );
-      text = text.replaceAllMapped(
-        RegExp(r'__([^_\n]+)__'),
-        (m) => m.group(1) ?? '',
-      );
-      text = text.replaceAllMapped(
-        RegExp(r'~~([^~\n]+)~~'),
-        (m) => m.group(1) ?? '',
-      );
+      text = stripMarkdown(text);
     }
 
     // 5. Decodifica entidades nomeadas
@@ -399,6 +380,91 @@ class EmailHtmlSanitizer {
   /// Remove marcadores Markdown do texto sem deixar asteriscos crus
   static String markdownToCleanPlainText(String text) {
     return extractPlainText(text, cleanMarkdown: true);
+  }
+
+  static final RegExp _markdownCodeBlockRegex = RegExp(r'```[\s\S]*?```');
+  static final RegExp _markdownInlineCodeRegex = RegExp(r'`([^`\n]+)`');
+  static final RegExp _markdownBlockquoteRegex = RegExp(
+    r'^\s*>\s?',
+    multiLine: true,
+  );
+  static final RegExp _markdownListBulletRegex = RegExp(
+    r'^\s*[-*+]\s+',
+    multiLine: true,
+  );
+
+  /// Remove marcadores Markdown preservando texto legível em prévias e resumos,
+  /// incluindo marcadores residuais (`**`, `*`, `__`, `~~`, `` ` ``) truncados.
+  static String stripMarkdown(String raw) {
+    if (raw.isEmpty) return raw;
+    var text = raw;
+    text = text.replaceAll(_markdownTableDividerRegex, '');
+    text = text.replaceAll(_markdownImageRegex, '');
+    text = text.replaceAllMapped(_markdownLinkRegex, (m) => m.group(1) ?? '');
+    text = text.replaceAllMapped(
+      _markdownCodeBlockRegex,
+      (m) => m.group(0)?.replaceAll('```', '').trim() ?? '',
+    );
+    text = text.replaceAllMapped(
+      _markdownInlineCodeRegex,
+      (m) => m.group(1) ?? '',
+    );
+    text = text.replaceAll(_markdownHeadingRegex, '');
+    text = text.replaceAll(_markdownBlockquoteRegex, '');
+    text = text.replaceAll(_markdownListBulletRegex, '• ');
+    // Aplica do mais específico (*** / ___) para o mais simples, repetindo em casos aninhados.
+    for (var i = 0; i < 2; i++) {
+      text = text.replaceAllMapped(
+        RegExp(r'\*\*\*([^*\n]+)\*\*\*'),
+        (m) => m.group(1) ?? '',
+      );
+      text = text.replaceAllMapped(
+        RegExp(r'___([^_\n]+)___'),
+        (m) => m.group(1) ?? '',
+      );
+      text = text.replaceAllMapped(
+        RegExp(r'\*\*([^\n]+?)\*\*'),
+        (m) => m.group(1) ?? '',
+      );
+      text = text.replaceAllMapped(
+        RegExp(r'__([^\n]+?)__'),
+        (m) => m.group(1) ?? '',
+      );
+      text = text.replaceAllMapped(
+        RegExp(r'(?<!\*)\*([^*\n]+?)\*(?!\*)'),
+        (m) => m.group(1) ?? '',
+      );
+      text = text.replaceAllMapped(
+        RegExp(r'(^|[\s(>\[])_([^_\n]+)_(?=[\s).,!?:;\]<]|$)'),
+        (m) => '${m.group(1) ?? ''}${m.group(2) ?? ''}',
+      );
+      text = text.replaceAllMapped(
+        RegExp(r'~~([^~\n]+)~~'),
+        (m) => m.group(1) ?? '',
+      );
+    }
+    // Remove marcadores soltos ou truncados (ex.: "**incrível" ou "Sistema *...").
+    text = text.replaceAll(RegExp(r'\*\*+'), '');
+    text = text.replaceAll(RegExp(r'__+'), '');
+    text = text.replaceAll(RegExp(r'~~+'), '');
+    text = text.replaceAllMapped(
+      RegExp(
+        r'(^|[\s(\[{"'
+        "'"
+        r'])\*(?=\S)',
+      ),
+      (m) => m.group(1) ?? '',
+    );
+    text = text.replaceAllMapped(
+      RegExp(
+        r'(\S)\*(?=[\s).,!?:;\]}"'
+        "'"
+        r'…\u2026]|$)',
+      ),
+      (m) => m.group(1) ?? '',
+    );
+    text = text.replaceAllMapped(RegExp(r'\*(?=\s*(?:\.{3}|…)?$)'), (_) => '');
+    return text;
   }
 
   /// Monta o documento HTML completo seguro para exibição isolada em um `<iframe>` sandboxed.

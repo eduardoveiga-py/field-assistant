@@ -69,6 +69,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
   bool _unreadOnly = false;
   String? _selectedEmailAccount;
   String? _selectedEmailId;
+  String? _stickyOpenedEmailId;
+  bool _isEmailSelectionMode = false;
+  final Set<String> _selectedEmailIds = <String>{};
   bool _isSyncingEmails = false;
   final ScrollController _emailsScrollController = ScrollController();
   final ScrollController _capturesScrollController = ScrollController();
@@ -76,13 +79,23 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
   List<JwEmailMessage> _cachedEmails = const [];
   String _selectedCaptureAccount = '__all__';
   List<EmailAccount> _cachedAccounts = const [];
+  Future<List<EmailAccount>>? _accountsFuture;
+
+  Future<List<EmailAccount>> _getAccountsFuture() {
+    final db = ref.read(repositoryProvider).db;
+    return _accountsFuture ??= EmailAccountsManager.loadAccounts(db);
+  }
 
   Future<void> _loadCachedAccounts() async {
     try {
       final db = ref.read(repositoryProvider).db;
-      final accs = await EmailAccountsManager.loadAccounts(db);
+      final future = EmailAccountsManager.loadAccounts(db);
+      _accountsFuture = future;
+      final accs = await future;
       if (mounted) setState(() => _cachedAccounts = accs);
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.warning('Falha ao carregar contas de e-mail em cache', e, st);
+    }
   }
 
   @override
@@ -224,9 +237,8 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
   }
 
   Widget _buildCaptureAccountFilterBar(bool isDark) {
-    final db = ref.read(repositoryProvider).db;
     return FutureBuilder<List<EmailAccount>>(
-      future: EmailAccountsManager.loadAccounts(db),
+      future: _getAccountsFuture(),
       builder: (context, snapshot) {
         final accounts = snapshot.data ?? const <EmailAccount>[];
         final items = <DropdownMenuItem<String>>[
@@ -287,6 +299,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
   }
 
   Future<void> _syncEmails() async {
+    if (_isSyncingEmails) return;
     setState(() => _isSyncingEmails = true);
     try {
       final db = ref.read(repositoryProvider).db;
@@ -672,11 +685,11 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                     key: const PageStorageKey<String>('inbox_captures_list'),
                     controller: _capturesScrollController,
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
+                      horizontal: 14,
+                      vertical: 10,
                     ),
                     itemCount: entries.length,
-                    separatorBuilder: (ctx, i) => const SizedBox(height: 10),
+                    separatorBuilder: (ctx, i) => const SizedBox(height: 8),
                     itemBuilder: (ctx, i) {
                       final entry = entries[i];
                       final card = _buildEntryCard(entry, isDark);
@@ -936,55 +949,116 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
     return Container(
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: Colors.black.withValues(alpha: isDark ? 0.16 : 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 1),
           ),
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Linha do Cabeçalho: Tipo + Categoria + Ações Rápidas
             Row(
               children: [
-                _buildSourceBadge(entry.sourceType),
-                const SizedBox(width: 8),
-                if (entry.suggestedCategory != null &&
-                    entry.suggestedCategory!.isNotEmpty)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primaryBlue.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      _resolveCategoryLabel(entry),
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: AppTheme.primaryBlue,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                Expanded(
+                  child: Row(
+                    children: [
+                      _buildSourceBadge(entry.sourceType),
+                      if (entry.suggestedCategory != null &&
+                          entry.suggestedCategory!.isNotEmpty) ...[
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppTheme.primaryBlue.withValues(
+                                alpha: 0.12,
+                              ),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              _resolveCategoryLabel(entry),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 10.5,
+                                color: AppTheme.primaryBlue,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
-                const Spacer(),
+                ),
+                const SizedBox(width: 6),
+                if (entry.sourceType == 'email') ...[
+                  IconButton(
+                    key: Key('btn_capture_fullscreen_${entry.id}'),
+                    icon: const Icon(
+                      Icons.open_in_full_rounded,
+                      size: 16,
+                      color: AppTheme.primaryBlue,
+                    ),
+                    tooltip: 'Ler e-mail em tela cheia',
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 28,
+                      minHeight: 28,
+                    ),
+                    style: IconButton.styleFrom(
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      minimumSize: const Size(28, 28),
+                      padding: EdgeInsets.zero,
+                    ),
+                    onPressed: () {
+                      final emailMsg = _captureEntryToJwEmail(entry);
+                      if (!emailMsg.isRead) {
+                        unawaited(
+                          _markEmailsReadStatus(
+                            [emailMsg],
+                            isRead: true,
+                            showFeedback: false,
+                          ),
+                        );
+                      }
+                      _openEmailReaderScreen(
+                        context,
+                        emailMsg,
+                        _cachedAccounts,
+                      );
+                    },
+                  ),
+                  const SizedBox(width: 4),
+                ],
                 Text(
                   _formatDate(entry.capturedAt),
-                  style: const TextStyle(fontSize: 11, color: Colors.grey),
+                  style: const TextStyle(fontSize: 10.5, color: Colors.grey),
                 ),
+                const SizedBox(width: 2),
                 PopupMenuButton<String>(
-                  icon: const Icon(Icons.more_vert, size: 20),
+                  padding: EdgeInsets.zero,
+                  iconSize: 18,
+                  style: IconButton.styleFrom(
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    minimumSize: const Size(28, 28),
+                    padding: EdgeInsets.zero,
+                  ),
+                  icon: const Icon(Icons.more_vert, size: 18),
                   onSelected: (val) => _handleCardMenuAction(val, entry),
                   itemBuilder: (ctx) => [
                     const PopupMenuItem(
@@ -1061,7 +1135,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                 ),
               ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 6),
 
             // Conteúdo textual ou Cabeçalho de E-mail
             if (entry.sourceType == 'email') ...[
@@ -1107,7 +1181,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                             ),
                           ],
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 2),
                       ],
                       if (subject != null) ...[
                         Text(
@@ -1115,14 +1189,14 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontSize: 14.5,
+                            fontSize: 14,
                             fontWeight: FontWeight.w600,
                             color: isDark
                                 ? Colors.white
                                 : const Color(0xFF0F172A),
                           ),
                         ),
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 4),
                       ],
                       Text(
                         EmailHtmlSanitizer.extractPlainText(
@@ -1236,15 +1310,15 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
               ),
             ],
 
-            const SizedBox(height: 12),
+            const SizedBox(height: 6),
             const Divider(height: 1),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
 
             // Botões de Conversão Não-Destrutiva
             if (entry.status != 'converted')
               Wrap(
-                spacing: 8,
-                runSpacing: 6,
+                spacing: 6,
+                runSpacing: 5,
                 children: [
                   _buildConvertButton(
                     label: 'Virar Tarefa',
@@ -1352,23 +1426,23 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(6),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(6),
           border: Border.all(color: color.withValues(alpha: 0.3)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 14, color: color),
-            const SizedBox(width: 6),
+            Icon(icon, size: 13, color: color),
+            const SizedBox(width: 4),
             Text(
               label,
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 11,
                 fontWeight: FontWeight.bold,
                 color: color,
               ),
@@ -2252,7 +2326,30 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
+              IconButton(
+                key: const Key('btn_toggle_email_selection'),
+                tooltip: _isEmailSelectionMode
+                    ? 'Sair da seleção'
+                    : 'Selecionar e-mails',
+                icon: Icon(
+                  _isEmailSelectionMode
+                      ? Icons.checklist_rtl_rounded
+                      : Icons.checklist_rounded,
+                  size: 20,
+                  color: _isEmailSelectionMode ? AppTheme.primaryBlue : null,
+                ),
+                visualDensity: VisualDensity.compact,
+                onPressed: () {
+                  setState(() {
+                    _isEmailSelectionMode = !_isEmailSelectionMode;
+                    if (!_isEmailSelectionMode) {
+                      _selectedEmailIds.clear();
+                    }
+                  });
+                },
+              ),
+              const SizedBox(width: 4),
               FilledButton.tonalIcon(
                 style: FilledButton.styleFrom(
                   visualDensity: VisualDensity.compact,
@@ -2358,6 +2455,8 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                           _selectedEmailFolder = folder == 'Todas as pastas'
                               ? null
                               : folder;
+                          _stickyOpenedEmailId = null;
+                          _selectedEmailIds.clear();
                         });
                       },
                     ),
@@ -2452,7 +2551,11 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
 
               final currentFolder = _selectedEmailFolder ?? 'Todas as pastas';
               final visible = emails.where((email) {
-                if (_unreadOnly && email.isRead) return false;
+                if (_unreadOnly &&
+                    email.isRead &&
+                    email.id != _stickyOpenedEmailId) {
+                  return false;
+                }
                 // Filtro por pasta
                 if (currentFolder == 'Caixa de Entrada') {
                   final fn = (email.folderName ?? '').toLowerCase();
@@ -2472,7 +2575,10 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                 } else if (currentFolder == 'Enviadas' ||
                     currentFolder == 'Enviados') {
                   final fn = (email.folderName ?? '').toLowerCase();
-                  if (!fn.contains('enviad') && !fn.contains('sent')) {
+                  final hasSentLabel = email.labels.contains('SENT');
+                  if (!fn.contains('enviad') &&
+                      !fn.contains('sent') &&
+                      !hasSentLabel) {
                     return false;
                   }
                 } else if (currentFolder == 'Rascunhos') {
@@ -2511,14 +2617,163 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                 return true;
               }).toList();
 
-              final db = ref.read(repositoryProvider).db;
-
               return FutureBuilder<List<EmailAccount>>(
-                future: EmailAccountsManager.loadAccounts(db),
+                future: _getAccountsFuture(),
                 builder: (ctx, accSnapshot) {
-                  final accounts = accSnapshot.data ?? [];
+                  final accounts = accSnapshot.data ?? _cachedAccounts;
+                  final visibleIds = visible.map((m) => m.id).toSet();
+                  final selectedTargets = visible
+                      .where((m) => _selectedEmailIds.contains(m.id))
+                      .toList();
+                  final allSelected =
+                      visible.isNotEmpty &&
+                      selectedTargets.length == visible.length;
+                  final anyUnreadSelected = selectedTargets.any(
+                    (m) => !m.isRead,
+                  );
                   return Column(
                     children: [
+                      if (_isEmailSelectionMode)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          margin: const EdgeInsets.fromLTRB(16, 4, 16, 2),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primaryBlue.withValues(
+                              alpha: isDark ? 0.22 : 0.1,
+                            ),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: AppTheme.primaryBlue.withValues(
+                                alpha: 0.4,
+                              ),
+                            ),
+                          ),
+                          child: Wrap(
+                            spacing: 6,
+                            runSpacing: 4,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              Text(
+                                '${selectedTargets.length} selecionada(s)',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              TextButton(
+                                key: const Key('btn_batch_select_all_emails'),
+                                style: TextButton.styleFrom(
+                                  visualDensity: VisualDensity.compact,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                  ),
+                                ),
+                                onPressed: visible.isEmpty
+                                    ? null
+                                    : () {
+                                        setState(() {
+                                          if (allSelected) {
+                                            _selectedEmailIds.clear();
+                                          } else {
+                                            _selectedEmailIds
+                                              ..clear()
+                                              ..addAll(visibleIds);
+                                          }
+                                        });
+                                      },
+                                child: Text(allSelected ? 'Limpar' : 'Todas'),
+                              ),
+                              FilledButton.tonalIcon(
+                                key: const Key('btn_batch_move_folder'),
+                                style: FilledButton.styleFrom(
+                                  visualDensity: VisualDensity.compact,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                  ),
+                                ),
+                                icon: const Icon(
+                                  Icons.drive_file_move_outlined,
+                                  size: 16,
+                                ),
+                                label: const Text(
+                                  'Mover pasta',
+                                  style: TextStyle(fontSize: 12),
+                                ),
+                                onPressed: selectedTargets.isEmpty
+                                    ? null
+                                    : () => _showMoveToFolderDialog(
+                                        selectedTargets,
+                                      ),
+                              ),
+                              FilledButton.tonalIcon(
+                                key: const Key('btn_batch_mark_read'),
+                                style: FilledButton.styleFrom(
+                                  visualDensity: VisualDensity.compact,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                  ),
+                                ),
+                                icon: Icon(
+                                  anyUnreadSelected
+                                      ? Icons.mark_email_read_outlined
+                                      : Icons.mark_email_unread_outlined,
+                                  size: 16,
+                                ),
+                                label: Text(
+                                  anyUnreadSelected
+                                      ? 'Marcar lida'
+                                      : 'Não lida',
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                                onPressed: selectedTargets.isEmpty
+                                    ? null
+                                    : () => _markEmailsReadStatus(
+                                        selectedTargets,
+                                        isRead: anyUnreadSelected,
+                                      ),
+                              ),
+                              FilledButton.tonalIcon(
+                                key: const Key('btn_batch_delete_emails'),
+                                style: FilledButton.styleFrom(
+                                  visualDensity: VisualDensity.compact,
+                                  foregroundColor: Colors.redAccent,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                  ),
+                                ),
+                                icon: const Icon(
+                                  Icons.delete_outline,
+                                  size: 16,
+                                ),
+                                label: const Text(
+                                  'Excluir',
+                                  style: TextStyle(fontSize: 12),
+                                ),
+                                onPressed: selectedTargets.isEmpty
+                                    ? null
+                                    : () => _deleteEmailsWithConfirm(
+                                        selectedTargets,
+                                      ),
+                              ),
+                              IconButton(
+                                key: const Key('btn_exit_email_selection'),
+                                icon: const Icon(Icons.close, size: 18),
+                                tooltip: 'Sair da seleção',
+                                visualDensity: VisualDensity.compact,
+                                onPressed: () {
+                                  setState(() {
+                                    _isEmailSelectionMode = false;
+                                    _selectedEmailIds.clear();
+                                  });
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
                       // Barra de Seleção de Conta, Tags, Não Lidos e Contador
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 4),
@@ -2671,6 +2926,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                 onSelected: (val) {
                                   setState(() {
                                     _unreadOnly = val;
+                                    _stickyOpenedEmailId = null;
                                   });
                                 },
                               ),
@@ -2833,25 +3089,45 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                   const SizedBox(height: 4),
                               itemBuilder: (c, i) {
                                 final msg = visible[i];
-                                final isSelected =
-                                    isMasterDetail && msg.id == selectedMsg.id;
+                                final isChecked = _selectedEmailIds.contains(
+                                  msg.id,
+                                );
+                                final isSelected = _isEmailSelectionMode
+                                    ? isChecked
+                                    : (isMasterDetail &&
+                                          msg.id == selectedMsg.id);
                                 return _buildEmailCard(
                                   msg,
                                   isDark,
                                   isHub: false,
                                   isSelected: isSelected,
+                                  isSelectionMode: _isEmailSelectionMode,
+                                  isChecked: isChecked,
                                   accounts: accounts,
-                                  onTap: () {
+                                  onLongPress: () {
                                     setState(() {
-                                      _selectedEmailId = msg.id;
+                                      _isEmailSelectionMode = true;
+                                      _selectedEmailIds.add(msg.id);
                                     });
-                                    if (!isMasterDetail) {
-                                      _openEmailReaderScreen(
-                                        context,
-                                        msg,
-                                        accounts,
-                                      );
+                                  },
+                                  onTap: () {
+                                    if (_isEmailSelectionMode) {
+                                      setState(() {
+                                        if (_selectedEmailIds.contains(
+                                          msg.id,
+                                        )) {
+                                          _selectedEmailIds.remove(msg.id);
+                                        } else {
+                                          _selectedEmailIds.add(msg.id);
+                                        }
+                                      });
+                                      return;
                                     }
+                                    _openEmailAndMarkRead(
+                                      msg,
+                                      accounts,
+                                      isMasterDetail: isMasterDetail,
+                                    );
                                   },
                                 );
                               },
@@ -3066,8 +3342,21 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                 ),
                 itemCount: letters.length,
                 separatorBuilder: (c, i) => const SizedBox(height: 4),
-                itemBuilder: (c, i) =>
-                    _buildEmailCard(letters[i], isDark, isHub: true),
+                itemBuilder: (c, i) {
+                  final letter = letters[i];
+                  return _buildEmailCard(
+                    letter,
+                    isDark,
+                    isHub: true,
+                    onTap: () => _openEmailAndMarkRead(
+                      letter,
+                      _cachedAccounts,
+                      isMasterDetail: false,
+                      openModalInstead: true,
+                      isHub: true,
+                    ),
+                  );
+                },
               );
             },
           ),
@@ -3085,11 +3374,15 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
     bool isDark, {
     bool isHub = false,
     bool isSelected = false,
+    bool isSelectionMode = false,
+    bool isChecked = false,
     VoidCallback? onTap,
+    VoidCallback? onLongPress,
     List<EmailAccount>? accounts,
   }) {
     final cleanPreview = EmailHtmlSanitizer.extractPlainText(
       msg.bodyText.isNotEmpty ? msg.bodyText : msg.bodyHtml,
+      cleanMarkdown: true,
     ).replaceAll('\n', ' ').trim();
     final isUnread = !msg.isRead;
     final senderName = EmailHtmlSanitizer.displaySenderName(msg.from);
@@ -3121,7 +3414,16 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
 
     return InkWell(
       borderRadius: BorderRadius.circular(10),
-      onTap: onTap ?? () => _showEmailDetailsModal(context, msg),
+      onLongPress: onLongPress,
+      onTap:
+          onTap ??
+          () => _openEmailAndMarkRead(
+            msg,
+            accounts ?? _cachedAccounts,
+            isMasterDetail: false,
+            openModalInstead: true,
+            isHub: isHub,
+          ),
       child: Container(
         decoration: BoxDecoration(
           color: isSelected
@@ -3141,45 +3443,57 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Indicador não lido + Avatar
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                CircleAvatar(
-                  radius: 16,
-                  backgroundColor: isHub
-                      ? const Color(0xFF8B5CF6).withValues(alpha: 0.16)
-                      : (msg.isDraft
-                            ? Colors.amber.withValues(alpha: 0.16)
-                            : AppTheme.primaryBlue.withValues(alpha: 0.12)),
-                  child: Text(
-                    initials,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: isHub
-                          ? const Color(0xFF8B5CF6)
-                          : (msg.isDraft
-                                ? Colors.amber.shade800
-                                : AppTheme.primaryBlue),
-                    ),
-                  ),
+            // Indicador não lido + Avatar (ou Checkbox em modo de seleção)
+            if (isSelectionMode)
+              SizedBox(
+                width: 32,
+                height: 32,
+                child: Checkbox(
+                  key: Key('chk_email_${msg.id}'),
+                  value: isChecked,
+                  visualDensity: VisualDensity.compact,
+                  onChanged: (_) => onTap?.call(),
                 ),
-                if (isUnread)
-                  Positioned(
-                    top: -2,
-                    left: -2,
-                    child: Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: AppTheme.primaryBlue,
-                        shape: BoxShape.circle,
+              )
+            else
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  CircleAvatar(
+                    radius: 16,
+                    backgroundColor: isHub
+                        ? const Color(0xFF8B5CF6).withValues(alpha: 0.16)
+                        : (msg.isDraft
+                              ? Colors.amber.withValues(alpha: 0.16)
+                              : AppTheme.primaryBlue.withValues(alpha: 0.12)),
+                    child: Text(
+                      initials,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: isHub
+                            ? const Color(0xFF8B5CF6)
+                            : (msg.isDraft
+                                  ? Colors.amber.shade800
+                                  : AppTheme.primaryBlue),
                       ),
                     ),
                   ),
-              ],
-            ),
+                  if (isUnread)
+                    Positioned(
+                      top: -2,
+                      left: -2,
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: AppTheme.primaryBlue,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             const SizedBox(width: 10),
 
             // Conteúdo principal
@@ -3240,27 +3554,58 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                         constraints: const BoxConstraints(),
                         tooltip: 'Mais opções',
                         onSelected: (val) async {
-                          if (val == 'export') {
+                          if (val == 'toggle_read') {
+                            await _markEmailsReadStatus([
+                              msg,
+                            ], isRead: !msg.isRead);
+                          } else if (val == 'move_folder') {
+                            await _showMoveToFolderDialog([msg]);
+                          } else if (val == 'export') {
                             _showExportEmailModal(msg);
                           } else if (val == 'to_task') {
                             _convertEmailToTask(msg);
                           } else if (val == 'to_research') {
                             _convertEmailToResearch(msg);
                           } else if (val == 'delete') {
-                            await ref
-                                .read(jwEmailServiceProvider)
-                                .deleteEmail(msg.id);
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('E-mail excluído.'),
-                                ),
-                              );
-                            }
+                            await _deleteEmailsWithConfirm([msg]);
                           }
                         },
-                        itemBuilder: (ctx) => const [
+                        itemBuilder: (ctx) => [
                           PopupMenuItem(
+                            value: 'toggle_read',
+                            child: Row(
+                              children: [
+                                Icon(
+                                  msg.isRead
+                                      ? Icons.mark_email_unread_outlined
+                                      : Icons.mark_email_read_outlined,
+                                  size: 18,
+                                  color: AppTheme.primaryBlue,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  msg.isRead
+                                      ? 'Marcar como não lida'
+                                      : 'Marcar como lida',
+                                ),
+                              ],
+                            ),
+                          ),
+                          const PopupMenuItem(
+                            value: 'move_folder',
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.drive_file_move_outlined,
+                                  size: 18,
+                                  color: Colors.indigoAccent,
+                                ),
+                                SizedBox(width: 8),
+                                Text('Mover para pasta...'),
+                              ],
+                            ),
+                          ),
+                          const PopupMenuItem(
                             value: 'export',
                             child: Row(
                               children: [
@@ -3466,7 +3811,13 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
         ? rawType
         : (ext.isNotEmpty ? ext : 'file');
     final base64Str = att['base64']?.toString();
-    Uint8List? rawBytes = att['rawBytes'] as Uint8List?;
+    final rawBytesVal = att['rawBytes'];
+    Uint8List? rawBytes;
+    if (rawBytesVal is Uint8List) {
+      rawBytes = rawBytesVal;
+    } else if (rawBytesVal is List) {
+      rawBytes = Uint8List.fromList(rawBytesVal.whereType<int>().toList());
+    }
 
     if (rawBytes == null && base64Str != null && base64Str.isNotEmpty) {
       try {
@@ -3922,6 +4273,22 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                     },
                   ),
                 OutlinedButton.icon(
+                  icon: Icon(
+                    msg.isRead
+                        ? Icons.mark_email_unread_outlined
+                        : Icons.mark_email_read_outlined,
+                    size: 16,
+                  ),
+                  label: Text(msg.isRead ? 'Não lida' : 'Lida'),
+                  onPressed: () =>
+                      _markEmailsReadStatus([msg], isRead: !msg.isRead),
+                ),
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.drive_file_move_outlined, size: 16),
+                  label: const Text('Mover pasta'),
+                  onPressed: () => _showMoveToFolderDialog([msg]),
+                ),
+                OutlinedButton.icon(
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.redAccent,
                   ),
@@ -4155,6 +4522,30 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                           );
                         },
                       ),
+                    OutlinedButton.icon(
+                      icon: Icon(
+                        msg.isRead
+                            ? Icons.mark_email_unread_outlined
+                            : Icons.mark_email_read_outlined,
+                        size: 16,
+                      ),
+                      label: Text(msg.isRead ? 'Não lida' : 'Lida'),
+                      onPressed: () async {
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        await _markEmailsReadStatus([msg], isRead: !msg.isRead);
+                      },
+                    ),
+                    OutlinedButton.icon(
+                      icon: const Icon(
+                        Icons.drive_file_move_outlined,
+                        size: 16,
+                      ),
+                      label: const Text('Mover pasta'),
+                      onPressed: () async {
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        await _showMoveToFolderDialog([msg]);
+                      },
+                    ),
                     OutlinedButton.icon(
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.redAccent,
@@ -5256,7 +5647,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                         finalHtmlBody =
                                             '$baseCleanHtml<br><br>--<br>${selectedAccount!.signatureHtml}';
                                         finalPlainBody =
-                                            '$baseCleanPlain\n\n--\n${EmailHtmlSanitizer.extractPlainText(selectedAccount!.signatureHtml)}';
+                                            '$baseCleanPlain\n\n--\n${EmailHtmlSanitizer.extractPlainText(selectedAccount!.signatureHtml, cleanMarkdown: true)}';
                                       } else {
                                         finalHtmlBody = baseCleanHtml;
                                         finalPlainBody = baseCleanPlain;
@@ -5359,7 +5750,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                         finalHtmlBody =
                                             '$baseCleanHtml<br><br>--<br>${selectedAccount!.signatureHtml}';
                                         finalPlainBody =
-                                            '$baseCleanPlain\n\n--\n${EmailHtmlSanitizer.extractPlainText(selectedAccount!.signatureHtml)}';
+                                            '$baseCleanPlain\n\n--\n${EmailHtmlSanitizer.extractPlainText(selectedAccount!.signatureHtml, cleanMarkdown: true)}';
                                       } else {
                                         finalHtmlBody = baseCleanHtml;
                                         finalPlainBody = baseCleanPlain;
@@ -5460,6 +5851,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                                   ? finalHtmlBody
                                                   : null,
                                               attachments: attachments,
+                                              isRead: true,
                                               isDraft: false,
                                               isPermanentRetained: true,
                                               tags: tags,
@@ -5576,6 +5968,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                                   ? finalHtmlBody
                                                   : null,
                                               attachments: attachments,
+                                              isRead: true,
                                               isDraft: false,
                                               isPermanentRetained: true,
                                               tags: tags,
@@ -5719,6 +6112,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                                   ? finalHtmlBody
                                                   : null,
                                               attachments: attachments,
+                                              isRead: true,
                                               isDraft: false,
                                               isPermanentRetained: true,
                                               tags: tags,
@@ -5811,6 +6205,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                                   ? finalHtmlBody
                                                   : null,
                                               attachments: attachments,
+                                              isRead: true,
                                               isDraft: false,
                                               tags: tags,
                                             );
@@ -6003,6 +6398,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                             date: now,
                                             bodyText: bodyText,
                                             attachments: attachments,
+                                            isRead: true,
                                             isDraft: false,
                                             isPermanentRetained: true,
                                             tags: tags,
@@ -6194,6 +6590,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                           date: DateTime.now(),
                                           bodyText: bodyText,
                                           attachments: attachments,
+                                          isRead: true,
                                           isDraft: false,
                                           tags: tags,
                                         );
@@ -6277,7 +6674,8 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
           .read(taskManagerProvider)
           .createTask(
             title: msg.subject,
-            description: 'E-mail de ${msg.from}:\n\n${msg.bodyText}',
+            description:
+                'E-mail de ${msg.from}:\n\n${EmailHtmlSanitizer.stripMarkdown(msg.bodyText)}',
             priority: 'normal',
             category: 'ministry',
             tags: msg.tags,
@@ -6304,7 +6702,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
           .addArticle(
             title: msg.subject,
             summary: 'Correspondência JW de ${msg.from}',
-            content: msg.bodyText,
+            content: EmailHtmlSanitizer.stripMarkdown(msg.bodyText),
             tags: msg.tags.isNotEmpty ? msg.tags : ['email_retido'],
           );
       if (mounted) {
@@ -6323,13 +6721,226 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
     }
   }
 
-  Future<void> _confirmDeleteEmail(JwEmailMessage msg) async {
+  JwEmailMessage _captureEntryToJwEmail(InboxEntry entry) {
+    if (entry.metadata.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(entry.metadata);
+        if (decoded is Map<String, dynamic> && decoded['email'] is Map) {
+          final emailMap = Map<String, dynamic>.from(decoded['email'] as Map);
+          return JwEmailMessage.fromJson(emailMap);
+        }
+      } catch (_) {}
+    }
+    final lines = entry.content.trim().split('\n');
+    final subject = lines.isNotEmpty && lines.first.trim().isNotEmpty
+        ? lines.first.trim()
+        : 'E-mail capturado';
+    final body = lines.length > 1
+        ? lines.sublist(1).join('\n').trim()
+        : entry.content.trim();
+    return JwEmailMessage(
+      id: entry.id,
+      subject: subject,
+      from: _extractCaptureAccountEmail(entry) ?? 'Remetente desconhecido',
+      to: '',
+      accountEmail: _extractCaptureAccountEmail(entry),
+      date: entry.capturedAt,
+      bodyText: body,
+      attachments: _parseJsonList(entry.attachments),
+      isRead: true,
+    );
+  }
+
+  Future<void> _openEmailAndMarkRead(
+    JwEmailMessage msg,
+    List<EmailAccount> accounts, {
+    required bool isMasterDetail,
+    bool openModalInstead = false,
+    bool isHub = false,
+  }) async {
+    setState(() {
+      _selectedEmailId = msg.id;
+      _stickyOpenedEmailId = msg.id;
+      if (!msg.isRead) {
+        _cachedEmails = _cachedEmails
+            .map((e) => e.id == msg.id ? e.copyWith(isRead: true) : e)
+            .toList();
+      }
+    });
+
+    final openedMsg = msg.isRead ? msg : msg.copyWith(isRead: true);
+    if (!msg.isRead) {
+      unawaited(
+        _markEmailsReadStatus([msg], isRead: true, showFeedback: false),
+      );
+    }
+
+    if (openModalInstead) {
+      _showEmailDetailsModal(context, openedMsg, accounts);
+    } else if (!isMasterDetail) {
+      _openEmailReaderScreen(context, openedMsg, accounts);
+    }
+  }
+
+  Future<void> _markEmailsReadStatus(
+    List<JwEmailMessage> targets, {
+    required bool isRead,
+    bool showFeedback = true,
+  }) async {
+    if (targets.isEmpty) return;
+    try {
+      final db = ref.read(repositoryProvider).db;
+      final coordinator = EmailSyncCoordinator(
+        db,
+        jwEmailService: ref.read(jwEmailServiceProvider),
+      );
+      final res = await coordinator.updateReadStatus(targets, isRead: isRead);
+      if (!mounted) return;
+      if (showFeedback) {
+        setState(() {
+          _isEmailSelectionMode = false;
+          _selectedEmailIds.clear();
+        });
+      }
+      if (res.warnings.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(res.warnings.first),
+            backgroundColor: Colors.orange.shade800,
+          ),
+        );
+      } else if (showFeedback) {
+        final label = isRead ? 'lida(s)' : 'não lida(s)';
+        final syncSuffix = res.remoteSynced > 0
+            ? ' e sincronizada(s) com o servidor.'
+            : (res.hasReadOnlyAccountNotice
+                  ? ' (conta Exchange/Hub permanece somente leitura no servidor).'
+                  : '.');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${targets.length} mensagem(ns) marcada(s) como $label$syncSuffix',
+            ),
+          ),
+        );
+      }
+    } catch (e, st) {
+      AppLogger.warning('Falha ao atualizar status de leitura', e, st);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Erro ao atualizar leitura: ${_friendlySyncError(e)}',
+            ),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _showMoveToFolderDialog(List<JwEmailMessage> targets) async {
+    if (targets.isEmpty) return;
+    const folders = [
+      ('Caixa de Entrada', Icons.inbox_outlined),
+      ('Enviadas', Icons.send_outlined),
+      ('Rascunhos', Icons.drafts_outlined),
+      ('Spam', Icons.report_gmailerrorred_outlined),
+      ('Lixeira', Icons.delete_outline),
+    ];
+    final destination = await showDialog<String>(
+      context: context,
+      builder: (dlgCtx) => SimpleDialog(
+        title: Text(
+          targets.length == 1
+              ? 'Mover e-mail para pasta'
+              : 'Mover ${targets.length} e-mails para pasta',
+        ),
+        children: folders.map((item) {
+          return SimpleDialogOption(
+            key: Key('opt_move_folder_${item.$1}'),
+            onPressed: () => Navigator.pop(dlgCtx, item.$1),
+            child: Row(
+              children: [
+                Icon(item.$2, size: 18, color: AppTheme.primaryBlue),
+                const SizedBox(width: 12),
+                Text(item.$1),
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+    );
+    if (destination == null || !mounted) return;
+
+    try {
+      final db = ref.read(repositoryProvider).db;
+      final coordinator = EmailSyncCoordinator(
+        db,
+        jwEmailService: ref.read(jwEmailServiceProvider),
+      );
+      final res = await coordinator.moveMessagesToFolder(
+        targets,
+        targetFolderName: destination,
+      );
+      if (!mounted) return;
+      setState(() {
+        _isEmailSelectionMode = false;
+        _selectedEmailIds.clear();
+        if (targets.any((m) => m.id == _selectedEmailId)) {
+          _stickyOpenedEmailId = null;
+        }
+      });
+      final syncNote = res.remoteSynced > 0
+          ? ' e atualizado no servidor.'
+          : (res.warnings.isNotEmpty
+                ? '. ${res.warnings.first}'
+                : (res.hasReadOnlyAccountNotice
+                      ? ' (movido localmente; servidor Exchange/Hub somente leitura).'
+                      : '.'));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${targets.length} mensagem(ns) movida(s) para "$destination"$syncNote',
+          ),
+          backgroundColor: res.warnings.isNotEmpty
+              ? Colors.orange.shade800
+              : null,
+        ),
+      );
+    } catch (e, st) {
+      AppLogger.warning('Falha ao mover e-mails para $destination', e, st);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao mover pasta: ${_friendlySyncError(e)}'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteEmailsWithConfirm(List<JwEmailMessage> targets) async {
+    if (targets.isEmpty) return;
+    final allInTrash = targets.every((m) => m.folderName == 'Lixeira');
+    final isSingle = targets.length == 1;
     final confirm = await showDialog<bool>(
       context: context,
       builder: (dlgCtx) => AlertDialog(
-        title: const Text('Excluir e-mail?'),
-        content: const Text(
-          'Deseja excluir esta mensagem do aplicativo? Ela será removida das cópias locais.',
+        title: Text(
+          allInTrash
+              ? (isSingle
+                    ? 'Excluir permanentemente?'
+                    : 'Excluir ${targets.length} permanentemente?')
+              : (isSingle
+                    ? 'Excluir e-mail?'
+                    : 'Excluir ${targets.length} e-mails?'),
+        ),
+        content: Text(
+          allInTrash
+              ? 'As mensagens já estão na Lixeira e serão removidas permanentemente do aplicativo e do servidor.'
+              : 'As mensagens serão movidas para a Lixeira local e no servidor conectado.',
         ),
         actions: [
           TextButton(
@@ -6337,6 +6948,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
             child: const Text('Cancelar'),
           ),
           FilledButton(
+            key: const Key('btn_confirm_delete_emails'),
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => Navigator.pop(dlgCtx, true),
             child: const Text('Excluir'),
@@ -6344,14 +6956,52 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
         ],
       ),
     );
-    if (confirm == true) {
-      await ref.read(jwEmailServiceProvider).deleteEmail(msg.id);
-      if (mounted && context.mounted) {
+    if (confirm != true || !mounted) return;
+
+    try {
+      final db = ref.read(repositoryProvider).db;
+      final coordinator = EmailSyncCoordinator(
+        db,
+        jwEmailService: ref.read(jwEmailServiceProvider),
+      );
+      final res = await coordinator.deleteMessages(targets);
+      if (!mounted) return;
+      setState(() {
+        _isEmailSelectionMode = false;
+        _selectedEmailIds.clear();
+        if (targets.any((m) => m.id == _selectedEmailId)) {
+          _selectedEmailId = null;
+          _stickyOpenedEmailId = null;
+        }
+      });
+      final msg = allInTrash
+          ? '${targets.length} e-mail(s) excluído(s) definitivamente.'
+          : '${targets.length} e-mail(s) movido(s) para a Lixeira.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            res.warnings.isNotEmpty ? '$msg ${res.warnings.first}' : msg,
+          ),
+          backgroundColor: res.warnings.isNotEmpty
+              ? Colors.orange.shade800
+              : null,
+        ),
+      );
+    } catch (e, st) {
+      AppLogger.warning('Falha ao excluir e-mails', e, st);
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('E-mail excluído com sucesso.')),
+          SnackBar(
+            content: Text('Erro ao excluir e-mails: ${_friendlySyncError(e)}'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
         );
       }
     }
+  }
+
+  Future<void> _confirmDeleteEmail(JwEmailMessage msg) async {
+    await _deleteEmailsWithConfirm([msg]);
   }
 
   static String _extractLastRecipientToken(String text) {

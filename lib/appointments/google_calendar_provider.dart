@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 
 import '../core/app_logger.dart';
+import '../core/google_sign_in_initializer.dart';
 import '../database/app_database.dart';
 import '../inbox/oauth_token_store.dart';
 import 'calendar_provider.dart';
@@ -118,12 +119,16 @@ class GoogleCalendarProvider implements CalendarProvider {
           _initialized = true;
           return;
         }
-        await _googleSignIn.initialize(clientId: defaultWebClientId);
+        await GoogleSignInInitializer.ensureInitialized(
+          _googleSignIn,
+          clientId: defaultWebClientId,
+        );
         _webUserEmail ??= await _secureStorage.read(key: _keyConnectedEmail);
       } else {
         final isIos = defaultTargetPlatform == TargetPlatform.iOS;
         final iosClientId = defaultIosClientId.trim();
-        await _googleSignIn.initialize(
+        await GoogleSignInInitializer.ensureInitialized(
+          _googleSignIn,
           clientId: isIos && iosClientId.isNotEmpty ? iosClientId : null,
         );
       }
