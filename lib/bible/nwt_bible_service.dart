@@ -615,6 +615,21 @@ class NwtBibleService {
       final archiveFile = filesByPath[path];
       if (archiveFile == null) continue;
 
+      final lowerPath = path.toLowerCase();
+      final isNonChapterNavOrExtract =
+          lowerPath.contains('-extracted') ||
+          RegExp(r'(?:^|/)bible(?:book|chapter|verse)nav')
+              .hasMatch(lowerPath) ||
+          RegExp(r'(?:^|/)(?:toc|nav|cover|pagenav)\.xhtml$')
+              .hasMatch(lowerPath);
+      if (isNonChapterNavOrExtract) {
+        if (idx % 60 == 0) {
+          onProgress?.call(idx + 1, total);
+          await Future<void>.delayed(Duration.zero);
+        }
+        continue;
+      }
+
       final tocHint = tocLabelsByHref[path];
       final xhtmlContent = _decodeFileUtf8(archiveFile);
       _extractBibleFromXhtml(
@@ -716,6 +731,12 @@ class NwtBibleService {
       doc = null;
     }
 
+    if (doc != null) {
+      if (_isNonBibleNavigationOrExtractDocument(doc)) {
+        return;
+      }
+    }
+
     var detectedBook = _inferBookNumber(
       doc: doc,
       filePath: filePath,
@@ -726,61 +747,80 @@ class NwtBibleService {
       filePath: filePath,
       tocTitleHint: tocTitleHint,
     );
+    if (detectedBook != null &&
+        detectedChapter == null &&
+        NwtBibleBooks.byNumber(detectedBook)?.chapterCount == 1) {
+      detectedChapter = 1;
+    }
 
     if (doc != null) {
-      // 1. Padrão JW EPUB / EPUB3: id="chapter43_chapter3" / "v43-3-16" / "v16" + <span class="verse"> ou <sup>
-      final versesFound = <int, String>{};
-      final verseElements = doc.descendants.whereType<XmlElement>().where((el) {
-        final cls = (el.getAttribute('class') ?? '').toLowerCase();
-        final id = (el.getAttribute('id') ?? '').toLowerCase();
-        return cls.contains('verse') ||
-            RegExp(r'^v\d+(-\d+-\d+)?$').hasMatch(id);
-      });
+      final body = doc.findAllElements('body').firstOrNull ?? doc.rootElement;
+      final hasChapterVerseMarkers = body.descendants
+          .whereType<XmlElement>()
+          .any(
+            (el) => RegExp(
+              r'^chapter\d+_verse\d+$',
+              caseSensitive: false,
+            ).hasMatch(el.getAttribute('id') ?? ''),
+          );
 
-      for (final el in verseElements) {
-        final id = el.getAttribute('id') ?? '';
-        final tripleMatch = RegExp(r'(\d{1,2})[-_](\d{1,3})[-_](\d{1,3})$')
-            .firstMatch(id);
-        if (tripleMatch != null) {
-          detectedBook ??= int.tryParse(tripleMatch.group(1)!);
-          detectedChapter ??= int.tryParse(tripleMatch.group(2)!);
-          final vNum = int.tryParse(tripleMatch.group(3)!);
-          if (vNum != null) {
+      if (!hasChapterVerseMarkers) {
+        // 1. Padrão EPUB simplificado: <span class="verse"> / id="v43-3-16" / id="v16"
+        final versesFound = <int, String>{};
+        final verseElements = doc.descendants.whereType<XmlElement>().where((
+          el,
+        ) {
+          final cls = (el.getAttribute('class') ?? '').toLowerCase();
+          final id = (el.getAttribute('id') ?? '').toLowerCase();
+          return cls.contains('verse') ||
+              RegExp(r'^v\d+(-\d+-\d+)?$').hasMatch(id);
+        });
+
+        for (final el in verseElements) {
+          final id = el.getAttribute('id') ?? '';
+          final tripleMatch = RegExp(r'(\d{1,2})[-_](\d{1,3})[-_](\d{1,3})$')
+              .firstMatch(id);
+          if (tripleMatch != null) {
+            detectedBook ??= int.tryParse(tripleMatch.group(1)!);
+            detectedChapter ??= int.tryParse(tripleMatch.group(2)!);
+            final vNum = int.tryParse(tripleMatch.group(3)!);
+            if (vNum != null) {
+              final text = _cleanVerseElementText(el, vNum);
+              if (text.isNotEmpty) {
+                versesFound[vNum] = _appendText(versesFound[vNum], text);
+              }
+            }
+            continue;
+          }
+
+          final supNum = _extractSupNumber(el);
+          final idNumMatch = RegExp(r'(\d{1,3})$').firstMatch(id);
+          final vNum =
+              supNum ??
+              (idNumMatch != null ? int.tryParse(idNumMatch.group(1)!) : null);
+          if (vNum != null && vNum >= 1 && vNum <= 176) {
             final text = _cleanVerseElementText(el, vNum);
             if (text.isNotEmpty) {
               versesFound[vNum] = _appendText(versesFound[vNum], text);
             }
           }
-          continue;
         }
 
-        final supNum = _extractSupNumber(el);
-        final idNumMatch = RegExp(r'(\d{1,3})$').firstMatch(id);
-        final vNum =
-            supNum ??
-            (idNumMatch != null ? int.tryParse(idNumMatch.group(1)!) : null);
-        if (vNum != null && vNum >= 1 && vNum <= 176) {
-          final text = _cleanVerseElementText(el, vNum);
-          if (text.isNotEmpty) {
-            versesFound[vNum] = _appendText(versesFound[vNum], text);
+        if (versesFound.isNotEmpty &&
+            detectedBook != null &&
+            detectedChapter != null) {
+          final bookMap = outBooks.putIfAbsent(detectedBook, () => {});
+          final chMap = bookMap.putIfAbsent(detectedChapter, () => {});
+          for (final entry in versesFound.entries) {
+            chMap[entry.key] = _appendText(chMap[entry.key], entry.value);
           }
+          return;
         }
       }
 
-      if (versesFound.isNotEmpty &&
-          detectedBook != null &&
-          detectedChapter != null) {
-        final bookMap = outBooks.putIfAbsent(detectedBook, () => {});
-        final chMap = bookMap.putIfAbsent(detectedChapter, () => {});
-        for (final entry in versesFound.entries) {
-          chMap[entry.key] = _appendText(chMap[entry.key], entry.value);
-        }
-        return;
-      }
-
-      // 2. Padrão JW EPUB alternativa: parágrafos contendo <span id="v43003016"> / <strong><sup>16</sup></strong>
+      // 2. Padrão JW EPUB oficial: <span id="chapterX_verseY">, <span class="w_ch">,
+      // <strong><sup>N</sup></strong>, parágrafos contínuos (.sb/.sl/.sz) ou <span id="v43003016">
       if (detectedBook != null && detectedChapter != null) {
-        final body = doc.findAllElements('body').firstOrNull ?? doc.rootElement;
         final fallbackVerses = _parseParagraphMarkerVerses(body);
         if (fallbackVerses.isNotEmpty) {
           final bookMap = outBooks.putIfAbsent(detectedBook, () => {});
@@ -793,36 +833,155 @@ class NwtBibleService {
     }
   }
 
+  static bool _isNonBibleNavigationOrExtractDocument(XmlDocument doc) {
+    for (final div in doc.findAllElements('div')) {
+      final cls = (div.getAttribute('class') ?? '').toLowerCase();
+      final tokens = cls.split(RegExp(r'\s+'));
+      if (tokens.contains('groupext')) {
+        return true;
+      }
+    }
+    for (final p in doc.findAllElements('p')) {
+      final cls = (p.getAttribute('class') ?? '').toLowerCase();
+      final tokens = cls.split(RegExp(r'\s+'));
+      if (tokens.contains('w_biblebook') ||
+          tokens.contains('w_biblechapter') ||
+          tokens.contains('w_bibleverse')) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   static Map<int, String> _parseParagraphMarkerVerses(XmlElement root) {
     final result = <int, String>{};
-    for (final p in root.findAllElements('p')) {
+    int? currentVerse;
+    final buf = StringBuffer();
+    var needParagraphSpace = false;
+
+    void flush() {
+      if (currentVerse != null) {
+        final t = _normalizeWhitespace(
+          buf.toString().replaceAll(RegExp(r'[\u00A0\u202F\u200B]'), ' '),
+        );
+        if (t.isNotEmpty) {
+          result[currentVerse!] = _appendText(result[currentVerse!], t);
+        }
+      }
+      buf.clear();
+    }
+
+    bool isIgnoredParagraph(XmlElement p) {
       final cls = (p.getAttribute('class') ?? '').toLowerCase();
-      if (cls.contains('qu') ||
-          cls.contains('fn') ||
-          cls.contains('footnote')) {
+      final tokens = cls
+          .split(RegExp(r'\s+'))
+          .where((t) => t.isNotEmpty)
+          .toSet();
+      const skipParagraphClasses = <String>{
+        'qu',
+        'fn',
+        'footnote',
+        'w_navigation',
+        'w_biblebookname',
+        'docnav',
+        'contextttl',
+        'ss',
+        'st',
+        'sd',
+        'sw',
+      };
+      if (tokens.any(skipParagraphClasses.contains)) {
+        return true;
+      }
+      XmlNode? parent = p.parent;
+      while (parent is XmlElement) {
+        final pTag = parent.name.local.toLowerCase();
+        if (pTag == 'header' ||
+            pTag == 'nav' ||
+            pTag == 'aside' ||
+            pTag == 'figure' ||
+            pTag == 'figcaption') {
+          return true;
+        }
+        final pCls = (parent.getAttribute('class') ?? '').toLowerCase();
+        if (pCls.contains('groupfootnote') ||
+            pCls.contains('groupext') ||
+            pCls.contains('footnote') ||
+            pCls.contains('docnav')) {
+          return true;
+        }
+        if (parent.attributes.any(
+          (a) =>
+              a.name.local.toLowerCase() == 'type' &&
+              (a.value.toLowerCase() == 'footnote' ||
+                  a.value.toLowerCase() == 'noteref'),
+        )) {
+          return true;
+        }
+        parent = parent.parent;
+      }
+      return false;
+    }
+
+    for (final p in root.findAllElements('p')) {
+      if (isIgnoredParagraph(p)) {
         continue;
       }
-      int? currentVerse;
-      final buf = StringBuffer();
-
-      void flush() {
-        if (currentVerse != null) {
-          final t = _normalizeWhitespace(buf.toString());
-          if (t.isNotEmpty) {
-            result[currentVerse!] = _appendText(result[currentVerse!], t);
-          }
-        }
-        buf.clear();
-      }
+      needParagraphSpace = currentVerse != null;
 
       void walk(XmlNode node) {
         if (node is XmlElement) {
+          final tag = node.name.local.toLowerCase();
+          if (tag == 'aside' || tag == 'header' || tag == 'nav') {
+            return;
+          }
           final id = (node.getAttribute('id') ?? '').toLowerCase();
           final elCls = (node.getAttribute('class') ?? '').toLowerCase();
-          if (node.name.local == 'sup' ||
-              elCls.contains('versenum') ||
-              elCls.contains('vl') ||
-              (elCls.contains('chapter') && id.startsWith('chapter')) ||
+          final elTokens = elCls
+              .split(RegExp(r'\s+'))
+              .where((t) => t.isNotEmpty)
+              .toSet();
+
+          if (elTokens.contains('w_ch') ||
+              elTokens.contains('pagenum') ||
+              elTokens.contains('fn') ||
+              elTokens.contains('footnote') ||
+              elTokens.contains('groupfootnote') ||
+              node.getAttribute('aria-hidden') == 'true') {
+            return;
+          }
+
+          if (node.attributes.any(
+            (a) =>
+                a.name.local.toLowerCase() == 'type' &&
+                (a.value.toLowerCase() == 'footnote' ||
+                    a.value.toLowerCase() == 'noteref'),
+          )) {
+            return;
+          }
+
+          final chapterVerseMatch = RegExp(
+            r'^chapter\d+_verse(\d+)$',
+            caseSensitive: false,
+          ).firstMatch(id);
+          if (chapterVerseMatch != null) {
+            final v = int.tryParse(chapterVerseMatch.group(1)!);
+            if (v != null && v >= 1 && v <= 176) {
+              flush();
+              currentVerse = v;
+              needParagraphSpace = false;
+              result.putIfAbsent(v, () => '');
+            }
+            for (final child in node.children) {
+              walk(child);
+            }
+            return;
+          }
+
+          if (tag == 'sup' ||
+              elTokens.contains('versenum') ||
+              elTokens.contains('vl') ||
+              (elTokens.contains('chapter') && id.startsWith('chapter')) ||
               RegExp(r'^v\d{6,9}$').hasMatch(id)) {
             final numCandidate = int.tryParse(
               node.innerText.replaceAll(RegExp(r'[^0-9]'), ''),
@@ -832,30 +991,43 @@ class NwtBibleService {
                 numCandidate <= 176) {
               flush();
               currentVerse = numCandidate;
+              needParagraphSpace = false;
+              result.putIfAbsent(numCandidate, () => '');
               return;
             }
           }
+
           // Ignora marcadores de rodapé/referência cruzada (+, *)
-          if (node.name.local == 'a' &&
-              (elCls.contains('fn') ||
-                  elCls.contains('footnote') ||
+          if (tag == 'a' &&
+              (elTokens.contains('fn') ||
+                  elTokens.contains('footnote') ||
+                  elTokens.contains('noteref') ||
+                  (node.getAttribute('href')?.startsWith('#footnote') ??
+                      false) ||
                   node.innerText.trim() == '*' ||
                   node.innerText.trim() == '+')) {
             return;
           }
+
           for (final child in node.children) {
             walk(child);
           }
         } else if (node is XmlText) {
           if (currentVerse != null) {
-            buf.write(node.value);
+            final txt = node.value;
+            if (needParagraphSpace && txt.trim().isNotEmpty) {
+              buf.write(' ');
+              needParagraphSpace = false;
+            }
+            buf.write(txt);
           }
         }
       }
 
       walk(p);
-      flush();
     }
+    flush();
+    result.removeWhere((_, v) => v.trim().isEmpty);
     return result;
   }
 
@@ -929,9 +1101,21 @@ class NwtBibleService {
     }
 
     if (doc != null) {
+      for (final p in doc.findAllElements('p')) {
+        final cls = (p.getAttribute('class') ?? '').toLowerCase();
+        if (cls.contains('w_biblebookname')) {
+          final bookLink = p.findElements('a').firstOrNull;
+          if (bookLink != null) {
+            final found = NwtBibleBooks.findByQuery(bookLink.innerText);
+            if (found != null) return found.number;
+          }
+        }
+      }
       for (final tag in const ['title', 'h1', 'h2']) {
         for (final el in doc.findAllElements(tag)) {
-          final found = NwtBibleBooks.findByQuery(el.innerText);
+          final txt = el.innerText.trim();
+          if (txt.toLowerCase().startsWith('textos extraídos:')) continue;
+          final found = NwtBibleBooks.findByQuery(txt);
           if (found != null) return found.number;
         }
       }
@@ -944,6 +1128,29 @@ class NwtBibleService {
     required String filePath,
     String? tocTitleHint,
   }) {
+    if (doc != null) {
+      for (final p in doc.findAllElements('p')) {
+        final cls = (p.getAttribute('class') ?? '').toLowerCase();
+        if (cls.contains('w_biblebookname')) {
+          for (final a in p.findElements('a')) {
+            final href = (a.getAttribute('href') ?? '').toLowerCase();
+            if (href.contains('biblechapternav')) {
+              final ch = int.tryParse(a.innerText.trim());
+              if (ch != null && ch >= 1 && ch <= 150) return ch;
+            }
+          }
+        }
+      }
+      for (final el in doc.descendants.whereType<XmlElement>()) {
+        final id = (el.getAttribute('id') ?? '').toLowerCase();
+        final chMatch = RegExp(r'^chapter(\d+)(?:_verse\d+)?$').firstMatch(id);
+        if (chMatch != null) {
+          final ch = int.tryParse(chMatch.group(1)!);
+          if (ch != null && ch >= 1 && ch <= 150) return ch;
+        }
+      }
+    }
+
     if (tocTitleHint != null && tocTitleHint.isNotEmpty) {
       final m = RegExp(r'(\d{1,3})\s*$').firstMatch(tocTitleHint.trim());
       if (m != null) {
@@ -1148,7 +1355,10 @@ class NwtBibleService {
   }
 
   static String _normalizeWhitespace(String raw) {
-    return raw.replaceAll(RegExp(r'\s+'), ' ').trim();
+    return raw
+        .replaceAll(RegExp(r'[\u00A0\u202F\u200B]'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
   }
 
   static String _appendText(String? existing, String addition) {

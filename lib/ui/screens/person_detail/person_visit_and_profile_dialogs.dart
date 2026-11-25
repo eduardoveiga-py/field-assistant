@@ -19,6 +19,9 @@ extension _PersonDetailVisitAndProfileDialogs on _PersonDetailScreenState {
       context: context,
       builder: (ctx) => ManagedTextControllers(
         initialTexts: const [''],
+        customFactories: [
+          (text) => RichFormattedEditingController.fromMarkup(text),
+        ],
         builder: (ctx, ctrls) {
           final notesController = ctrls[0];
 
@@ -167,13 +170,20 @@ extension _PersonDetailVisitAndProfileDialogs on _PersonDetailScreenState {
                       },
                     ),
                     const SizedBox(height: 12),
+                    RichMarkdownToolbar(
+                      controller: notesController,
+                      enableHighlightPalette: false,
+                      enableImagePicker: false,
+                      enableCrossReferences: true,
+                    ),
+                    const SizedBox(height: 6),
                     TextField(
                       controller: notesController,
                       decoration: const InputDecoration(
                         labelText: 'Observação complementar (opcional)',
                         hintText: 'Ex: Deixou portas abertas para uma ocasião futura...',
                       ),
-                      maxLines: 2,
+                      maxLines: 3,
                     ),
                   ],
                 ),
@@ -189,7 +199,10 @@ extension _PersonDetailVisitAndProfileDialogs on _PersonDetailScreenState {
                     foregroundColor: Colors.black,
                   ),
                   onPressed: () async {
-                    final extraNotes = notesController.text.trim();
+                    final extraNotes =
+                        RichFormattedEditingController.readMarkup(
+                          notesController,
+                        ).trim();
                     final coordinator = ref.read(
                       scheduleReleaseCoordinatorProvider,
                     );
@@ -1030,6 +1043,13 @@ extension _PersonDetailVisitAndProfileDialogs on _PersonDetailScreenState {
               ? '${existingStudy!.currentParagraph}'
               : '1-5',
         ],
+        customFactories: [
+          (text) => RichFormattedEditingController.fromMarkup(text),
+          (text) => RichFormattedEditingController.fromMarkup(text),
+          (text) => RichFormattedEditingController.fromMarkup(text),
+          null,
+          null,
+        ],
         builder: (ctx, ctrls) {
           final notesController = ctrls[0];
           final topicsController = ctrls[1];
@@ -1038,9 +1058,15 @@ extension _PersonDetailVisitAndProfileDialogs on _PersonDetailScreenState {
           final paragraphsController = ctrls[4];
           void updateDraft() {
             _PersonDetailScreenState._quickVisitDrafts[person.id] = {
-              'notes': notesController.text,
-              'topics': topicsController.text,
-              'nextStep': nextStepController.text,
+              'notes': RichFormattedEditingController.readMarkup(
+                notesController,
+              ),
+              'topics': RichFormattedEditingController.readMarkup(
+                topicsController,
+              ),
+              'nextStep': RichFormattedEditingController.readMarkup(
+                nextStepController,
+              ),
               'type': selectedType,
               'recordStudy': recordStudy,
             };
@@ -1422,12 +1448,35 @@ extension _PersonDetailVisitAndProfileDialogs on _PersonDetailScreenState {
 
                       TextField(
                         controller: topicsController,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'Ponto Bíblico / Assunto considerado',
                           hintText: 'Ex: Mateus 24:14 ou Lição 02',
+                          suffixIcon: IconButton(
+                            icon: const Icon(
+                              Icons.bookmark_add_outlined,
+                              size: 19,
+                              color: AppTheme.primaryBlue,
+                            ),
+                            tooltip: 'Inserir referência (TNM ou Abas do App)',
+                            onPressed: () =>
+                                RichMarkdownToolbar.pickAndInsertReference(
+                                  ctx,
+                                  db: ref.read(databaseProvider),
+                                  controller: topicsController,
+                                  onChanged: updateDraft,
+                                ),
+                          ),
                         ),
                       ),
                       const SizedBox(height: 12),
+                      RichMarkdownToolbar(
+                        controller: notesController,
+                        enableHighlightPalette: false,
+                        enableImagePicker: false,
+                        enableCrossReferences: true,
+                        onChanged: updateDraft,
+                      ),
+                      const SizedBox(height: 6),
                       TextField(
                         controller: notesController,
                         decoration: const InputDecoration(
@@ -1435,15 +1484,30 @@ extension _PersonDetailVisitAndProfileDialogs on _PersonDetailScreenState {
                           hintText:
                               'Dúvidas expressas pelo morador, comentários...',
                         ),
-                        maxLines: 2,
+                        maxLines: 3,
                       ),
                       const SizedBox(height: 12),
                       TextField(
                         controller: nextStepController,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'Próximo passo / Próximo estudo combinado',
                           hintText:
                               'Ex: Responder por que Deus permite o sofrimento',
+                          suffixIcon: IconButton(
+                            icon: const Icon(
+                              Icons.bookmark_add_outlined,
+                              size: 19,
+                              color: AppTheme.primaryBlue,
+                            ),
+                            tooltip: 'Inserir referência (TNM ou Abas do App)',
+                            onPressed: () =>
+                                RichMarkdownToolbar.pickAndInsertReference(
+                                  ctx,
+                                  db: ref.read(databaseProvider),
+                                  controller: nextStepController,
+                                  onChanged: updateDraft,
+                                ),
+                          ),
                         ),
                       ),
                       const SizedBox(height: 14),
@@ -1558,30 +1622,37 @@ extension _PersonDetailVisitAndProfileDialogs on _PersonDetailScreenState {
                             }
 
                             // 2. Registro da Visita (Atômico)
+                            final rawNotes =
+                                RichFormattedEditingController.readMarkup(
+                                  notesController,
+                                ).trim();
+                            final rawTopics =
+                                RichFormattedEditingController.readMarkup(
+                                  topicsController,
+                                ).trim();
+                            final rawNextStep =
+                                RichFormattedEditingController.readMarkup(
+                                  nextStepController,
+                                ).trim();
                             final formattedNotes = isStudyConsidered
                                 ? DashboardCalculator.formatSessionNotesWithAttendance(
-                                    notesController.text.trim().isEmpty
-                                        ? null
-                                        : notesController.text.trim(),
+                                    rawNotes.isEmpty ? null : rawNotes,
                                     attendanceCount,
                                   )
-                                : (notesController.text.trim().isEmpty
-                                      ? null
-                                      : notesController.text.trim());
+                                : (rawNotes.isEmpty ? null : rawNotes);
 
                             await repo.createVisit(
                               personId: person.id,
                               dateTime: selectedDate,
                               contactType: selectedType,
                               result: selectedResult,
-                              topicsDiscussed:
-                                  topicsController.text.trim().isEmpty
+                              topicsDiscussed: rawTopics.isEmpty
                                   ? null
-                                  : topicsController.text.trim(),
+                                  : rawTopics,
                               notes: formattedNotes,
-                              nextStep: nextStepController.text.trim().isEmpty
+                              nextStep: rawNextStep.isEmpty
                                   ? null
-                                  : nextStepController.text.trim(),
+                                  : rawNextStep,
                               suggestedReturnDate: scheduleReturn
                                   ? returnDateTime
                                   : null,
@@ -1621,9 +1692,9 @@ extension _PersonDetailVisitAndProfileDialogs on _PersonDetailScreenState {
                                 lessonCovered: lesson,
                                 paragraphsCovered: paraText,
                                 sessionNotes: formattedNotes,
-                                nextStep: nextStepController.text.trim().isEmpty
+                                nextStep: rawNextStep.isEmpty
                                     ? null
-                                    : nextStepController.text.trim(),
+                                    : rawNextStep,
                                 status: 'realizada',
                                 participantIds: [person.id],
                               );
@@ -2045,6 +2116,9 @@ extension _PersonDetailVisitAndProfileDialogs on _PersonDetailScreenState {
       context: context,
       builder: (ctx) => ManagedTextControllers(
         initialTexts: [noteToEdit?['text'] ?? ''],
+        customFactories: [
+          (text) => RichFormattedEditingController.fromMarkup(text),
+        ],
         builder: (ctx, ctrls) {
           final textController = ctrls[0];
 
@@ -2073,6 +2147,13 @@ extension _PersonDetailVisitAndProfileDialogs on _PersonDetailScreenState {
                     ),
                   ),
                   const SizedBox(height: 12),
+                  RichMarkdownToolbar(
+                    controller: textController,
+                    enableHighlightPalette: false,
+                    enableImagePicker: false,
+                    enableCrossReferences: true,
+                  ),
+                  const SizedBox(height: 6),
                   TextField(
                     controller: textController,
                     decoration: const InputDecoration(
@@ -2116,7 +2197,9 @@ extension _PersonDetailVisitAndProfileDialogs on _PersonDetailScreenState {
                   foregroundColor: Colors.white,
                 ),
                 onPressed: () async {
-                  final text = textController.text.trim();
+                  final text = RichFormattedEditingController.readMarkup(
+                    textController,
+                  ).trim();
                   if (text.isEmpty) return;
 
                   final currentNotes = _parseNotes(person.generalNotes);
@@ -2173,6 +2256,9 @@ extension _PersonDetailVisitAndProfileDialogs on _PersonDetailScreenState {
       context: context,
       builder: (ctx) => ManagedTextControllers(
         initialTexts: [targetToEdit?['title'] ?? ''],
+        customFactories: [
+          (text) => RichFormattedEditingController.fromMarkup(text),
+        ],
         builder: (ctx, ctrls) {
           final titleController = ctrls[0];
 
@@ -2201,6 +2287,13 @@ extension _PersonDetailVisitAndProfileDialogs on _PersonDetailScreenState {
                     ),
                   ),
                   const SizedBox(height: 12),
+                  RichMarkdownToolbar(
+                    controller: titleController,
+                    enableHighlightPalette: false,
+                    enableImagePicker: false,
+                    enableCrossReferences: true,
+                  ),
+                  const SizedBox(height: 6),
                   TextField(
                     controller: titleController,
                     decoration: const InputDecoration(
@@ -2244,7 +2337,9 @@ extension _PersonDetailVisitAndProfileDialogs on _PersonDetailScreenState {
                   foregroundColor: Colors.white,
                 ),
                 onPressed: () async {
-                  final title = titleController.text.trim();
+                  final title = RichFormattedEditingController.readMarkup(
+                    titleController,
+                  ).trim();
                   if (title.isEmpty) return;
 
                   final currentTargets = _parseTargets(

@@ -29,6 +29,7 @@ class RichMarkdownToolbar extends StatefulWidget {
   final VoidCallback? onChanged;
   final bool enableHighlightPalette;
   final bool enableCrossReferences;
+  final bool enableImagePicker;
   final AppRefCategory initialReferenceCategory;
   final ValueChanged<AppReferencePickResult>? onReferenceInserted;
 
@@ -38,9 +39,52 @@ class RichMarkdownToolbar extends StatefulWidget {
     this.onChanged,
     this.enableHighlightPalette = true,
     this.enableCrossReferences = true,
+    this.enableImagePicker = true,
     this.initialReferenceCategory = AppRefCategory.question,
     this.onReferenceInserted,
   });
+
+  /// Abre o seletor de referências cruzadas (`📖` TNM / `🔖` Abas) diretamente
+  /// para qualquer [TextEditingController], mantendo a edição WYSIWYG limpa.
+  static Future<AppReferencePickResult?> pickAndInsertReference(
+    BuildContext context, {
+    required AppDatabase db,
+    required TextEditingController controller,
+    AppRefCategory initialCategory = AppRefCategory.bible,
+    VoidCallback? onChanged,
+  }) async {
+    final picked = await showAppReferencePickerDialog(
+      context,
+      db: db,
+      initialCategory: initialCategory,
+    );
+    if (picked == null) return null;
+
+    final linkMatch = RegExp(r'^\[([^\]]+)\]\(([^)]+)\)$')
+        .firstMatch(picked.markdownToken.trim());
+    final pickedLabel = linkMatch != null
+        ? linkMatch.group(1)!
+        : (picked.candidate?.title ?? 'Referência');
+    final pickedUrl = linkMatch != null
+        ? linkMatch.group(2)!
+        : (picked.candidate?.buildUri() ?? '');
+
+    if (controller is RichFormattedEditingController && pickedUrl.isNotEmpty) {
+      controller.insertLink(label: pickedLabel, url: pickedUrl);
+    } else {
+      final sel = controller.selection;
+      final cur = controller.text;
+      final start = (sel.isValid ? sel.start : cur.length).clamp(0, cur.length);
+      final end = (sel.isValid ? sel.end : cur.length).clamp(start, cur.length);
+      final token = '${picked.markdownToken.trim()} ';
+      controller.value = TextEditingValue(
+        text: cur.replaceRange(start, end, token),
+        selection: TextSelection.collapsed(offset: start + token.length),
+      );
+    }
+    onChanged?.call();
+    return picked;
+  }
 
   @override
   State<RichMarkdownToolbar> createState() => _RichMarkdownToolbarState();
@@ -541,6 +585,7 @@ class _RichMarkdownToolbarState extends State<RichMarkdownToolbar> {
                     ),
                     const VerticalDivider(width: 16, indent: 8, endIndent: 8),
                     _toolbarButton(
+                      key: const Key('btn_toolbar_insert_bible'),
                       icon: Icons.menu_book_outlined,
                       tooltip: widget.enableCrossReferences
                           ? 'Referência Bíblica TNM (Popup)'
@@ -572,12 +617,13 @@ class _RichMarkdownToolbarState extends State<RichMarkdownToolbar> {
                         onTap: () => _showColorPicker(context),
                       ),
                     const VerticalDivider(width: 16, indent: 8, endIndent: 8),
-                    _toolbarButton(
-                      key: const Key('btn_toolbar_insert_image'),
-                      icon: Icons.add_photo_alternate_outlined,
-                      tooltip: 'Inserir Imagem (Dispositivo ou Gravuras)',
-                      onTap: () => _showImagePickerDialog(context),
-                    ),
+                    if (widget.enableImagePicker)
+                      _toolbarButton(
+                        key: const Key('btn_toolbar_insert_image'),
+                        icon: Icons.add_photo_alternate_outlined,
+                        tooltip: 'Inserir Imagem (Dispositivo ou Gravuras)',
+                        onTap: () => _showImagePickerDialog(context),
+                      ),
                     _toolbarButton(
                       icon: Icons.link_rounded,
                       tooltip: 'Inserir Link / Publicação',

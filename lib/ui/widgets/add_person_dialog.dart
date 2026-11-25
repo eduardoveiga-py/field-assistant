@@ -10,6 +10,8 @@ import '../../territory/sector_manager.dart';
 import '../providers.dart';
 import 'managed_text_controllers.dart';
 import 'map_location_picker_dialog.dart';
+import 'rich_formatted_editing_controller.dart';
+import 'rich_markdown_toolbar.dart';
 
 /// Abre diretamente o formulário modal de cadastro de novo contato / nova pessoa.
 Future<void> showAddPersonDialog(BuildContext context, WidgetRef ref) async {
@@ -25,6 +27,17 @@ Future<void> showAddPersonDialog(BuildContext context, WidgetRef ref) async {
     context: context,
     builder: (ctx) => ManagedTextControllers(
       initialTexts: const ['', '', '', '', '', 'Sábado às 09:00', '', '', ''],
+      customFactories: [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        (text) => RichFormattedEditingController.fromMarkup(text),
+      ],
       builder: (ctx, ctrls) {
         final nameController = ctrls[0];
         final phoneController = ctrls[1];
@@ -554,6 +567,13 @@ Future<void> showAddPersonDialog(BuildContext context, WidgetRef ref) async {
                     ),
                   ),
                   const SizedBox(height: 12),
+                  RichMarkdownToolbar(
+                    controller: notesController,
+                    enableHighlightPalette: false,
+                    enableImagePicker: false,
+                    enableCrossReferences: true,
+                  ),
+                  const SizedBox(height: 6),
                   TextField(
                     controller: notesController,
                     decoration: const InputDecoration(
@@ -562,7 +582,7 @@ Future<void> showAddPersonDialog(BuildContext context, WidgetRef ref) async {
                       hintText:
                           'Ex: Família receptiva, dúvidas sobre a Bíblia...',
                     ),
-                    maxLines: 2,
+                    maxLines: 3,
                   ),
                 ],
               ),
@@ -607,6 +627,9 @@ Future<void> showAddPersonDialog(BuildContext context, WidgetRef ref) async {
                   final lng = double.tryParse(lngController.text.trim());
 
                   final repo = ref.read(repositoryProvider);
+                  final notesMarkup = RichFormattedEditingController.readMarkup(
+                    notesController,
+                  ).trim();
                   await repo.createPerson(
                     name: name,
                     phone: phoneController.text.trim().isEmpty
@@ -621,9 +644,7 @@ Future<void> showAddPersonDialog(BuildContext context, WidgetRef ref) async {
                     preferredSchedule: scheduleController.text.trim().isEmpty
                         ? null
                         : scheduleController.text.trim(),
-                    generalNotes: notesController.text.trim().isEmpty
-                        ? null
-                        : notesController.text.trim(),
+                    generalNotes: notesMarkup.isEmpty ? null : notesMarkup,
                   );
 
                   if (ctx.mounted) Navigator.pop(ctx);

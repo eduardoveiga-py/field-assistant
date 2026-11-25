@@ -7,6 +7,7 @@ import '../../contacts/doorstep_briefing_helper.dart';
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
 import '../../voice_notes/audio_recording_service.dart';
+import 'markdown_preview_text.dart';
 
 /// Card de visualização ultrarrápida (30 segundos) para preparação imediata
 /// na calçada ou porta do morador/estudante bíblico.
@@ -262,8 +263,8 @@ class _DoorstepBriefingCardState extends State<DoorstepBriefingCard> {
           ),
           if (transcription != null && transcription.isNotEmpty) ...[
             const SizedBox(height: 8),
-            Text(
-              '"$transcription"',
+            MarkdownPreviewText(
+              text: '"$transcription"',
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
@@ -473,8 +474,8 @@ class _DoorstepBriefingCardState extends State<DoorstepBriefingCard> {
           ),
           const SizedBox(height: 6),
           if (hasContent) ...[
-            Text(
-              data.lessonAndPoint!,
+            MarkdownPreviewText(
+              text: data.lessonAndPoint!,
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: isSunMode ? FontWeight.w900 : FontWeight.bold,
@@ -624,8 +625,8 @@ class _DoorstepBriefingCardState extends State<DoorstepBriefingCard> {
           ),
           const SizedBox(height: 5),
           if (hasContent)
-            Text(
-              content.trim(),
+            MarkdownPreviewText(
+              text: content.trim(),
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(

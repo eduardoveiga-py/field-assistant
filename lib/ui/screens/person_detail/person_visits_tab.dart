@@ -115,8 +115,8 @@ extension _PersonDetailVisitsTab on _PersonDetailScreenState {
                             ),
                           ),
                           const SizedBox(height: 2),
-                          Text(
-                            person.nextActionNote ?? 'Esta revisita foi encerrada, mas todo o histórico está preservado.',
+                          MarkdownPreviewText(
+                            text: person.nextActionNote ?? 'Esta revisita foi encerrada, mas todo o histórico está preservado.',
                             style: const TextStyle(
                               fontSize: 12,
                               color: Color(0xFF78350F),

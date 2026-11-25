@@ -4,6 +4,7 @@ import '../../../core/app_theme.dart';
 import '../../../core/date_utils.dart';
 import '../../../database/app_database.dart';
 import '../../../publications/publication_catalog.dart';
+import '../markdown_preview_text.dart';
 
 /// Painel de detalhe lateral exibido no modo iPad Master-Detail (>= 900px)
 /// da tela de Estudos Bíblicos, reunindo progresso, sessões recentes e ações rápidas.
@@ -304,14 +305,18 @@ class StudyDetailPane extends StatelessWidget {
                         Text('Parágrafos: ${session.paragraphsCovered}'),
                       if (session.sessionNotes != null &&
                           session.sessionNotes!.isNotEmpty)
-                        Text(session.sessionNotes!),
+                        MarkdownPreviewText(
+                          text: session.sessionNotes!,
+                          style: const TextStyle(fontSize: 13),
+                        ),
                       if (session.nextStep != null &&
                           session.nextStep!.isNotEmpty)
-                        Text(
-                          'Próximo passo: ${session.nextStep}',
+                        MarkdownPreviewText(
+                          text: 'Próximo passo: ${session.nextStep}',
                           style: const TextStyle(
                             color: AppTheme.primaryBlue,
                             fontWeight: FontWeight.w500,
+                            fontSize: 13,
                           ),
                         ),
                     ],

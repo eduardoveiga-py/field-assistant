@@ -23,6 +23,7 @@ import '../widgets/screen_hero_accent_band.dart';
 import '../widgets/add_person_dialog.dart';
 import '../widgets/managed_text_controllers.dart';
 import '../widgets/person_deletion_dialog.dart';
+import '../../inbox/email_html_sanitizer.dart';
 
 export '../widgets/add_person_dialog.dart';
 
@@ -1575,14 +1576,29 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
                                           ),
                                           const SizedBox(width: 6),
                                           Expanded(
-                                            child: Text(
-                                              'Próxima ação: ${AppDateUtils.formatDate(person.nextActionAt)} — ${person.nextActionNote ?? "Sem anotação"}',
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                color: isDark
-                                                    ? const Color(0xFFFDE68A)
-                                                    : const Color(0xFF92400E),
-                                              ),
+                                            child: Builder(
+                                              builder: (_) {
+                                                final rawNote =
+                                                    person.nextActionNote ??
+                                                    'Sem anotação';
+                                                final cleanNote =
+                                                    EmailHtmlSanitizer.stripMarkdown(
+                                                      rawNote,
+                                                    ).trim();
+                                                return Text(
+                                                  'Próxima ação: ${AppDateUtils.formatDate(person.nextActionAt)} — ${cleanNote.isEmpty ? "Sem anotação" : cleanNote}',
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    color: isDark
+                                                        ? const Color(
+                                                            0xFFFDE68A,
+                                                          )
+                                                        : const Color(
+                                                            0xFF92400E,
+                                                          ),
+                                                  ),
+                                                );
+                                              },
                                             ),
                                           ),
                                         ],

@@ -87,22 +87,16 @@ class LffBookCatalog {
   ];
 
   static const List<LffEndnoteInfo> endnotes = [
+    LffEndnoteInfo(number: 1, title: 'Quem é Babilônia, a Grande?'),
+    LffEndnoteInfo(number: 2, title: 'Quando o Messias iria aparecer?'),
     LffEndnoteInfo(
-      number: 1,
-      title: 'O nome de Deus nas Escrituras Hebraicas e Gregas',
+      number: 3,
+      title: 'Procedimentos médicos que envolvam sangue',
     ),
-    LffEndnoteInfo(number: 2, title: 'O que a Bíblia diz sobre a Trindade?'),
-    LffEndnoteInfo(number: 3, title: 'Datas bíblicas e o ano de 1914'),
-    LffEndnoteInfo(number: 4, title: 'Quem são o arcanjo Miguel e Abadom?'),
-    LffEndnoteInfo(number: 5, title: 'Questões médicas envolvendo o sangue'),
-    LffEndnoteInfo(
-      number: 6,
-      title: 'O que a Bíblia diz sobre neutralidade cristã',
-    ),
-    LffEndnoteInfo(
-      number: 7,
-      title: 'Assuntos comerciais e legais entre cristãos',
-    ),
+    LffEndnoteInfo(number: 4, title: 'Separação'),
+    LffEndnoteInfo(number: 5, title: 'Feriados e comemorações'),
+    LffEndnoteInfo(number: 6, title: 'Doenças contagiosas'),
+    LffEndnoteInfo(number: 7, title: 'Assuntos comerciais e jurídicos'),
   ];
 
   static const List<LffLessonInfo> lessons = [
@@ -1474,6 +1468,7 @@ class LffBookCatalog {
 }
 
 /// Catálogo Oficial da Brochura Introdutória "Seja Feliz para Sempre! — Comece a Aprender sobre a Bíblia"
+/// Estrutura oficial verificada diretamente no pacote oficial lffi_T (Lições 01 a 03 completas)
 class LffiBrochureCatalog {
   static const int totalLessons = 3;
 
@@ -1483,51 +1478,59 @@ class LffiBrochureCatalog {
       title: 'Como a Bíblia pode ajudar você?',
       section: 1,
       pointTitles: [
-        '1. A Bíblia pode nos guiar',
-        '2. A Bíblia pode responder às nossas perguntas',
-        '3. A leitura da Bíblia pode ser agradável',
+        '1. Quais são algumas perguntas que a Bíblia responde?',
+        '2. Como a Bíblia pode nos ajudar a ser mais felizes no dia a dia?',
+        '3. A Bíblia pode guiar nosso caminho',
+        '4. A Bíblia pode responder a nossas perguntas',
+        '5. Você pode gostar de ler a Bíblia',
+        '6. Outras pessoas podem nos ajudar a entender a Bíblia',
       ],
-      summary: 'A Bíblia nos dá conselhos práticos para o dia a dia, responde a perguntas importantes e nos dá esperança e consolo.',
+      summary: 'A Bíblia dá conselhos práticos para o dia a dia, responde a perguntas importantes e traz consolo e esperança.',
       reviewQuestions: [
-        'Que tipo de conselhos encontramos na Bíblia?',
+        'Sobre que assuntos a Bíblia dá conselhos?',
         'Quais são algumas perguntas que a Bíblia responde?',
-        'O que você gostaria de aprender na Bíblia?',
+        'O que você gostaria de aprender da Bíblia?',
       ],
-      tryThis:
-          'Leia a primeira parte do programa de leitura da Bíblia desta lição.',
+      tryThis: 'Ler a primeira parte da próxima lição.',
     ),
     LffLessonInfo(
       number: 2,
       title: 'A Bíblia nos dá esperança',
       section: 1,
       pointTitles: [
-        '1. A Bíblia promete que teremos um futuro maravilhoso',
-        '2. A esperança da Bíblia pode fazer a diferença na nossa vida hoje',
-        '3. A esperança da Bíblia nos dá forças para perseverar',
+        '1. Que esperança a Bíblia nos dá?',
+        '2. Qual é a promessa da Bíblia para o futuro?',
+        '3. Como você pode ter certeza de que tudo que a Bíblia diz vai acontecer?',
+        '4. A Bíblia promete que podemos viver para sempre sem sofrimento',
+        '5. As promessas da Bíblia podem fazer a diferença na sua vida',
       ],
-      summary: 'A Bíblia promete que teremos um futuro maravilhoso. Essa esperança nos ajuda a lidar com os problemas hoje.',
+      summary: 'A Bíblia nos dá esperança. E saber que ela promete um futuro feliz nos ajuda a lidar com os problemas.',
       reviewQuestions: [
-        'Que promessas da Bíblia para o futuro você mais gostou?',
-        'Como a esperança da Bíblia pode ajudar você hoje?',
+        'Por que as pessoas precisam de esperança?',
+        'O que a Bíblia diz sobre o futuro?',
+        'Como a esperança da Bíblia pode fazer a diferença na sua vida?',
       ],
-      tryThis: 'Leia os textos bíblicos citados nesta lição e pense em como eles se aplicam a você.',
+      tryThis: 'Ler de novo as passagens bíblicas desta lição para conhecer melhor as promessas da Bíblia.',
     ),
     LffLessonInfo(
       number: 3,
       title: 'Será que você pode acreditar na Bíblia?',
       section: 1,
       pointTitles: [
-        '1. A Bíblia está de acordo com a ciência',
-        '2. A Bíblia relata acontecimentos históricos com exatidão',
-        '3. As profecias da Bíblia se cumprem',
+        '1. Será que as histórias da Bíblia aconteceram mesmo?',
+        '2. Por que podemos dizer que a Bíblia é de confiança apesar de ser tão antiga?',
+        '3. Por que podemos acreditar no que a Bíblia diz para o futuro?',
+        '4. A ciência concorda com a Bíblia',
+        '5. A Bíblia falou com antecedência sobre acontecimentos importantes',
+        '6. A Bíblia já falava sobre as coisas que vemos hoje',
       ],
-      summary: 'A ciência, a história e as profecias cumpridas provam que podemos confiar na Bíblia.',
+      summary: 'A História, a ciência e as profecias mostram que você pode acreditar na Bíblia.',
       reviewQuestions: [
-        'A Bíblia é um livro de mitos ou relata a verdade?',
-        'Quais são alguns exemplos de harmonia entre a Bíblia e a ciência?',
-        'Você acha que pode confiar na Bíblia?',
+        'Você acha que a Bíblia conta histórias inventadas ou reais?',
+        'Que exemplo mostra que a Bíblia concorda com a ciência?',
+        'Você acha que as profecias da Bíblia se cumprem?',
       ],
-      tryThis: 'No final desta lição 3: Perguntar se o estudante aceita continuar com o livro completo a partir da Lição 4.',
+      tryThis: 'No final desta lição 3: Perguntar se o estudante aceita continuar o curso no livro completo a partir da Lição 4.',
     ),
   ];
 
@@ -1535,51 +1538,405 @@ class LffiBrochureCatalog {
     if (number < 1 || number > lessons.length) return null;
     return lessons[number - 1];
   }
+
+  static double calculateProgressPercentage({
+    required int lesson,
+    required int point,
+  }) {
+    final safeLesson = lesson.clamp(1, totalLessons);
+    final info = getLesson(safeLesson);
+    final maxPoints = info?.totalPoints ?? 6;
+    final clampedPoint = point.clamp(0, maxPoints);
+    final lessonWeight = 100.0 / totalLessons;
+    final base = (safeLesson - 1) * lessonWeight;
+    final current = (clampedPoint / maxPoints) * lessonWeight;
+    return (base + current).clamp(0.0, 100.0);
+  }
+
+  static ({int nextLesson, int nextPoint, String label}) getNextProgression({
+    required int currentLesson,
+    required int currentPoint,
+  }) {
+    final safeLesson = currentLesson.clamp(1, totalLessons);
+    final info = getLesson(safeLesson);
+    final maxPoints = info?.totalPoints ?? 6;
+    if (currentPoint < maxPoints) {
+      final nextP = currentPoint + 1;
+      return (
+        nextLesson: safeLesson,
+        nextPoint: nextP,
+        label: 'Lição $safeLesson, Ponto $nextP',
+      );
+    }
+    if (safeLesson >= totalLessons) {
+      return (
+        nextLesson: totalLessons,
+        nextPoint: maxPoints,
+        label: 'Avançar para o livro completo (Lição 4)',
+      );
+    }
+    final nextL = safeLesson + 1;
+    return (
+      nextLesson: nextL,
+      nextPoint: 1,
+      label: 'Próxima Lição: Lição $nextL, Ponto 1',
+    );
+  }
+
+  static List<({String id, String title, String category, int totalPoints})>
+  getAllStudyUnits() {
+    return [
+      for (final l in lessons)
+        (
+          id: 'lesson_${l.number}',
+          title: 'Lição ${l.number}: ${l.title}',
+          category: 'Lições da Brochura (Introdução)',
+          totalPoints: l.totalPoints,
+        ),
+    ];
+  }
+}
+
+/// Representação de uma lição da brochura "Escute a Deus e Viva para Sempre" (ll-T).
+class ListenToGodLessonInfo {
+  final int number;
+  final String title;
+  final int paragraphs;
+  final List<String> pointTitles;
+
+  const ListenToGodLessonInfo({
+    required this.number,
+    required this.title,
+    required this.paragraphs,
+    required this.pointTitles,
+  });
+
+  int get totalPoints => pointTitles.length;
+  String get displayName => 'Lição $number: $title';
 }
 
 /// Catálogo Oficial da Brochura "Escute a Deus e Viva para Sempre"
+/// Extraído diretamente da edição oficial ll-T (EPUB/JW Library).
 class ListenToGodCatalog {
   static const int totalLessons = 14;
 
-  static const List<({int number, String title, int paragraphs})> lessons = [
-    (number: 1, title: 'Como Deus fala com a gente?', paragraphs: 5),
-    (number: 2, title: 'Quem é Deus?', paragraphs: 6),
-    (number: 3, title: 'Como era a vida no começo?', paragraphs: 4),
-    (
-      number: 4,
-      title: 'O que aconteceu quando Adão e Eva escutaram Satanás?',
-      paragraphs: 5,
-    ),
-    (number: 5, title: 'Como as pessoas eram nos dias de Noé?', paragraphs: 4),
-    (number: 6, title: 'O que você pode aprender do Dilúvio?', paragraphs: 5),
-    (number: 7, title: 'Quem era Jesus?', paragraphs: 7),
-    (
-      number: 8,
-      title: 'O que a morte de Jesus tem a ver com você?',
-      paragraphs: 6,
-    ),
-    (
-      number: 9,
-      title: 'Quando a Terra vai se tornar um paraíso?',
-      paragraphs: 6,
-    ),
-    (
-      number: 10,
-      title: 'Se você escutar a Deus, que bênçãos você vai ter?',
+  static const List<ListenToGodLessonInfo> lessons = [
+    ListenToGodLessonInfo(
+      number: 1,
+      title: 'Como podemos escutar a Deus?',
       paragraphs: 7,
+      pointTitles: [
+        'Deus fala conosco por meio da Bíblia. 2 Timóteo 3:16',
+        'Pessoas em todo o mundo estão escutando a Deus. Mateus 28:19',
+      ],
     ),
-    (number: 11, title: 'Será que Jeová nos escuta?', paragraphs: 4),
-    (number: 12, title: 'Como sua família pode ser feliz?', paragraphs: 6),
-    (
-      number: 13,
-      title: 'O que você precisa fazer para deixar Jeová feliz?',
+    ListenToGodLessonInfo(
+      number: 2,
+      title: 'Quem é o Deus verdadeiro?',
+      paragraphs: 4,
+      pointTitles: [
+        'Jeová criou tudo no céu . . . e na Terra. Apocalipse 4:11',
+      ],
+    ),
+    ListenToGodLessonInfo(
+      number: 3,
+      title: 'Como era a vida no Paraíso?',
+      paragraphs: 7,
+      pointTitles: [
+        'Jeová deu muitas coisas boas a Adão e Eva. Gênesis 1:28',
+        'Deus lhes disse para não comerem de uma das árvores. Gênesis 2:16, 17',
+      ],
+    ),
+    ListenToGodLessonInfo(
+      number: 4,
+      title: 'Eles escutaram a Satanás — qual foi o resultado?',
       paragraphs: 5,
+      pointTitles: [
+        'Adão e Eva não obedeceram a Deus e por isso morreram. Gênesis 3:6, 23',
+        'Os mortos são como pó: eles não têm vida. Gênesis 3:19',
+      ],
     ),
-    (number: 14, title: 'Como você mostra que é fiel a Jeová?', paragraphs: 5),
+    ListenToGodLessonInfo(
+      number: 5,
+      title: 'O grande Dilúvio — quem escutou? Quem não deu ouvidos?',
+      paragraphs: 7,
+      pointTitles: [
+        'Na época de Noé, a maioria das pessoas fazia o que era mau. Gênesis 6:5',
+        'Noé escutou a Deus e construiu uma arca. Gênesis 6:13, 14, 18, 19, 22',
+      ],
+    ),
+    ListenToGodLessonInfo(
+      number: 6,
+      title: 'O que podemos aprender do grande Dilúvio?',
+      paragraphs: 6,
+      pointTitles: [
+        'Deus destruiu os maus, mas salvou Noé e a família dele. Gênesis 7:11, 12, 23',
+        'Deus novamente destruirá as pessoas más e salvará as boas. Mateus 24:37-39',
+      ],
+    ),
+    ListenToGodLessonInfo(
+      number: 7,
+      title: 'Quem foi Jesus?',
+      paragraphs: 6,
+      pointTitles: [
+        'Jeová enviou Jesus à Terra. 1 João 4:9',
+        'Jesus fez o bem, mas foi odiado. 1 Pedro 2:21-24',
+      ],
+    ),
+    ListenToGodLessonInfo(
+      number: 8,
+      title: 'O que a morte de Jesus significa para você?',
+      paragraphs: 8,
+      pointTitles: [
+        'Jesus morreu para que pudéssemos viver. João 3:16',
+        'Jeová ressuscitou Jesus e o designou como Rei do Reino de Deus. Daniel 7:13, 14',
+      ],
+    ),
+    ListenToGodLessonInfo(
+      number: 9,
+      title: 'Quando virá o Paraíso?',
+      paragraphs: 6,
+      pointTitles: [
+        'Os problemas atuais provam que o Reino de Deus agirá logo. Lucas 21:10, 11; 2 Timóteo 3:1-5',
+        'O Reino acabará com toda a maldade. 2 Pedro 3:13',
+      ],
+    ),
+    ListenToGodLessonInfo(
+      number: 10,
+      title: 'Que bênçãos receberão aqueles que escutam a Deus?',
+      paragraphs: 4,
+      pointTitles: [
+        'A maioria dos que já morreram ressuscitarão para viver na Terra. Atos 24:15',
+        'O Reino de Deus acabará com todo o sofrimento. Apocalipse 21:3, 4',
+      ],
+    ),
+    ListenToGodLessonInfo(
+      number: 11,
+      title: 'Será que Jeová nos escuta?',
+      paragraphs: 7,
+      pointTitles: [
+        'Deus realmente escuta nossas orações. 1 Pedro 3:12',
+        'Podemos orar sobre muitas coisas. 1 João 5:14',
+      ],
+    ),
+    ListenToGodLessonInfo(
+      number: 12,
+      title: 'Como sua vida em família pode ser feliz?',
+      paragraphs: 7,
+      pointTitles: [
+        'O amor é o segredo das famílias felizes. Efésios 5:33',
+        'Seja bondoso e fiel; não cruel e desleal. Colossenses 3:5, 8-10',
+      ],
+    ),
+    ListenToGodLessonInfo(
+      number: 13,
+      title: 'O que precisamos fazer para agradar a Deus?',
+      paragraphs: 12,
+      pointTitles: [
+        'Não faça o que é mau. 1 Coríntios 6:9, 10',
+        'Faça o que é bom. Mateus 7:12',
+      ],
+    ),
+    ListenToGodLessonInfo(
+      number: 14,
+      title: 'Como você pode mostrar lealdade a Jeová?',
+      paragraphs: 7,
+      pointTitles: [
+        'Tome sua posição a favor de Jeová. 1 Pedro 5:6-9',
+        'Faça a escolha certa: escute a Deus. Mateus 7:24, 25',
+      ],
+    ),
   ];
 
-  static ({int number, String title, int paragraphs})? getLesson(int number) {
+  static ListenToGodLessonInfo? getLesson(int number) {
     if (number < 1 || number > lessons.length) return null;
     return lessons[number - 1];
+  }
+
+  static double calculateProgressPercentage({
+    required int lesson,
+    required int point,
+  }) {
+    final safeLesson = lesson.clamp(1, totalLessons);
+    final info = getLesson(safeLesson);
+    final maxPoints = info?.totalPoints ?? 2;
+    final clampedPoint = point.clamp(0, maxPoints);
+    final lessonWeight = 100.0 / totalLessons;
+    final base = (safeLesson - 1) * lessonWeight;
+    final current = (clampedPoint / maxPoints) * lessonWeight;
+    return (base + current).clamp(0.0, 100.0);
+  }
+
+  static ({int nextLesson, int nextPoint, String label}) getNextProgression({
+    required int currentLesson,
+    required int currentPoint,
+  }) {
+    final safeLesson = currentLesson.clamp(1, totalLessons);
+    final info = getLesson(safeLesson);
+    final maxPoints = info?.totalPoints ?? 2;
+    if (currentPoint < maxPoints) {
+      final nextP = currentPoint + 1;
+      return (
+        nextLesson: safeLesson,
+        nextPoint: nextP,
+        label: 'Lição $safeLesson, Subtópico $nextP',
+      );
+    }
+    if (safeLesson >= totalLessons) {
+      return (
+        nextLesson: totalLessons,
+        nextPoint: maxPoints,
+        label: '🎉 Brochura concluída!',
+      );
+    }
+    final nextL = safeLesson + 1;
+    return (
+      nextLesson: nextL,
+      nextPoint: 1,
+      label: 'Próxima Lição: Lição $nextL, Subtópico 1',
+    );
+  }
+
+  static List<({String id, String title, String category, int totalPoints})>
+  getAllStudyUnits() {
+    return [
+      for (final l in lessons)
+        (
+          id: 'lesson_${l.number}',
+          title: 'Lição ${l.number}: ${l.title}',
+          category: 'Lições da Brochura Escute a Deus',
+          totalPoints: l.totalPoints,
+        ),
+    ];
+  }
+}
+
+/// Despachante unificado dos índices oficiais (títulos de lições e subtópicos)
+/// para `lff-book` / `lff`, `lff-brochure` / `lffi` e `ll-brochure` / `ll`.
+class StudyPublicationIndexHelper {
+  StudyPublicationIndexHelper._();
+
+  static String canonicalId(String publicationId) {
+    final p = publicationId.trim().toLowerCase();
+    if (p == 'lff-book' || p == 'lff') return 'lff-book';
+    if (p == 'lff-brochure' || p == 'lffi') return 'lff-brochure';
+    if (p == 'll-brochure' || p == 'll') return 'll-brochure';
+    return p;
+  }
+
+  static bool isSupported(String publicationId) {
+    final c = canonicalId(publicationId);
+    return c == 'lff-book' || c == 'lff-brochure' || c == 'll-brochure';
+  }
+
+  static String shortCode(String publicationId) {
+    switch (canonicalId(publicationId)) {
+      case 'lff-brochure':
+        return 'lffi';
+      case 'll-brochure':
+        return 'll';
+      case 'lff-book':
+      default:
+        return 'lff';
+    }
+  }
+
+  static int totalLessonsFor(String publicationId) {
+    switch (canonicalId(publicationId)) {
+      case 'lff-brochure':
+        return LffiBrochureCatalog.totalLessons;
+      case 'll-brochure':
+        return ListenToGodCatalog.totalLessons;
+      case 'lff-book':
+      default:
+        return LffBookCatalog.totalLessons;
+    }
+  }
+
+  static String? getLessonTitle(String publicationId, int lesson) {
+    switch (canonicalId(publicationId)) {
+      case 'lff-brochure':
+        return LffiBrochureCatalog.getLesson(lesson)?.title;
+      case 'll-brochure':
+        return ListenToGodCatalog.getLesson(lesson)?.title;
+      case 'lff-book':
+      default:
+        return LffBookCatalog.getLesson(lesson)?.title;
+    }
+  }
+
+  static List<String> getLessonPointTitles(String publicationId, int lesson) {
+    switch (canonicalId(publicationId)) {
+      case 'lff-brochure':
+        return LffiBrochureCatalog.getLesson(lesson)?.pointTitles ?? const [];
+      case 'll-brochure':
+        return ListenToGodCatalog.getLesson(lesson)?.pointTitles ?? const [];
+      case 'lff-book':
+      default:
+        return LffBookCatalog.getLesson(lesson)?.pointTitles ?? const [];
+    }
+  }
+
+  static List<({String id, String title, String category, int totalPoints})>
+  getAllStudyUnits(String publicationId) {
+    switch (canonicalId(publicationId)) {
+      case 'lff-brochure':
+        return LffiBrochureCatalog.getAllStudyUnits();
+      case 'll-brochure':
+        return ListenToGodCatalog.getAllStudyUnits();
+      case 'lff-book':
+      default:
+        return LffBookCatalog.getAllStudyUnits();
+    }
+  }
+
+  static double calculateProgressPercentage({
+    required String publicationId,
+    required int lesson,
+    required int point,
+  }) {
+    switch (canonicalId(publicationId)) {
+      case 'lff-brochure':
+        return LffiBrochureCatalog.calculateProgressPercentage(
+          lesson: lesson,
+          point: point,
+        );
+      case 'll-brochure':
+        return ListenToGodCatalog.calculateProgressPercentage(
+          lesson: lesson,
+          point: point,
+        );
+      case 'lff-book':
+      default:
+        return LffBookCatalog.calculateProgressPercentage(
+          lesson: lesson,
+          point: point,
+        );
+    }
+  }
+
+  static ({int nextLesson, int nextPoint, String label}) getNextProgression({
+    required String publicationId,
+    required int currentLesson,
+    required int currentPoint,
+  }) {
+    switch (canonicalId(publicationId)) {
+      case 'lff-brochure':
+        return LffiBrochureCatalog.getNextProgression(
+          currentLesson: currentLesson,
+          currentPoint: currentPoint,
+        );
+      case 'll-brochure':
+        return ListenToGodCatalog.getNextProgression(
+          currentLesson: currentLesson,
+          currentPoint: currentPoint,
+        );
+      case 'lff-book':
+      default:
+        return LffBookCatalog.getNextProgression(
+          currentLesson: currentLesson,
+          currentPoint: currentPoint,
+        );
+    }
   }
 }

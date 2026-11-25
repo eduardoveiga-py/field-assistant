@@ -873,6 +873,9 @@ extension _PersonDetailStudyDialogs on _PersonDetailScreenState {
       context: context,
       builder: (ctx) => ManagedTextControllers(
         initialTexts: const [''],
+        customFactories: [
+          (text) => RichFormattedEditingController.fromMarkup(text),
+        ],
         builder: (ctx, ctrls) {
           final tagController = ctrls[0];
 
@@ -1009,6 +1012,9 @@ extension _PersonDetailStudyDialogs on _PersonDetailScreenState {
       context: context,
       builder: (ctx) => ManagedTextControllers(
         initialTexts: const [''],
+        customFactories: [
+          (text) => RichFormattedEditingController.fromMarkup(text),
+        ],
         builder: (ctx, ctrls) {
           final notesController = ctrls[0];
 
@@ -1171,13 +1177,20 @@ extension _PersonDetailStudyDialogs on _PersonDetailScreenState {
                       },
                     ),
                     const SizedBox(height: 12),
+                    RichMarkdownToolbar(
+                      controller: notesController,
+                      enableHighlightPalette: false,
+                      enableImagePicker: false,
+                      enableCrossReferences: true,
+                    ),
+                    const SizedBox(height: 6),
                     TextField(
                       controller: notesController,
                       decoration: const InputDecoration(
                         labelText: 'Observação complementar (opcional)',
                         hintText: 'Ex: Portas abertas para contato futuro...',
                       ),
-                      maxLines: 2,
+                      maxLines: 3,
                     ),
                   ],
                 ),
@@ -1200,7 +1213,9 @@ extension _PersonDetailStudyDialogs on _PersonDetailScreenState {
                         .endStudyWithScheduleRelease(
                           study: study,
                           endReason: selectedReason,
-                          notes: notesController.text.trim(),
+                          notes: RichFormattedEditingController.readMarkup(
+                            notesController,
+                          ).trim(),
                           releaseFutureAppointments: true,
                         );
 
@@ -1272,15 +1287,26 @@ extension _PersonDetailStudyDialogs on _PersonDetailScreenState {
       existingUpcomingAppt = upcoming.first;
     }
 
-    int selectedLesson = (study.currentLesson ?? 1).clamp(1, 60);
-    int selectedStartPoint = (study.currentParagraph ?? 1).clamp(1, 6);
+    final pubId = StudyPublicationIndexHelper.isSupported(study.publicationId)
+        ? study.publicationId
+        : 'lff-book';
+    final maxLessons = StudyPublicationIndexHelper.totalLessonsFor(pubId);
+    final pubShortCode = StudyPublicationIndexHelper.shortCode(pubId);
+    int selectedLesson = (study.currentLesson ?? 1).clamp(1, maxLessons);
+    final initLessonPoints = StudyPublicationIndexHelper.getLessonPointTitles(
+      pubId,
+      selectedLesson,
+    );
+    final initMaxPt = initLessonPoints.isNotEmpty ? initLessonPoints.length : 6;
+    int selectedStartPoint = (study.currentParagraph ?? 1).clamp(1, initMaxPt);
     int selectedEndPoint = selectedStartPoint;
     String sessionOutcome = 'realizada'; // 'realizada' ou 'cancelada'
     String failureMotive = 'Cancelado pelo estudante';
     String selectedUnitId = 'lesson_$selectedLesson';
-    final allUnits = LffBookCatalog.getAllStudyUnits();
+    final allUnits = StudyPublicationIndexHelper.getAllStudyUnits(pubId);
 
-    final initialNext = LffBookCatalog.getNextProgression(
+    final initialNext = StudyPublicationIndexHelper.getNextProgression(
+      publicationId: pubId,
       currentLesson: selectedLesson,
       currentPoint: selectedEndPoint,
     );
@@ -1329,6 +1355,12 @@ extension _PersonDetailStudyDialogs on _PersonDetailScreenState {
           '',
           study.nextTopic ?? initialNext.label,
         ],
+        customFactories: [
+          null,
+          null,
+          (text) => RichFormattedEditingController.fromMarkup(text),
+          (text) => RichFormattedEditingController.fromMarkup(text),
+        ],
         builder: (ctx, ctrls) {
           final lessonController = ctrls[0];
           final paragraphsController = ctrls[1];
@@ -1337,19 +1369,25 @@ extension _PersonDetailStudyDialogs on _PersonDetailScreenState {
           return StatefulBuilder(
             builder: (ctx, setDialogState) {
               final isDark = Theme.of(ctx).brightness == Brightness.dark;
-              final lessonInfo = LffBookCatalog.getLesson(selectedLesson);
               final progressPercent =
-                  LffBookCatalog.calculateProgressPercentage(
+                  StudyPublicationIndexHelper.calculateProgressPercentage(
+                    publicationId: pubId,
                     lesson: selectedLesson,
                     point: selectedEndPoint,
                   );
 
-              int currentUnitMaxPoints = 6;
               final foundUnit = allUnits
                   .where((u) => u.id == selectedUnitId)
                   .firstOrNull;
-              currentUnitMaxPoints =
-                  foundUnit?.totalPoints ?? (lessonInfo?.totalPoints ?? 6);
+              final pointTitles = selectedUnitId.startsWith('lesson_')
+                  ? StudyPublicationIndexHelper.getLessonPointTitles(
+                      pubId,
+                      selectedLesson,
+                    )
+                  : const <String>[];
+              final currentUnitMaxPoints =
+                  foundUnit?.totalPoints ??
+                  (pointTitles.isNotEmpty ? pointTitles.length : 6);
 
               void updatePoints(int startP, int endP) {
                 setDialogState(() {
@@ -1358,11 +1396,13 @@ extension _PersonDetailStudyDialogs on _PersonDetailScreenState {
                   paragraphsController.text = startP == endP
                       ? '$startP'
                       : '$startP-$endP';
-                  final nextProg = LffBookCatalog.getNextProgression(
-                    currentLesson: selectedLesson,
-                    currentPoint: endP,
-                  );
-                  nextStepController.text = nextProg.label;
+                  final nextProg =
+                      StudyPublicationIndexHelper.getNextProgression(
+                        publicationId: pubId,
+                        currentLesson: selectedLesson,
+                        currentPoint: endP,
+                      );
+                  (nextStepController..clear()).text = nextProg.label;
                 });
               }
 
@@ -1628,12 +1668,18 @@ extension _PersonDetailStudyDialogs on _PersonDetailScreenState {
                         ),
                         const SizedBox(height: 14),
 
-                        // Seletor Inteligente de Unidade (Lições 1-60, Revisões 1-4, Entenda Melhor 1-7)
+                        // Seletor Inteligente de Unidade / Lição e Subtópicos
                         DropdownButtonFormField<String>(
-                          initialValue: selectedUnitId,
+                          initialValue:
+                              allUnits.any((u) => u.id == selectedUnitId)
+                              ? selectedUnitId
+                              : (allUnits.isNotEmpty
+                                    ? allUnits.first.id
+                                    : null),
                           isExpanded: true,
-                          decoration: const InputDecoration(
-                            labelText: 'Unidade / Lição Estudada (lff) *',
+                          decoration: InputDecoration(
+                            labelText:
+                                'Unidade / Lição Estudada ($pubShortCode) *',
                           ),
                           items: allUnits.map((u) {
                             return DropdownMenuItem<String>(
@@ -1654,16 +1700,35 @@ extension _PersonDetailStudyDialogs on _PersonDetailScreenState {
                                   selectedLesson = int.parse(
                                     val.replaceFirst('lesson_', ''),
                                   );
+                                  final newPts =
+                                      StudyPublicationIndexHelper.getLessonPointTitles(
+                                        pubId,
+                                        selectedLesson,
+                                      );
+                                  final maxPt = newPts.isNotEmpty
+                                      ? newPts.length
+                                      : 6;
+                                  selectedStartPoint = 1;
+                                  selectedEndPoint = selectedEndPoint.clamp(
+                                    1,
+                                    maxPt,
+                                  );
                                   lessonController.text = selectedLesson
                                       .toString();
+                                  paragraphsController.text =
+                                      selectedStartPoint == selectedEndPoint
+                                      ? '$selectedStartPoint'
+                                      : '$selectedStartPoint-$selectedEndPoint';
                                   final nextProg =
-                                      LffBookCatalog.getNextProgression(
+                                      StudyPublicationIndexHelper.getNextProgression(
+                                        publicationId: pubId,
                                         currentLesson: selectedLesson,
                                         currentPoint: selectedEndPoint,
                                       );
-                                  nextStepController.text = nextProg.label;
+                                  (nextStepController..clear()).text =
+                                      nextProg.label;
                                 } else {
-                                  nextStepController.text = val;
+                                  (nextStepController..clear()).text = val;
                                 }
                               });
                             }
@@ -1671,10 +1736,10 @@ extension _PersonDetailStudyDialogs on _PersonDetailScreenState {
                         ),
                         const SizedBox(height: 12),
 
-                        // Seletor dos Pontos da Lição
-                        Text(
-                          'Pontos Cobertos:',
-                          style: const TextStyle(
+                        // Seletor dos Pontos / Subtópicos da Lição
+                        const Text(
+                          'Pontos / Subtópicos Cobertos:',
+                          style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
                           ),
@@ -1717,6 +1782,50 @@ extension _PersonDetailStudyDialogs on _PersonDetailScreenState {
                             );
                           }),
                         ),
+                        if (pointTitles.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? const Color(0xFF1E293B)
+                                  : const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: isDark
+                                    ? const Color(0xFF334155)
+                                    : const Color(0xFFE2E8F0),
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                for (
+                                  var p = selectedStartPoint;
+                                  p <= selectedEndPoint;
+                                  p++
+                                )
+                                  if (p >= 1 && p <= pointTitles.length)
+                                    Padding(
+                                      padding: const EdgeInsets.only(bottom: 2),
+                                      child: Text(
+                                        pointTitles[p - 1],
+                                        style: TextStyle(
+                                          fontSize: 11.5,
+                                          color: isDark
+                                              ? const Color(0xFFCBD5E1)
+                                              : const Color(0xFF334155),
+                                        ),
+                                      ),
+                                    ),
+                              ],
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 10),
                         TextField(
                           controller: paragraphsController,
@@ -1734,11 +1843,13 @@ extension _PersonDetailStudyDialogs on _PersonDetailScreenState {
                                 selectedStartPoint = parsed;
                                 selectedEndPoint = parsed;
                                 final nextProg =
-                                    LffBookCatalog.getNextProgression(
+                                    StudyPublicationIndexHelper.getNextProgression(
+                                      publicationId: pubId,
                                       currentLesson: selectedLesson,
                                       currentPoint: parsed,
                                     );
-                                nextStepController.text = nextProg.label;
+                                (nextStepController..clear()).text =
+                                    nextProg.label;
                               });
                             }
                           },
@@ -1825,6 +1936,13 @@ extension _PersonDetailStudyDialogs on _PersonDetailScreenState {
                         const SizedBox(height: 12),
                       ],
 
+                      RichMarkdownToolbar(
+                        controller: notesController,
+                        enableHighlightPalette: false,
+                        enableImagePicker: false,
+                        enableCrossReferences: true,
+                      ),
+                      const SizedBox(height: 6),
                       TextField(
                         controller: notesController,
                         decoration: InputDecoration(
@@ -1835,14 +1953,28 @@ extension _PersonDetailStudyDialogs on _PersonDetailScreenState {
                               ? 'Descreva o que houve ou motivo de contato...'
                               : 'Dúvidas esclarecidas, pontos de interesse...',
                         ),
-                        maxLines: 2,
+                        maxLines: 3,
                       ),
                       const SizedBox(height: 12),
                       TextField(
                         controller: nextStepController,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'Próximo assunto',
                           hintText: 'Ex: Lição 2, Ponto 1 em diante',
+                          suffixIcon: IconButton(
+                            icon: const Icon(
+                              Icons.bookmark_add_outlined,
+                              size: 19,
+                              color: AppTheme.primaryBlue,
+                            ),
+                            tooltip: 'Inserir referência (TNM ou Abas do App)',
+                            onPressed: () =>
+                                RichMarkdownToolbar.pickAndInsertReference(
+                                  ctx,
+                                  db: ref.read(databaseProvider),
+                                  controller: nextStepController,
+                                ),
+                          ),
                         ),
                       ),
                       const SizedBox(height: 14),
@@ -1895,12 +2027,19 @@ extension _PersonDetailStudyDialogs on _PersonDetailScreenState {
                       }
 
                       final repo = ref.read(repositoryProvider);
+                      final rawNotes =
+                          RichFormattedEditingController.readMarkup(
+                            notesController,
+                          ).trim();
+                      final rawNextStep =
+                          RichFormattedEditingController.readMarkup(
+                            nextStepController,
+                          ).trim();
 
                       if (sessionOutcome == 'cancelada') {
-                        final formattedNotes =
-                            notesController.text.trim().isEmpty
+                        final formattedNotes = rawNotes.isEmpty
                             ? '[Sessão Cancelada: $failureMotive]'
-                            : '[Sessão Cancelada: $failureMotive] ${notesController.text.trim()}';
+                            : '[Sessão Cancelada: $failureMotive] $rawNotes';
 
                         await repo.createStudySession(
                           studyId: study.id,
@@ -1908,18 +2047,14 @@ extension _PersonDetailStudyDialogs on _PersonDetailScreenState {
                           lessonCovered: study.currentLesson,
                           paragraphsCovered: null,
                           sessionNotes: formattedNotes,
-                          nextStep: nextStepController.text.trim().isEmpty
-                              ? null
-                              : nextStepController.text.trim(),
+                          nextStep: rawNextStep.isEmpty ? null : rawNextStep,
                           status: 'cancelada',
                           participantIds: [person.id],
                         );
 
-                        if (nextStepController.text.trim().isNotEmpty) {
+                        if (rawNextStep.isNotEmpty) {
                           await repo.updateStudy(
-                            study.copyWith(
-                              nextTopic: Value(nextStepController.text.trim()),
-                            ),
+                            study.copyWith(nextTopic: Value(rawNextStep)),
                           );
                         }
                       } else {
@@ -1928,9 +2063,7 @@ extension _PersonDetailStudyDialogs on _PersonDetailScreenState {
                             selectedLesson;
                         final formattedNotes =
                             DashboardCalculator.formatSessionNotesWithAttendance(
-                              notesController.text.trim().isEmpty
-                                  ? null
-                                  : notesController.text.trim(),
+                              rawNotes.isEmpty ? null : rawNotes,
                               attendanceCount,
                             );
 
@@ -1943,9 +2076,7 @@ extension _PersonDetailStudyDialogs on _PersonDetailScreenState {
                               ? null
                               : paragraphsController.text.trim(),
                           sessionNotes: formattedNotes,
-                          nextStep: nextStepController.text.trim().isEmpty
-                              ? null
-                              : nextStepController.text.trim(),
+                          nextStep: rawNextStep.isEmpty ? null : rawNextStep,
                           status: 'realizada',
                           participantIds: [person.id],
                         );
@@ -1958,9 +2089,7 @@ extension _PersonDetailStudyDialogs on _PersonDetailScreenState {
                                   selectedEndPoint,
                             ),
                             nextTopic: Value(
-                              nextStepController.text.trim().isEmpty
-                                  ? null
-                                  : nextStepController.text.trim(),
+                              rawNextStep.isEmpty ? null : rawNextStep,
                             ),
                             lastSessionAt: Value(DateTime.now()),
                           ),

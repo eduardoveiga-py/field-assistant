@@ -18,6 +18,13 @@ extension _ContactsMapTerritoryModals on _ContactsMapScreenState {
       context: context,
       builder: (ctx) => ManagedTextControllers(
         initialTexts: ['', initAddr, '', initLat, initLng],
+        customFactories: [
+          null,
+          null,
+          (text) => RichFormattedEditingController.fromMarkup(text),
+          null,
+          null,
+        ],
         builder: (ctx, ctrls) {
           final nameController = ctrls[0];
           final addressController = ctrls[1];
@@ -261,13 +268,20 @@ extension _ContactsMapTerritoryModals on _ContactsMapScreenState {
                         ],
                       ),
                       const SizedBox(height: 8),
+                      RichMarkdownToolbar(
+                        controller: notesController,
+                        enableHighlightPalette: false,
+                        enableImagePicker: false,
+                        enableCrossReferences: true,
+                      ),
+                      const SizedBox(height: 6),
                       TextField(
                         controller: notesController,
                         decoration: const InputDecoration(
                           labelText: 'Observações / Instruções para encontrar',
                           hintText: 'Ex: Ponto de encontro da saída de campo no sábado às 9:00',
                         ),
-                        maxLines: 2,
+                        maxLines: 3,
                       ),
                     ],
                   ),
@@ -286,6 +300,10 @@ extension _ContactsMapTerritoryModals on _ContactsMapScreenState {
                       final lat = double.tryParse(latController.text.trim());
                       final lng = double.tryParse(lngController.text.trim());
 
+                      final notesMarkup =
+                          RichFormattedEditingController.readMarkup(
+                            notesController,
+                          ).trim();
                       await mgr.addLandmark(
                         name: name,
                         category: selectedCategory,
@@ -294,9 +312,7 @@ extension _ContactsMapTerritoryModals on _ContactsMapScreenState {
                             : addressController.text.trim(),
                         latitude: lat,
                         longitude: lng,
-                        notes: notesController.text.trim().isEmpty
-                            ? null
-                            : notesController.text.trim(),
+                        notes: notesMarkup.isEmpty ? null : notesMarkup,
                       );
 
                       if (ctx.mounted) Navigator.pop(ctx);
@@ -322,11 +338,14 @@ extension _ContactsMapTerritoryModals on _ContactsMapScreenState {
   }
 
   void _shareLandmark(TerritoryLandmark landmark) async {
+    final cleanNotes = landmark.notes != null
+        ? EmailHtmlSanitizer.stripMarkdown(landmark.notes!).trim()
+        : '';
     final text =
         '📍 Ponto de Referência no Território: ${landmark.name}\n'
         'Categoria: ${landmark.categoryLabel}\n'
         '${landmark.address != null ? "Endereço: ${landmark.address}\n" : ""}'
-        '${landmark.notes != null ? "Observações: ${landmark.notes}\n" : ""}'
+        '${cleanNotes.isNotEmpty ? "Observações: $cleanNotes\n" : ""}'
         '${landmark.latitude != null && landmark.longitude != null ? "Coordenadas: ${landmark.latitude},${landmark.longitude}" : ""}';
 
     Clipboard.setData(ClipboardData(text: text));

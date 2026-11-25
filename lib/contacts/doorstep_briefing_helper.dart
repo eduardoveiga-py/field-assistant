@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import '../core/app_logger.dart';
 import '../database/app_database.dart';
+import '../inbox/email_html_sanitizer.dart';
 import '../publications/publication_catalog.dart';
 import '../publications/publication_link_resolver.dart';
 import '../voice_notes/voice_note_models.dart';
@@ -414,5 +415,23 @@ class DoorstepBriefingHelper {
         'completedAt': null,
       },
     ];
+  }
+
+  /// Extrai texto puro legível de `generalNotes` (suportando JSON array e Markdown/app://).
+  static String extractPlainNotesSummary(
+    String? raw, {
+    String separator = '; ',
+  }) {
+    if (raw == null || raw.trim().isEmpty) return '';
+    final notes = parseNotes(raw);
+    if (notes.isEmpty) return '';
+    return notes
+        .map(
+          (n) =>
+              EmailHtmlSanitizer.stripMarkdown((n['text'] ?? '').toString())
+                  .trim(),
+        )
+        .where((t) => t.isNotEmpty)
+        .join(separator);
   }
 }
