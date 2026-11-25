@@ -1,6 +1,3 @@
-import 'dart:io';
-
-import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,8 +5,10 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/app_theme.dart';
 import '../../references/app_reference.dart';
+import 'app_inline_image_view.dart';
 import 'app_reference_viewer.dart';
 import 'highlight_text_helper.dart';
+import 'jw_highlight_floating_toolbar.dart';
 import 'universal_attachment_viewer.dart';
 
 /// Abre a janela dedicada para leitura completa e imersiva de itens do aplicativo,
@@ -130,12 +129,8 @@ class KnowledgeItemReaderDialog extends StatefulWidget {
 class _KnowledgeItemReaderDialogState extends State<KnowledgeItemReaderDialog> {
   late String _content;
   final List<GestureRecognizer> _recognizers = [];
-
-  // Rastreia seleção ativa em algum segmento de texto para aplicar cor em 1 toque pela barra JW.
-  MappedRichTextResult? _activeSegMap;
-  int _activeSegRawStart = 0;
-  int _activeSegRawEnd = 0;
-  TextSelection? _activeSelection;
+  final JwHighlightFloatingController _hlFloating =
+      JwHighlightFloatingController();
 
   @override
   void initState() {
@@ -153,6 +148,7 @@ class _KnowledgeItemReaderDialogState extends State<KnowledgeItemReaderDialog> {
 
   @override
   void dispose() {
+    _hlFloating.dispose();
     _disposeRecognizers();
     super.dispose();
   }
@@ -238,11 +234,14 @@ class _KnowledgeItemReaderDialogState extends State<KnowledgeItemReaderDialog> {
   }
 
   List<_ContentSegment> _splitSegments(String rawText) {
-    final imageRegex = RegExp(
-      r'^!\[([^\]]*)\]\(([^\)]+)\)\s*$',
+    // Extrai tanto ![alt](src) quanto referências do Banco de Gravuras
+    // [🖼️ legenda](app://ref/picture/<id>) (mesmo com <u> legado) para exibir a imagem em si.
+    final mediaRegex = RegExp(
+      r'!\[([^\]]*)\]\(([^\)]+)\)|(?:<u\b[^>]*>)?\[([^\]]*)\]\((app://ref/picture/[^)\s]+)\)(?:</u>)?',
       multiLine: true,
+      caseSensitive: false,
     );
-    final matches = imageRegex.allMatches(rawText).toList();
+    final matches = mediaRegex.allMatches(rawText).toList();
     if (matches.isEmpty) {
       return [
         _ContentSegment.text(
@@ -268,12 +267,17 @@ class _KnowledgeItemReaderDialogState extends State<KnowledgeItemReaderDialog> {
           );
         }
       }
+      final rawAlt = m.group(1) ?? m.group(3) ?? 'Imagem';
+      final cleanAlt = HighlightTextHelper.stripHighlightTags(rawAlt)
+          .replaceFirst(RegExp(r'^🖼️\s*'), '')
+          .trim();
+      final src = m.group(2) ?? m.group(4) ?? '';
       segments.add(
         _ContentSegment.image(
           rawStart: m.start,
           rawEnd: m.end,
-          imageAlt: m.group(1) ?? 'Imagem',
-          imageSrc: m.group(2) ?? '',
+          imageAlt: cleanAlt.isEmpty ? 'Imagem' : cleanAlt,
+          imageSrc: src,
         ),
       );
       cursor = m.end;
@@ -319,10 +323,9 @@ class _KnowledgeItemReaderDialogState extends State<KnowledgeItemReaderDialog> {
       updatedSegText,
     );
 
+    _hlFloating.hide();
     setState(() {
       _content = updatedFull;
-      _activeSelection = null;
-      _activeSegMap = null;
     });
 
     if (widget.onContentUpdated != null) {
@@ -335,12 +338,6 @@ class _KnowledgeItemReaderDialogState extends State<KnowledgeItemReaderDialog> {
     _disposeRecognizers();
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final typeColor = _getTypeColor();
-    final hasActiveSelection =
-        _canInteractiveHighlight &&
-        _activeSelection != null &&
-        _activeSelection!.isValid &&
-        !_activeSelection!.isCollapsed &&
-        _activeSegMap != null;
 
     return Dialog(
       backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
@@ -492,146 +489,6 @@ class _KnowledgeItemReaderDialogState extends State<KnowledgeItemReaderDialog> {
                 ),
               ),
 
-              // Barra de Sublinhado JW Library (quando habilitado no módulo)
-              if (_canInteractiveHighlight)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? const Color(0xFF0F1A2E)
-                        : const Color(0xFFF8FAFC),
-                    border: Border(
-                      bottom: BorderSide(
-                        color: isDark ? Colors.white10 : Colors.black12,
-                      ),
-                    ),
-                  ),
-                  child: Wrap(
-                    alignment: WrapAlignment.spaceBetween,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    spacing: 8,
-                    runSpacing: 4,
-                    children: [
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.border_color_outlined,
-                            size: 14,
-                            color: hasActiveSelection
-                                ? AppTheme.primaryBlue
-                                : Colors.grey,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            hasActiveSelection
-                                ? 'Sublinhar seleção:'
-                                : 'Selecione um trecho abaixo para sublinhar:',
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: hasActiveSelection
-                                  ? FontWeight.w600
-                                  : FontWeight.normal,
-                              color: isDark
-                                  ? const Color(0xFFCBD5E1)
-                                  : const Color(0xFF475569),
-                            ),
-                          ),
-                        ],
-                      ),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          for (final c in HighlightTextHelper.colors)
-                            Tooltip(
-                              message: 'Sublinhar (${c.label})',
-                              child: InkWell(
-                                key: Key('btn_reader_hl_${c.id}'),
-                                borderRadius: BorderRadius.circular(14),
-                                onTap: hasActiveSelection
-                                    ? () => _applyColorToSelection(
-                                        segment: _ContentSegment.text(
-                                          rawStart: _activeSegRawStart,
-                                          rawEnd: _activeSegRawEnd,
-                                          text: _content.substring(
-                                            _activeSegRawStart,
-                                            _activeSegRawEnd,
-                                          ),
-                                        ),
-                                        mapped: _activeSegMap!,
-                                        selStart: _activeSelection!.start,
-                                        selEnd: _activeSelection!.end,
-                                        colorHex: c.hex,
-                                      )
-                                    : () {
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(
-                                              const SnackBar(
-                                                content: Text(
-                                                  'Selecione primeiro um trecho do texto para sublinhar.',
-                                                ),
-                                                duration: Duration(seconds: 2),
-                                              ),
-                                            );
-                                      },
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 4,
-                                    vertical: 4,
-                                  ),
-                                  child: CircleAvatar(
-                                    radius: 9,
-                                    backgroundColor: c.color.withValues(
-                                      alpha: hasActiveSelection ? 1.0 : 0.45,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          Tooltip(
-                            message: 'Remover sublinhado da seleção',
-                            child: IconButton(
-                              key: const Key('btn_reader_hl_clear'),
-                              visualDensity: VisualDensity.compact,
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(
-                                minWidth: 28,
-                                minHeight: 28,
-                              ),
-                              icon: Icon(
-                                Icons.format_clear,
-                                size: 17,
-                                color: hasActiveSelection
-                                    ? Colors.redAccent
-                                    : Colors.grey,
-                              ),
-                              onPressed: hasActiveSelection
-                                  ? () => _applyColorToSelection(
-                                      segment: _ContentSegment.text(
-                                        rawStart: _activeSegRawStart,
-                                        rawEnd: _activeSegRawEnd,
-                                        text: _content.substring(
-                                          _activeSegRawStart,
-                                          _activeSegRawEnd,
-                                        ),
-                                      ),
-                                      mapped: _activeSegMap!,
-                                      selStart: _activeSelection!.start,
-                                      selEnd: _activeSelection!.end,
-                                      colorHex: null,
-                                    )
-                                  : null,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-
               // Barra de Tags e Ações Rápidas
               Container(
                 padding: const EdgeInsets.symmetric(
@@ -750,56 +607,62 @@ class _KnowledgeItemReaderDialogState extends State<KnowledgeItemReaderDialog> {
 
               // Conteúdo Formatado em Markdown com Referências Clicáveis e Sublinhado Direto
               Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _buildRichMarkdownBody(context, _content, isDark),
-                      if (widget.attachments.isNotEmpty) ...[
-                        const SizedBox(height: 24),
-                        const Divider(),
-                        const Text(
-                          'Anexos & Documentos:',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
+                child: NotificationListener<ScrollNotification>(
+                  onNotification: (_) {
+                    _hlFloating.hide();
+                    return false;
+                  },
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _buildRichMarkdownBody(context, _content, isDark),
+                        if (widget.attachments.isNotEmpty) ...[
+                          const SizedBox(height: 24),
+                          const Divider(),
+                          const Text(
+                            'Anexos & Documentos:',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 10),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: widget.attachments.map((att) {
-                            final name = att['name']?.toString() ?? 'anexo';
-                            final path =
-                                att['path']?.toString() ??
-                                att['filePath']?.toString() ??
-                                '';
-                            final type = att['type']?.toString() ?? 'file';
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: widget.attachments.map((att) {
+                              final name = att['name']?.toString() ?? 'anexo';
+                              final path =
+                                  att['path']?.toString() ??
+                                  att['filePath']?.toString() ??
+                                  '';
+                              final type = att['type']?.toString() ?? 'file';
 
-                            return ActionChip(
-                              avatar: const Icon(
-                                Icons.attachment,
-                                size: 16,
-                                color: AppTheme.primaryBlue,
-                              ),
-                              label: Text(name),
-                              onPressed: () {
-                                if (path.isNotEmpty) {
-                                  showUniversalAttachmentViewer(
-                                    context,
-                                    filePath: path,
-                                    title: name,
-                                    fileType: type,
-                                  );
-                                }
-                              },
-                            );
-                          }).toList(),
-                        ),
+                              return ActionChip(
+                                avatar: const Icon(
+                                  Icons.attachment,
+                                  size: 16,
+                                  color: AppTheme.primaryBlue,
+                                ),
+                                label: Text(name),
+                                onPressed: () {
+                                  if (path.isNotEmpty) {
+                                    showUniversalAttachmentViewer(
+                                      context,
+                                      filePath: path,
+                                      title: name,
+                                      fileType: type,
+                                    );
+                                  }
+                                },
+                              );
+                            }).toList(),
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -854,63 +717,84 @@ class _KnowledgeItemReaderDialogState extends State<KnowledgeItemReaderDialog> {
         baseStyle,
         onLinkTap: (url) => _openUrlOrReference(context, url),
         disposables: _recognizers,
+        isDark: isDark,
       );
       if (mapped.spans.isEmpty) continue;
 
+      final anchorKey = GlobalKey();
       widgets.add(
-        SelectableText.rich(
-          TextSpan(children: mapped.spans),
-          onSelectionChanged: _canInteractiveHighlight
-              ? (sel, cause) {
-                  setState(() {
-                    _activeSegMap = mapped;
-                    _activeSegRawStart = seg.rawStart;
-                    _activeSegRawEnd = seg.rawEnd;
-                    _activeSelection = sel;
-                  });
-                }
-              : null,
-          contextMenuBuilder: (ctx, editableTextState) {
-            final sel = editableTextState.textEditingValue.selection;
-            final canHighlight =
-                _canInteractiveHighlight && sel.isValid && !sel.isCollapsed;
-            final items = <ContextMenuButtonItem>[
-              ...editableTextState.contextMenuButtonItems,
-              if (canHighlight) ...[
-                for (final c in HighlightTextHelper.colors)
+        Listener(
+          key: anchorKey,
+          onPointerDown: (e) => _hlFloating.recordPointerDown(e.position),
+          onPointerUp: (e) => _hlFloating.recordPointerUp(e.position),
+          child: SelectableText.rich(
+            TextSpan(children: mapped.spans),
+            onSelectionChanged: _canInteractiveHighlight
+                ? (sel, cause) {
+                    if (sel.isValid &&
+                        !sel.isCollapsed &&
+                        sel.end > sel.start) {
+                      _hlFloating.show(
+                        context: context,
+                        keyPrefix: 'reader',
+                        anchorKey: anchorKey,
+                        onPickColor: (hex) => _applyColorToSelection(
+                          segment: seg,
+                          mapped: mapped,
+                          selStart: sel.start,
+                          selEnd: sel.end,
+                          colorHex: hex,
+                        ),
+                      );
+                    } else {
+                      _hlFloating.hide();
+                    }
+                  }
+                : null,
+            contextMenuBuilder: (ctx, editableTextState) {
+              final sel = editableTextState.textEditingValue.selection;
+              final canHighlight =
+                  _canInteractiveHighlight && sel.isValid && !sel.isCollapsed;
+              final items = <ContextMenuButtonItem>[
+                ...editableTextState.contextMenuButtonItems,
+                if (canHighlight) ...[
+                  for (final c in HighlightTextHelper.colors)
+                    ContextMenuButtonItem(
+                      label: 'Marcar (${c.label})',
+                      onPressed: () {
+                        ContextMenuController.removeAny();
+                        _hlFloating.hide();
+                        _applyColorToSelection(
+                          segment: seg,
+                          mapped: mapped,
+                          selStart: sel.start,
+                          selEnd: sel.end,
+                          colorHex: c.hex,
+                        );
+                      },
+                    ),
                   ContextMenuButtonItem(
-                    label: 'Sublinhar (${c.label})',
+                    label: 'Remover marcação',
                     onPressed: () {
                       ContextMenuController.removeAny();
+                      _hlFloating.hide();
                       _applyColorToSelection(
                         segment: seg,
                         mapped: mapped,
                         selStart: sel.start,
                         selEnd: sel.end,
-                        colorHex: c.hex,
+                        colorHex: null,
                       );
                     },
                   ),
-                ContextMenuButtonItem(
-                  label: 'Remover Sublinhado',
-                  onPressed: () {
-                    ContextMenuController.removeAny();
-                    _applyColorToSelection(
-                      segment: seg,
-                      mapped: mapped,
-                      selStart: sel.start,
-                      selEnd: sel.end,
-                      colorHex: null,
-                    );
-                  },
-                ),
-              ],
-            ];
-            return AdaptiveTextSelectionToolbar.buttonItems(
-              anchors: editableTextState.contextMenuAnchors,
-              buttonItems: items,
-            );
-          },
+                ],
+              ];
+              return AdaptiveTextSelectionToolbar.buttonItems(
+                anchors: editableTextState.contextMenuAnchors,
+                buttonItems: items,
+              );
+            },
+          ),
         ),
       );
     }
@@ -927,82 +811,6 @@ class _KnowledgeItemReaderDialogState extends State<KnowledgeItemReaderDialog> {
     String alt,
     bool isDark,
   ) {
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: isDark ? Colors.white10 : Colors.black12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-            child: InkWell(
-              onTap: () => showUniversalAttachmentViewer(
-                context,
-                filePath: src,
-                title: alt,
-              ),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 280),
-                child: src.startsWith('http')
-                    ? Image.network(src, fit: BoxFit.cover)
-                    : !kIsWeb && File(src).existsSync()
-                    ? Image.file(File(src), fit: BoxFit.cover)
-                    : Container(
-                        height: 120,
-                        alignment: Alignment.center,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(
-                              Icons.image,
-                              color: Colors.grey,
-                              size: 28,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              alt,
-                              style: const TextStyle(color: Colors.grey),
-                            ),
-                          ],
-                        ),
-                      ),
-              ),
-            ),
-          ),
-          if (alt.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.photo_outlined,
-                    size: 14,
-                    color: Colors.grey,
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      alt,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  const Text(
-                    'Toque para expandir',
-                    style: TextStyle(fontSize: 11, color: AppTheme.primaryBlue),
-                  ),
-                ],
-              ),
-            ),
-        ],
-      ),
-    );
+    return AppInlineImageView(src: src, alt: alt, maxHeight: 280);
   }
 }

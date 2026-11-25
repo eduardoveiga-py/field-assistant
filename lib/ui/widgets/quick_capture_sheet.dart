@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -13,6 +14,9 @@ import '../../core/app_theme.dart';
 import '../../voice_notes/audio_recording_service.dart';
 import '../providers.dart';
 import 'adaptive_ministry_sheet.dart';
+import 'app_inline_image_view.dart';
+import 'markdown_preview_text.dart';
+import 'rich_formatted_editing_controller.dart';
 import 'rich_markdown_toolbar.dart';
 
 /// Modal adaptativo de captura rápida do Módulo A — Inbox Universal.
@@ -57,7 +61,8 @@ class QuickCaptureSheet extends ConsumerStatefulWidget {
 class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
-  final TextEditingController _textController = TextEditingController();
+  final RichFormattedEditingController _textController =
+      RichFormattedEditingController();
   final TextEditingController _noteController = TextEditingController();
 
   String _selectedCategory = 'ministry';
@@ -277,7 +282,13 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet>
         final bytes = await picked.readAsBytes();
         String finalPath = picked.path;
 
-        if (!kIsWeb) {
+        if (kIsWeb || finalPath.isEmpty) {
+          final lower = picked.name.toLowerCase();
+          final mime = lower.endsWith('.png')
+              ? 'image/png'
+              : (lower.endsWith('.webp') ? 'image/webp' : 'image/jpeg');
+          finalPath = 'data:$mime;base64,${base64Encode(bytes)}';
+        } else {
           try {
             final appDir = await getApplicationDocumentsDirectory();
             final imgFolder = Directory('${appDir.path}/documents');
@@ -312,6 +323,21 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet>
     }
   }
 
+  Future<void> _pickImageFromPictureBank() async {
+    final db = ref.read(databaseProvider);
+    final pic = await showPictureBankPickerModal(context, db: db);
+    if (pic == null || !mounted) return;
+    final cleanCaption = MarkdownPreviewText.cleanMarkdown(pic.caption).trim();
+    setState(() {
+      _attachedFilePath = pic.imageData;
+      _attachedFileName = cleanCaption.isEmpty
+          ? 'gravura.png'
+          : '$cleanCaption.png';
+      _attachedFileSize = pic.imageData.length;
+      _attachedFileType = 'image';
+    });
+  }
+
   // ==========================================
   // SALVAR NA INBOX
   // ==========================================
@@ -325,7 +351,8 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet>
     try {
       if (tabIndex == 0) {
         // Texto
-        final text = _textController.text.trim();
+        final text = RichFormattedEditingController.readMarkup(_textController)
+            .trim();
         if (text.isEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Digite algo para salvar na Inbox.')),
@@ -706,65 +733,79 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet>
       return Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: AppTheme.primaryBlue.withValues(alpha: 0.5),
+          if (_attachedFileType == 'image') ...[
+            AppInlineImageView(
+              src: _attachedFilePath!,
+              alt: _attachedFileName ?? 'Imagem',
+              maxHeight: 130,
+              onRemove: () {
+                setState(() {
+                  _attachedFilePath = null;
+                  _attachedFileName = null;
+                  _attachedFileSize = null;
+                });
+              },
+            ),
+          ] else
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isDark
+                    ? const Color(0xFF0F172A)
+                    : const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: AppTheme.primaryBlue.withValues(alpha: 0.5),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.description_rounded,
+                    color: AppTheme.primaryBlue,
+                    size: 32,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _attachedFileName ?? 'Arquivo',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          '$sizeKb KB',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () {
+                      setState(() {
+                        _attachedFilePath = null;
+                        _attachedFileName = null;
+                        _attachedFileSize = null;
+                      });
+                    },
+                    tooltip: 'Remover',
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      color: Colors.redAccent,
+                      size: 20,
+                    ),
+                  ),
+                ],
               ),
             ),
-            child: Row(
-              children: [
-                Icon(
-                  _attachedFileType == 'image'
-                      ? Icons.image_rounded
-                      : Icons.description_rounded,
-                  color: AppTheme.primaryBlue,
-                  size: 32,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _attachedFileName ?? 'Arquivo',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      Text(
-                        '$sizeKb KB',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  onPressed: () {
-                    setState(() {
-                      _attachedFilePath = null;
-                      _attachedFileName = null;
-                      _attachedFileSize = null;
-                    });
-                  },
-                  tooltip: 'Remover',
-                  icon: const Icon(
-                    Icons.close_rounded,
-                    color: Colors.redAccent,
-                    size: 20,
-                  ),
-                ),
-              ],
-            ),
-          ),
           const SizedBox(height: 10),
           TextField(
             controller: _noteController,
@@ -785,27 +826,40 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet>
     }
 
     return Center(
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
+      child: Wrap(
+        alignment: WrapAlignment.center,
+        spacing: 10,
+        runSpacing: 10,
         children: [
           OutlinedButton.icon(
             onPressed: _pickDocument,
             icon: const Icon(Icons.upload_file_rounded),
             label: const Text('Documento'),
             style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
           ),
-          const SizedBox(width: 12),
           OutlinedButton.icon(
             onPressed: () => _pickImage(ImageSource.gallery),
             icon: const Icon(Icons.photo_library_rounded),
-            label: const Text('Galeria / Foto'),
+            label: const Text('Galeria / Dispositivo'),
             style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+          OutlinedButton.icon(
+            key: const Key('btn_quick_capture_picture_bank'),
+            onPressed: _pickImageFromPictureBank,
+            icon: const Icon(Icons.collections_bookmark_outlined),
+            label: const Text('Banco de Gravuras'),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),

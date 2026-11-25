@@ -610,12 +610,15 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
                 ))
                 .get();
         for (final inb in inboxEntries) {
+          final cleanTitle = MarkdownPreviewText.cleanMarkdown(inb.content)
+              .replaceAll('\n', ' ')
+              .trim();
           results.add(
             GlobalSearchResultItem(
               id: inb.id,
-              title: inb.content.length > 50
-                  ? '${inb.content.substring(0, 50)}...'
-                  : inb.content,
+              title: cleanTitle.length > 50
+                  ? '${cleanTitle.substring(0, 50)}...'
+                  : cleanTitle,
               subtitle: 'Inbox • Status: ${inb.status}',
               type: GlobalSearchResultType.inbox,
               onTap: () {

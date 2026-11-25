@@ -91,17 +91,59 @@ void main() {
       final underlineSpan = res.spans.whereType<TextSpan>().firstWhere(
         (s) => s.text == 'Texto sublinhado',
       );
-      expect(underlineSpan.style?.decoration, equals(TextDecoration.underline));
       expect(
-        underlineSpan.style?.decorationColor,
-        equals(const Color(0xFF8B5CF6)),
+        underlineSpan.style?.backgroundColor,
+        equals(const Color(0xFF8B5CF6).withValues(alpha: 0.34)),
       );
-      expect(underlineSpan.style?.decorationThickness, equals(2.5));
+      expect(underlineSpan.style?.decoration, isNull);
 
       expect(disposables.length, equals(1));
       disposables.first.onTap?.call();
       expect(tappedUrl, equals('app://ref/bible/43/3/16'));
 
+      for (final d in disposables) {
+        d.dispose();
+      }
+    });
+
+    test('marcação de link Markdown envolve o link inteiro e cura tags <u> legadas internas', () {
+      const raw = 'Leia [📖 João 3:16 (TNM)](app://ref/bible/43/3/16) hoje.';
+      final mapped = HighlightTextHelper.buildMappedSpans(
+        raw,
+        const TextStyle(fontSize: 14),
+      );
+
+      final start = mapped.plainDisplayText.indexOf('João');
+      final end = start + 'João 3:16'.length;
+      final updated = HighlightTextHelper.applyUnderlineToDisplaySelection(
+        rawText: raw,
+        selectionStart: start,
+        selectionEnd: end,
+        colorHex: '#F97316',
+      );
+      expect(
+        updated,
+        equals(
+          'Leia <u style="color:#F97316">[📖 João 3:16 (TNM)](app://ref/bible/43/3/16)</u> hoje.',
+        ),
+      );
+
+      // Verifica cura automática de marcação legada `[<u ...>Label</u>](url)` sem exibir `<u` cru
+      const corrupted =
+          'Veja [<u style="color:#F97316">🖼️ Gravura</u>](app://ref/picture/pic-1)';
+      final disposables = <TapGestureRecognizer>[];
+      String? tapped;
+      final healed = HighlightTextHelper.buildMappedSpans(
+        corrupted,
+        const TextStyle(fontSize: 14),
+        onLinkTap: (u) => tapped = u,
+        disposables: disposables,
+      );
+      expect(healed.plainDisplayText, equals('Veja 🖼️ Gravura'));
+      expect(healed.plainDisplayText, isNot(contains('<u')));
+      expect(disposables.length, equals(1));
+      disposables.first.onTap?.call();
+      expect(tapped, equals('app://ref/picture/pic-1'));
       for (final d in disposables) {
         d.dispose();
       }

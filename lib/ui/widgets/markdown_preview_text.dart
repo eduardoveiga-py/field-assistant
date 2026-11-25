@@ -1,8 +1,10 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
+import 'app_inline_image_view.dart';
 import 'app_reference_viewer.dart';
 import 'highlight_text_helper.dart';
+import 'jw_highlight_floating_toolbar.dart';
 
 /// Widget de exibição de texto formatado para pré-visualização e leitura em cards e painéis.
 /// Suporta sublinhado colorido estilo JW Library (`<u style="color:#hex">`), marca-texto `<mark>`,
@@ -130,8 +132,9 @@ class MarkdownPreviewText extends StatefulWidget {
 
 class _MarkdownPreviewTextState extends State<MarkdownPreviewText> {
   final List<GestureRecognizer> _recognizers = [];
+  final JwHighlightFloatingController _hlFloating =
+      JwHighlightFloatingController();
   late String _liveText;
-  TextSelection? _activeSelection;
 
   @override
   void initState() {
@@ -153,6 +156,7 @@ class _MarkdownPreviewTextState extends State<MarkdownPreviewText> {
 
   @override
   void dispose() {
+    _hlFloating.dispose();
     _disposeRecognizers();
     super.dispose();
   }
@@ -165,22 +169,26 @@ class _MarkdownPreviewTextState extends State<MarkdownPreviewText> {
   }
 
   Future<void> _applySelectionHighlight(
+    int segRawStart,
+    int segRawEnd,
+    String segText,
     MappedRichTextResult mapped,
     int selStart,
     int selEnd,
     String? colorHex,
   ) async {
-    final updated = HighlightTextHelper.applyUnderlineWithMap(
-      rawText: _liveText,
+    final updatedSeg = HighlightTextHelper.applyUnderlineWithMap(
+      rawText: segText,
       map: mapped,
       selectionStart: selStart,
       selectionEnd: selEnd,
       colorHex: colorHex,
     );
-    if (updated == _liveText) return;
+    if (updatedSeg == segText) return;
+    final updated = _liveText.replaceRange(segRawStart, segRawEnd, updatedSeg);
+    _hlFloating.hide();
     setState(() {
       _liveText = updated;
-      _activeSelection = null;
     });
     if (widget.onContentUpdated != null) {
       await widget.onContentUpdated!(updated);
@@ -191,6 +199,7 @@ class _MarkdownPreviewTextState extends State<MarkdownPreviewText> {
   Widget build(BuildContext context) {
     _disposeRecognizers();
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final defaultStyle = DefaultTextStyle.of(context).style;
     final effectiveStyle = widget.style != null
         ? defaultStyle.merge(widget.style)
@@ -204,6 +213,164 @@ class _MarkdownPreviewTextState extends State<MarkdownPreviewText> {
       }
     }
 
+    // Em visualizações sem corte de linhas (maxLines == null), extrai imagens Markdown e referências
+    // de gravura (app://ref/picture/<id>) para exibir a foto real inline.
+    if (widget.maxLines == null) {
+      final mediaRegex = RegExp(
+        r'!\[([^\]]*)\]\(([^\)]+)\)|(?:<u\b[^>]*>)?\[([^\]]*)\]\((app://ref/picture/[^)\s]+)\)(?:</u>)?',
+        multiLine: true,
+        caseSensitive: false,
+      );
+      final mediaMatches = mediaRegex.allMatches(_liveText).toList();
+      if (mediaMatches.isNotEmpty) {
+        final children = <Widget>[];
+        var cursor = 0;
+
+        void addTextSegment(int start, int end) {
+          final rawSlice = _liveText.substring(start, end);
+          if (rawSlice.trim().isEmpty) return;
+          final mapped = HighlightTextHelper.buildMappedSpans(
+            rawSlice,
+            effectiveStyle,
+            onLinkTap: handleTap,
+            disposables: _recognizers,
+            isDark: isDark,
+          );
+          if (mapped.spans.isEmpty) return;
+          final canHighlightInline =
+              widget.allowHighlights && widget.onContentUpdated != null;
+          if (widget.selectable || canHighlightInline) {
+            final anchorKey = GlobalKey();
+            children.add(
+              Listener(
+                key: anchorKey,
+                onPointerDown: (e) => _hlFloating.recordPointerDown(e.position),
+                onPointerUp: (e) => _hlFloating.recordPointerUp(e.position),
+                child: SelectableText.rich(
+                  TextSpan(children: mapped.spans),
+                  textAlign: widget.textAlign,
+                  onSelectionChanged: canHighlightInline
+                      ? (sel, _) {
+                          if (!mounted) return;
+                          if (sel.isValid &&
+                              !sel.isCollapsed &&
+                              sel.end > sel.start) {
+                            _hlFloating.show(
+                              context: context,
+                              keyPrefix: 'inline',
+                              anchorKey: anchorKey,
+                              onPickColor: (hex) => _applySelectionHighlight(
+                                start,
+                                end,
+                                rawSlice,
+                                mapped,
+                                sel.start,
+                                sel.end,
+                                hex,
+                              ),
+                            );
+                          } else {
+                            _hlFloating.hide();
+                          }
+                        }
+                      : null,
+                  contextMenuBuilder: (ctx, editableTextState) {
+                    final sel = editableTextState.textEditingValue.selection;
+                    final canHighlight =
+                        canHighlightInline && sel.isValid && !sel.isCollapsed;
+                    final items = <ContextMenuButtonItem>[
+                      ...editableTextState.contextMenuButtonItems,
+                      if (canHighlight) ...[
+                        for (final c in HighlightTextHelper.colors)
+                          ContextMenuButtonItem(
+                            label: 'Marcar (${c.label})',
+                            onPressed: () {
+                              ContextMenuController.removeAny();
+                              _hlFloating.hide();
+                              _applySelectionHighlight(
+                                start,
+                                end,
+                                rawSlice,
+                                mapped,
+                                sel.start,
+                                sel.end,
+                                c.hex,
+                              );
+                            },
+                          ),
+                        ContextMenuButtonItem(
+                          label: 'Remover marcação',
+                          onPressed: () {
+                            ContextMenuController.removeAny();
+                            _hlFloating.hide();
+                            _applySelectionHighlight(
+                              start,
+                              end,
+                              rawSlice,
+                              mapped,
+                              sel.start,
+                              sel.end,
+                              null,
+                            );
+                          },
+                        ),
+                      ],
+                    ];
+                    return AdaptiveTextSelectionToolbar.buttonItems(
+                      anchors: editableTextState.contextMenuAnchors,
+                      buttonItems: items,
+                    );
+                  },
+                ),
+              ),
+            );
+          } else {
+            children.add(
+              Text.rich(
+                TextSpan(children: mapped.spans),
+                textAlign: widget.textAlign,
+              ),
+            );
+          }
+        }
+
+        for (final m in mediaMatches) {
+          if (m.start > cursor) {
+            addTextSegment(cursor, m.start);
+          }
+          final rawAlt = m.group(1) ?? m.group(3) ?? 'Imagem';
+          final cleanAlt = HighlightTextHelper.stripHighlightTags(rawAlt)
+              .replaceFirst(RegExp(r'^🖼️\s*'), '')
+              .trim();
+          final src = m.group(2) ?? m.group(4) ?? '';
+          children.add(
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: AppInlineImageView(
+                src: src,
+                alt: cleanAlt.isEmpty ? 'Imagem' : cleanAlt,
+                maxHeight: 220,
+              ),
+            ),
+          );
+          cursor = m.end;
+          while (cursor < _liveText.length &&
+              (_liveText[cursor] == '\n' || _liveText[cursor] == '\r')) {
+            cursor++;
+          }
+        }
+        if (cursor < _liveText.length) {
+          addTextSegment(cursor, _liveText.length);
+        }
+        if (children.isEmpty) return const SizedBox.shrink();
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: children,
+        );
+      }
+    }
+
     final displaySource = _liveText.replaceAllMapped(
       RegExp(r'!\[([^\]]*)\]\([^\)]+\)'),
       (m) => (m.group(1)?.isNotEmpty ?? false) ? '[${m.group(1)}]' : '',
@@ -214,6 +381,7 @@ class _MarkdownPreviewTextState extends State<MarkdownPreviewText> {
       effectiveStyle,
       onLinkTap: handleTap,
       disposables: _recognizers,
+      isDark: isDark,
     );
 
     if (mapped.spans.isEmpty) {
@@ -224,135 +392,88 @@ class _MarkdownPreviewTextState extends State<MarkdownPreviewText> {
         widget.allowHighlights && widget.onContentUpdated != null;
 
     if (widget.selectable || canHighlightInline) {
-      final hasSelection =
-          canHighlightInline &&
-          _activeSelection != null &&
-          !_activeSelection!.isCollapsed &&
-          _activeSelection!.end > _activeSelection!.start;
-      final isDark = Theme.of(context).brightness == Brightness.dark;
-
-      final selectableWidget = SelectableText.rich(
-        TextSpan(children: mapped.spans),
-        textAlign: widget.textAlign,
-        maxLines: widget.maxLines,
-        onSelectionChanged: canHighlightInline
-            ? (sel, _) {
-                if (mounted) {
-                  setState(() => _activeSelection = sel);
+      final anchorKey = GlobalKey();
+      final selectableWidget = Listener(
+        key: anchorKey,
+        onPointerDown: (e) => _hlFloating.recordPointerDown(e.position),
+        onPointerUp: (e) => _hlFloating.recordPointerUp(e.position),
+        child: SelectableText.rich(
+          TextSpan(children: mapped.spans),
+          textAlign: widget.textAlign,
+          maxLines: widget.maxLines,
+          onSelectionChanged: canHighlightInline
+              ? (sel, _) {
+                  if (!mounted) return;
+                  if (sel.isValid && !sel.isCollapsed && sel.end > sel.start) {
+                    _hlFloating.show(
+                      context: context,
+                      keyPrefix: 'inline',
+                      anchorKey: anchorKey,
+                      onPickColor: (hex) => _applySelectionHighlight(
+                        0,
+                        _liveText.length,
+                        _liveText,
+                        mapped,
+                        sel.start,
+                        sel.end,
+                        hex,
+                      ),
+                    );
+                  } else {
+                    _hlFloating.hide();
+                  }
                 }
-              }
-            : null,
-        contextMenuBuilder: (ctx, editableTextState) {
-          final sel = editableTextState.textEditingValue.selection;
-          final canHighlight =
-              canHighlightInline && sel.isValid && !sel.isCollapsed;
-          final items = <ContextMenuButtonItem>[
-            ...editableTextState.contextMenuButtonItems,
-            if (canHighlight) ...[
-              for (final c in HighlightTextHelper.colors)
+              : null,
+          contextMenuBuilder: (ctx, editableTextState) {
+            final sel = editableTextState.textEditingValue.selection;
+            final canHighlight =
+                canHighlightInline && sel.isValid && !sel.isCollapsed;
+            final items = <ContextMenuButtonItem>[
+              ...editableTextState.contextMenuButtonItems,
+              if (canHighlight) ...[
+                for (final c in HighlightTextHelper.colors)
+                  ContextMenuButtonItem(
+                    label: 'Marcar (${c.label})',
+                    onPressed: () {
+                      ContextMenuController.removeAny();
+                      _hlFloating.hide();
+                      _applySelectionHighlight(
+                        0,
+                        _liveText.length,
+                        _liveText,
+                        mapped,
+                        sel.start,
+                        sel.end,
+                        c.hex,
+                      );
+                    },
+                  ),
                 ContextMenuButtonItem(
-                  label: 'Sublinhar (${c.label})',
+                  label: 'Remover marcação',
                   onPressed: () {
                     ContextMenuController.removeAny();
-                    _applySelectionHighlight(mapped, sel.start, sel.end, c.hex);
+                    _hlFloating.hide();
+                    _applySelectionHighlight(
+                      0,
+                      _liveText.length,
+                      _liveText,
+                      mapped,
+                      sel.start,
+                      sel.end,
+                      null,
+                    );
                   },
                 ),
-              ContextMenuButtonItem(
-                label: 'Remover Sublinhado',
-                onPressed: () {
-                  ContextMenuController.removeAny();
-                  _applySelectionHighlight(mapped, sel.start, sel.end, null);
-                },
-              ),
-            ],
-          ];
-          return AdaptiveTextSelectionToolbar.buttonItems(
-            anchors: editableTextState.contextMenuAnchors,
-            buttonItems: items,
-          );
-        },
+              ],
+            ];
+            return AdaptiveTextSelectionToolbar.buttonItems(
+              anchors: editableTextState.contextMenuAnchors,
+              buttonItems: items,
+            );
+          },
+        ),
       );
-
-      if (!canHighlightInline) {
-        return selectableWidget;
-      }
-
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          selectableWidget,
-          if (hasSelection) ...[
-            const SizedBox(height: 6),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: isDark
-                    ? const Color(0xFF1E293B)
-                    : const Color(0xFFF1F5F9),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: isDark ? Colors.white12 : Colors.black12,
-                ),
-              ),
-              child: Wrap(
-                spacing: 6,
-                runSpacing: 4,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  Text(
-                    'Sublinhar:',
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w600,
-                      color: isDark ? Colors.white70 : const Color(0xFF475569),
-                    ),
-                  ),
-                  for (final c in HighlightTextHelper.colors)
-                    InkWell(
-                      key: Key('btn_inline_hl_${c.id}'),
-                      borderRadius: BorderRadius.circular(12),
-                      onTap: () => _applySelectionHighlight(
-                        mapped,
-                        _activeSelection!.start,
-                        _activeSelection!.end,
-                        c.hex,
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(3),
-                        child: CircleAvatar(
-                          radius: 8,
-                          backgroundColor: c.color,
-                        ),
-                      ),
-                    ),
-                  IconButton(
-                    key: const Key('btn_inline_hl_clear'),
-                    tooltip: 'Remover sublinhado',
-                    visualDensity: VisualDensity.compact,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(
-                      minWidth: 26,
-                      minHeight: 26,
-                    ),
-                    icon: const Icon(
-                      Icons.format_clear,
-                      size: 16,
-                      color: Colors.redAccent,
-                    ),
-                    onPressed: () => _applySelectionHighlight(
-                      mapped,
-                      _activeSelection!.start,
-                      _activeSelection!.end,
-                      null,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ],
-      );
+      return selectableWidget;
     }
 
     return Text.rich(

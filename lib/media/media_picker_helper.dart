@@ -6,6 +6,8 @@ import 'package:image_picker/image_picker.dart';
 
 import '../core/app_logger.dart';
 import '../core/app_theme.dart';
+import '../database/app_database.dart';
+import '../ui/widgets/app_inline_image_view.dart';
 import '../ui/widgets/managed_text_controllers.dart';
 
 // Helper Web para seleção de arquivos diretamente via HTML se estiver no navegador
@@ -13,10 +15,12 @@ import 'media_file_image.dart';
 import 'media_web_stub.dart' if (dart.library.js_interop) 'media_web_impl.dart';
 
 class MediaPickerHelper {
-  /// Abre seletor com opções: Tirar Foto (Câmera), Escolher do Dispositivo ou Colar URL/Base64
+  /// Abre seletor com opções: Banco de Gravuras (quando [pictureBankDb] é informado),
+  /// Tirar Foto (Câmera), Escolher do Dispositivo ou Colar URL/Base64.
   static Future<String?> pickImage(
     BuildContext context, {
     String title = 'Selecionar Imagem',
+    AppDatabase? pictureBankDb,
   }) async {
     return showDialog<String>(
       context: context,
@@ -30,7 +34,13 @@ class MediaPickerHelper {
               children: [
                 const Icon(Icons.add_a_photo, color: AppTheme.primaryBlue),
                 const SizedBox(width: 8),
-                Text(title, style: const TextStyle(fontSize: 18)),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(fontSize: 18),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               ],
             ),
             content: ConstrainedBox(
@@ -45,6 +55,50 @@ class MediaPickerHelper {
                       style: TextStyle(fontSize: 13, color: AppTheme.textMuted),
                     ),
                     const SizedBox(height: 16),
+
+                    if (pictureBankDb != null) ...[
+                      ListTile(
+                        key: const Key('btn_media_pick_picture_bank'),
+                        leading: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0EA5E9)
+                                .withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(
+                            Icons.photo_library_rounded,
+                            color: Color(0xFF0EA5E9),
+                          ),
+                        ),
+                        title: const Text(
+                          'Escolher do Banco de Gravuras',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                        subtitle: const Text(
+                          'Selecionar uma gravura já salva no aplicativo',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        onTap: () async {
+                          final pic = await showPictureBankPickerModal(
+                            ctx,
+                            db: pictureBankDb,
+                          );
+                          if (pic != null &&
+                              pic.imageData.isNotEmpty &&
+                              ctx.mounted) {
+                            Navigator.pop(ctx, pic.imageData);
+                          }
+                        },
+                      ),
+                      const Divider(height: 16),
+                    ],
 
                     // OPÇÃO 1: CÂMERA (Tirar Foto)
                     ListTile(

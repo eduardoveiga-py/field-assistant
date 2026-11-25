@@ -12,6 +12,7 @@ import '../../picture_bank/picture_entry_model.dart';
 import '../../references/app_reference.dart';
 import '../providers.dart';
 import '../widgets/markdown_preview_text.dart';
+import '../widgets/rich_formatted_editing_controller.dart';
 import '../widgets/rich_markdown_toolbar.dart';
 
 /// Tela da Aba "Banco de Gravuras" do Field Assistant.
@@ -79,288 +80,301 @@ class _PictureBankScreenState extends ConsumerState<PictureBankScreen> {
 
   Future<void> _showAddPictureModal() async {
     String? pickedImageData;
-    final captionCtrl = TextEditingController();
+    final captionCtrl = RichFormattedEditingController();
     final tagsCtrl = TextEditingController();
     final urlCtrl = TextEditingController();
     bool isPicking = false;
 
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheetState) => SafeArea(
-          child: Padding(
-            padding: EdgeInsets.only(
-              top: 20,
-              left: 20,
-              right: 20,
-              bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-            ),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Row(
-                        children: [
-                          Icon(
-                            Icons.add_photo_alternate,
-                            color: AppTheme.accentTeal,
-                          ),
-                          SizedBox(width: 8),
-                          Text(
-                            'Adicionar ao Banco de Gravuras',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close),
-                        onPressed: () => Navigator.pop(ctx),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-
-                  // Área de Seleção de Imagem
-                  Center(
-                    child: Column(
+    try {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        builder: (ctx) => StatefulBuilder(
+          builder: (ctx, setSheetState) => SafeArea(
+            child: Padding(
+              padding: EdgeInsets.only(
+                top: 20,
+                left: 20,
+                right: 20,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        if (pickedImageData != null &&
-                            pickedImageData!.isNotEmpty)
-                          Container(
-                            height: 180,
-                            width: double.infinity,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: AppTheme.accentTeal,
-                                width: 2,
-                              ),
-                            ),
-                            clipBehavior: Clip.antiAlias,
-                            child: _buildPictureWidget(pickedImageData!),
-                          )
-                        else
-                          Container(
-                            height: 120,
-                            width: double.infinity,
-                            decoration: BoxDecoration(
-                              color: Colors.grey.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: Colors.grey.shade400,
-                                style: BorderStyle.solid,
-                              ),
-                            ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(
-                                  Icons.image_outlined,
-                                  size: 40,
-                                  color: Colors.grey,
-                                ),
-                                const SizedBox(height: 6),
-                                const Text(
-                                  'Nenhuma imagem selecionada',
-                                  style: TextStyle(
-                                    color: Colors.grey,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        const SizedBox(height: 10),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                        const Row(
                           children: [
-                            ElevatedButton.icon(
-                              icon: isPicking
-                                  ? const SizedBox(
-                                      width: 14,
-                                      height: 14,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : const Icon(Icons.folder_open, size: 18),
-                              label: const Text('Escolher Imagem'),
-                              onPressed: isPicking
-                                  ? null
-                                  : () async {
-                                      setSheetState(() => isPicking = true);
-                                      try {
-                                        final res = await FilePicker.pickFiles(
-                                          type: FileType.image,
-                                        );
-                                        if (res.isNotEmpty) {
-                                          final file = res.first;
-                                          if (kIsWeb) {
-                                            try {
-                                              final bytes = await file
-                                                  .readAsBytes();
-                                              final b64 = base64Encode(bytes);
-                                              setSheetState(() {
-                                                pickedImageData =
-                                                    'data:image/png;base64,$b64';
-                                              });
-                                            } catch (_) {}
-                                          } else if (file.path != null) {
-                                            setSheetState(() {
-                                              pickedImageData = file.path;
-                                            });
-                                          }
-                                        }
-                                      } catch (e) {
-                                        debugPrint(
-                                          'Erro ao selecionar foto: $e',
-                                        );
-                                      } finally {
-                                        setSheetState(() => isPicking = false);
-                                      }
-                                    },
+                            Icon(
+                              Icons.add_photo_alternate,
+                              color: AppTheme.accentTeal,
+                            ),
+                            SizedBox(width: 8),
+                            Text(
+                              'Adicionar ao Banco de Gravuras',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ],
                         ),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.pop(ctx),
+                        ),
                       ],
                     ),
-                  ),
+                    const SizedBox(height: 14),
 
-                  const SizedBox(height: 14),
-                  TextField(
-                    controller: urlCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Ou cole a URL direta da imagem (opcional)',
-                      hintText: 'https://exemplo.com/imagem.jpg',
-                      prefixIcon: Icon(Icons.link),
-                      isDense: true,
-                    ),
-                    onChanged: (val) {
-                      if (val.trim().startsWith('http')) {
-                        setSheetState(() => pickedImageData = val.trim());
-                      }
-                    },
-                  ),
-
-                  const SizedBox(height: 12),
-                  RichMarkdownToolbar(
-                    controller: captionCtrl,
-                    initialReferenceCategory: AppRefCategory.picture,
-                    onChanged: () => setSheetState(() {}),
-                  ),
-                  const SizedBox(height: 6),
-                  TextField(
-                    controller: captionCtrl,
-                    minLines: 1,
-                    maxLines: 4,
-                    decoration: const InputDecoration(
-                      labelText: 'Legenda da Foto / Gravura *',
-                      hintText: 'Ex: Visita na comunidade Betânia / Ilustração Bíblica',
-                      isDense: true,
-                    ),
-                  ),
-
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: tagsCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Tags (separadas por vírgula)',
-                      hintText: 'Ex: campo, estudo, solimoes, jandiatuba',
-                      prefixIcon: Icon(Icons.tag),
-                      isDense: true,
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(ctx),
-                        child: const Text('Cancelar'),
+                    // Área de Seleção de Imagem
+                    Center(
+                      child: Column(
+                        children: [
+                          if (pickedImageData != null &&
+                              pickedImageData!.isNotEmpty)
+                            Container(
+                              height: 180,
+                              width: double.infinity,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: AppTheme.accentTeal,
+                                  width: 2,
+                                ),
+                              ),
+                              clipBehavior: Clip.antiAlias,
+                              child: _buildPictureWidget(pickedImageData!),
+                            )
+                          else
+                            Container(
+                              height: 120,
+                              width: double.infinity,
+                              decoration: BoxDecoration(
+                                color: Colors.grey.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: Colors.grey.shade400,
+                                  style: BorderStyle.solid,
+                                ),
+                              ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(
+                                    Icons.image_outlined,
+                                    size: 40,
+                                    color: Colors.grey,
+                                  ),
+                                  const SizedBox(height: 6),
+                                  const Text(
+                                    'Nenhuma imagem selecionada',
+                                    style: TextStyle(
+                                      color: Colors.grey,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          const SizedBox(height: 10),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              ElevatedButton.icon(
+                                icon: isPicking
+                                    ? const SizedBox(
+                                        width: 14,
+                                        height: 14,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Icon(Icons.folder_open, size: 18),
+                                label: const Text('Escolher Imagem'),
+                                onPressed: isPicking
+                                    ? null
+                                    : () async {
+                                        setSheetState(() => isPicking = true);
+                                        try {
+                                          final res =
+                                              await FilePicker.pickFiles(
+                                                type: FileType.image,
+                                              );
+                                          if (res.isNotEmpty) {
+                                            final file = res.first;
+                                            if (kIsWeb) {
+                                              try {
+                                                final bytes = await file
+                                                    .readAsBytes();
+                                                final b64 = base64Encode(bytes);
+                                                setSheetState(() {
+                                                  pickedImageData =
+                                                      'data:image/png;base64,$b64';
+                                                });
+                                              } catch (_) {}
+                                            } else if (file.path != null) {
+                                              setSheetState(() {
+                                                pickedImageData = file.path;
+                                              });
+                                            }
+                                          }
+                                        } catch (e) {
+                                          debugPrint(
+                                            'Erro ao selecionar foto: $e',
+                                          );
+                                        } finally {
+                                          setSheetState(
+                                            () => isPicking = false,
+                                          );
+                                        }
+                                      },
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 8),
-                      FilledButton.icon(
-                        icon: const Icon(Icons.save),
-                        label: const Text('Salvar Gravura'),
-                        onPressed: () async {
-                          final caption = captionCtrl.text.trim();
-                          final image = pickedImageData ?? urlCtrl.text.trim();
-                          if (caption.isEmpty) {
-                            ScaffoldMessenger.of(ctx).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Informe uma legenda para a gravura.',
-                                ),
-                                backgroundColor: AppTheme.alertRed,
-                              ),
-                            );
-                            return;
-                          }
-                          if (image.isEmpty) {
-                            ScaffoldMessenger.of(ctx).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Selecione uma imagem ou informe a URL.',
-                                ),
-                                backgroundColor: AppTheme.alertRed,
-                              ),
-                            );
-                            return;
-                          }
+                    ),
 
-                          final rawTags = tagsCtrl.text
-                              .split(',')
-                              .map((t) => t.trim().replaceAll('#', ''))
-                              .where((t) => t.isNotEmpty)
-                              .toList();
-
-                          final newEntry = PictureEntry(
-                            id: const Uuid().v4(),
-                            caption: caption,
-                            tags: rawTags,
-                            imageData: image,
-                            createdAt: DateTime.now(),
-                            updatedAt: DateTime.now(),
-                          );
-
-                          final db = ref.read(repositoryProvider).db;
-                          await PictureBankManager.savePicture(db, newEntry);
-                          if (ctx.mounted) Navigator.pop(ctx);
-                          await _loadPictures();
-
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Gravura salva no banco com sucesso!',
-                                ),
-                                backgroundColor: AppTheme.successGreen,
-                              ),
-                            );
-                          }
-                        },
+                    const SizedBox(height: 14),
+                    TextField(
+                      controller: urlCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Ou cole a URL direta da imagem (opcional)',
+                        hintText: 'https://exemplo.com/imagem.jpg',
+                        prefixIcon: Icon(Icons.link),
+                        isDense: true,
                       ),
-                    ],
-                  ),
-                ],
+                      onChanged: (val) {
+                        if (val.trim().startsWith('http')) {
+                          setSheetState(() => pickedImageData = val.trim());
+                        }
+                      },
+                    ),
+
+                    const SizedBox(height: 12),
+                    RichMarkdownToolbar(
+                      controller: captionCtrl,
+                      initialReferenceCategory: AppRefCategory.picture,
+                      onChanged: () => setSheetState(() {}),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: captionCtrl,
+                      minLines: 1,
+                      maxLines: 4,
+                      decoration: const InputDecoration(
+                        labelText: 'Legenda da Foto / Gravura *',
+                        hintText: 'Ex: Visita na comunidade Betânia / Ilustração Bíblica',
+                        isDense: true,
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: tagsCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Tags (separadas por vírgula)',
+                        hintText: 'Ex: campo, estudo, solimoes, jandiatuba',
+                        prefixIcon: Icon(Icons.tag),
+                        isDense: true,
+                      ),
+                    ),
+
+                    const SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text('Cancelar'),
+                        ),
+                        const SizedBox(width: 8),
+                        FilledButton.icon(
+                          icon: const Icon(Icons.save),
+                          label: const Text('Salvar Gravura'),
+                          onPressed: () async {
+                            final caption =
+                                RichFormattedEditingController.readMarkup(
+                                  captionCtrl,
+                                ).trim();
+                            final image =
+                                pickedImageData ?? urlCtrl.text.trim();
+                            if (caption.isEmpty) {
+                              ScaffoldMessenger.of(ctx).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Informe uma legenda para a gravura.',
+                                  ),
+                                  backgroundColor: AppTheme.alertRed,
+                                ),
+                              );
+                              return;
+                            }
+                            if (image.isEmpty) {
+                              ScaffoldMessenger.of(ctx).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Selecione uma imagem ou informe a URL.',
+                                  ),
+                                  backgroundColor: AppTheme.alertRed,
+                                ),
+                              );
+                              return;
+                            }
+
+                            final rawTags = tagsCtrl.text
+                                .split(',')
+                                .map((t) => t.trim().replaceAll('#', ''))
+                                .where((t) => t.isNotEmpty)
+                                .toList();
+
+                            final newEntry = PictureEntry(
+                              id: const Uuid().v4(),
+                              caption: caption,
+                              tags: rawTags,
+                              imageData: image,
+                              createdAt: DateTime.now(),
+                              updatedAt: DateTime.now(),
+                            );
+
+                            final db = ref.read(repositoryProvider).db;
+                            await PictureBankManager.savePicture(db, newEntry);
+                            if (ctx.mounted) Navigator.pop(ctx);
+                            await _loadPictures();
+
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Gravura salva no banco com sucesso!',
+                                  ),
+                                  backgroundColor: AppTheme.successGreen,
+                                ),
+                              );
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
         ),
-      ),
-    );
+      );
+    } finally {
+      captionCtrl.dispose();
+      tagsCtrl.dispose();
+      urlCtrl.dispose();
+    }
   }
 
   void _openPictureViewer(PictureEntry picture) {

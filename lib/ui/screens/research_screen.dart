@@ -7,8 +7,10 @@ import '../../core/app_theme.dart';
 import '../../media/media_picker_helper.dart';
 import '../../reports/web_downloader.dart';
 import '../../research/research_manager.dart';
+import '../providers.dart';
 import '../widgets/managed_text_controllers.dart';
 import '../widgets/markdown_preview_text.dart';
+import '../widgets/rich_formatted_editing_controller.dart';
 import '../widgets/rich_markdown_toolbar.dart';
 
 class ResearchScreen extends ConsumerStatefulWidget {
@@ -262,7 +264,7 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
     final plainText =
         '${article.title}\n\n'
         'RESUMO:\n${article.summary}\n\n'
-        'CONTEÚDO:\n${article.content}';
+        'CONTEÚDO:\n${MarkdownPreviewText.cleanMarkdown(article.content)}';
 
     showModalBottomSheet(
       context: context,
@@ -640,6 +642,12 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
           existing?.content ?? '',
           '',
         ],
+        customFactories: [
+          null,
+          null,
+          (text) => RichFormattedEditingController.fromMarkup(text),
+          null,
+        ],
         builder: (ctx, ctrls) {
           final titleController = ctrls[0];
           final summaryController = ctrls[1];
@@ -837,6 +845,9 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
                                             await MediaPickerHelper.pickImage(
                                               context,
                                               title: 'Anexar Imagem à Pesquisa',
+                                              pictureBankDb: ref.read(
+                                                databaseProvider,
+                                              ),
                                             );
                                         if (img != null && img.isNotEmpty) {
                                           setDialogState(
@@ -924,7 +935,10 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
                               onPressed: () async {
                                 final title = titleController.text.trim();
                                 final summary = summaryController.text.trim();
-                                final content = contentController.text.trim();
+                                final content =
+                                    RichFormattedEditingController.readMarkup(
+                                      contentController,
+                                    ).trim();
                                 if (title.isEmpty ||
                                     summary.isEmpty ||
                                     content.isEmpty) {
