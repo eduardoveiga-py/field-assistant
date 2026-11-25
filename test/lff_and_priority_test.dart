@@ -844,17 +844,48 @@ void main() {
       expect(titles.any((t) => t.contains('T-37')), isFalse);
     });
 
-    test('Brochura Escute a Deus e Viva para Sempre possui contagens reais variadas de parágrafos', () {
+    test('Brochura Escute a Deus e Viva para Sempre possui títulos oficiais, subtópicos e parágrafos reais', () {
       expect(ListenToGodCatalog.lessons.length, equals(14));
+      expect(
+        ListenToGodCatalog.getLesson(1)?.title,
+        equals('Como podemos escutar a Deus?'),
+      );
+      expect(
+        ListenToGodCatalog.getLesson(5)?.title,
+        equals('O grande Dilúvio — quem escutou? Quem não deu ouvidos?'),
+      );
+      expect(
+        ListenToGodCatalog.getLesson(14)?.title,
+        equals('Como você pode mostrar lealdade a Jeová?'),
+      );
+      for (final lesson in ListenToGodCatalog.lessons) {
+        expect(lesson.pointTitles, isNotEmpty);
+        expect(lesson.totalPoints, equals(lesson.pointTitles.length));
+      }
+
       final paragraphs = ListenToGodCatalog.lessons
           .map((l) => l.paragraphs)
           .toList();
 
-      // Não são todos padronizados em 4
+      // Contagens variadas extraídas do corpo das lições em ll-T
       expect(paragraphs.toSet().length, greaterThan(1));
-      expect(paragraphs, contains(5));
-      expect(paragraphs, contains(6));
-      expect(paragraphs, contains(7));
+      expect(paragraphs, containsAll([4, 5, 6, 7, 8, 12]));
+    });
+
+    test('Notas da secção Entenda Melhor do livro Seja Feliz para Sempre correspondem ao EPUB oficial', () {
+      expect(LffBookCatalog.endnotes.length, equals(7));
+      expect(
+        LffBookCatalog.endnotes.map((e) => e.title).toList(),
+        equals([
+          'Quem é Babilônia, a Grande?',
+          'Quando o Messias iria aparecer?',
+          'Procedimentos médicos que envolvam sangue',
+          'Separação',
+          'Feriados e comemorações',
+          'Doenças contagiosas',
+          'Assuntos comerciais e jurídicos',
+        ]),
+      );
     });
 
     test('LffBookCatalog possui contagens reais variadas e não-padronizadas (4 a 7 pontos)', () {
@@ -899,12 +930,60 @@ void main() {
       }
     });
 
-    test('Brochura introdutória LffiBrochureCatalog possui exatamente 3 lições com 3 pontos cada', () {
+    test('Brochura introdutória LffiBrochureCatalog possui 3 lições com 6, 5 e 6 subtópicos reais de lffi-T', () {
       expect(LffiBrochureCatalog.lessons.length, equals(3));
-      for (final l in LffiBrochureCatalog.lessons) {
-        expect(l.totalPoints, equals(3));
+      expect(
+        LffiBrochureCatalog.lessons.map((l) => l.totalPoints).toList(),
+        equals([6, 5, 6]),
+      );
+      for (var i = 0; i < 3; i++) {
+        expect(
+          LffiBrochureCatalog.lessons[i].title,
+          equals(LffBookCatalog.lessons[i].title),
+        );
+        expect(
+          LffiBrochureCatalog.lessons[i].pointTitles,
+          equals(LffBookCatalog.lessons[i].pointTitles),
+        );
       }
     });
+
+    test(
+      'StudyPublicationIndexHelper despacha lff, lffi e ll corretamente',
+      () {
+        expect(StudyPublicationIndexHelper.isSupported('lff-book'), isTrue);
+        expect(StudyPublicationIndexHelper.isSupported('lff'), isTrue);
+        expect(StudyPublicationIndexHelper.isSupported('lff-brochure'), isTrue);
+        expect(StudyPublicationIndexHelper.isSupported('lffi'), isTrue);
+        expect(StudyPublicationIndexHelper.isSupported('ll-brochure'), isTrue);
+        expect(StudyPublicationIndexHelper.isSupported('ll'), isTrue);
+
+        expect(
+          StudyPublicationIndexHelper.totalLessonsFor('lff-brochure'),
+          equals(3),
+        );
+        expect(
+          StudyPublicationIndexHelper.totalLessonsFor('ll-brochure'),
+          equals(14),
+        );
+        expect(
+          StudyPublicationIndexHelper.getLessonPointTitles('lffi', 3).length,
+          equals(6),
+        );
+        expect(
+          StudyPublicationIndexHelper.getLessonPointTitles('ll', 1).length,
+          equals(2),
+        );
+        expect(
+          StudyPublicationIndexHelper.calculateProgressPercentage(
+            publicationId: 'lff-brochure',
+            lesson: 3,
+            point: 6,
+          ),
+          equals(100.0),
+        );
+      },
+    );
   });
 
   group('Composição e Decomposição de Endereço com Bairro e Setor', () {
