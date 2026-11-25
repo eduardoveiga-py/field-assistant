@@ -461,8 +461,26 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
                           ),
                         ),
                         const SizedBox(height: 4),
-                        Text(
-                          article.summary,
+                        MarkdownPreviewText(
+                          text: article.summary,
+                          selectable: true,
+                          allowHighlights: true,
+                          maxLines: 8,
+                          onContentUpdated: (updated) async {
+                            final mgr = ref.read(researchManagerProvider);
+                            await mgr.updateArticle(
+                              ResearchArticleItem(
+                                id: article.id,
+                                title: article.title,
+                                summary: updated,
+                                content: article.content,
+                                tags: article.tags,
+                                attachments: article.attachments,
+                                createdAt: article.createdAt,
+                                updatedAt: DateTime.now(),
+                              ),
+                            );
+                          },
                           style: const TextStyle(
                             fontSize: 13,
                             fontStyle: FontStyle.italic,
@@ -479,8 +497,26 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                   ),
                   const SizedBox(height: 8),
-                  SelectableText(
-                    article.content,
+                  MarkdownPreviewText(
+                    text: article.content,
+                    selectable: true,
+                    allowHighlights: true,
+                    maxLines: 60,
+                    onContentUpdated: (updated) async {
+                      final mgr = ref.read(researchManagerProvider);
+                      await mgr.updateArticle(
+                        ResearchArticleItem(
+                          id: article.id,
+                          title: article.title,
+                          summary: article.summary,
+                          content: updated,
+                          tags: article.tags,
+                          attachments: article.attachments,
+                          createdAt: article.createdAt,
+                          updatedAt: DateTime.now(),
+                        ),
+                      );
+                    },
                     style: TextStyle(
                       fontSize: 14,
                       height: 1.6,

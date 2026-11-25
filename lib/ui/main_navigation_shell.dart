@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/i18n/app_locale_strings.dart';
 import '../appointments/calendar_provider.dart';
 import '../appointments/calendar_sync_coordinator.dart';
+import '../navigation/app_navigation_controller.dart';
 import '../sync/supabase_sync_service.dart';
 import '../sync/sync_owner_guard.dart';
 import 'providers.dart';
@@ -107,11 +108,17 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
 
   AppFeature _currentFeature = AppFeature.today;
   bool _showingSettings = false;
+  final Map<AppFeature, int> _featureSubTabs = {};
+  int _navEpoch = 0;
 
-  void _onFeatureSelect(AppFeature feature) {
+  void _onFeatureSelect(AppFeature feature, {int? subTabIndex}) {
     setState(() {
       _currentFeature = feature;
       _showingSettings = false;
+      if (subTabIndex != null) {
+        _featureSubTabs[feature] = subTabIndex;
+        _navEpoch++;
+      }
     });
   }
 
@@ -199,11 +206,20 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
       case AppFeature.territoryMaps:
         return const ContactsMapScreen();
       case AppFeature.inbox:
-        return const InboxScreen();
+        return InboxScreen(
+          initialTabIndex: _featureSubTabs[AppFeature.inbox],
+          navigationEpoch: _navEpoch,
+        );
       case AppFeature.tasksProjects:
-        return const TasksScreen();
+        return TasksScreen(
+          initialTabIndex: _featureSubTabs[AppFeature.tasksProjects],
+          navigationEpoch: _navEpoch,
+        );
       case AppFeature.knowledge:
-        return const KnowledgeBaseScreen();
+        return KnowledgeBaseScreen(
+          initialTabIndex: _featureSubTabs[AppFeature.knowledge],
+          navigationEpoch: _navEpoch,
+        );
       case AppFeature.pictureBank:
         return const PictureBankScreen();
     }
@@ -485,6 +501,17 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
   Widget build(BuildContext context) {
     final activeFeatures = ref.watch(activeFeaturesProvider);
     final strings = ref.watch(appStringsProvider);
+
+    ref.listen<AppNavigationRequest?>(appNavigationProvider, (_, next) {
+      if (next == null) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ref.read(appNavigationProvider.notifier).clearIfHandled(next.requestId);
+        if (activeFeatures.contains(next.feature)) {
+          _onFeatureSelect(next.feature, subTabIndex: next.subTabIndex);
+        }
+      });
+    });
 
     // Se a feature atual foi desativada e não estamos em ajustes, redireciona com segurança para Hoje
     if (!_showingSettings && !activeFeatures.contains(_currentFeature)) {

@@ -10,6 +10,8 @@ import '../knowledge/knowledge_manager.dart';
 import '../core/biometric_auth_service.dart';
 import '../inbox/jw_email_service.dart';
 import '../appointments/availability_engine.dart';
+import '../core/feature_registry.dart';
+import '../navigation/app_navigation_controller.dart';
 
 // Provider do Banco Drift
 final databaseProvider = Provider<AppDatabase>((ref) {
@@ -261,3 +263,32 @@ final syncQueueCountsProvider =
       final repo = ref.watch(repositoryProvider);
       return repo.watchSyncQueueCounts();
     });
+
+class AppNavigationNotifier extends Notifier<AppNavigationRequest?> {
+  int _counter = 0;
+
+  @override
+  AppNavigationRequest? build() => null;
+
+  void navigateTo(AppFeature feature, {int? subTabIndex, String? focusItemId}) {
+    _counter++;
+    state = AppNavigationRequest(
+      requestId: _counter,
+      feature: feature,
+      subTabIndex: subTabIndex,
+      focusItemId: focusItemId,
+    );
+  }
+
+  void clearIfHandled(int requestId) {
+    if (state?.requestId == requestId) {
+      state = null;
+    }
+  }
+}
+
+/// Controlador reativo de navegação cruzada acionado por popups de referências.
+final appNavigationProvider =
+    NotifierProvider<AppNavigationNotifier, AppNavigationRequest?>(
+      AppNavigationNotifier.new,
+    );

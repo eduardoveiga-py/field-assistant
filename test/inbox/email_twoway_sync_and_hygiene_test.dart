@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:ministerio_pessoal/core/biometric_auth_service.dart';
+import 'package:ministerio_pessoal/core/google_sign_in_initializer.dart';
 import 'package:ministerio_pessoal/database/app_database.dart';
 import 'package:ministerio_pessoal/inbox/email_account_model.dart';
 import 'package:ministerio_pessoal/inbox/email_sync_coordinator.dart';
@@ -775,6 +776,165 @@ void main() {
         (jsonDecode(entries.single.metadata)['email'] as Map)['isRead'],
         isTrue,
       );
+    });
+
+    test('Microsoft Graph evita HTTP 400 ErrorInvalidIdMalformed em IDs UUID sintéticos e limpa fila envenenada', () async {
+      final now = DateTime.now().toUtc();
+      final acc = EmailAccount(
+        id: 'acc_ms_synth',
+        name: 'Outlook Teste',
+        email: 'eduveiga@hotmail.com',
+        providerType: EmailProviderType.hotmail,
+        incomingHost: 'graph.microsoft.com',
+        outgoingHost: 'graph.microsoft.com',
+        incomingProtocol: 'microsoft_graph',
+        outgoingProtocol: 'microsoft_graph',
+        username: 'eduveiga@hotmail.com',
+        createdAt: now,
+      );
+      await EmailAccountsManager.saveAccount(db, acc);
+      await const OAuthTokenStore().saveTokenBundle(
+        acc.id,
+        OAuthTokenBundle(
+          accessToken: 'ms_valid_token',
+          refreshToken: 'ms_refresh',
+          expiresAt: now.add(const Duration(hours: 1)),
+        ),
+      );
+
+      const syntheticUuid = '123e4567-e89b-12d3-a456-426614174000';
+      final localSentMsg = JwEmailMessage(
+        id: syntheticUuid,
+        accountEmail: acc.email,
+        folderName: 'Enviadas',
+        subject: 'Assunto Local Sem Match',
+        from: acc.email,
+        to: 'dest@gmail.com',
+        date: now,
+        bodyText: 'Corpo local',
+        isRead: false,
+      );
+      await db
+          .into(db.inboxEntries)
+          .insert(
+            InboxEntriesCompanion.insert(
+              id: 'email_$syntheticUuid',
+              content: localSentMsg.bodyText,
+              sourceType: const drift.Value('email'),
+              suggestedCategory: const drift.Value('email'),
+              capturedAt: now,
+              metadata: drift.Value(
+                jsonEncode({'email': localSentMsg.toJson()}),
+              ),
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+
+      // Injeta uma ação antiga envenenada com UUID sintético na fila offline
+      await db
+          .into(db.appKvStore)
+          .insertOnConflictUpdate(
+            AppKvStoreCompanion.insert(
+              key: 'email_pending_remote_actions_v1',
+              value: jsonEncode([
+                {
+                  'entryId': 'email_$syntheticUuid',
+                  'accountId': acc.id,
+                  'accountEmail': acc.email,
+                  'protocol': 'microsoft_graph',
+                  'messageId': syntheticUuid,
+                  'remoteId': syntheticUuid,
+                  'action': 'read',
+                  'isRead': true,
+                },
+              ]),
+              updatedAt: drift.Value(now),
+            ),
+          );
+
+      final hitPaths = <String>[];
+      final mockClient = MockClient((req) async {
+        hitPaths.add('${req.method} ${req.url.path}');
+        if (req.url.path.contains('/sentitems/messages')) {
+          return http.Response(jsonEncode({'value': []}), 200);
+        }
+        if (req.url.path.contains(syntheticUuid)) {
+          return http.Response(
+            jsonEncode({
+              'error': {
+                'code': 'ErrorInvalidIdMalformed',
+                'message': 'Id is malformed.',
+              },
+            }),
+            400,
+          );
+        }
+        return http.Response(jsonEncode({'value': []}), 200);
+      });
+
+      final coordinator = EmailSyncCoordinator(
+        db,
+        microsoftService: MicrosoftOAuthService(
+          httpClient: mockClient,
+          clientId: 'test-client',
+        ),
+      );
+
+      final res = await coordinator.updateReadStatus([
+        localSentMsg,
+      ], isRead: true);
+      expect(res.localUpdated, equals(1));
+      expect(res.warnings, isEmpty);
+      expect(hitPaths.any((p) => p.contains(syntheticUuid)), isFalse);
+
+      // Flush limpa a fila legada envenenada sem warnings
+      final flushWarnings = await coordinator.flushPendingRemoteActions([acc]);
+      expect(flushWarnings, isEmpty);
+
+      final queueRow =
+          await (db.select(db.appKvStore)
+                ..where((t) => t.key.equals('email_pending_remote_actions_v1')))
+              .getSingle();
+      expect(jsonDecode(queueRow.value), isEmpty);
+    });
+
+    test('Gmail sendEmail retorna id real do servidor e GoogleSignInInitializer guarda prompt único Web', () async {
+      const accountId = 'acc_gmail_send_1';
+      await const OAuthTokenStore().saveTokenBundle(
+        accountId,
+        OAuthTokenBundle(
+          accessToken: 'gmail_valid_token',
+          expiresAt: DateTime.now().add(const Duration(hours: 1)),
+        ),
+      );
+
+      final mockClient = MockClient((req) async {
+        if (req.method == 'POST' && req.url.path.endsWith('/messages/send')) {
+          return http.Response(
+            jsonEncode({'id': 'gmail_real_msg_999', 'threadId': 'thr_1'}),
+            200,
+          );
+        }
+        return http.Response('{}', 404);
+      });
+
+      final gmail = GmailOAuthService(httpClient: mockClient);
+      final sentId = await gmail.sendEmail(
+        accountId: accountId,
+        from: 'eu@gmail.com',
+        to: const ['amigo@gmail.com'],
+        subject: 'Teste ID real',
+        bodyText: 'Corpo teste',
+      );
+      expect(sentId, equals('gmail_real_msg_999'));
+
+      GoogleSignInInitializer.resetForTesting();
+      expect(GoogleSignInInitializer.hasPromptedWebSession, isFalse);
+      GoogleSignInInitializer.markWebSessionPrompted();
+      expect(GoogleSignInInitializer.hasPromptedWebSession, isTrue);
+      GoogleSignInInitializer.resetForTesting();
+      expect(GoogleSignInInitializer.hasPromptedWebSession, isFalse);
     });
   });
 }

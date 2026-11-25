@@ -1209,28 +1209,55 @@ extension _SettingsIntegrationCards on _SettingsScreenState {
                                 ),
                               ),
                               if (acc.isOAuth)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.green.withValues(alpha: 0.15),
-                                    borderRadius: BorderRadius.circular(4),
-                                    border: Border.all(
-                                      color: Colors.green.withValues(
-                                        alpha: 0.5,
+                                FutureBuilder<OAuthTokenBundle?>(
+                                  future: const OAuthTokenStore()
+                                      .readTokenBundle(acc.id),
+                                  builder: (ctx, tokenSnap) {
+                                    if (tokenSnap.connectionState ==
+                                        ConnectionState.waiting) {
+                                      return const SizedBox.shrink();
+                                    }
+                                    final bundle = tokenSnap.data;
+                                    final hasRefresh =
+                                        bundle?.refreshToken != null &&
+                                        bundle!.refreshToken!.isNotEmpty;
+                                    final isExpiredWithoutRefresh =
+                                        bundle == null ||
+                                        (bundle.isExpired && !hasRefresh);
+                                    final badgeColor = isExpiredWithoutRefresh
+                                        ? Colors.amber.shade800
+                                        : Colors.green;
+                                    final badgeLabel = bundle == null
+                                        ? 'Reconectar OAuth'
+                                        : (isExpiredWithoutRefresh
+                                              ? 'Sessão Expirada'
+                                              : 'OAuth 2.0 Conectado');
+                                    return Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 2,
                                       ),
-                                    ),
-                                  ),
-                                  child: const Text(
-                                    'OAuth 2.0 Conectado',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: Colors.green,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
+                                      decoration: BoxDecoration(
+                                        color: badgeColor.withValues(
+                                          alpha: 0.15,
+                                        ),
+                                        borderRadius: BorderRadius.circular(4),
+                                        border: Border.all(
+                                          color: badgeColor.withValues(
+                                            alpha: 0.5,
+                                          ),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        badgeLabel,
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: badgeColor,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    );
+                                  },
                                 ),
                             ],
                           ),

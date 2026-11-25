@@ -762,6 +762,23 @@ class _ExperiencesScreenState extends ConsumerState<ExperiencesScreen> {
                               itemType: 'Experiência',
                               tags: exp.tags,
                               updatedAt: exp.dateTime,
+                              allowHighlights: true,
+                              onContentUpdated: (updated) async {
+                                final mgr = ref.read(experienceManagerProvider);
+                                await mgr.updateExperience(
+                                  MinistryExperienceItem(
+                                    id: exp.id,
+                                    title: exp.title,
+                                    content: updated,
+                                    mediaUrls: exp.mediaUrls,
+                                    tags: exp.tags,
+                                    dateTime: exp.dateTime,
+                                    locationOrModality: exp.locationOrModality,
+                                    createdAt: exp.createdAt,
+                                    updatedAt: DateTime.now(),
+                                  ),
+                                );
+                              },
                               onEdit: () => _showAddEditExperienceModal(
                                 context,
                                 existing: exp,

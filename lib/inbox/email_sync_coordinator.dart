@@ -223,19 +223,23 @@ class EmailSyncCoordinator {
         e is JwEmailAuthException ||
         msg.contains('401') ||
         msg.contains('auth') ||
-        msg.contains('autenticação') ||
+        msg.contains('autentica') ||
+        msg.contains('expirad') ||
+        msg.contains('token') ||
         msg.contains('senha') ||
         msg.contains('credencia');
 
     final isGmail =
         (acc != null &&
-            (acc.email.toLowerCase().contains('gmail') ||
+            (acc.incomingProtocol == 'gmail_api' ||
+                acc.email.toLowerCase().contains('gmail') ||
                 acc.incomingHost.toLowerCase().contains('gmail'))) ||
         msg.contains('gmail');
 
     final isMicrosoft =
         (acc != null &&
-            (acc.email.toLowerCase().contains('outlook') ||
+            (acc.incomingProtocol == 'microsoft_graph' ||
+                acc.email.toLowerCase().contains('outlook') ||
                 acc.email.toLowerCase().contains('hotmail') ||
                 acc.incomingHost.toLowerCase().contains('outlook') ||
                 acc.incomingHost.toLowerCase().contains('office365'))) ||
@@ -244,6 +248,12 @@ class EmailSyncCoordinator {
         msg.contains('office365');
 
     if (isAuthError) {
+      if (acc != null && acc.incomingProtocol == 'gmail_api') {
+        return 'Sessão do Gmail expirada ou não autorizada — toque em Reconectar.';
+      }
+      if (acc != null && acc.incomingProtocol == 'microsoft_graph') {
+        return 'Sessão Microsoft expirada ou revogada — toque em Reconectar.';
+      }
       if (isGmail) {
         return 'Falha de autenticação (401). No Gmail, use uma Senha de App de 16 dígitos ou OAuth2 se a verificação em duas etapas estiver ativa.';
       }
@@ -712,6 +722,20 @@ class EmailSyncCoordinator {
         .firstOrNull;
   }
 
+  /// Indica se um ID de e-mail é sintético local (ex.: UUID v4 de rascunho/enviada local)
+  /// e não um ID remoto válido do Gmail ou Microsoft Graph.
+  static bool isLocalSyntheticMessageId(String rawId) =>
+      MicrosoftOAuthService.isSyntheticLocalId(rawId);
+
+  static bool _isPermanentInvalidIdOrMissingError(Object e) {
+    final lower = e.toString().toLowerCase();
+    return lower.contains('errorinvalididmalformed') ||
+        lower.contains('invalididmalformed') ||
+        lower.contains('id is malformed') ||
+        lower.contains('invalid compression id') ||
+        (lower.contains('http 404') && lower.contains('recusou'));
+  }
+
   Future<String> _resolveEffectiveRemoteId(JwEmailMessage msg) async {
     final entryId = msg.id.startsWith('email_') ? msg.id : 'email_${msg.id}';
     final row = await (db.select(
@@ -728,6 +752,93 @@ class EmailSyncCoordinator {
       } catch (_) {}
     }
     return msg.id.startsWith('email_') ? msg.id.substring(6) : msg.id;
+  }
+
+  /// Caso uma mensagem enviada localmente ainda tenha ID sintético (UUID v4), tenta
+  /// reconciliar localmente ou no servidor Graph (`sentitems`) o ItemId real para não gerar HTTP 400.
+  Future<String?> _tryResolveSyntheticRemoteId({
+    required EmailAccount acc,
+    required String entryId,
+    required String subject,
+    DateTime? sentDateUtc,
+  }) async {
+    // 1. Verifica se já existe outra linha sincronizada do servidor com mesmo assunto/data/conta
+    final targetSub = subject.trim().toLowerCase();
+    final targetEmail = acc.email.trim().toLowerCase();
+    if (targetSub.isNotEmpty) {
+      final candidateRows = await (db.select(
+        db.inboxEntries,
+      )..where((t) => t.sourceType.equals('email'))).get();
+      for (final row in candidateRows) {
+        if (row.id == entryId) continue;
+        try {
+          final meta = jsonDecode(row.metadata) as Map<String, dynamic>;
+          final emailRaw = meta['email'];
+          if (emailRaw is! Map) continue;
+          final rowAcc = (emailRaw['accountEmail']?.toString() ?? '')
+              .trim()
+              .toLowerCase();
+          if (rowAcc != targetEmail) continue;
+          final rowSub = (emailRaw['subject']?.toString() ?? '')
+              .trim()
+              .toLowerCase();
+          if (rowSub != targetSub) continue;
+          final rid =
+              emailRaw['remoteId']?.toString() ??
+              emailRaw['id']?.toString() ??
+              (row.id.startsWith('email_') ? row.id.substring(6) : row.id);
+          if (isLocalSyntheticMessageId(rid)) continue;
+          if (sentDateUtc != null) {
+            final rowDate = DateTime.tryParse(
+              emailRaw['date']?.toString() ?? '',
+            )?.toUtc();
+            if (rowDate != null &&
+                rowDate.difference(sentDateUtc.toUtc()).inMinutes.abs() > 20) {
+              continue;
+            }
+          }
+          await _bindRemoteIdToEntry(entryId, rid);
+          return rid;
+        } catch (_) {}
+      }
+    }
+
+    // 2. Consulta leve em sentitems no Microsoft Graph (quando aplicável)
+    if (acc.incomingProtocol == 'microsoft_graph' && targetSub.isNotEmpty) {
+      final ms = microsoftService ?? MicrosoftOAuthService();
+      final resolved = await ms.findRecentSentMessageId(
+        accountId: acc.id,
+        subject: subject,
+        sentAfterUtc: sentDateUtc,
+      );
+      if (resolved != null && resolved.isNotEmpty) {
+        await _bindRemoteIdToEntry(entryId, resolved);
+        return resolved;
+      }
+    }
+    return null;
+  }
+
+  Future<void> _bindRemoteIdToEntry(String entryId, String remoteId) async {
+    final row = await (db.select(
+      db.inboxEntries,
+    )..where((t) => t.id.equals(entryId))).getSingleOrNull();
+    if (row == null || row.metadata.isEmpty) return;
+    try {
+      final meta = Map<String, dynamic>.from(jsonDecode(row.metadata) as Map);
+      final emailRaw = meta['email'];
+      if (emailRaw is Map) {
+        final emailMap = Map<String, dynamic>.from(emailRaw);
+        emailMap['remoteId'] = remoteId;
+        emailMap.remove('isLocalSentPendingResolution');
+        meta['email'] = emailMap;
+        await (db.update(
+          db.inboxEntries,
+        )..where((t) => t.id.equals(entryId))).write(
+          InboxEntriesCompanion(metadata: drift.Value(jsonEncode(meta))),
+        );
+      }
+    } catch (_) {}
   }
 
   /// Atualiza status de leitura (`isRead`) localmente e reflete no servidor da conta conectada.
@@ -899,7 +1010,28 @@ class EmailSyncCoordinator {
         continue;
       }
 
-      final remoteId = await _resolveEffectiveRemoteId(msg);
+      var remoteId = await _resolveEffectiveRemoteId(msg);
+      final isOAuthProtocol =
+          acc.incomingProtocol == 'microsoft_graph' ||
+          acc.incomingProtocol == 'gmail_api';
+      if (isOAuthProtocol && isLocalSyntheticMessageId(remoteId)) {
+        final entryId = msg.id.startsWith('email_')
+            ? msg.id
+            : 'email_${msg.id}';
+        final resolved = await _tryResolveSyntheticRemoteId(
+          acc: acc,
+          entryId: entryId,
+          subject: msg.subject,
+          sentDateUtc: msg.date,
+        );
+        if (resolved == null || isLocalSyntheticMessageId(resolved)) {
+          // Registro puramente local (ex.: rascunho/enviada sem ItemId no servidor):
+          // não envia UUID sintético para o Graph/Gmail para evitar HTTP 400 ErrorInvalidIdMalformed.
+          continue;
+        }
+        remoteId = resolved;
+      }
+
       final actionMap = <String, dynamic>{
         'entryId': msg.id.startsWith('email_') ? msg.id : 'email_${msg.id}',
         'accountId': acc.id,
@@ -923,6 +1055,12 @@ class EmailSyncCoordinator {
         );
         remoteSynced++;
       } catch (e, st) {
+        if (_isPermanentInvalidIdOrMissingError(e)) {
+          AppLogger.info(
+            'Descartando sincronização remota para ID sintético/inexistente ($actionType / ${acc.name}): $e',
+          );
+          continue;
+        }
         AppLogger.warning(
           'Falha ao enviar alteração "$actionType" para ${acc.name}; enfileirando para retry offline',
           e,
@@ -1153,6 +1291,47 @@ class EmailSyncCoordinator {
         remaining.add(action);
         continue;
       }
+
+      // Saneamento automático de ações legadas com ID sintético local (ex.: UUIDv4 enfileirado anteriormente)
+      final queuedRemoteId =
+          (action['remoteId'] as String?) ??
+          (action['messageId'] as String? ?? '');
+      if ((acc.incomingProtocol == 'microsoft_graph' ||
+              acc.incomingProtocol == 'gmail_api') &&
+          isLocalSyntheticMessageId(queuedRemoteId)) {
+        final entryId = action['entryId'] as String? ?? '';
+        String subject = '';
+        DateTime? sentAt;
+        if (entryId.isNotEmpty) {
+          final row = await (db.select(
+            db.inboxEntries,
+          )..where((t) => t.id.equals(entryId))).getSingleOrNull();
+          if (row != null && row.metadata.isNotEmpty) {
+            try {
+              final meta = jsonDecode(row.metadata) as Map<String, dynamic>;
+              final emailRaw = meta['email'];
+              if (emailRaw is Map) {
+                subject = emailRaw['subject']?.toString() ?? '';
+                sentAt = DateTime.tryParse(emailRaw['date']?.toString() ?? '');
+              }
+            } catch (_) {}
+          }
+        }
+        final resolved = subject.isNotEmpty
+            ? await _tryResolveSyntheticRemoteId(
+                acc: acc,
+                entryId: entryId,
+                subject: subject,
+                sentDateUtc: sentAt,
+              )
+            : null;
+        if (resolved == null || isLocalSyntheticMessageId(resolved)) {
+          // Descarta ação impossível de enviar (evita loop infinito de HTTP 400 ErrorInvalidIdMalformed).
+          continue;
+        }
+        action['remoteId'] = resolved;
+      }
+
       try {
         await _executeSingleRemoteAction(
           action,
@@ -1160,6 +1339,12 @@ class EmailSyncCoordinator {
           interactive: interactive,
         );
       } catch (e, st) {
+        if (_isPermanentInvalidIdOrMissingError(e)) {
+          AppLogger.info(
+            'Ação pendente descartada por ID inválido ou inexistente no servidor (${action['action']} / ${acc.name}): $e',
+          );
+          continue;
+        }
         AppLogger.warning(
           'Falha ao reenviar ação pendente de e-mail (${action['action']}) para ${acc.name}',
           e,

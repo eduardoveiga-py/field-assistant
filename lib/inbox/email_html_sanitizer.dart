@@ -336,7 +336,12 @@ class EmailHtmlSanitizer {
 
   /// Converte texto formatado do compositor (com **negrito**, *itálico*, __sublinhado__, etc.)
   /// para HTML limpo bem-formatado para envio de e-mails.
-  static String markdownToCleanHtml(String text) {
+  /// Quando [preserveAppRefLinks] é false (envio externo), links internos `app://ref/...`
+  /// são convertidos em texto legível sem URI interna quebrada.
+  static String markdownToCleanHtml(
+    String text, {
+    bool preserveAppRefLinks = false,
+  }) {
     if (text.trim().isEmpty) return '';
 
     final lower = text.trim().toLowerCase();
@@ -364,7 +369,15 @@ class EmailHtmlSanitizer {
       (m) => '<u>${m.group(1)}</u>',
     );
 
-    // Links: [texto](url)
+    // Links internos do app: [rótulo](app://ref/...)
+    s = s.replaceAllMapped(
+      RegExp(r'\[([^\]]+)\]\((app://ref/[^\)]+)\)'),
+      (m) => preserveAppRefLinks
+          ? '<a href="${m.group(2)}">${m.group(1)}</a>'
+          : '<b>${m.group(1)}</b>',
+    );
+
+    // Links web externos: [texto](https?://...)
     s = s.replaceAllMapped(
       RegExp(r'\[([^\]]+)\]\((https?://[^\)]+)\)'),
       (m) => '<a href="${m.group(2)}">${m.group(1)}</a>',
@@ -398,6 +411,13 @@ class EmailHtmlSanitizer {
   static String stripMarkdown(String raw) {
     if (raw.isEmpty) return raw;
     var text = raw;
+    text = text.replaceAllMapped(
+      RegExp(
+        r'<(?:u|mark)(?:\s+[^>]*)?>([\s\S]*?)</(?:u|mark)>',
+        caseSensitive: false,
+      ),
+      (m) => m.group(1) ?? '',
+    );
     text = text.replaceAll(_markdownTableDividerRegex, '');
     text = text.replaceAll(_markdownImageRegex, '');
     text = text.replaceAllMapped(_markdownLinkRegex, (m) => m.group(1) ?? '');

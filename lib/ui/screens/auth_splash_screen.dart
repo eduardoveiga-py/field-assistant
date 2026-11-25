@@ -11,12 +11,14 @@ import 'package:uuid/uuid.dart';
 
 import '../../appointments/calendar_provider.dart';
 import '../../appointments/calendar_sync_coordinator.dart';
+import '../../appointments/google_calendar_provider.dart';
 import '../../core/app_logger.dart';
 import '../../core/app_theme.dart';
 import '../../core/app_version.dart';
 import '../../database/app_database.dart';
 import '../../inbox/email_account_model.dart';
 import '../../inbox/email_sync_coordinator.dart';
+import '../../inbox/gmail_oauth_service.dart';
 import '../../inbox/microsoft_oauth_service.dart';
 import '../../inbox/oauth_token_store.dart';
 import '../../sync/supabase_sync_service.dart';
@@ -268,6 +270,39 @@ class _AuthGateShellState extends ConsumerState<AuthGateShell>
 
     // Prepara tarefas de sincronização bidirecional quando autenticado
     final syncTasks = <Future>[];
+    if (shouldAuthenticate) {
+      // Restaura/persiste tokens OAuth do Google (Gmail + Google Calendar) uma única vez na SplashScreen
+      // para que a sessão inteira funcione sem reaberturas repetidas do diálogo do Google.
+      syncTasks.add(() async {
+        try {
+          final accounts = await EmailAccountsManager.loadAccounts(db);
+          final gmailTargets = accounts
+              .where((a) => a.isActive && a.incomingProtocol == 'gmail_api')
+              .map((a) => (id: a.id, email: a.email))
+              .toList();
+          final hasGoogleCalendar = await GoogleCalendarProvider()
+              .isAuthorized()
+              .timeout(
+                const Duration(milliseconds: 400),
+                onTimeout: () => false,
+              );
+          if (gmailTargets.isNotEmpty || hasGoogleCalendar) {
+            await GmailOAuthService()
+                .warmUpSessionOnSplash(
+                  gmailAccounts: gmailTargets,
+                  includeCalendar: hasGoogleCalendar,
+                )
+                .timeout(const Duration(seconds: 4), onTimeout: () => false);
+          }
+        } catch (e, st) {
+          AppLogger.warning(
+            'Falha não-bloqueante ao restaurar sessão Google na SplashScreen',
+            e,
+            st,
+          );
+        }
+      }());
+    }
     if (hasSession) {
       syncTasks.add(
         ref.read(supabaseSyncServiceProvider).sync().catchError((

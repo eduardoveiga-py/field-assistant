@@ -28,7 +28,14 @@ import 'research_screen.dart';
 /// Tela do Módulo C — Base de Conhecimento do Field Assistant.
 /// Centraliza notas formatadas, dúvidas bíblicas, arquivos/documentos locais e links de estudo.
 class KnowledgeBaseScreen extends ConsumerStatefulWidget {
-  const KnowledgeBaseScreen({super.key});
+  final int? initialTabIndex;
+  final int navigationEpoch;
+
+  const KnowledgeBaseScreen({
+    super.key,
+    this.initialTabIndex,
+    this.navigationEpoch = 0,
+  });
 
   @override
   ConsumerState<KnowledgeBaseScreen> createState() =>
@@ -52,10 +59,28 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    final safeIdx = (widget.initialTabIndex ?? 0).clamp(0, 3);
+    _tabController = TabController(
+      length: 4,
+      vsync: this,
+      initialIndex: safeIdx,
+    );
     _tabController.addListener(() {
       if (mounted) setState(() {});
     });
+  }
+
+  @override
+  void didUpdateWidget(covariant KnowledgeBaseScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialTabIndex != null &&
+        (widget.initialTabIndex != oldWidget.initialTabIndex ||
+            widget.navigationEpoch != oldWidget.navigationEpoch)) {
+      final safeIdx = widget.initialTabIndex!.clamp(0, 3);
+      if (_tabController.index != safeIdx) {
+        _tabController.animateTo(safeIdx);
+      }
+    }
   }
 
   @override
@@ -351,6 +376,13 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                                   itemType: 'Nota',
                                   updatedAt: note.updatedAt,
                                   tags: noteTags,
+                                  allowHighlights: true,
+                                  onContentUpdated: (updated) async {
+                                    await km.updateNote(
+                                      note.id,
+                                      content: updated,
+                                    );
+                                  },
                                   onEdit: () => _showEditNoteModal(note),
                                   onDelete: () => km.softDeleteNote(note.id),
                                   onExport: () => _exportNote(note),
@@ -657,6 +689,14 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                               const Divider(height: 24),
                               MarkdownPreviewText(
                                 text: selectedNote.content,
+                                selectable: true,
+                                allowHighlights: true,
+                                onContentUpdated: (updated) async {
+                                  await km.updateNote(
+                                    selectedNote!.id,
+                                    content: updated,
+                                  );
+                                },
                                 style: const TextStyle(
                                   fontSize: 15,
                                   height: 1.5,
@@ -766,17 +806,38 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                         ),
                         child: InkWell(
                           onTap: () {
+                            final hasAnswer =
+                                q.answer != null && q.answer!.trim().isNotEmpty;
+                            final readerSubtitle = isAnswered
+                                ? (q.context?.trim().isNotEmpty == true
+                                      ? 'Respondida • Contexto: ${q.context!.trim()}'
+                                      : 'Respondida')
+                                : 'Em Aberto';
                             showKnowledgeItemReader(
                               context,
                               title: q.question,
-                              content: q.answer != null && q.answer!.isNotEmpty
-                                  ? '**Contexto:**\n${q.context ?? "Sem contexto"}\n\n---\n\n**Resposta Bíblica:**\n${q.answer}'
+                              content: hasAnswer
+                                  ? q.answer!
                                   : (q.context ??
                                         'Dúvida ainda sem resposta bíblica cadastrada.'),
                               category: q.category,
                               itemType: 'Dúvida',
                               updatedAt: q.updatedAt,
-                              subtitle: isAnswered ? 'Respondida' : 'Em Aberto',
+                              subtitle: readerSubtitle,
+                              allowHighlights: true,
+                              onContentUpdated: (updated) async {
+                                if (hasAnswer) {
+                                  await km.updateQuestion(
+                                    q.id,
+                                    answer: updated,
+                                  );
+                                } else {
+                                  await km.updateQuestion(
+                                    q.id,
+                                    context: updated,
+                                  );
+                                }
+                              },
                               onEdit: () => _showEditQuestionModal(q),
                               onDelete: () => km.softDeleteQuestion(q.id),
                               onExport: () => _exportQuestion(q),
@@ -1210,6 +1271,32 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                                 icon: const Icon(Icons.more_vert, size: 20),
                                 onSelected: (val) {
                                   if (val == 'open') _openDocument(doc);
+                                  if (val == 'details') {
+                                    showKnowledgeItemReader(
+                                      context,
+                                      title: doc.title,
+                                      content:
+                                          doc.description?.trim().isNotEmpty ==
+                                              true
+                                          ? doc.description!
+                                          : 'Arquivo: ${doc.fileName} (${doc.fileType})',
+                                      category: doc.category,
+                                      itemType: 'Documento',
+                                      subtitle: doc.fileName,
+                                      tags: docTags,
+                                      updatedAt: doc.updatedAt,
+                                      allowHighlights: true,
+                                      onContentUpdated: (updated) async {
+                                        await km.updateDocument(
+                                          doc.id,
+                                          description: updated,
+                                        );
+                                      },
+                                      onEdit: () => _showEditDocumentModal(doc),
+                                      onDelete: () =>
+                                          km.softDeleteDocument(doc.id),
+                                    );
+                                  }
                                   if (val == 'external') {
                                     _openDocumentExternal(doc);
                                   }
@@ -1223,7 +1310,11 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                                 itemBuilder: (ctx) => [
                                   const PopupMenuItem(
                                     value: 'open',
-                                    child: Text('Abrir no App'),
+                                    child: Text('Abrir Arquivo no App'),
+                                  ),
+                                  const PopupMenuItem(
+                                    value: 'details',
+                                    child: Text('Anotações & Referências'),
                                   ),
                                   const PopupMenuItem(
                                     value: 'external',
@@ -1390,6 +1481,9 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                       ),
                       child: InkWell(
                         onTap: () {
+                          final hasDesc =
+                              r.description != null &&
+                              r.description!.trim().isNotEmpty;
                           showKnowledgeItemReader(
                             context,
                             title: r.title,
@@ -1401,6 +1495,15 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                             url: r.url,
                             tags: resTags,
                             updatedAt: r.updatedAt,
+                            allowHighlights: hasDesc,
+                            onContentUpdated: hasDesc
+                                ? (updated) async {
+                                    await km.updateResource(
+                                      r.id,
+                                      description: updated,
+                                    );
+                                  }
+                                : null,
                             onEdit: () => _showEditResourceModal(r),
                             onDelete: () => km.softDeleteResource(r.id),
                           );
@@ -2093,10 +2196,15 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
       title: 'Editar Documento',
       titleLeading: const Icon(Icons.description, color: AppTheme.primaryBlue),
       builder: (ctx, scroll) => ManagedTextControllers(
-        initialTexts: [doc.title, existingTags.join(', ')],
+        initialTexts: [
+          doc.title,
+          existingTags.join(', '),
+          doc.description ?? '',
+        ],
         builder: (ctx, ctrls) {
           final titleCtrl = ctrls[0];
           final tagsCtrl = ctrls[1];
+          final descCtrl = ctrls[2];
 
           return StatefulBuilder(
             builder: (ctx, setSheetState) {
@@ -2155,6 +2263,17 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                         border: OutlineInputBorder(),
                       ),
                     ),
+                    const SizedBox(height: 12),
+                    RichMarkdownToolbar(controller: descCtrl),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: descCtrl,
+                      maxLines: 4,
+                      decoration: const InputDecoration(
+                        labelText: 'Anotações e Referências (Markdown)',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
                     const SizedBox(height: 16),
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
@@ -2165,6 +2284,7 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                       onPressed: () async {
                         final title = titleCtrl.text.trim();
                         if (title.isEmpty) return;
+                        final desc = descCtrl.text.trim();
                         final rawTags = tagsCtrl.text
                             .split(',')
                             .map((t) => t.trim())
@@ -2174,6 +2294,7 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                         await km.updateDocument(
                           doc.id,
                           title: title,
+                          description: desc.isNotEmpty ? desc : '',
                           category: category,
                           tags: rawTags,
                         );
