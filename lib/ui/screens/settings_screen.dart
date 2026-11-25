@@ -28,12 +28,16 @@ import '../../appointments/calendar_sync_coordinator.dart';
 import '../../core/app_logger.dart';
 import '../../database/app_database.dart';
 import '../../inbox/jw_email_service.dart';
+import '../../sync/media_bytes.dart';
 import '../../sync/supabase_config.dart';
 import '../../sync/supabase_sync_service.dart';
 import '../../sync/sync_owner_guard.dart';
+import '../widgets/app_inline_image_view.dart';
 import '../widgets/managed_text_controllers.dart';
+import '../widgets/markdown_preview_text.dart';
 import '../widgets/pin_auth_dialog.dart';
 import '../widgets/e2ee_setup_dialog.dart';
+import '../widgets/rich_formatted_editing_controller.dart';
 import 'auth_splash_screen.dart';
 
 import '../../core/app_theme.dart';

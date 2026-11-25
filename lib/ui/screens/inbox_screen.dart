@@ -31,19 +31,21 @@ import '../../inbox/microsoft_oauth_service.dart';
 import '../../inbox/oauth_token_store.dart';
 import '../../references/app_reference.dart';
 import '../../research/research_manager.dart';
+import '../../sync/media_bytes.dart';
 import '../../sync/supabase_sync_service.dart';
 import '../../voice_notes/audio_recording_service.dart';
 import '../providers.dart';
 import 'email_contacts_screen.dart';
 import 'settings_screen.dart';
 import '../widgets/adaptive_ministry_sheet.dart';
+import '../widgets/app_inline_image_view.dart';
 import '../widgets/app_reference_viewer.dart';
 import '../widgets/email_html_frame.dart';
 import '../widgets/knowledge_item_reader_dialog.dart';
 import '../widgets/managed_text_controllers.dart';
 import '../widgets/markdown_preview_text.dart';
 import '../widgets/quick_capture_sheet.dart';
-import '../widgets/rich_email_editing_controller.dart';
+import '../widgets/rich_formatted_editing_controller.dart';
 import '../widgets/rich_markdown_toolbar.dart';
 import '../widgets/universal_attachment_viewer.dart';
 
@@ -1524,7 +1526,11 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
         color: Color(0xFF10B981),
       ),
       builder: (ctx, scroll) => ManagedTextControllers(
-        initialTexts: [entry.content, ''],
+        initialTexts: [MarkdownPreviewText.cleanMarkdown(entry.content), ''],
+        customFactories: [
+          null,
+          (text) => RichFormattedEditingController.fromMarkup(text),
+        ],
         builder: (ctx, ctrls) {
           final titleCtrl = ctrls[0];
           final descCtrl = ctrls[1];
@@ -1641,9 +1647,12 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                         ),
                         onPressed: () async {
                           final title = titleCtrl.text.trim().isEmpty
-                              ? entry.content
+                              ? MarkdownPreviewText.cleanMarkdown(entry.content)
                               : titleCtrl.text.trim();
-                          final desc = descCtrl.text.trim();
+                          final desc =
+                              RichFormattedEditingController.readMarkup(
+                                descCtrl,
+                              ).trim();
                           final inboxMgr = ref.read(inboxManagerProvider);
                           await inboxMgr.convertToTask(
                             entry.id,
@@ -1689,7 +1698,11 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
         color: Color(0xFF3B82F6),
       ),
       builder: (ctx, scroll) => ManagedTextControllers(
-        initialTexts: [entry.content, ''],
+        initialTexts: [MarkdownPreviewText.cleanMarkdown(entry.content), ''],
+        customFactories: [
+          null,
+          (text) => RichFormattedEditingController.fromMarkup(text),
+        ],
         builder: (ctx, ctrls) {
           final nameCtrl = ctrls[0];
           final objCtrl = ctrls[1];
@@ -1727,9 +1740,11 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                     ),
                     onPressed: () async {
                       final name = nameCtrl.text.trim().isEmpty
-                          ? entry.content
+                          ? MarkdownPreviewText.cleanMarkdown(entry.content)
                           : nameCtrl.text.trim();
-                      final obj = objCtrl.text.trim();
+                      final obj = RichFormattedEditingController.readMarkup(
+                        objCtrl,
+                      ).trim();
                       final inboxMgr = ref.read(inboxManagerProvider);
                       await inboxMgr.convertToProject(
                         entry.id,
@@ -1761,9 +1776,10 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
   }
 
   void _showConvertToNoteDialog(InboxEntry entry) {
-    final initTitle = entry.content.length > 40
-        ? '${entry.content.substring(0, 40)}...'
-        : entry.content;
+    final cleanNoteTitle = MarkdownPreviewText.cleanMarkdown(entry.content);
+    final initTitle = cleanNoteTitle.length > 40
+        ? '${cleanNoteTitle.substring(0, 40)}...'
+        : cleanNoteTitle;
 
     showAdaptiveMinistrySheet(
       context: context,
@@ -1774,6 +1790,10 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
       ),
       builder: (ctx, scroll) => ManagedTextControllers(
         initialTexts: [initTitle, entry.content],
+        customFactories: [
+          null,
+          (text) => RichFormattedEditingController.fromMarkup(text),
+        ],
         builder: (ctx, ctrls) {
           final titleCtrl = ctrls[0];
           final contentCtrl = ctrls[1];
@@ -1814,7 +1834,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                       final title = titleCtrl.text.trim().isEmpty
                           ? 'Nova Nota'
                           : titleCtrl.text.trim();
-                      final content = contentCtrl.text.trim();
+                      final content = RichFormattedEditingController.readMarkup(
+                        contentCtrl,
+                      ).trim();
                       final inboxMgr = ref.read(inboxManagerProvider);
                       await inboxMgr.convertToNote(
                         entry.id,
@@ -1852,7 +1874,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
       title: 'Converter em Dúvida Teocrática',
       titleLeading: const Icon(Icons.help_outline, color: Color(0xFFF59E0B)),
       builder: (ctx, scroll) => ManagedTextControllers(
-        initialTexts: [entry.content],
+        initialTexts: [MarkdownPreviewText.cleanMarkdown(entry.content)],
         builder: (ctx, ctrls) {
           final qCtrl = ctrls[0];
 
@@ -1882,7 +1904,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                     ),
                     onPressed: () async {
                       final qText = qCtrl.text.trim().isEmpty
-                          ? entry.content
+                          ? MarkdownPreviewText.cleanMarkdown(entry.content)
                           : qCtrl.text.trim();
                       final inboxMgr = ref.read(inboxManagerProvider);
                       await inboxMgr.convertToQuestion(
@@ -1938,6 +1960,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
       titleLeading: const Icon(Icons.edit_note, color: AppTheme.primaryBlue),
       builder: (ctx, scroll) => ManagedTextControllers(
         initialTexts: [entry.content],
+        customFactories: [
+          (text) => RichFormattedEditingController.fromMarkup(text),
+        ],
         builder: (ctx, ctrls) {
           final contentCtrl = ctrls[0];
 
@@ -1957,7 +1982,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                       controller: contentCtrl,
                       maxLines: 5,
                       decoration: const InputDecoration(
-                        labelText: 'Conteúdo da Captura (Markdown e Imagens)',
+                        labelText: 'Conteúdo da Captura',
                         border: OutlineInputBorder(),
                       ),
                     ),
@@ -1998,7 +2023,10 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                         padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
                       onPressed: () async {
-                        final updated = contentCtrl.text.trim();
+                        final updated =
+                            RichFormattedEditingController.readMarkup(
+                              contentCtrl,
+                            ).trim();
                         if (updated.isEmpty) return;
                         final inboxMgr = ref.read(inboxManagerProvider);
                         await inboxMgr.updateEntry(
@@ -4935,7 +4963,10 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
     final initCc = existingDraft?.cc.join(', ') ?? '';
     final initBcc = existingDraft?.bcc.join(', ') ?? '';
     final initSubject = existingDraft?.subject ?? initialSubject ?? '';
-    final initBody = existingDraft?.bodyText ?? '';
+    final draftHtml = existingDraft?.bodyHtml?.trim() ?? '';
+    final initBody = draftHtml.isNotEmpty
+        ? draftHtml
+        : (existingDraft?.bodyText ?? '');
     final initTags = existingDraft?.tags.join(', ') ?? '';
 
     await showModalBottomSheet(
@@ -4958,7 +4989,13 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
           null,
           null,
           null,
-          (text) => RichEmailEditingController(text: text),
+          (text) =>
+              RegExp(
+                r'<(?:b|strong|i|em|u|s|a|span|p|br|div|img)\b',
+                caseSensitive: false,
+              ).hasMatch(text)
+              ? RichFormattedEditingController.fromHtml(text)
+              : RichFormattedEditingController.fromMarkup(text),
           null,
         ],
         builder: (ctx, ctrls) {
@@ -5660,7 +5697,10 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                   color: const Color(0xFFCBD5E1),
                                 ),
                               ),
-                              child: contentCtrl.text.trim().isEmpty
+                              child:
+                                  RichFormattedEditingController.readMarkup(
+                                    contentCtrl,
+                                  ).trim().isEmpty
                                   ? const Text(
                                       '(Nenhum conteúdo digitado)',
                                       style: TextStyle(
@@ -5671,7 +5711,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                     )
                                   : HtmlWidget(
                                       EmailHtmlSanitizer.markdownToCleanHtml(
-                                        contentCtrl.text.trim(),
+                                        RichFormattedEditingController.readMarkup(
+                                          contentCtrl,
+                                        ).trim(),
                                       ),
                                       textStyle: const TextStyle(
                                         fontSize: 13,
@@ -5779,20 +5821,111 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                 fontSize: 13,
                               ),
                             ),
-                            OutlinedButton.icon(
-                              style: OutlinedButton.styleFrom(
-                                visualDensity: VisualDensity.compact,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 4,
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 6,
+                              children: [
+                                OutlinedButton.icon(
+                                  key: const Key(
+                                    'btn_compose_pick_picture_bank',
+                                  ),
+                                  style: OutlinedButton.styleFrom(
+                                    visualDensity: VisualDensity.compact,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 4,
+                                    ),
+                                  ),
+                                  icon: const Icon(
+                                    Icons.photo_library_outlined,
+                                    size: 16,
+                                  ),
+                                  label: const Text(
+                                    'Banco de Gravuras',
+                                    style: TextStyle(fontSize: 12),
+                                  ),
+                                  onPressed: isSending
+                                      ? null
+                                      : () async {
+                                          final pic =
+                                              await showPictureBankPickerModal(
+                                                ctx,
+                                                db: db,
+                                              );
+                                          if (pic == null) return;
+                                          var b64 = '';
+                                          var size = 0;
+                                          var mime = 'image/png';
+                                          var ext = 'png';
+                                          final raw = pic.imageData.trim();
+                                          if (raw.startsWith('data:image/')) {
+                                            final comma = raw.indexOf(
+                                              'base64,',
+                                            );
+                                            if (comma != -1) {
+                                              b64 = raw.substring(comma + 7);
+                                              if (raw
+                                                  .substring(0, comma)
+                                                  .toLowerCase()
+                                                  .contains('jpeg')) {
+                                                mime = 'image/jpeg';
+                                                ext = 'jpg';
+                                              }
+                                              try {
+                                                size = base64Decode(b64).length;
+                                              } catch (_) {}
+                                            }
+                                          } else {
+                                            final bytes = await readMediaBytes(
+                                              raw,
+                                            );
+                                            if (bytes != null &&
+                                                bytes.isNotEmpty) {
+                                              b64 = base64.encode(bytes);
+                                              size = bytes.length;
+                                            }
+                                          }
+                                          if (b64.isNotEmpty) {
+                                            final cleanCap =
+                                                MarkdownPreviewText.cleanMarkdown(
+                                                  pic.caption,
+                                                ).trim();
+                                            final safeTitle =
+                                                (cleanCap.isEmpty
+                                                        ? 'gravura'
+                                                        : cleanCap)
+                                                    .replaceAll(
+                                                      RegExp(r'[^a-zA-Z0-9_-]'),
+                                                      '_',
+                                                    );
+                                            attachments.add({
+                                              'name': '$safeTitle.$ext',
+                                              'size': size,
+                                              'path': '$safeTitle.$ext',
+                                              'base64': b64,
+                                              'contentType': mime,
+                                              'type': ext,
+                                            });
+                                            setSheetState(() {});
+                                          }
+                                        },
                                 ),
-                              ),
-                              icon: const Icon(Icons.attach_file, size: 16),
-                              label: const Text(
-                                'Adicionar Anexo',
-                                style: TextStyle(fontSize: 12),
-                              ),
-                              onPressed: isSending ? null : pickAttachments,
+                                OutlinedButton.icon(
+                                  style: OutlinedButton.styleFrom(
+                                    visualDensity: VisualDensity.compact,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 4,
+                                    ),
+                                  ),
+                                  icon: const Icon(Icons.attach_file, size: 16),
+                                  label: const Text(
+                                    'Dispositivo',
+                                    style: TextStyle(fontSize: 12),
+                                  ),
+                                  onPressed: isSending ? null : pickAttachments,
+                                ),
+                              ],
                             ),
                           ],
                         ),
@@ -5856,7 +5989,10 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                           JwSmtpClient.parseRecipients(
                                             bccCtrl.text,
                                           );
-                                      final rawText = contentCtrl.text.trim();
+                                      final rawText =
+                                          RichFormattedEditingController.readMarkup(
+                                            contentCtrl,
+                                          ).trim();
                                       final baseLocalHtml =
                                           EmailHtmlSanitizer.markdownToCleanHtml(
                                             rawText,
@@ -5960,7 +6096,10 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                   : () async {
                                       final to = toCtrl.text.trim();
                                       final subject = subjectCtrl.text.trim();
-                                      final rawText = contentCtrl.text.trim();
+                                      final rawText =
+                                          RichFormattedEditingController.readMarkup(
+                                            contentCtrl,
+                                          ).trim();
                                       final baseCleanHtml =
                                           EmailHtmlSanitizer.markdownToCleanHtml(
                                             rawText,

@@ -9,9 +9,11 @@ import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
 import '../../experiences/experience_manager.dart';
 import '../../media/media_picker_helper.dart';
+import '../providers.dart';
 import '../widgets/knowledge_item_reader_dialog.dart';
 import '../widgets/managed_text_controllers.dart';
 import '../widgets/markdown_preview_text.dart';
+import '../widgets/rich_formatted_editing_controller.dart';
 import '../widgets/rich_markdown_toolbar.dart';
 import '../widgets/universal_attachment_viewer.dart';
 
@@ -134,7 +136,7 @@ class _ExperiencesScreenState extends ConsumerState<ExperiencesScreen> {
                   ],
                   pw.SizedBox(height: 8),
                   pw.Text(
-                    exp.content,
+                    MarkdownPreviewText.cleanMarkdown(exp.content),
                     style: const pw.TextStyle(fontSize: 11, lineSpacing: 1.3),
                   ),
                 ],
@@ -165,6 +167,11 @@ class _ExperiencesScreenState extends ConsumerState<ExperiencesScreen> {
       context: context,
       builder: (ctx) => ManagedTextControllers(
         initialTexts: [existing?.title ?? '', existing?.content ?? '', ''],
+        customFactories: [
+          null,
+          (text) => RichFormattedEditingController.fromMarkup(text),
+          null,
+        ],
         builder: (ctx, ctrls) {
           final titleController = ctrls[0];
           final contentController = ctrls[1];
@@ -339,7 +346,7 @@ class _ExperiencesScreenState extends ConsumerState<ExperiencesScreen> {
                                 TextField(
                                   controller: contentController,
                                   decoration: const InputDecoration(
-                                    labelText: 'Relato da Experiência * (Markdown e imagens)',
+                                    labelText: 'Relato da Experiência *',
                                     hintText: 'Escreva como foi o contato, reações, textos bíblicos usados e lições aprendidas...',
                                   ),
                                   maxLines: 5,
@@ -369,6 +376,9 @@ class _ExperiencesScreenState extends ConsumerState<ExperiencesScreen> {
                                             await MediaPickerHelper.pickImage(
                                               context,
                                               title: 'Adicionar Foto à Experiência',
+                                              pictureBankDb: ref.read(
+                                                databaseProvider,
+                                              ),
                                             );
                                         if (img != null && img.isNotEmpty) {
                                           setDialogState(
@@ -521,7 +531,10 @@ class _ExperiencesScreenState extends ConsumerState<ExperiencesScreen> {
                               ),
                               onPressed: () async {
                                 final title = titleController.text.trim();
-                                final content = contentController.text.trim();
+                                final content =
+                                    RichFormattedEditingController.readMarkup(
+                                      contentController,
+                                    ).trim();
                                 if (title.isEmpty || content.isEmpty) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(

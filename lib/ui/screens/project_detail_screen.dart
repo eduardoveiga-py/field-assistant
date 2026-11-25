@@ -12,6 +12,7 @@ import '../providers.dart';
 import '../widgets/adaptive_ministry_sheet.dart';
 import '../widgets/managed_text_controllers.dart';
 import '../widgets/markdown_preview_text.dart';
+import '../widgets/rich_formatted_editing_controller.dart';
 import '../widgets/rich_markdown_toolbar.dart';
 
 /// Tela de Detalhes de um Projeto do Módulo B.
@@ -393,6 +394,11 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       titleLeading: const Icon(Icons.add_task, color: AppTheme.primaryBlue),
       builder: (ctx, scroll) => ManagedTextControllers(
         initialTexts: const ['', '', ''],
+        customFactories: [
+          null,
+          (text) => RichFormattedEditingController.fromMarkup(text),
+          null,
+        ],
         builder: (ctx, ctrls) {
           final titleCtrl = ctrls[0];
           final descCtrl = ctrls[1];
@@ -433,7 +439,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                       controller: descCtrl,
                       maxLines: 2,
                       decoration: const InputDecoration(
-                        labelText: 'Descrição ou detalhes (Markdown)',
+                        labelText: 'Descrição ou detalhes',
                         border: OutlineInputBorder(),
                       ),
                     ),
@@ -493,7 +499,9 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                       onPressed: () async {
                         final title = titleCtrl.text.trim();
                         if (title.isEmpty) return;
-                        final descText = descCtrl.text.trim();
+                        final descText =
+                            RichFormattedEditingController.readMarkup(descCtrl)
+                                .trim();
                         final rawTags = tagsCtrl.text
                             .split(',')
                             .map((t) => t.trim())
@@ -564,6 +572,11 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           project.objective ?? '',
           existingTags.join(', '),
         ],
+        customFactories: [
+          null,
+          (text) => RichFormattedEditingController.fromMarkup(text),
+          null,
+        ],
         builder: (ctx, ctrls) {
           final nameCtrl = ctrls[0];
           final objCtrl = ctrls[1];
@@ -603,7 +616,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                       controller: objCtrl,
                       maxLines: 3,
                       decoration: const InputDecoration(
-                        labelText: 'Objetivo Principal (Markdown)',
+                        labelText: 'Objetivo Principal',
                         border: OutlineInputBorder(),
                       ),
                     ),
@@ -671,7 +684,9 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                       onPressed: () async {
                         final name = nameCtrl.text.trim();
                         if (name.isEmpty) return;
-                        final objText = objCtrl.text.trim();
+                        final objText =
+                            RichFormattedEditingController.readMarkup(objCtrl)
+                                .trim();
                         final rawTags = tagsCtrl.text
                             .split(',')
                             .map((t) => t.trim())

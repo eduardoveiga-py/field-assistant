@@ -18,9 +18,11 @@ import '../../reports/web_downloader.dart';
 import '../../research/research_manager.dart';
 import '../providers.dart';
 import '../widgets/adaptive_ministry_sheet.dart';
+import '../widgets/app_inline_image_view.dart';
 import '../widgets/knowledge_item_reader_dialog.dart';
 import '../widgets/managed_text_controllers.dart';
 import '../widgets/markdown_preview_text.dart';
+import '../widgets/rich_formatted_editing_controller.dart';
 import '../widgets/rich_markdown_toolbar.dart';
 import '../widgets/universal_attachment_viewer.dart';
 import 'research_screen.dart';
@@ -1735,6 +1737,11 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
       titleLeading: const Icon(Icons.note_add, color: Color(0xFF8B5CF6)),
       builder: (ctx, scroll) => ManagedTextControllers(
         initialTexts: const ['', '', ''],
+        customFactories: [
+          null,
+          (text) => RichFormattedEditingController.fromMarkup(text),
+          null,
+        ],
         builder: (ctx, ctrls) {
           final titleCtrl = ctrls[0];
           final contentCtrl = ctrls[1];
@@ -1803,7 +1810,7 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                       controller: contentCtrl,
                       maxLines: 6,
                       decoration: const InputDecoration(
-                        labelText: 'Conteúdo (Markdown suportado)...',
+                        labelText: 'Conteúdo da Nota',
                         border: OutlineInputBorder(),
                       ),
                     ),
@@ -1822,7 +1829,10 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                             onPressed: () async {
                               final title = titleCtrl.text.trim();
                               if (title.isEmpty) return;
-                              final content = contentCtrl.text.trim();
+                              final content =
+                                  RichFormattedEditingController.readMarkup(
+                                    contentCtrl,
+                                  ).trim();
                               final rawTags = tagsCtrl.text
                                   .split(',')
                                   .map((t) => t.trim())
@@ -1851,7 +1861,10 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                             onPressed: () async {
                               final title = titleCtrl.text.trim();
                               if (title.isEmpty) return;
-                              final content = contentCtrl.text.trim();
+                              final content =
+                                  RichFormattedEditingController.readMarkup(
+                                    contentCtrl,
+                                  ).trim();
                               final rawTags = tagsCtrl.text
                                   .split(',')
                                   .map((t) => t.trim())
@@ -1905,6 +1918,11 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
       titleLeading: const Icon(Icons.edit_note, color: Color(0xFF8B5CF6)),
       builder: (ctx, scroll) => ManagedTextControllers(
         initialTexts: [note.title, note.content, existingTags.join(', ')],
+        customFactories: [
+          null,
+          (text) => RichFormattedEditingController.fromMarkup(text),
+          null,
+        ],
         builder: (ctx, ctrls) {
           final titleCtrl = ctrls[0];
           final contentCtrl = ctrls[1];
@@ -1980,7 +1998,7 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                       controller: contentCtrl,
                       maxLines: 6,
                       decoration: const InputDecoration(
-                        labelText: 'Conteúdo (Markdown)...',
+                        labelText: 'Conteúdo da Nota',
                         border: OutlineInputBorder(),
                       ),
                     ),
@@ -1999,7 +2017,10 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                             onPressed: () async {
                               final title = titleCtrl.text.trim();
                               if (title.isEmpty) return;
-                              final content = contentCtrl.text.trim();
+                              final content =
+                                  RichFormattedEditingController.readMarkup(
+                                    contentCtrl,
+                                  ).trim();
                               final rawTags = tagsCtrl.text
                                   .split(',')
                                   .map((t) => t.trim())
@@ -2046,7 +2067,10 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                             onPressed: () async {
                               final title = titleCtrl.text.trim();
                               if (title.isEmpty) return;
-                              final content = contentCtrl.text.trim();
+                              final content =
+                                  RichFormattedEditingController.readMarkup(
+                                    contentCtrl,
+                                  ).trim();
                               final rawTags = tagsCtrl.text
                                   .split(',')
                                   .map((t) => t.trim())
@@ -2100,6 +2124,11 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
       titleLeading: const Icon(Icons.help_outline, color: Color(0xFFF59E0B)),
       builder: (ctx, scroll) => ManagedTextControllers(
         initialTexts: [q.question, q.context ?? '', q.answer ?? ''],
+        customFactories: [
+          null,
+          (text) => RichFormattedEditingController.fromMarkup(text),
+          (text) => RichFormattedEditingController.fromMarkup(text),
+        ],
         builder: (ctx, ctrls) {
           final qCtrl = ctrls[0];
           final ctxCtrl = ctrls[1];
@@ -2152,8 +2181,12 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                   onPressed: () async {
                     final question = qCtrl.text.trim();
                     if (question.isEmpty) return;
-                    final ctxText = ctxCtrl.text.trim();
-                    final ansText = ansCtrl.text.trim();
+                    final ctxText = RichFormattedEditingController.readMarkup(
+                      ctxCtrl,
+                    ).trim();
+                    final ansText = RichFormattedEditingController.readMarkup(
+                      ansCtrl,
+                    ).trim();
                     final km = ref.read(knowledgeManagerProvider);
                     await km.updateQuestion(
                       q.id,
@@ -2200,6 +2233,11 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
           doc.title,
           existingTags.join(', '),
           doc.description ?? '',
+        ],
+        customFactories: [
+          null,
+          null,
+          (text) => RichFormattedEditingController.fromMarkup(text),
         ],
         builder: (ctx, ctrls) {
           final titleCtrl = ctrls[0];
@@ -2270,7 +2308,7 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                       controller: descCtrl,
                       maxLines: 4,
                       decoration: const InputDecoration(
-                        labelText: 'Anotações e Referências (Markdown)',
+                        labelText: 'Anotações e Referências',
                         border: OutlineInputBorder(),
                       ),
                     ),
@@ -2284,7 +2322,9 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                       onPressed: () async {
                         final title = titleCtrl.text.trim();
                         if (title.isEmpty) return;
-                        final desc = descCtrl.text.trim();
+                        final desc = RichFormattedEditingController.readMarkup(
+                          descCtrl,
+                        ).trim();
                         final rawTags = tagsCtrl.text
                             .split(',')
                             .map((t) => t.trim())
@@ -2340,6 +2380,12 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
           resource.url ?? '',
           resource.description ?? '',
           existingTags.join(', '),
+        ],
+        customFactories: [
+          null,
+          null,
+          (text) => RichFormattedEditingController.fromMarkup(text),
+          null,
         ],
         builder: (ctx, ctrls) {
           final titleCtrl = ctrls[0];
@@ -2442,7 +2488,9 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                         final title = titleCtrl.text.trim();
                         if (title.isEmpty) return;
                         final urlText = urlCtrl.text.trim();
-                        final descText = descCtrl.text.trim();
+                        final descText =
+                            RichFormattedEditingController.readMarkup(descCtrl)
+                                .trim();
                         final rawTags = tagsCtrl.text
                             .split(',')
                             .map((t) => t.trim())
@@ -2704,6 +2752,10 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
       titleLeading: const Icon(Icons.help_outline, color: Color(0xFFF59E0B)),
       builder: (ctx, scroll) => ManagedTextControllers(
         initialTexts: const ['', ''],
+        customFactories: [
+          null,
+          (text) => RichFormattedEditingController.fromMarkup(text),
+        ],
         builder: (ctx, ctrls) {
           final qCtrl = ctrls[0];
           final ctxCtrl = ctrls[1];
@@ -2745,7 +2797,9 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                   onPressed: () async {
                     final q = qCtrl.text.trim();
                     if (q.isEmpty) return;
-                    final ctxText = ctxCtrl.text.trim();
+                    final ctxText = RichFormattedEditingController.readMarkup(
+                      ctxCtrl,
+                    ).trim();
                     final km = ref.read(knowledgeManagerProvider);
                     await km.createQuestion(
                       question: q,
@@ -2773,6 +2827,9 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
       titleLeading: const Icon(Icons.menu_book, color: Colors.green),
       builder: (ctx, scroll) => ManagedTextControllers(
         initialTexts: [question.answer ?? ''],
+        customFactories: [
+          (text) => RichFormattedEditingController.fromMarkup(text),
+        ],
         builder: (ctx, ctrls) {
           final ansCtrl = ctrls[0];
 
@@ -2811,7 +2868,9 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
                   onPressed: () async {
-                    final ans = ansCtrl.text.trim();
+                    final ans = RichFormattedEditingController.readMarkup(
+                      ansCtrl,
+                    ).trim();
                     if (ans.isEmpty) return;
                     final km = ref.read(knowledgeManagerProvider);
                     await km.answerQuestion(question.id, answer: ans);
@@ -2831,10 +2890,113 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
   }
 
   Future<void> _pickAndRegisterDocument() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                child: Row(
+                  children: [
+                    Icon(Icons.upload_file, color: AppTheme.primaryBlue),
+                    SizedBox(width: 8),
+                    Text(
+                      'Anexar Arquivo ou Imagem',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(),
+              ListTile(
+                key: const Key('btn_kb_doc_from_device'),
+                leading: const CircleAvatar(
+                  backgroundColor: AppTheme.primaryBlue,
+                  child: Icon(Icons.upload_file, color: Colors.white),
+                ),
+                title: const Text('Importar do Dispositivo'),
+                subtitle: const Text(
+                  'PDF, EPUB, DOC, TXT ou Imagem salva no aparelho',
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickAndRegisterDocumentFromDevice();
+                },
+              ),
+              ListTile(
+                key: const Key('btn_kb_doc_from_picture_bank'),
+                leading: const CircleAvatar(
+                  backgroundColor: Color(0xFF0EA5E9),
+                  child: Icon(Icons.photo_library_rounded, color: Colors.white),
+                ),
+                title: const Text('Importar do Banco de Gravuras'),
+                subtitle: const Text(
+                  'Registrar uma gravura do aplicativo como documento',
+                ),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final db = ref.read(databaseProvider);
+                  final pic = await showPictureBankPickerModal(context, db: db);
+                  if (pic == null) return;
+                  final cleanCaption = MarkdownPreviewText.cleanMarkdown(
+                    pic.caption,
+                  ).trim();
+                  final title = cleanCaption.isEmpty ? 'Gravura' : cleanCaption;
+                  final km = ref.read(knowledgeManagerProvider);
+                  await km.registerDocument(
+                    title: title,
+                    fileName:
+                        '${title.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_')}.png',
+                    filePath: pic.imageData,
+                    fileSize: pic.imageData.length,
+                    fileType: 'image',
+                    category: 'manual',
+                    tags: pic.tags,
+                  );
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Gravura registrada em Documentos com sucesso!',
+                        ),
+                      ),
+                    );
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickAndRegisterDocumentFromDevice() async {
     try {
       final res = await FilePicker.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['pdf', 'epub', 'doc', 'docx', 'txt'],
+        allowedExtensions: [
+          'pdf',
+          'epub',
+          'doc',
+          'docx',
+          'txt',
+          'png',
+          'jpg',
+          'jpeg',
+          'webp',
+        ],
       );
       if (res.isNotEmpty) {
         final f = res.first;
@@ -2950,6 +3112,12 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
       titleLeading: const Icon(Icons.link, color: Colors.teal),
       builder: (ctx, scroll) => ManagedTextControllers(
         initialTexts: const ['', '', '', ''],
+        customFactories: [
+          null,
+          null,
+          (text) => RichFormattedEditingController.fromMarkup(text),
+          null,
+        ],
         builder: (ctx, ctrls) {
           final titleCtrl = ctrls[0];
           final urlCtrl = ctrls[1];
@@ -3012,7 +3180,9 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                     final title = titleCtrl.text.trim();
                     if (title.isEmpty) return;
                     final urlText = urlCtrl.text.trim();
-                    final descText = descCtrl.text.trim();
+                    final descText = RichFormattedEditingController.readMarkup(
+                      descCtrl,
+                    ).trim();
                     final rawTags = tagsCtrl.text
                         .split(',')
                         .map((t) => t.trim())

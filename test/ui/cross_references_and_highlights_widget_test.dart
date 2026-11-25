@@ -260,8 +260,9 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        expect(find.byKey(const Key('btn_reader_hl_green')), findsOneWidget);
-        expect(find.byKey(const Key('btn_reader_hl_clear')), findsOneWidget);
+        // Pílula JW flutuante permanece oculta até o usuário selecionar texto
+        expect(find.byKey(const Key('btn_reader_hl_green')), findsNothing);
+        expect(find.byKey(const Key('btn_reader_hl_clear')), findsNothing);
 
         // Simula seleção do usuário em modo leitura ("Meditar")
         final selectable = tester.widget<SelectableText>(
@@ -272,6 +273,10 @@ void main() {
           SelectionChangedCause.drag,
         );
         await tester.pump();
+
+        // Pílula flutuante aparece automaticamente com todas as cores
+        expect(find.byKey(const Key('btn_reader_hl_green')), findsOneWidget);
+        expect(find.byKey(const Key('btn_reader_hl_clear')), findsOneWidget);
 
         // Toca no botão Verde da paleta JW Library
         await tester.tap(find.byKey(const Key('btn_reader_hl_green')));

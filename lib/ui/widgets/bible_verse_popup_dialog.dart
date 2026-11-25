@@ -8,6 +8,7 @@ import '../../bible/nwt_bible_service.dart';
 import '../../core/app_theme.dart';
 import '../../database/app_database.dart';
 import 'highlight_text_helper.dart';
+import 'jw_highlight_floating_toolbar.dart';
 
 /// Abre o popup interativo de leitura de passagem bíblica (Tradução do Novo Mundo).
 Future<void> showBibleVersePopup(
@@ -56,12 +57,20 @@ class _BibleVersePopupDialogState extends State<BibleVersePopupDialog> {
   bool _importing = false;
   double _fontSize = 16;
   String? _statusMessage;
-  TextSelection? _activeSelection;
+  final JwHighlightFloatingController _hlFloating =
+      JwHighlightFloatingController();
+  final GlobalKey _verseAnchorKey = GlobalKey();
 
   @override
   void initState() {
     super.initState();
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    _hlFloating.dispose();
+    super.dispose();
   }
 
   Future<void> _loadData() async {
@@ -249,6 +258,7 @@ class _BibleVersePopupDialogState extends State<BibleVersePopupDialog> {
         rawMarkup,
         verseStyle,
         stripBlockPrefixes: false,
+        isDark: isDark,
       );
       final docStart = cursor;
       final docEnd = docStart + mapped.plainDisplayText.length;
@@ -316,9 +326,9 @@ class _BibleVersePopupDialogState extends State<BibleVersePopupDialog> {
         verseSpec: widget.verseSpec,
       );
       if (!mounted) return;
+      _hlFloating.hide();
       setState(() {
         _lookup = updatedLookup;
-        _activeSelection = null;
       });
     }
   }
@@ -451,199 +461,102 @@ class _BibleVersePopupDialogState extends State<BibleVersePopupDialog> {
                   ? Builder(
                       builder: (ctx) {
                         final slices = _buildVerseSlices(isDark);
-                        final hasSel =
-                            _activeSelection != null &&
-                            !_activeSelection!.isCollapsed &&
-                            _activeSelection!.end > _activeSelection!.start;
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: isDark
-                                    ? const Color(0xFF0F1A2E)
-                                    : const Color(0xFFF8FAFC),
-                                border: Border(
-                                  bottom: BorderSide(
-                                    color: isDark
-                                        ? Colors.white10
-                                        : Colors.black12,
-                                  ),
-                                ),
-                              ),
-                              child: Wrap(
-                                alignment: WrapAlignment.spaceBetween,
-                                crossAxisAlignment: WrapCrossAlignment.center,
-                                spacing: 8,
-                                runSpacing: 4,
-                                children: [
-                                  Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.border_color_outlined,
-                                        size: 14,
-                                        color: hasSel
-                                            ? const Color(0xFF4338CA)
-                                            : Colors.grey,
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        hasSel ? 'Sublinhar versículo:' : 'Selecione um trecho para sublinhar:',
+                        return NotificationListener<ScrollNotification>(
+                          onNotification: (_) {
+                            _hlFloating.hide();
+                            return false;
+                          },
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.all(20),
+                            child: Listener(
+                              key: _verseAnchorKey,
+                              onPointerDown: (e) =>
+                                  _hlFloating.recordPointerDown(e.position),
+                              onPointerUp: (e) =>
+                                  _hlFloating.recordPointerUp(e.position),
+                              child: SelectableText.rich(
+                                TextSpan(
+                                  children: [
+                                    for (final slice in slices) ...[
+                                      TextSpan(
+                                        text: '${slice.number} ',
                                         style: TextStyle(
-                                          fontSize: 11.5,
-                                          fontWeight: hasSel
-                                              ? FontWeight.w600
-                                              : FontWeight.normal,
-                                          color: isDark
-                                              ? const Color(0xFFCBD5E1)
-                                              : const Color(0xFF475569),
+                                          fontSize: _fontSize * 0.78,
+                                          fontWeight: FontWeight.bold,
+                                          color: const Color(0xFF4338CA),
                                         ),
                                       ),
+                                      ...slice.mapped.spans,
+                                      const TextSpan(text: ' '),
                                     ],
-                                  ),
-                                  Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
+                                  ],
+                                ),
+                                onSelectionChanged: (sel, _) {
+                                  if (!mounted) return;
+                                  if (sel.isValid &&
+                                      !sel.isCollapsed &&
+                                      sel.end > sel.start) {
+                                    _hlFloating.show(
+                                      context: ctx,
+                                      keyPrefix: 'bible',
+                                      anchorKey: _verseAnchorKey,
+                                      onPickColor: (hex) =>
+                                          _applyHighlightToSelection(
+                                            slices,
+                                            sel.start,
+                                            sel.end,
+                                            hex,
+                                          ),
+                                    );
+                                  } else {
+                                    _hlFloating.hide();
+                                  }
+                                },
+                                contextMenuBuilder: (menuCtx, editableState) {
+                                  final sel =
+                                      editableState.textEditingValue.selection;
+                                  final canHl = sel.isValid && !sel.isCollapsed;
+                                  final items = <ContextMenuButtonItem>[
+                                    ...editableState.contextMenuButtonItems,
+                                    if (canHl) ...[
                                       for (final c
                                           in HighlightTextHelper.colors)
-                                        Tooltip(
-                                          message: 'Sublinhar (${c.label})',
-                                          child: InkWell(
-                                            key: Key('btn_bible_hl_${c.id}'),
-                                            borderRadius: BorderRadius.circular(
-                                              14,
-                                            ),
-                                            onTap: hasSel
-                                                ? () =>
-                                                      _applyHighlightToSelection(
-                                                        slices,
-                                                        _activeSelection!.start,
-                                                        _activeSelection!.end,
-                                                        c.hex,
-                                                      )
-                                                : null,
-                                            child: Padding(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 4,
-                                                    vertical: 3,
-                                                  ),
-                                              child: CircleAvatar(
-                                                radius: 8,
-                                                backgroundColor: c.color
-                                                    .withValues(
-                                                      alpha: hasSel ? 1.0 : 0.4,
-                                                    ),
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      IconButton(
-                                        key: const Key('btn_bible_hl_clear'),
-                                        tooltip: 'Remover sublinhado',
-                                        visualDensity: VisualDensity.compact,
-                                        padding: EdgeInsets.zero,
-                                        constraints: const BoxConstraints(
-                                          minWidth: 26,
-                                          minHeight: 26,
-                                        ),
-                                        icon: Icon(
-                                          Icons.format_clear,
-                                          size: 16,
-                                          color: hasSel
-                                              ? Colors.redAccent
-                                              : Colors.grey,
-                                        ),
-                                        onPressed: hasSel
-                                            ? () => _applyHighlightToSelection(
-                                                slices,
-                                                _activeSelection!.start,
-                                                _activeSelection!.end,
-                                                null,
-                                              )
-                                            : null,
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Expanded(
-                              child: SingleChildScrollView(
-                                padding: const EdgeInsets.all(20),
-                                child: SelectableText.rich(
-                                  TextSpan(
-                                    children: [
-                                      for (final slice in slices) ...[
-                                        TextSpan(
-                                          text: '${slice.number} ',
-                                          style: TextStyle(
-                                            fontSize: _fontSize * 0.78,
-                                            fontWeight: FontWeight.bold,
-                                            color: const Color(0xFF4338CA),
-                                          ),
-                                        ),
-                                        ...slice.mapped.spans,
-                                        const TextSpan(text: ' '),
-                                      ],
-                                    ],
-                                  ),
-                                  onSelectionChanged: (sel, _) {
-                                    if (mounted) {
-                                      setState(() => _activeSelection = sel);
-                                    }
-                                  },
-                                  contextMenuBuilder: (menuCtx, editableState) {
-                                    final sel = editableState
-                                        .textEditingValue
-                                        .selection;
-                                    final canHl =
-                                        sel.isValid && !sel.isCollapsed;
-                                    final items = <ContextMenuButtonItem>[
-                                      ...editableState.contextMenuButtonItems,
-                                      if (canHl) ...[
-                                        for (final c
-                                            in HighlightTextHelper.colors)
-                                          ContextMenuButtonItem(
-                                            label: 'Sublinhar (${c.label})',
-                                            onPressed: () {
-                                              ContextMenuController.removeAny();
-                                              _applyHighlightToSelection(
-                                                slices,
-                                                sel.start,
-                                                sel.end,
-                                                c.hex,
-                                              );
-                                            },
-                                          ),
                                         ContextMenuButtonItem(
-                                          label: 'Remover Sublinhado',
+                                          label: 'Marcar (${c.label})',
                                           onPressed: () {
                                             ContextMenuController.removeAny();
+                                            _hlFloating.hide();
                                             _applyHighlightToSelection(
                                               slices,
                                               sel.start,
                                               sel.end,
-                                              null,
+                                              c.hex,
                                             );
                                           },
                                         ),
-                                      ],
-                                    ];
-                                    return AdaptiveTextSelectionToolbar.buttonItems(
-                                      anchors: editableState.contextMenuAnchors,
-                                      buttonItems: items,
-                                    );
-                                  },
-                                ),
+                                      ContextMenuButtonItem(
+                                        label: 'Remover marcação',
+                                        onPressed: () {
+                                          ContextMenuController.removeAny();
+                                          _hlFloating.hide();
+                                          _applyHighlightToSelection(
+                                            slices,
+                                            sel.start,
+                                            sel.end,
+                                            null,
+                                          );
+                                        },
+                                      ),
+                                    ],
+                                  ];
+                                  return AdaptiveTextSelectionToolbar.buttonItems(
+                                    anchors: editableState.contextMenuAnchors,
+                                    buttonItems: items,
+                                  );
+                                },
                               ),
                             ),
-                          ],
+                          ),
                         );
                       },
                     )

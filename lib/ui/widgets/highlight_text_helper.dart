@@ -135,6 +135,7 @@ class HighlightTextHelper {
     ValueChanged<String>? onLinkTap,
     List<GestureRecognizer>? disposables,
     bool stripBlockPrefixes = true,
+    bool isDark = false,
   }) {
     if (rawText.isEmpty) {
       return const MappedRichTextResult(
@@ -183,6 +184,202 @@ class HighlightTextHelper {
       }
     }
 
+    void parseInline(
+      String slice,
+      TextStyle currentStyle,
+      int sliceOffset, {
+      GestureRecognizer? inheritedRecognizer,
+      bool hasActiveHighlight = false,
+    }) {
+      if (slice.isEmpty) return;
+      final matches = inlineTokenRegex.allMatches(slice).toList();
+      if (matches.isEmpty) {
+        emitSpan(
+          slice,
+          currentStyle,
+          sliceOffset,
+          recognizer: inheritedRecognizer,
+        );
+        return;
+      }
+
+      var lastEnd = 0;
+      for (final m in matches) {
+        if (m.start > lastEnd) {
+          emitSpan(
+            slice.substring(lastEnd, m.start),
+            currentStyle,
+            sliceOffset + lastEnd,
+            recognizer: inheritedRecognizer,
+          );
+        }
+
+        if (m.group(2) != null) {
+          // <u style="color:#hex">text</u> -> preenchimento integral estilo JW Library
+          final hlColor = parseHexColor(m.group(1));
+          final innerText = m.group(2)!;
+          final innerIdx = slice.indexOf(innerText, m.start);
+          final innerStart = sliceOffset + (innerIdx >= 0 ? innerIdx : m.start);
+          parseInline(
+            innerText,
+            currentStyle.copyWith(
+              backgroundColor: hlColor.withValues(alpha: isDark ? 0.42 : 0.34),
+            ),
+            innerStart,
+            inheritedRecognizer: inheritedRecognizer,
+            hasActiveHighlight: true,
+          );
+        } else if (m.group(4) != null) {
+          // <mark style="background:#hex">text</mark>
+          final markColor = parseHexColor(m.group(3), fallback: Colors.amber);
+          final innerText = m.group(4)!;
+          final innerIdx = slice.indexOf(innerText, m.start);
+          final innerStart = sliceOffset + (innerIdx >= 0 ? innerIdx : m.start);
+          parseInline(
+            innerText,
+            currentStyle.copyWith(
+              backgroundColor: markColor.withValues(
+                alpha: isDark ? 0.42 : 0.36,
+              ),
+            ),
+            innerStart,
+            inheritedRecognizer: inheritedRecognizer,
+            hasActiveHighlight: true,
+          );
+        } else if (m.group(5) != null) {
+          parseInline(
+            m.group(5)!,
+            currentStyle.copyWith(
+              fontWeight: FontWeight.bold,
+              fontStyle: FontStyle.italic,
+            ),
+            sliceOffset + m.start + 3,
+            inheritedRecognizer: inheritedRecognizer,
+            hasActiveHighlight: hasActiveHighlight,
+          );
+        } else if (m.group(6) != null) {
+          parseInline(
+            m.group(6)!,
+            currentStyle.copyWith(fontWeight: FontWeight.bold),
+            sliceOffset + m.start + 2,
+            inheritedRecognizer: inheritedRecognizer,
+            hasActiveHighlight: hasActiveHighlight,
+          );
+        } else if (m.group(7) != null) {
+          parseInline(
+            m.group(7)!,
+            currentStyle.copyWith(fontStyle: FontStyle.italic),
+            sliceOffset + m.start + 1,
+            inheritedRecognizer: inheritedRecognizer,
+            hasActiveHighlight: hasActiveHighlight,
+          );
+        } else if (m.group(8) != null) {
+          parseInline(
+            m.group(8)!,
+            currentStyle.copyWith(
+              fontWeight: FontWeight.bold,
+              fontStyle: FontStyle.italic,
+            ),
+            sliceOffset + m.start + 3,
+            inheritedRecognizer: inheritedRecognizer,
+            hasActiveHighlight: hasActiveHighlight,
+          );
+        } else if (m.group(9) != null) {
+          parseInline(
+            m.group(9)!,
+            currentStyle.copyWith(fontWeight: FontWeight.bold),
+            sliceOffset + m.start + 2,
+            inheritedRecognizer: inheritedRecognizer,
+            hasActiveHighlight: hasActiveHighlight,
+          );
+        } else if (m.group(10) != null) {
+          parseInline(
+            m.group(10)!,
+            currentStyle.copyWith(fontStyle: FontStyle.italic),
+            sliceOffset + m.start + 1,
+            inheritedRecognizer: inheritedRecognizer,
+            hasActiveHighlight: hasActiveHighlight,
+          );
+        } else if (m.group(11) != null) {
+          emitSpan(
+            m.group(11)!,
+            currentStyle.copyWith(
+              fontFamily: 'monospace',
+              backgroundColor: hasActiveHighlight
+                  ? currentStyle.backgroundColor
+                  : (currentStyle.color ?? Colors.black).withValues(
+                      alpha: 0.08,
+                    ),
+            ),
+            sliceOffset + m.start + 1,
+            recognizer: inheritedRecognizer,
+          );
+        } else if (m.group(12) != null) {
+          parseInline(
+            m.group(12)!,
+            currentStyle.copyWith(decoration: TextDecoration.lineThrough),
+            sliceOffset + m.start + 2,
+            inheritedRecognizer: inheritedRecognizer,
+            hasActiveHighlight: hasActiveHighlight,
+          );
+        } else if (m.group(13) != null) {
+          // [label](url) — cura também tags <u>/<mark> legadas que tenham sido inseridas dentro do rótulo
+          final rawLabel = m.group(13)!;
+          final url = m.group(14) ?? '';
+          final isAppRef = AppReferenceHelper.isAppReferenceUrl(url);
+          TapGestureRecognizer? recognizer =
+              inheritedRecognizer as TapGestureRecognizer?;
+          if (recognizer == null && onLinkTap != null && url.isNotEmpty) {
+            recognizer = TapGestureRecognizer()..onTap = () => onLinkTap(url);
+            disposables?.add(recognizer);
+          }
+
+          Color? effectiveBg = currentStyle.backgroundColor;
+          final legacyTag = anyHighlightTagRegex.firstMatch(rawLabel);
+          if (!hasActiveHighlight && legacyTag != null) {
+            final legacyHex = legacyTag.group(1) ?? legacyTag.group(3);
+            final legacyColor = parseHexColor(legacyHex);
+            effectiveBg = legacyColor.withValues(alpha: isDark ? 0.42 : 0.34);
+          } else if (!hasActiveHighlight && effectiveBg == null && isAppRef) {
+            final baseLinkColor = url.contains('/bible/')
+                ? const Color(0xFF4338CA)
+                : AppTheme.accentTeal;
+            effectiveBg = baseLinkColor.withValues(alpha: 0.10);
+          }
+
+          final linkColor = url.contains('/bible/')
+              ? const Color(0xFF6366F1)
+              : (isAppRef ? AppTheme.accentTeal : AppTheme.primaryBlue);
+
+          final cleanLabel = stripHighlightTags(rawLabel);
+          emitTransformedSpan(
+            cleanLabel,
+            currentStyle.copyWith(
+              color: linkColor,
+              fontWeight: FontWeight.w600,
+              decoration: TextDecoration.underline,
+              decorationColor: linkColor.withValues(alpha: 0.7),
+              backgroundColor: effectiveBg,
+            ),
+            sliceOffset + m.start,
+            sliceOffset + m.end,
+            recognizer: recognizer,
+          );
+        }
+
+        lastEnd = m.end;
+      }
+
+      if (lastEnd < slice.length) {
+        emitSpan(
+          slice.substring(lastEnd),
+          currentStyle,
+          sliceOffset + lastEnd,
+          recognizer: inheritedRecognizer,
+        );
+      }
+    }
+
     // Processa linha a linha para mapear cabeçalhos/citações/listas sem perder offsets originais.
     final lines = rawText.split('\n');
     var lineCursor = 0;
@@ -209,7 +406,14 @@ class HighlightTextHelper {
 
         if (headingMatch != null) {
           contentStartInLine = headingMatch.end;
-          lineStyle = baseStyle.copyWith(fontWeight: FontWeight.bold);
+          final level = headingMatch.group(1)!.trim().length;
+          final baseSize = baseStyle.fontSize ?? 14.5;
+          final delta = level <= 1 ? 6.0 : (level == 2 ? 4.0 : 2.0);
+          lineStyle = baseStyle.copyWith(
+            fontWeight: FontWeight.bold,
+            fontSize: baseSize + delta,
+            height: 1.35,
+          );
         } else if (quoteMatch != null) {
           contentStartInLine = quoteMatch.end;
           lineStyle = baseStyle.copyWith(fontStyle: FontStyle.italic);
@@ -236,162 +440,7 @@ class HighlightTextHelper {
 
       final visibleLine = line.substring(contentStartInLine);
       final baseOffset = lineStartRaw + contentStartInLine;
-
-      final matches = inlineTokenRegex.allMatches(visibleLine).toList();
-      if (matches.isEmpty) {
-        emitSpan(visibleLine, lineStyle, baseOffset);
-        continue;
-      }
-
-      var lastEnd = 0;
-      for (final m in matches) {
-        if (m.start > lastEnd) {
-          emitSpan(
-            visibleLine.substring(lastEnd, m.start),
-            lineStyle,
-            baseOffset + lastEnd,
-          );
-        }
-
-        if (m.group(2) != null) {
-          // <u style="color:#hex">text</u>
-          final underlineColor = parseHexColor(m.group(1));
-          final innerText = m.group(2)!;
-          final innerStart =
-              baseOffset + visibleLine.indexOf(innerText, m.start);
-          emitSpan(
-            innerText,
-            lineStyle.copyWith(
-              decoration: TextDecoration.underline,
-              decorationColor: underlineColor,
-              decorationThickness: 2.5,
-              backgroundColor: underlineColor.withValues(alpha: 0.14),
-            ),
-            innerStart >= baseOffset ? innerStart : baseOffset + m.start,
-          );
-        } else if (m.group(4) != null) {
-          // <mark style="background:#hex">text</mark>
-          final markColor = parseHexColor(m.group(3), fallback: Colors.amber);
-          final innerText = m.group(4)!;
-          final innerStart =
-              baseOffset + visibleLine.indexOf(innerText, m.start);
-          emitSpan(
-            innerText,
-            lineStyle.copyWith(
-              backgroundColor: markColor.withValues(alpha: 0.35),
-              decoration: TextDecoration.underline,
-              decorationColor: markColor,
-              decorationThickness: 2.0,
-              fontWeight: FontWeight.w600,
-            ),
-            innerStart >= baseOffset ? innerStart : baseOffset + m.start,
-          );
-        } else if (m.group(5) != null) {
-          // ***bold italic***
-          emitSpan(
-            m.group(5)!,
-            lineStyle.copyWith(
-              fontWeight: FontWeight.bold,
-              fontStyle: FontStyle.italic,
-            ),
-            baseOffset + m.start + 3,
-          );
-        } else if (m.group(6) != null) {
-          // **bold**
-          emitSpan(
-            m.group(6)!,
-            lineStyle.copyWith(fontWeight: FontWeight.bold),
-            baseOffset + m.start + 2,
-          );
-        } else if (m.group(7) != null) {
-          // *italic*
-          emitSpan(
-            m.group(7)!,
-            lineStyle.copyWith(fontStyle: FontStyle.italic),
-            baseOffset + m.start + 1,
-          );
-        } else if (m.group(8) != null) {
-          // ___bold italic___
-          emitSpan(
-            m.group(8)!,
-            lineStyle.copyWith(
-              fontWeight: FontWeight.bold,
-              fontStyle: FontStyle.italic,
-            ),
-            baseOffset + m.start + 3,
-          );
-        } else if (m.group(9) != null) {
-          // __bold__
-          emitSpan(
-            m.group(9)!,
-            lineStyle.copyWith(fontWeight: FontWeight.bold),
-            baseOffset + m.start + 2,
-          );
-        } else if (m.group(10) != null) {
-          // _italic_
-          emitSpan(
-            m.group(10)!,
-            lineStyle.copyWith(fontStyle: FontStyle.italic),
-            baseOffset + m.start + 1,
-          );
-        } else if (m.group(11) != null) {
-          // `code`
-          emitSpan(
-            m.group(11)!,
-            lineStyle.copyWith(
-              fontFamily: 'monospace',
-              backgroundColor: (lineStyle.color ?? Colors.black).withValues(
-                alpha: 0.08,
-              ),
-            ),
-            baseOffset + m.start + 1,
-          );
-        } else if (m.group(12) != null) {
-          // ~~strikethrough~~
-          emitSpan(
-            m.group(12)!,
-            lineStyle.copyWith(decoration: TextDecoration.lineThrough),
-            baseOffset + m.start + 2,
-          );
-        } else if (m.group(13) != null) {
-          // [label](url)
-          final label = m.group(13)!;
-          final url = m.group(14) ?? '';
-          final isAppRef = AppReferenceHelper.isAppReferenceUrl(url);
-          TapGestureRecognizer? recognizer;
-          if (onLinkTap != null && url.isNotEmpty) {
-            recognizer = TapGestureRecognizer()..onTap = () => onLinkTap(url);
-            disposables?.add(recognizer);
-          }
-          final linkColor = url.contains('/bible/')
-              ? const Color(0xFF4338CA)
-              : (isAppRef ? AppTheme.accentTeal : AppTheme.primaryBlue);
-          emitSpan(
-            label,
-            lineStyle.copyWith(
-              color: linkColor,
-              fontWeight: FontWeight.w600,
-              decoration: TextDecoration.underline,
-              decorationColor: linkColor.withValues(alpha: 0.6),
-              backgroundColor: isAppRef
-                  ? linkColor.withValues(alpha: 0.09)
-                  : null,
-            ),
-            baseOffset + m.start + 1,
-            recognizer: recognizer,
-          );
-        }
-
-        lastEnd = m.end;
-      }
-
-      if (lastEnd < visibleLine.length) {
-        emitSpan(
-          visibleLine.substring(lastEnd),
-          lineStyle,
-          baseOffset + lastEnd,
-        );
-      }
+      parseInline(visibleLine, lineStyle, baseOffset);
     }
 
     return MappedRichTextResult(
@@ -499,6 +548,23 @@ class HighlightTextHelper {
         } else if (overlapsEnd && !overlapsStart) {
           rawEnd = m.end;
         }
+      }
+    }
+
+    // Garante que links [label](url) e marcações inline não sejam fatiados no meio.
+    final atomicTokenRegex = RegExp(
+      r'(\[[^\]]+\]\([^)]+\)|`[^`]+`|\*\*\*[^*\n]+\*\*\*|\*\*[^*\n]+\*\*|~~[^~\n]+~~)',
+    );
+    for (final m in atomicTokenRegex.allMatches(rawText)) {
+      if (m.start < rawEnd && m.end > rawStart) {
+        if (m.start < rawStart) rawStart = m.start;
+        if (m.end > rawEnd) rawEnd = m.end;
+      }
+    }
+    for (final m in anyHighlightTagRegex.allMatches(rawText)) {
+      if (m.start < rawEnd && m.end > rawStart) {
+        if (m.start < rawStart) rawStart = m.start;
+        if (m.end > rawEnd) rawEnd = m.end;
       }
     }
 

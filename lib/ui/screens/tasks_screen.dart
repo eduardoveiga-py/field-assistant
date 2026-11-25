@@ -13,6 +13,7 @@ import '../widgets/adaptive_ministry_sheet.dart';
 import '../widgets/knowledge_item_reader_dialog.dart';
 import '../widgets/managed_text_controllers.dart';
 import '../widgets/markdown_preview_text.dart';
+import '../widgets/rich_formatted_editing_controller.dart';
 import '../widgets/rich_markdown_toolbar.dart';
 import '../widgets/universal_attachment_viewer.dart';
 import 'person_detail_screen.dart';
@@ -718,8 +719,8 @@ class _TasksScreenState extends ConsumerState<TasksScreen>
             ],
             if (project.objective != null && project.objective!.isNotEmpty) ...[
               const SizedBox(height: 8),
-              Text(
-                project.objective!,
+              MarkdownPreviewText(
+                text: project.objective!,
                 style: TextStyle(
                   fontSize: 13,
                   color: isDark
@@ -1228,6 +1229,11 @@ class _TasksScreenState extends ConsumerState<TasksScreen>
       titleLeading: const Icon(Icons.add_task, color: AppTheme.primaryBlue),
       builder: (ctx, scroll) => ManagedTextControllers(
         initialTexts: const ['', '', ''],
+        customFactories: [
+          null,
+          (text) => RichFormattedEditingController.fromMarkup(text),
+          null,
+        ],
         builder: (ctx, ctrls) {
           final titleCtrl = ctrls[0];
           final descCtrl = ctrls[1];
@@ -1258,7 +1264,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen>
                       controller: descCtrl,
                       maxLines: 3,
                       decoration: const InputDecoration(
-                        labelText: 'Descrição ou detalhes (Markdown e imagens)',
+                        labelText: 'Descrição ou detalhes',
                         border: OutlineInputBorder(),
                       ),
                     ),
@@ -1376,7 +1382,9 @@ class _TasksScreenState extends ConsumerState<TasksScreen>
                       onPressed: () async {
                         final title = titleCtrl.text.trim();
                         if (title.isEmpty) return;
-                        final descText = descCtrl.text.trim();
+                        final descText =
+                            RichFormattedEditingController.readMarkup(descCtrl)
+                                .trim();
                         final taskMgr = ref.read(taskManagerProvider);
                         final tags = tagsCtrl.text
                             .split(',')
@@ -1426,6 +1434,11 @@ class _TasksScreenState extends ConsumerState<TasksScreen>
           task.description ?? '',
           initialTags.join(', '),
         ],
+        customFactories: [
+          null,
+          (text) => RichFormattedEditingController.fromMarkup(text),
+          null,
+        ],
         builder: (ctx, ctrls) {
           final titleCtrl = ctrls[0];
           final descCtrl = ctrls[1];
@@ -1455,7 +1468,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen>
                       controller: descCtrl,
                       maxLines: 3,
                       decoration: const InputDecoration(
-                        labelText: 'Descrição ou detalhes (Markdown e imagens)',
+                        labelText: 'Descrição ou detalhes',
                         border: OutlineInputBorder(),
                       ),
                     ),
@@ -1580,7 +1593,9 @@ class _TasksScreenState extends ConsumerState<TasksScreen>
                       onPressed: () async {
                         final title = titleCtrl.text.trim();
                         if (title.isEmpty) return;
-                        final descText = descCtrl.text.trim();
+                        final descText =
+                            RichFormattedEditingController.readMarkup(descCtrl)
+                                .trim();
                         final taskMgr = ref.read(taskManagerProvider);
                         final tags = tagsCtrl.text
                             .split(',')
@@ -1652,6 +1667,11 @@ class _TasksScreenState extends ConsumerState<TasksScreen>
       titleLeading: const Icon(Icons.folder_special, color: Color(0xFF3B82F6)),
       builder: (ctx, scroll) => ManagedTextControllers(
         initialTexts: const ['', '', ''],
+        customFactories: [
+          null,
+          (text) => RichFormattedEditingController.fromMarkup(text),
+          null,
+        ],
         builder: (ctx, ctrls) {
           final nameCtrl = ctrls[0];
           final objCtrl = ctrls[1];
@@ -1682,7 +1702,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen>
                       controller: objCtrl,
                       maxLines: 3,
                       decoration: const InputDecoration(
-                        labelText: 'Objetivo Principal (Markdown e imagens)',
+                        labelText: 'Objetivo Principal',
                         border: OutlineInputBorder(),
                       ),
                     ),
@@ -1757,7 +1777,9 @@ class _TasksScreenState extends ConsumerState<TasksScreen>
                       onPressed: () async {
                         final name = nameCtrl.text.trim();
                         if (name.isEmpty) return;
-                        final objText = objCtrl.text.trim();
+                        final objText =
+                            RichFormattedEditingController.readMarkup(objCtrl)
+                                .trim();
                         final projMgr = ref.read(projectManagerProvider);
                         final tags = tagsCtrl.text
                             .split(',')
@@ -1803,6 +1825,11 @@ class _TasksScreenState extends ConsumerState<TasksScreen>
           project.objective ?? '',
           initialTags.join(', '),
         ],
+        customFactories: [
+          null,
+          (text) => RichFormattedEditingController.fromMarkup(text),
+          null,
+        ],
         builder: (ctx, ctrls) {
           final nameCtrl = ctrls[0];
           final objCtrl = ctrls[1];
@@ -1832,7 +1859,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen>
                       controller: objCtrl,
                       maxLines: 3,
                       decoration: const InputDecoration(
-                        labelText: 'Objetivo Principal (Markdown e imagens)',
+                        labelText: 'Objetivo Principal',
                         border: OutlineInputBorder(),
                       ),
                     ),
@@ -1909,7 +1936,9 @@ class _TasksScreenState extends ConsumerState<TasksScreen>
                       onPressed: () async {
                         final name = nameCtrl.text.trim();
                         if (name.isEmpty) return;
-                        final objText = objCtrl.text.trim();
+                        final objText =
+                            RichFormattedEditingController.readMarkup(objCtrl)
+                                .trim();
                         final projMgr = ref.read(projectManagerProvider);
                         final tags = tagsCtrl.text
                             .split(',')
