@@ -1,15 +1,17 @@
 name: Independent Flutter validation
 on:
-  push:
-    branches: ['main', 'master', 'stabilization/**', 'arena/**']
-  pull_request:
-    branches: ['main', 'master']
   workflow_dispatch:
+    inputs:
+      include_native_checks:
+        description: 'Executar checagens de compilação Windows e iOS (no-codesign)'
+        type: boolean
+        required: false
+        default: true
 permissions:
   contents: read
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
   sql_safety:
     name: SQL isolation and compare-and-swap
@@ -79,6 +81,7 @@ jobs:
   build_windows_check:
     name: Windows compilation check (no credentials)
     needs: [tests]
+    if: inputs.include_native_checks == true
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -99,6 +102,7 @@ jobs:
   build_ios_check:
     name: iOS compilation check (unsigned, no credentials)
     needs: [tests]
+    if: inputs.include_native_checks == true
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

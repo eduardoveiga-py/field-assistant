@@ -24,7 +24,7 @@ Sempre que editar ou criar arquivos em `.github/**` (especialmente workflows ou 
    ```bash
    python -c "import yaml, glob; [yaml.safe_load(open(f, encoding='utf-8')) for f in glob.glob('.github/**/*.yml', recursive=True)]"
    ```
-2. **Proibição de `paths-ignore` no nível raiz:** Nunca adicione `paths-ignore` no nível raiz de workflows cujos jobs sejam `Required` no ruleset `Protect master` (ex.: `Flutter Analyze, Format & Test`, `Windows compilation check`, `iOS compilation check`, etc.). A omissão desses jobs deixa os checks em estado pendente eterno no GitHub, bloqueando o merge na `master`.
+2. **Proibição de `paths-ignore` no nível raiz:** Nunca adicione `paths-ignore` no nível raiz de workflows cujos jobs sejam `Required` no ruleset `Protect master` (ex.: `Flutter Analyze, Format & Test`, `Build Web (Release)`, `Headless Integration Tests (Linux xvfb)`, `SQL Isolation, RLS & E2EE CAS (PGlite)`, `Secret Pattern Audit & SBOM Generation`, etc.). A omissão desses jobs deixa os checks em estado pendente eterno no GitHub, bloqueando o merge na `master`.
 
 ## 3. Alinhamento de SHAs do CodeQL
 Em `.github/workflows/security-scan.yml`:
