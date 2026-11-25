@@ -63,6 +63,64 @@ class InboxScreen extends ConsumerStatefulWidget {
     this.navigationEpoch = 0,
   });
 
+  /// Abre o compositor de e-mail completo (Gmail REST, Microsoft Graph, Exchange e SMTP)
+  /// com suporte opcional a corpo e anexos pré-carregados (ex.: Documentos Oficiais em PDF/PNG/DOCX).
+  static Future<void> showComposeSheet(
+    BuildContext context,
+    WidgetRef ref, {
+    JwEmailMessage? existingDraft,
+    String? initialTo,
+    String? initialSubject,
+    String? initialBody,
+    String? initialAccountEmail,
+    List<Map<String, dynamic>>? initialAttachments,
+  }) async {
+    final db = ref.read(repositoryProvider).db;
+    final accounts = await EmailAccountsManager.loadAccounts(db);
+
+    EmailAccount? selectedAccount;
+    if (existingDraft?.accountEmail != null &&
+        existingDraft!.accountEmail!.isNotEmpty) {
+      selectedAccount = accounts.firstWhereOrNull(
+        (a) =>
+            a.email.toLowerCase() == existingDraft.accountEmail!.toLowerCase(),
+      );
+    } else if (initialAccountEmail != null && initialAccountEmail.isNotEmpty) {
+      selectedAccount = accounts.firstWhereOrNull(
+        (a) => a.email.toLowerCase() == initialAccountEmail.toLowerCase(),
+      );
+    }
+    selectedAccount ??=
+        accounts.where((a) => a.isActive).firstOrNull ?? accounts.firstOrNull;
+
+    if (!context.mounted) return;
+
+    final initTo = existingDraft?.to ?? initialTo ?? '';
+    final initCc = existingDraft?.cc.join(', ') ?? '';
+    final initBcc = existingDraft?.bcc.join(', ') ?? '';
+    final initSubject = existingDraft?.subject ?? initialSubject ?? '';
+    final draftHtml = existingDraft?.bodyHtml?.trim() ?? '';
+    final initBody = draftHtml.isNotEmpty
+        ? draftHtml
+        : (existingDraft?.bodyText ?? initialBody ?? '');
+    final initTags = existingDraft?.tags.join(', ') ?? '';
+
+    await _InboxScreenState._runComposeModalSheet(
+      context: context,
+      ref: ref,
+      accounts: accounts,
+      initialSelectedAccount: selectedAccount,
+      existingDraft: existingDraft,
+      initTo: initTo,
+      initCc: initCc,
+      initBcc: initBcc,
+      initSubject: initSubject,
+      initBody: initBody,
+      initTags: initTags,
+      initialAttachments: initialAttachments,
+    );
+  }
+
   @override
   ConsumerState<InboxScreen> createState() => _InboxScreenState();
 }
@@ -4752,8 +4810,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
   // SELETOR MODAL DE CONTATOS DE E-MAIL
   // ==========================================
 
-  Future<void> _showContactPickerModal(
-    BuildContext context, {
+  static Future<void> _showContactPickerModal(
+    BuildContext context,
+    WidgetRef ref, {
     required ValueChanged<String> onSelected,
   }) async {
     final db = ref.read(repositoryProvider).db;
@@ -4933,42 +4992,32 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
     String? initialTo,
     String? initialSubject,
     String? initialAccountEmail,
+  }) {
+    return InboxScreen.showComposeSheet(
+      context,
+      ref,
+      existingDraft: existingDraft,
+      initialTo: initialTo,
+      initialSubject: initialSubject,
+      initialAccountEmail: initialAccountEmail ?? _selectedEmailAccount,
+    );
+  }
+
+  static Future<void> _runComposeModalSheet({
+    required BuildContext context,
+    required WidgetRef ref,
+    required List<EmailAccount> accounts,
+    required EmailAccount? initialSelectedAccount,
+    JwEmailMessage? existingDraft,
+    required String initTo,
+    required String initCc,
+    required String initBcc,
+    required String initSubject,
+    required String initBody,
+    required String initTags,
+    List<Map<String, dynamic>>? initialAttachments,
   }) async {
-    final db = ref.read(repositoryProvider).db;
-    final accounts = await EmailAccountsManager.loadAccounts(db);
-
-    EmailAccount? selectedAccount;
-    if (existingDraft?.accountEmail != null &&
-        existingDraft!.accountEmail!.isNotEmpty) {
-      selectedAccount = accounts.firstWhereOrNull(
-        (a) =>
-            a.email.toLowerCase() == existingDraft.accountEmail!.toLowerCase(),
-      );
-    } else if (initialAccountEmail != null && initialAccountEmail.isNotEmpty) {
-      selectedAccount = accounts.firstWhereOrNull(
-        (a) => a.email.toLowerCase() == initialAccountEmail.toLowerCase(),
-      );
-    } else if (_selectedEmailAccount != null &&
-        _selectedEmailAccount!.isNotEmpty) {
-      selectedAccount = accounts.firstWhereOrNull(
-        (a) => a.email.toLowerCase() == _selectedEmailAccount!.toLowerCase(),
-      );
-    }
-    selectedAccount ??=
-        accounts.where((a) => a.isActive).firstOrNull ?? accounts.firstOrNull;
-
-    if (!mounted) return;
-
-    final initTo = existingDraft?.to ?? initialTo ?? '';
-    final initCc = existingDraft?.cc.join(', ') ?? '';
-    final initBcc = existingDraft?.bcc.join(', ') ?? '';
-    final initSubject = existingDraft?.subject ?? initialSubject ?? '';
-    final draftHtml = existingDraft?.bodyHtml?.trim() ?? '';
-    final initBody = draftHtml.isNotEmpty
-        ? draftHtml
-        : (existingDraft?.bodyText ?? '');
-    final initTags = existingDraft?.tags.join(', ') ?? '';
-
+    var selectedAccount = initialSelectedAccount;
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -5122,13 +5171,15 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                   TextButton.icon(
                                     onPressed: () {
                                       Navigator.pop(ctx);
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (_) =>
-                                              const SettingsScreen(),
-                                        ),
-                                      );
+                                      if (context.mounted) {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) =>
+                                                const SettingsScreen(),
+                                          ),
+                                        );
+                                      }
                                     },
                                     icon: const Icon(Icons.settings, size: 16),
                                     label: const Text(
@@ -5198,6 +5249,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                         ? null
                                         : () => _showContactPickerModal(
                                             ctx,
+                                            ref,
                                             onSelected: (emails) {
                                               if (toCtrl.text.trim().isEmpty) {
                                                 toCtrl.text = emails;
@@ -5237,6 +5289,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                         ? null
                                         : () => _showContactPickerModal(
                                             ctx,
+                                            ref,
                                             onSelected: (emails) {
                                               if (toCtrl.text.trim().isEmpty) {
                                                 toCtrl.text = emails;
@@ -5283,6 +5336,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                     ? null
                                     : () => _showContactPickerModal(
                                         ctx,
+                                        ref,
                                         onSelected: (emails) {
                                           if (ccCtrl.text.trim().isEmpty) {
                                             ccCtrl.text = emails;
@@ -5322,6 +5376,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                     ? null
                                     : () => _showContactPickerModal(
                                         ctx,
+                                        ref,
                                         onSelected: (emails) {
                                           if (ccCtrl.text.trim().isEmpty) {
                                             ccCtrl.text = emails;
@@ -5356,6 +5411,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                     ? null
                                     : () => _showContactPickerModal(
                                         ctx,
+                                        ref,
                                         onSelected: (emails) {
                                           if (bccCtrl.text.trim().isEmpty) {
                                             bccCtrl.text = emails;
@@ -5395,6 +5451,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                     ? null
                                     : () => _showContactPickerModal(
                                         ctx,
+                                        ref,
                                         onSelected: (emails) {
                                           if (bccCtrl.text.trim().isEmpty) {
                                             bccCtrl.text = emails;
@@ -6065,7 +6122,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                           .read(jwEmailServiceProvider)
                                           .saveDraft(draft);
                                       if (ctx.mounted) Navigator.pop(ctx);
-                                      if (mounted) {
+                                      if (context.mounted) {
                                         ScaffoldMessenger.of(context)
                                             .showSnackBar(
                                               const SnackBar(
@@ -6325,7 +6382,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                             }
 
                                             if (ctx.mounted) Navigator.pop(ctx);
-                                            if (mounted) {
+                                            if (context.mounted) {
                                               ScaffoldMessenger.of(
                                                 context,
                                               ).showSnackBar(
@@ -6482,7 +6539,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                             }
 
                                             if (ctx.mounted) Navigator.pop(ctx);
-                                            if (mounted) {
+                                            if (context.mounted) {
                                               ScaffoldMessenger.of(
                                                 context,
                                               ).showSnackBar(
@@ -6626,7 +6683,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                             }
 
                                             if (ctx.mounted) Navigator.pop(ctx);
-                                            if (mounted) {
+                                            if (context.mounted) {
                                               ScaffoldMessenger.of(
                                                 context,
                                               ).showSnackBar(
@@ -6695,7 +6752,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                             }
 
                                             if (ctx.mounted) Navigator.pop(ctx);
-                                            if (mounted) {
+                                            if (context.mounted) {
                                               ScaffoldMessenger.of(
                                                 context,
                                               ).showSnackBar(
@@ -6918,7 +6975,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                           }
 
                                           if (ctx.mounted) Navigator.pop(ctx);
-                                          if (mounted) {
+                                          if (context.mounted) {
                                             ScaffoldMessenger.of(
                                               context,
                                             ).showSnackBar(
@@ -7074,7 +7131,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                         }
 
                                         if (ctx.mounted) Navigator.pop(ctx);
-                                        if (mounted) {
+                                        if (context.mounted) {
                                           ScaffoldMessenger.of(
                                             context,
                                           ).showSnackBar(

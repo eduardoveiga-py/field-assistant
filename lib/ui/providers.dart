@@ -7,6 +7,8 @@ import '../inbox/inbox_manager.dart';
 import '../tasks/task_manager.dart';
 import '../projects/project_manager.dart';
 import '../knowledge/knowledge_manager.dart';
+import '../official_docs/official_doc_manager.dart';
+import '../official_docs/official_doc_models.dart';
 import '../core/biometric_auth_service.dart';
 import '../inbox/jw_email_service.dart';
 import '../appointments/availability_engine.dart';
@@ -117,6 +119,23 @@ final recentNotesStreamProvider = StreamProvider<List<KnowledgeNoteEntry>>((
   final km = ref.watch(knowledgeManagerProvider);
   return km.watchNotes();
 });
+
+final officialDocManagerProvider = Provider<OfficialDocManager>((ref) {
+  final db = ref.watch(databaseProvider);
+  return OfficialDocManager(db: db);
+});
+
+final officialDocBundleStreamProvider =
+    StreamProvider<OfficialDocProfileBundle>((ref) {
+      final manager = ref.watch(officialDocManagerProvider);
+      return manager.watchBundle();
+    });
+
+final officialDocTemplatesStreamProvider =
+    StreamProvider<List<OfficialDocTemplate>>((ref) {
+      final manager = ref.watch(officialDocManagerProvider);
+      return manager.watchAllTemplates();
+    });
 
 // ==========================================
 // STREAM PROVIDERS REATIVOS EXISTENTES

@@ -13,6 +13,9 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/app_logger.dart';
 import '../../core/app_theme.dart';
+import '../../core/feature_registry.dart';
+import '../../official_docs/official_doc_manager.dart';
+import 'official_documents_screen.dart';
 import '../../database/app_database.dart';
 import '../../reports/web_downloader.dart';
 import '../../research/research_manager.dart';
@@ -47,6 +50,9 @@ class KnowledgeBaseScreen extends ConsumerStatefulWidget {
 class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
+  final ValueNotifier<String?> _officialDocSelectionNotifier = ValueNotifier(
+    null,
+  );
   final TextEditingController _searchCtrl = TextEditingController();
   String _searchQuery = '';
   String? _selectedNoteTag;
@@ -61,9 +67,9 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
   @override
   void initState() {
     super.initState();
-    final safeIdx = (widget.initialTabIndex ?? 0).clamp(0, 3);
+    final safeIdx = (widget.initialTabIndex ?? 0).clamp(0, 4);
     _tabController = TabController(
-      length: 4,
+      length: 5,
       vsync: this,
       initialIndex: safeIdx,
     );
@@ -78,7 +84,7 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
     if (widget.initialTabIndex != null &&
         (widget.initialTabIndex != oldWidget.initialTabIndex ||
             widget.navigationEpoch != oldWidget.navigationEpoch)) {
-      final safeIdx = widget.initialTabIndex!.clamp(0, 3);
+      final safeIdx = widget.initialTabIndex!.clamp(0, 4);
       if (_tabController.index != safeIdx) {
         _tabController.animateTo(safeIdx);
       }
@@ -87,6 +93,7 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
 
   @override
   void dispose() {
+    _officialDocSelectionNotifier.dispose();
     _tabController.dispose();
     _searchCtrl.dispose();
     super.dispose();
@@ -151,6 +158,7 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
             Tab(text: '❓ Perguntas & Dúvidas'),
             Tab(text: '📁 Documentos'),
             Tab(text: '🔗 Recursos'),
+            Tab(text: '✉️ Cartas & Atas'),
           ],
         ),
       ),
@@ -202,11 +210,63 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                 _buildQuestionsTab(isDark),
                 _buildDocumentsTab(isDark),
                 _buildResourcesTab(isDark),
+                _buildOfficialDocsTab(),
               ],
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildOfficialDocsTab() {
+    final isEnabled = ref.watch(
+      isFeatureEnabledProvider(AppFeature.officialDocuments),
+    );
+    if (!isEnabled) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.visibility_off_outlined,
+                  size: 48,
+                  color: Colors.grey,
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Módulo "Cartas & Atas" oculto',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Todas as suas cartas, pautas, atas, perfis e modelos salvos continuam intactos e sincronizados.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 13, color: Colors.grey),
+                ),
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  onPressed: () => FeatureRegistry.setFeatureEnabled(
+                    ref,
+                    AppFeature.officialDocuments,
+                    true,
+                  ),
+                  icon: const Icon(Icons.visibility),
+                  label: const Text('Reativar Cartas & Atas'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+    return OfficialDocumentsScreen(
+      embedded: true,
+      externalSelectionNotifier: _officialDocSelectionNotifier,
     );
   }
 
@@ -226,7 +286,9 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
           return const Center(child: CircularProgressIndicator());
         }
 
-        final allNotes = snapshot.data ?? [];
+        final allNotes = (snapshot.data ?? [])
+            .where((n) => !OfficialDocManager.isReservedCategory(n.category))
+            .toList();
         if (allNotes.isEmpty) {
           return _buildEmptyState(
             icon: Icons.note_outlined,
@@ -1719,6 +1781,24 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                 onTap: () {
                   Navigator.of(ctx).pop();
                   _showCreateResourceModal();
+                },
+              ),
+              ListTile(
+                leading: const CircleAvatar(
+                  backgroundColor: Color(0xFF0F766E),
+                  child: Icon(Icons.description_outlined, color: Colors.white),
+                ),
+                title: const Text(
+                  'Nova Carta, Pauta ou Ata',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                subtitle: const Text(
+                  'Criar documento oficial timbrado para PDF, PNG, DOCX ou e-mail',
+                ),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  _tabController.animateTo(4);
+                  _createOfficialDocFromKb();
                 },
               ),
             ],
@@ -3420,8 +3500,34 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
       case 3:
         _showCreateResourceModal();
         break;
+      case 4:
+        _createOfficialDocFromKb();
+        break;
       default:
         _showAddKnowledgeItemMenu();
+    }
+  }
+
+  Future<void> _createOfficialDocFromKb() async {
+    final enabled = ref.read(
+      isFeatureEnabledProvider(AppFeature.officialDocuments),
+    );
+    if (!enabled) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'O módulo Cartas & Atas está oculto em Personalizar Aplicativo.',
+          ),
+        ),
+      );
+      return;
+    }
+    final created = await OfficialDocumentsScreen.openTemplateChooserAndCreate(
+      context,
+      ref,
+    );
+    if (created != null && mounted) {
+      _officialDocSelectionNotifier.value = created.id;
     }
   }
 
@@ -3472,6 +3578,18 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
           icon: const Icon(Icons.add_link),
           label: const Text(
             'Novo Recurso',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+        );
+      case 4:
+        return FloatingActionButton.extended(
+          heroTag: 'fab_kb_4',
+          onPressed: _createOfficialDocFromKb,
+          backgroundColor: AppTheme.primaryBlue,
+          foregroundColor: Colors.white,
+          icon: const Icon(Icons.post_add),
+          label: const Text(
+            'Novo Doc.',
             style: TextStyle(fontWeight: FontWeight.bold),
           ),
         );

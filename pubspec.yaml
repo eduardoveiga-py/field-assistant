@@ -119,6 +119,74 @@ flutter:
     - assets/map/fonts/
     - assets/map/fonts/Noto Sans Regular/
     - assets/map/sprites/
+    - assets/fonts/
+
+  fonts:
+    - family: PTSerif
+      fonts:
+        - asset: assets/fonts/PT_Serif-Regular.ttf
+        - asset: assets/fonts/PT_Serif-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/PT_Serif-Italic.ttf
+          style: italic
+        - asset: assets/fonts/PT_Serif-BoldItalic.ttf
+          weight: 700
+          style: italic
+    - family: Caladea
+      fonts:
+        - asset: assets/fonts/Caladea-Regular.ttf
+        - asset: assets/fonts/Caladea-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Caladea-Italic.ttf
+          style: italic
+        - asset: assets/fonts/Caladea-BoldItalic.ttf
+          weight: 700
+          style: italic
+    - family: CrimsonText
+      fonts:
+        - asset: assets/fonts/CrimsonText-Regular.ttf
+        - asset: assets/fonts/CrimsonText-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/CrimsonText-Italic.ttf
+          style: italic
+        - asset: assets/fonts/CrimsonText-BoldItalic.ttf
+          weight: 700
+          style: italic
+    - family: PTSans
+      fonts:
+        - asset: assets/fonts/PT_Sans-Regular.ttf
+        - asset: assets/fonts/PT_Sans-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/PT_Sans-Italic.ttf
+          style: italic
+        - asset: assets/fonts/PT_Sans-BoldItalic.ttf
+          weight: 700
+          style: italic
+    - family: Lato
+      fonts:
+        - asset: assets/fonts/Lato-Regular.ttf
+        - asset: assets/fonts/Lato-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Lato-Italic.ttf
+          style: italic
+        - asset: assets/fonts/Lato-BoldItalic.ttf
+          weight: 700
+          style: italic
+    - family: Sacramento
+      fonts:
+        - asset: assets/fonts/Sacramento-Regular.ttf
+    - family: Courgette
+      fonts:
+        - asset: assets/fonts/Courgette-Regular.ttf
+    - family: GreatVibes
+      fonts:
+        - asset: assets/fonts/GreatVibes-Regular.ttf
+    - family: AlexBrush
+      fonts:
+        - asset: assets/fonts/AlexBrush-Regular.ttf
+    - family: Allura
+      fonts:
+        - asset: assets/fonts/Allura-Regular.ttf
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
