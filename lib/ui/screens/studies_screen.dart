@@ -21,6 +21,8 @@ import '../../dashboard/counting_rules.dart';
 import '../providers.dart';
 import '../widgets/global_appointment_scheduling_section.dart';
 import '../widgets/managed_text_controllers.dart';
+import '../widgets/rich_formatted_editing_controller.dart';
+import '../widgets/rich_markdown_toolbar.dart';
 import '../../publications/lff_book_catalog.dart';
 import '../../dashboard/student_priority_engine.dart';
 import '../widgets/screen_hero_accent_band.dart';

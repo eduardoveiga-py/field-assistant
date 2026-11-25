@@ -462,8 +462,8 @@ class PersonUnifiedTimelineSection extends ConsumerWidget {
                               ],
                             ),
                             const SizedBox(height: 8),
-                            Text(
-                              item.title,
+                            MarkdownPreviewText(
+                              text: item.title,
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 14,
@@ -505,8 +505,8 @@ class PersonUnifiedTimelineSection extends ConsumerWidget {
                                     ),
                                     const SizedBox(width: 6),
                                     Expanded(
-                                      child: Text(
-                                        'Próximo passo: ${item.nextStep}',
+                                      child: MarkdownPreviewText(
+                                        text: 'Próximo passo: ${item.nextStep}',
                                         style: const TextStyle(
                                           fontSize: 12,
                                           color: AppTheme.primaryBlue,

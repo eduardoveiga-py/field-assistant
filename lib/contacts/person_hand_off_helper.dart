@@ -1,6 +1,8 @@
 import 'package:url_launcher/url_launcher.dart';
 
 import '../database/app_database.dart';
+import '../inbox/email_html_sanitizer.dart';
+import 'doorstep_briefing_helper.dart';
 
 class PersonHandOffHelper {
   static String formatHandOffMessage({
@@ -36,12 +38,20 @@ class PersonHandOffHelper {
       buffer.writeln('⏰ *Melhor Horário:* ${person.preferredSchedule}');
     }
 
-    if (person.generalNotes != null && person.generalNotes!.trim().isNotEmpty) {
-      buffer.writeln('📝 *Observações / Assunto:* ${person.generalNotes}');
+    final plainNotes = DoorstepBriefingHelper.extractPlainNotesSummary(
+      person.generalNotes,
+    );
+    if (plainNotes.isNotEmpty) {
+      buffer.writeln('📝 *Observações / Assunto:* $plainNotes');
     }
 
     if (additionalNotes != null && additionalNotes.trim().isNotEmpty) {
-      buffer.writeln('📌 *Detalhes Adicionais:* $additionalNotes');
+      final cleanExtra = EmailHtmlSanitizer.stripMarkdown(
+        additionalNotes.trim(),
+      );
+      if (cleanExtra.isNotEmpty) {
+        buffer.writeln('📌 *Detalhes Adicionais:* $cleanExtra');
+      }
     }
 
     buffer.writeln('------------------------------------------');

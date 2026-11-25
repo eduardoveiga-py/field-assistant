@@ -39,6 +39,10 @@ import '../../territory/routing/offline_routing_engine.dart';
 import '../../territory/routing/external_navigation_launcher.dart';
 import 'contacts_map/offline_search_modal.dart';
 import '../widgets/person_deletion_dialog.dart';
+import '../../inbox/email_html_sanitizer.dart';
+import '../widgets/markdown_preview_text.dart';
+import '../widgets/rich_formatted_editing_controller.dart';
+import '../widgets/rich_markdown_toolbar.dart';
 
 part 'contacts_map/territory_modals.dart';
 part 'contacts_map/contacts_map_canvas.dart';

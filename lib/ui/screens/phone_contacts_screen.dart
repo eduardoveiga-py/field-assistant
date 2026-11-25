@@ -11,6 +11,8 @@ import '../../database/app_database.dart';
 import '../providers.dart';
 import '../widgets/managed_text_controllers.dart';
 import '../widgets/markdown_preview_text.dart';
+import '../widgets/rich_formatted_editing_controller.dart';
+import '../widgets/rich_markdown_toolbar.dart';
 import 'person_detail_screen.dart';
 
 class PhoneContactsScreen extends ConsumerStatefulWidget {
@@ -182,6 +184,15 @@ class _PhoneContactsScreenState extends ConsumerState<PhoneContactsScreen> {
           existing?.socialHandle ?? '',
           existing?.notes ?? '',
           '',
+        ],
+        customFactories: [
+          null,
+          null,
+          null,
+          null,
+          null,
+          (text) => RichFormattedEditingController.fromMarkup(text),
+          null,
         ],
         builder: (ctx, ctrls) {
           final nameController = ctrls[0];
@@ -458,13 +469,20 @@ class _PhoneContactsScreenState extends ConsumerState<PhoneContactsScreen> {
                         ],
                       ),
                       const SizedBox(height: 10),
+                      RichMarkdownToolbar(
+                        controller: notesController,
+                        enableHighlightPalette: false,
+                        enableImagePicker: false,
+                        enableCrossReferences: true,
+                      ),
+                      const SizedBox(height: 6),
                       TextField(
                         controller: notesController,
                         decoration: const InputDecoration(
                           labelText: 'Observações do Contato',
                           hintText: 'Ex: Conversamos sobre o futuro. Pediu para mandar mensagem na quinta.',
                         ),
-                        maxLines: 2,
+                        maxLines: 3,
                       ),
                     ],
                   ),
@@ -489,6 +507,10 @@ class _PhoneContactsScreenState extends ConsumerState<PhoneContactsScreen> {
                         return;
                       }
 
+                      final notesMarkup =
+                          RichFormattedEditingController.readMarkup(
+                            notesController,
+                          ).trim();
                       final mgr = ref.read(phoneContactsManagerProvider);
                       if (existing != null) {
                         await mgr.updatePhoneContact(
@@ -509,9 +531,7 @@ class _PhoneContactsScreenState extends ConsumerState<PhoneContactsScreen> {
                             socialHandle: hasSocial
                                 ? socialHandleController.text.trim()
                                 : null,
-                            notes: notesController.text.trim().isEmpty
-                                ? null
-                                : notesController.text.trim(),
+                            notes: notesMarkup.isEmpty ? null : notesMarkup,
                             tags: tags,
                             origin: selectedOrigin,
                             convertedPersonId: existing.convertedPersonId,
@@ -535,9 +555,7 @@ class _PhoneContactsScreenState extends ConsumerState<PhoneContactsScreen> {
                           socialHandle: hasSocial
                               ? socialHandleController.text.trim()
                               : null,
-                          notes: notesController.text.trim().isEmpty
-                              ? null
-                              : notesController.text.trim(),
+                          notes: notesMarkup.isEmpty ? null : notesMarkup,
                           tags: tags,
                           origin: selectedOrigin,
                         );

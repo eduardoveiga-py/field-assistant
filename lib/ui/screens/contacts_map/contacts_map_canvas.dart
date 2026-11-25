@@ -1487,8 +1487,8 @@ extension _ContactsMapCanvas on _ContactsMapScreenState {
                         if (_selectedPinLandmark!.notes != null &&
                             _selectedPinLandmark!.notes!.isNotEmpty) ...[
                           const SizedBox(height: 6),
-                          Text(
-                            _selectedPinLandmark!.notes!,
+                          MarkdownPreviewText(
+                            text: _selectedPinLandmark!.notes!,
                             style: TextStyle(
                               fontSize: 13,
                               color: isDark

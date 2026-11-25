@@ -402,19 +402,54 @@ extension _PersonDetailStudyAndNotesTabs on _PersonDetailScreenState {
           ),
           const SizedBox(height: 14),
 
-          // Card de Progresso Individual 0–100% no Livro LFF
-          if (linkedStudy.publicationId == 'lff-book') ...[
+          // Card de Progresso Individual 0–100% no Curso Oficial (LFF / LFFI / LL)
+          if (StudyPublicationIndexHelper.isSupported(
+            linkedStudy.publicationId,
+          )) ...[
             Builder(
               builder: (context) {
-                final lesson = linkedStudy.currentLesson ?? 1;
-                final point = linkedStudy.currentParagraph ?? 1;
-                final progressPct = LffBookCatalog.calculateProgressPercentage(
-                  lesson: lesson,
-                  point: point,
+                final pubId = linkedStudy.publicationId;
+                final maxLessons = StudyPublicationIndexHelper.totalLessonsFor(
+                  pubId,
                 );
-                final section = LffBookCatalog.getSectionForLesson(lesson);
-                final lessonInfo = LffBookCatalog.getLesson(lesson);
-                final pointsCovered = (lesson - 1) * 6 + point.clamp(1, 6);
+                final lesson = (linkedStudy.currentLesson ?? 1).clamp(
+                  1,
+                  maxLessons,
+                );
+                final pointTitles =
+                    StudyPublicationIndexHelper.getLessonPointTitles(
+                      pubId,
+                      lesson,
+                    );
+                final maxPt = pointTitles.isNotEmpty ? pointTitles.length : 6;
+                final point = (linkedStudy.currentParagraph ?? 1).clamp(
+                  1,
+                  maxPt,
+                );
+                final progressPct =
+                    StudyPublicationIndexHelper.calculateProgressPercentage(
+                      publicationId: pubId,
+                      lesson: lesson,
+                      point: point,
+                    );
+                final canonical = StudyPublicationIndexHelper.canonicalId(
+                  pubId,
+                );
+                final section = canonical == 'lff-book'
+                    ? LffBookCatalog.getSectionForLesson(lesson)
+                    : null;
+                final lessonTitle = StudyPublicationIndexHelper.getLessonTitle(
+                  pubId,
+                  lesson,
+                );
+                final pointsCovered = canonical == 'lff-book'
+                    ? (lesson - 1) * 6 + point.clamp(1, 6)
+                    : null;
+                final subtitleText = section != null
+                    ? 'Seção ${section.sectionNumber}: ${section.title}'
+                    : (canonical == 'lff-brochure'
+                          ? 'Brochura Seja Feliz para Sempre! (lffi)'
+                          : 'Brochura Escute a Deus e Viva (ll)');
 
                 final studyAgeDays = DateTime.now()
                     .difference(linkedStudy.startedAt)
@@ -486,7 +521,7 @@ extension _PersonDetailStudyAndNotesTabs on _PersonDetailScreenState {
                                       ),
                                     ),
                                     Text(
-                                      'Seção ${section.sectionNumber}: ${section.title}',
+                                      subtitleText,
                                       style: const TextStyle(
                                         fontSize: 11,
                                         color: AppTheme.textMuted,
@@ -539,7 +574,9 @@ extension _PersonDetailStudyAndNotesTabs on _PersonDetailScreenState {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              '$pointsCovered de 360 pontos concluídos',
+                              pointsCovered != null
+                                  ? '$pointsCovered de 360 pontos concluídos'
+                                  : 'Ponto/Subtópico $point de $maxPt',
                               style: const TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
@@ -547,7 +584,7 @@ extension _PersonDetailStudyAndNotesTabs on _PersonDetailScreenState {
                               ),
                             ),
                             Text(
-                              'Lição $lesson de 60',
+                              'Lição $lesson de $maxLessons',
                               style: const TextStyle(
                                 fontSize: 12,
                                 color: AppTheme.textMuted,
@@ -571,8 +608,8 @@ extension _PersonDetailStudyAndNotesTabs on _PersonDetailScreenState {
                                     ),
                                   ),
                                   Text(
-                                    lessonInfo != null
-                                        ? 'Lição $lesson: ${lessonInfo.title}'
+                                    lessonTitle != null
+                                        ? 'Lição $lesson: $lessonTitle'
                                         : 'Lição $lesson',
                                     style: const TextStyle(
                                       fontWeight: FontWeight.bold,
@@ -974,8 +1011,8 @@ extension _PersonDetailStudyAndNotesTabs on _PersonDetailScreenState {
                           ),
                           if (s.sessionNotes != null) ...[
                             const SizedBox(height: 4),
-                            Text(
-                              s.sessionNotes!,
+                            MarkdownPreviewText(
+                              text: s.sessionNotes!,
                               style: const TextStyle(
                                 color: AppTheme.textMuted,
                                 fontSize: 13,
@@ -991,8 +1028,8 @@ extension _PersonDetailStudyAndNotesTabs on _PersonDetailScreenState {
                                     .withValues(alpha: 0.08),
                                 borderRadius: BorderRadius.circular(4),
                               ),
-                              child: Text(
-                                'Próximo passo: ${s.nextStep}',
+                              child: MarkdownPreviewText(
+                                text: 'Próximo passo: ${s.nextStep}',
                                 style: const TextStyle(
                                   fontSize: 12,
                                   color: Color(0xFF7C3AED),
@@ -1225,8 +1262,9 @@ extension _PersonDetailStudyAndNotesTabs on _PersonDetailScreenState {
                           ],
                         ),
                         const Divider(height: 12),
-                        SelectableText(
-                          text,
+                        MarkdownPreviewText(
+                          text: text,
+                          selectable: true,
                           style: const TextStyle(fontSize: 14, height: 1.4),
                         ),
                       ],
@@ -1454,8 +1492,8 @@ extension _PersonDetailStudyAndNotesTabs on _PersonDetailScreenState {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    title,
+                                  MarkdownPreviewText(
+                                    text: title,
                                     style: TextStyle(
                                       fontSize: 15,
                                       fontWeight: FontWeight.w600,

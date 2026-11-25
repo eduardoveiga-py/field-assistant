@@ -19,6 +19,8 @@ import 'project_detail_screen.dart';
 import 'knowledge_base_screen.dart';
 import 'inbox_screen.dart';
 import '../widgets/markdown_preview_text.dart';
+import '../../contacts/doorstep_briefing_helper.dart';
+import '../../inbox/email_html_sanitizer.dart';
 
 enum GlobalSearchResultType {
   person('Pessoa', Icons.person, AppTheme.primaryBlue),
@@ -302,14 +304,19 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
             p.nextActionNote?.toLowerCase().contains(query) ?? false;
 
         if (nameMatch || addrMatch || noteMatch || nextMatch) {
+          final cleanSnippet = noteMatch
+              ? DoorstepBriefingHelper.extractPlainNotesSummary(p.generalNotes)
+              : (nextMatch && p.nextActionNote != null
+                    ? EmailHtmlSanitizer.stripMarkdown(p.nextActionNote!)
+                    : null);
           results.add(
             GlobalSearchResultItem(
               id: p.id,
               title: p.name,
               subtitle: p.address ?? 'Sem endereço cadastrado',
-              snippet: noteMatch
-                  ? p.generalNotes
-                  : (nextMatch ? p.nextActionNote : null),
+              snippet: (cleanSnippet?.isNotEmpty ?? false)
+                  ? cleanSnippet
+                  : null,
               type: GlobalSearchResultType.person,
               onTap: () {
                 Navigator.push(

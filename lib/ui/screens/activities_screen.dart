@@ -10,6 +10,9 @@ import '../widgets/pioneer_pace_card.dart';
 import '../../activities/auto_corrective_timer_logic.dart';
 import '../widgets/auto_corrective_timer_dialog.dart';
 import '../widgets/managed_text_controllers.dart';
+import '../widgets/markdown_preview_text.dart';
+import '../widgets/rich_formatted_editing_controller.dart';
+import '../widgets/rich_markdown_toolbar.dart';
 
 class ActivitiesScreen extends ConsumerStatefulWidget {
   const ActivitiesScreen({super.key});
@@ -174,6 +177,11 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
       context: context,
       builder: (ctx) => ManagedTextControllers(
         initialTexts: [initialH.toString(), initialM.toString(), ''],
+        customFactories: [
+          null,
+          null,
+          (text) => RichFormattedEditingController.fromMarkup(text),
+        ],
         builder: (ctx, ctrls) {
           final hoursController = ctrls[0];
           final minutesController = ctrls[1];
@@ -278,13 +286,20 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
                       },
                     ),
                     const SizedBox(height: 12),
+                    RichMarkdownToolbar(
+                      controller: notesController,
+                      enableHighlightPalette: false,
+                      enableImagePicker: false,
+                      enableCrossReferences: true,
+                    ),
+                    const SizedBox(height: 6),
                     TextField(
                       controller: notesController,
                       decoration: const InputDecoration(
                         labelText: 'Observações (opcional)',
                         hintText: 'Companheiro(a), publicações colocadas...',
                       ),
-                      maxLines: 2,
+                      maxLines: 3,
                     ),
                   ],
                 ),
@@ -311,14 +326,16 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
                       return;
                     }
 
+                    final notesMarkup =
+                        RichFormattedEditingController.readMarkup(
+                          notesController,
+                        ).trim();
                     final repo = ref.read(repositoryProvider);
                     await repo.createActivityRecord(
                       date: selectedDate,
                       durationSeconds: totalSeconds,
                       modality: selectedModality,
-                      notes: notesController.text.trim().isEmpty
-                          ? null
-                          : notesController.text.trim(),
+                      notes: notesMarkup.isEmpty ? null : notesMarkup,
                     );
 
                     if (onSavedCallback != null) onSavedCallback();
@@ -861,9 +878,22 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
                             _formatModality(act.modality),
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
-                          subtitle: Text(
-                            '${AppDateUtils.formatDate(act.date)}${act.notes != null ? " • ${act.notes}" : ""}',
-                            style: const TextStyle(fontSize: 12),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                AppDateUtils.formatDate(act.date),
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                              if (act.notes != null &&
+                                  act.notes!.trim().isNotEmpty) ...[
+                                const SizedBox(height: 2),
+                                MarkdownPreviewText(
+                                  text: act.notes!,
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                              ],
+                            ],
                           ),
                           trailing: IconButton(
                             icon: const Icon(

@@ -40,6 +40,9 @@ import '../../voice_notes/voice_notes_manager.dart';
 import '../../voice_notes/voice_note_models.dart';
 import '../widgets/quick_voice_note_dialog.dart';
 import '../widgets/doorstep_return_booking_dialog.dart';
+import '../widgets/markdown_preview_text.dart';
+import '../widgets/rich_formatted_editing_controller.dart';
+import '../widgets/rich_markdown_toolbar.dart';
 import '../../core/feature_registry.dart';
 
 import '../widgets/person_detail/person_unified_timeline_section.dart';

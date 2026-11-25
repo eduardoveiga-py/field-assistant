@@ -3,6 +3,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
+import '../contacts/doorstep_briefing_helper.dart';
 import '../core/date_utils.dart';
 import '../dashboard/counting_rules.dart';
 import '../database/app_database.dart';
@@ -847,7 +848,7 @@ class ReportExportService {
                             if (c.generalNotes != null &&
                                 c.generalNotes!.isNotEmpty)
                               pw.Text(
-                                'Obs: ${c.generalNotes}',
+                                'Obs: ${DoorstepBriefingHelper.extractPlainNotesSummary(c.generalNotes)}',
                                 style: const pw.TextStyle(
                                   fontSize: 7,
                                   color: PdfColors.grey600,
@@ -899,7 +900,9 @@ class ReportExportService {
           : '';
       final lat = c.latitude?.toString() ?? '';
       final lng = c.longitude?.toString() ?? '';
-      final notes = _cleanCsv(c.generalNotes ?? '');
+      final notes = _cleanCsv(
+        DoorstepBriefingHelper.extractPlainNotesSummary(c.generalNotes),
+      );
 
       buffer.writeln(
         '$name;$phone;$status;$address;$schedule;$lastContact;$nextAction;$lat;$lng;$notes',

@@ -6,12 +6,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../core/app_logger.dart';
+import '../../contacts/doorstep_briefing_helper.dart';
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
 import '../../database/app_database.dart';
+import '../../inbox/email_html_sanitizer.dart';
 import '../../ui/providers.dart';
 import 'managed_text_controllers.dart';
+import 'rich_formatted_editing_controller.dart';
+import 'rich_markdown_toolbar.dart';
 
 class PersonHandOffHelper {
   /// Gera texto completo estruturado para passar a revisita para outro publicador ou pioneiro
@@ -55,38 +58,35 @@ class PersonHandOffHelper {
     }
 
     if (lastVisit != null) {
+      final rawTopic =
+          lastVisit.topicsDiscussed ??
+          lastVisit.scriptureOrPub ??
+          'Conversa inicial';
+      final cleanTopic = EmailHtmlSanitizer.stripMarkdown(rawTopic).trim();
       buffer.writeln(
-        '💬 *Último Assunto Considerado:* ${lastVisit.topicsDiscussed ?? lastVisit.scriptureOrPub ?? "Conversa inicial"}',
+        '💬 *Último Assunto Considerado:* ${cleanTopic.isEmpty ? "Conversa inicial" : cleanTopic}',
       );
       if (lastVisit.nextStep != null && lastVisit.nextStep!.trim().isNotEmpty) {
-        buffer.writeln('⏭️ *Próximo Passo Combinado:* ${lastVisit.nextStep}');
+        final cleanNext = EmailHtmlSanitizer.stripMarkdown(lastVisit.nextStep!)
+            .trim();
+        if (cleanNext.isNotEmpty) {
+          buffer.writeln('⏭️ *Próximo Passo Combinado:* $cleanNext');
+        }
       }
     } else if (person.nextActionNote != null &&
         person.nextActionNote!.trim().isNotEmpty) {
-      buffer.writeln('⏭️ *Próximo Passo:* ${person.nextActionNote}');
+      final cleanNext = EmailHtmlSanitizer.stripMarkdown(person.nextActionNote!)
+          .trim();
+      if (cleanNext.isNotEmpty) {
+        buffer.writeln('⏭️ *Próximo Passo:* $cleanNext');
+      }
     }
 
-    if (person.generalNotes != null && person.generalNotes!.trim().isNotEmpty) {
-      try {
-        final decoded = jsonDecode(person.generalNotes!);
-        if (decoded is List && decoded.isNotEmpty) {
-          final noteTexts = decoded
-              .map((n) => n['text'] ?? '')
-              .where((t) => t.isNotEmpty)
-              .join('; ');
-          if (noteTexts.isNotEmpty) {
-            buffer.writeln('📝 *Observações:* $noteTexts');
-          }
-        } else {
-          buffer.writeln('📝 *Observações:* ${person.generalNotes}');
-        }
-      } catch (e, st) {
-        AppLogger.debug(
-          'Observações da pessoa em texto simples (não JSON): $e',
-          st,
-        );
-        buffer.writeln('📝 *Observações:* ${person.generalNotes}');
-      }
+    final plainNotes = DoorstepBriefingHelper.extractPlainNotesSummary(
+      person.generalNotes,
+    );
+    if (plainNotes.isNotEmpty) {
+      buffer.writeln('📝 *Observações:* $plainNotes');
     }
 
     buffer.writeln('\n_Repassado via App Território / Ministério Pessoal_');
@@ -122,6 +122,10 @@ class PersonHandOffHelper {
       context: context,
       builder: (ctx) => ManagedTextControllers(
         initialTexts: const ['', ''],
+        customFactories: [
+          null,
+          (text) => RichFormattedEditingController.fromMarkup(text),
+        ],
         builder: (ctx, ctrls) {
           final toPublisherController = ctrls[0];
           final notesController = ctrls[1];
@@ -284,6 +288,13 @@ class PersonHandOffHelper {
                         ],
                       ),
                       const SizedBox(height: 8),
+                      RichMarkdownToolbar(
+                        controller: notesController,
+                        enableHighlightPalette: false,
+                        enableImagePicker: false,
+                        enableCrossReferences: true,
+                      ),
+                      const SizedBox(height: 6),
                       TextField(
                         controller: notesController,
                         decoration: const InputDecoration(
@@ -325,12 +336,41 @@ class PersonHandOffHelper {
                       final dtFormatted = AppDateUtils.formatDateTimeWithAt(
                         chosenDate,
                       );
+                      final obsMarkup =
+                          RichFormattedEditingController.readMarkup(
+                            notesController,
+                          ).trim();
                       final noteEntry =
-                          'Revisita passada para $publisher em $dtFormatted.${notesController.text.trim().isNotEmpty ? " Obs: ${notesController.text.trim()}" : ""}';
+                          'Revisita passada para $publisher em $dtFormatted.${obsMarkup.isNotEmpty ? " Obs: $obsMarkup" : ""}';
                       final existingNotes = person.generalNotes ?? '';
-                      final updatedNotes = existingNotes.isEmpty
-                          ? noteEntry
-                          : '$existingNotes\n$noteEntry';
+                      String updatedNotes;
+                      try {
+                        final decoded = existingNotes.trim().isNotEmpty
+                            ? jsonDecode(existingNotes)
+                            : null;
+                        if (decoded is List) {
+                          final list = List<Map<String, dynamic>>.from(
+                            decoded.whereType<Map>().map(
+                              (e) => Map<String, dynamic>.from(e),
+                            ),
+                          );
+                          list.insert(0, {
+                            'id':
+                                'handoff-${DateTime.now().millisecondsSinceEpoch}',
+                            'text': noteEntry,
+                            'createdAt': DateTime.now().toIso8601String(),
+                          });
+                          updatedNotes = jsonEncode(list);
+                        } else {
+                          updatedNotes = existingNotes.isEmpty
+                              ? noteEntry
+                              : '$existingNotes\n$noteEntry';
+                        }
+                      } catch (_) {
+                        updatedNotes = existingNotes.isEmpty
+                            ? noteEntry
+                            : '$existingNotes\n$noteEntry';
+                      }
 
                       // Guarda nota no histórico e atualiza status para 'revisita_passada'
                       await repo.updatePerson(

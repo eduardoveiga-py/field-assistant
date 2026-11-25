@@ -13,6 +13,8 @@ import '../providers.dart';
 import '../widgets/add_person_dialog.dart';
 import '../widgets/managed_text_controllers.dart';
 import '../widgets/map_location_picker_dialog.dart';
+import '../widgets/rich_formatted_editing_controller.dart';
+import '../widgets/rich_markdown_toolbar.dart';
 import 'activities_screen.dart';
 import 'contacts_map_screen.dart';
 import 'person_detail_screen.dart';
@@ -427,6 +429,16 @@ class TodayScreen extends ConsumerWidget {
       context: context,
       builder: (dialogCtx) => ManagedTextControllers(
         initialTexts: const ['', '', '', '', '', '', '', ''],
+        customFactories: [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          (text) => RichFormattedEditingController.fromMarkup(text),
+          null,
+        ],
         builder: (dialogCtx, ctrls) {
           final nameController = ctrls[0];
           final langController = ctrls[1];
@@ -573,6 +585,13 @@ class TodayScreen extends ConsumerWidget {
                         ),
                       ),
                       const SizedBox(height: 10),
+                      RichMarkdownToolbar(
+                        controller: notesController,
+                        enableHighlightPalette: false,
+                        enableImagePicker: false,
+                        enableCrossReferences: true,
+                      ),
+                      const SizedBox(height: 6),
                       TextField(
                         controller: notesController,
                         decoration: const InputDecoration(
@@ -580,7 +599,7 @@ class TodayScreen extends ConsumerWidget {
                           hintText: 'Ex: Ficou com folheto em espanhol, aceitou visita',
                           prefixIcon: Icon(Icons.note_alt_outlined),
                         ),
-                        maxLines: 2,
+                        maxLines: 3,
                       ),
                       const SizedBox(height: 12),
                       CheckboxListTile(
@@ -614,6 +633,10 @@ class TodayScreen extends ConsumerWidget {
                       final lat = double.tryParse(latController.text.trim());
                       final lng = double.tryParse(lngController.text.trim());
 
+                      final additionalNotes =
+                          RichFormattedEditingController.readMarkup(
+                            notesController,
+                          ).trim();
                       final repo = ref.read(repositoryProvider);
                       final person = await repo.createPerson(
                         name: name,
@@ -630,13 +653,12 @@ class TodayScreen extends ConsumerWidget {
                             scheduleController.text.trim().isEmpty
                             ? null
                             : scheduleController.text.trim(),
-                        generalNotes: notesController.text.trim().isEmpty
+                        generalNotes: additionalNotes.isEmpty
                             ? (lang.isNotEmpty ? 'Idioma falado: $lang' : null)
-                            : '${notesController.text.trim()}${lang.isNotEmpty ? "\nIdioma: $lang" : ""}',
+                            : '$additionalNotes${lang.isNotEmpty ? "\nIdioma: $lang" : ""}',
                         tags: ['estrangeiro', if (lang.isNotEmpty) lang],
                       );
 
-                      final additionalNotes = notesController.text.trim();
                       if (dialogCtx.mounted) Navigator.pop(dialogCtx);
 
                       if (sendViaWhatsApp) {
