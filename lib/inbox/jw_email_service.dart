@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data' show Uint8List;
 import 'dart:io'
     show
         InternetAddress,
@@ -50,8 +51,11 @@ class JwEmailMessage {
   final bool isDraft;
   final bool isPermanentRetained;
   final List<String> tags;
+  final List<String> labels;
   final bool isHubCommunication;
   final String? hubType; // 'letter', 'announcement', 'form', 'policy'
+  /// Indica carga leve (apenas metadados de estado, sem re-baixar corpo/anexos).
+  final bool isMetadataOnly;
 
   JwEmailMessage({
     required this.id,
@@ -73,9 +77,29 @@ class JwEmailMessage {
     this.isDraft = false,
     this.isPermanentRetained = true,
     this.tags = const [],
+    this.labels = const [],
     this.isHubCommunication = false,
     this.hubType,
+    this.isMetadataOnly = false,
   });
+
+  /// Remove `rawBytes` (`Uint8List`) e converte eventuais buffers binários antes da persistência em JSON/SQLite,
+  /// evitando serialização de arrays inteiros gigantes na Web/IndexedDB e no SyncQueue.
+  static List<Map<String, dynamic>> sanitizeAttachmentsForPersistence(
+    List<Map<String, dynamic>> attachments,
+  ) {
+    if (attachments.isEmpty) return const [];
+    return attachments.map((att) {
+      final clean = <String, dynamic>{};
+      for (final entry in att.entries) {
+        if (entry.key == 'rawBytes') continue;
+        final v = entry.value;
+        if (v is Uint8List) continue;
+        clean[entry.key] = v;
+      }
+      return clean;
+    }).toList();
+  }
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -92,11 +116,12 @@ class JwEmailMessage {
     'bodyText': bodyText,
     'bodyHtml': bodyHtml,
     'rawEmlBase64': rawEmlBase64,
-    'attachments': attachments,
+    'attachments': sanitizeAttachmentsForPersistence(attachments),
     'isRead': isRead,
     'isDraft': isDraft,
     'isPermanentRetained': isPermanentRetained,
     'tags': tags,
+    'labels': labels,
     'isHubCommunication': isHubCommunication,
     'hubType': hubType,
   };
@@ -133,6 +158,9 @@ class JwEmailMessage {
     tags:
         (json['tags'] as List<dynamic>?)?.map((e) => e.toString()).toList() ??
         const [],
+    labels:
+        (json['labels'] as List<dynamic>?)?.map((e) => e.toString()).toList() ??
+        const [],
     isHubCommunication: json['isHubCommunication'] as bool? ?? false,
     hubType: json['hubType'] as String?,
   );
@@ -157,8 +185,10 @@ class JwEmailMessage {
     bool? isDraft,
     bool? isPermanentRetained,
     List<String>? tags,
+    List<String>? labels,
     bool? isHubCommunication,
     String? hubType,
+    bool? isMetadataOnly,
   }) {
     return JwEmailMessage(
       id: id ?? this.id,
@@ -180,8 +210,10 @@ class JwEmailMessage {
       isDraft: isDraft ?? this.isDraft,
       isPermanentRetained: isPermanentRetained ?? this.isPermanentRetained,
       tags: tags ?? this.tags,
+      labels: labels ?? this.labels,
       isHubCommunication: isHubCommunication ?? this.isHubCommunication,
       hubType: hubType ?? this.hubType,
+      isMetadataOnly: isMetadataOnly ?? this.isMetadataOnly,
     );
   }
 
@@ -296,6 +328,65 @@ typedef JwMissingUids = Future<Set<int>> Function(
   int uidValidity,
   List<int> uids,
 );
+typedef JwMissingMailboxUids = Future<Set<int>> Function(
+  String mailboxPath,
+  int uidValidity,
+  List<int> uids,
+);
+
+/// Metadados de pasta IMAP mapeados para as pastas padrão do app.
+class JwImapMailboxInfo {
+  final String path;
+  final String folderName;
+  final bool isDraft;
+  final bool isSent;
+  final bool isJunk;
+  final bool isTrash;
+
+  const JwImapMailboxInfo({
+    required this.path,
+    required this.folderName,
+    this.isDraft = false,
+    this.isSent = false,
+    this.isJunk = false,
+    this.isTrash = false,
+  });
+}
+
+/// Estado remoto resumido de um UID IMAP (`\Seen`).
+class JwImapUidFlag {
+  final int uid;
+  final bool isSeen;
+
+  const JwImapUidFlag({required this.uid, required this.isSeen});
+}
+
+/// Extensão opcional de [JwImapSession] com suporte multi-pastas (Enviadas, Rascunhos, Spam, Lixeira)
+/// e mutações bidirecionais (`STORE \Seen`, `MOVE`, `DELETE`).
+abstract class JwImapFolderSession implements JwImapSession {
+  Future<List<JwImapMailboxInfo>> listTargetMailboxes();
+  Future<int> selectMailbox(String mailboxPath);
+  Future<List<JwImapUidFlag>> searchUidFlags();
+  Future<List<JwEmailMessage>> fetchUidsInMailbox(
+    List<int> uids, {
+    required JwImapMailboxInfo mailbox,
+  });
+  Future<void> setReadFlag(
+    List<int> uids, {
+    required String mailboxPath,
+    required bool isRead,
+  });
+  Future<void> moveUidsToFolder(
+    List<int> uids, {
+    required String sourceMailbox,
+    required String targetFolderName,
+  });
+  Future<void> deleteUids(
+    List<int> uids, {
+    required String sourceMailbox,
+    bool permanent = false,
+  });
+}
 
 /// Converte a mensagem MIME já analisada pela biblioteca sem perder os bytes.
 @visibleForTesting
@@ -333,6 +424,7 @@ JwEmailMessage jwEmailFromMime(mail.MimeMessage message) {
     bodyText: message.decodeTextPlainPart() ?? '',
     bodyHtml: message.decodeTextHtmlPart(),
     rawEmlBase64: base64Encode(raw),
+    isRead: message.isSeen,
     isHubCommunication: isHub,
     hubType: isHub
         ? (subject.toLowerCase().contains('formulário') ? 'form' : 'letter')
@@ -340,13 +432,214 @@ JwEmailMessage jwEmailFromMime(mail.MimeMessage message) {
   );
 }
 
-class _EnoughMailSession implements JwImapSession {
+class _EnoughMailSession implements JwImapFolderSession {
   final mail.ImapClient client;
   _EnoughMailSession(Duration timeout)
     : client = mail.ImapClient(
         defaultWriteTimeout: timeout,
         defaultResponseTimeout: timeout,
       );
+
+  static String? _classifyCanonicalFolder(mail.Mailbox box) {
+    final lower = '${box.encodedName} ${box.path}'.toLowerCase();
+    if (box.isInbox || box.path.toUpperCase() == 'INBOX') {
+      return 'Caixa de Entrada';
+    }
+    if (box.isSent ||
+        RegExp(r'\b(sent|enviados|enviadas|itens enviados)\b')
+            .hasMatch(lower)) {
+      return 'Enviadas';
+    }
+    if (box.isDrafts ||
+        RegExp(r'\b(draft|drafts|rascunhos)\b').hasMatch(lower)) {
+      return 'Rascunhos';
+    }
+    if (box.isJunk || RegExp(r'\b(spam|junk|lixo)\b').hasMatch(lower)) {
+      return 'Spam';
+    }
+    if (box.isTrash ||
+        RegExp(r'\b(trash|deleted|lixeira|itens exclu)\b').hasMatch(lower)) {
+      return 'Lixeira';
+    }
+    return null;
+  }
+
+  @override
+  Future<List<JwImapMailboxInfo>> listTargetMailboxes() async {
+    final boxes = await client.listMailboxes(recursive: true);
+    final byCanonical = <String, JwImapMailboxInfo>{};
+    for (final box in boxes) {
+      if (box.isNotSelectable) continue;
+      final folderName = _classifyCanonicalFolder(box);
+      if (folderName == null) continue;
+      byCanonical.putIfAbsent(
+        folderName,
+        () => JwImapMailboxInfo(
+          path: box.path.isNotEmpty ? box.path : box.encodedPath,
+          folderName: folderName,
+          isDraft: folderName == 'Rascunhos',
+          isSent: folderName == 'Enviadas',
+          isJunk: folderName == 'Spam',
+          isTrash: folderName == 'Lixeira',
+        ),
+      );
+    }
+    byCanonical.putIfAbsent(
+      'Caixa de Entrada',
+      () => const JwImapMailboxInfo(
+        path: 'INBOX',
+        folderName: 'Caixa de Entrada',
+      ),
+    );
+    const preferredOrder = [
+      'Caixa de Entrada',
+      'Enviadas',
+      'Rascunhos',
+      'Spam',
+      'Lixeira',
+    ];
+    final ordered = <JwImapMailboxInfo>[];
+    for (final name in preferredOrder) {
+      final info = byCanonical[name];
+      if (info != null) ordered.add(info);
+    }
+    return ordered;
+  }
+
+  @override
+  Future<int> selectMailbox(String mailboxPath) async {
+    final box = mailboxPath.toUpperCase() == 'INBOX'
+        ? await client.selectInbox()
+        : await client.selectMailboxByPath(mailboxPath);
+    final validity = box.uidValidity;
+    if (validity == null || validity <= 0) {
+      throw const JwEmailConnectionException(
+        'Servidor IMAP não informou UIDVALIDITY.',
+      );
+    }
+    return validity;
+  }
+
+  @override
+  Future<List<JwImapUidFlag>> searchUidFlags() async {
+    final uids = await searchUids();
+    if (uids.isEmpty) return const [];
+    final recentUids = uids.length > 150
+        ? uids.sublist(uids.length - 150)
+        : uids;
+    try {
+      final res = await client.uidFetchMessages(
+        mail.MessageSequence.fromIds(recentUids, isUid: true),
+        '(UID FLAGS)',
+        responseTimeout: client.defaultResponseTimeout,
+      );
+      final seenByUid = <int, bool>{
+        for (final msg in res.messages)
+          if (msg.uid != null) msg.uid!: msg.isSeen,
+      };
+      return recentUids
+          .map(
+            (uid) => JwImapUidFlag(uid: uid, isSeen: seenByUid[uid] ?? false),
+          )
+          .toList();
+    } catch (_) {
+      return recentUids
+          .map((uid) => JwImapUidFlag(uid: uid, isSeen: false))
+          .toList();
+    }
+  }
+
+  @override
+  Future<List<JwEmailMessage>> fetchUidsInMailbox(
+    List<int> uids, {
+    required JwImapMailboxInfo mailbox,
+  }) async {
+    final result = await client.uidFetchMessages(
+      mail.MessageSequence.fromIds(uids, isUid: true),
+      '(UID FLAGS RFC822.SIZE BODY.PEEK[])',
+      responseTimeout: client.defaultResponseTimeout,
+    );
+    if (result.messages.any((message) => message.size == null)) {
+      throw const JwEmailConnectionException(
+        'Servidor IMAP não informou o tamanho da mensagem.',
+      );
+    }
+    return result.messages
+        .map(
+          (m) => jwEmailFromMime(m).copyWith(
+            folderId: mailbox.path,
+            folderName: mailbox.folderName,
+            isDraft: mailbox.isDraft,
+          ),
+        )
+        .toList();
+  }
+
+  @override
+  Future<void> setReadFlag(
+    List<int> uids, {
+    required String mailboxPath,
+    required bool isRead,
+  }) async {
+    if (uids.isEmpty) return;
+    await selectMailbox(mailboxPath);
+    await client.uidStore(mail.MessageSequence.fromIds(uids, isUid: true), [
+      mail.MessageFlags.seen,
+    ], action: isRead ? mail.StoreAction.add : mail.StoreAction.remove);
+  }
+
+  @override
+  Future<void> moveUidsToFolder(
+    List<int> uids, {
+    required String sourceMailbox,
+    required String targetFolderName,
+  }) async {
+    if (uids.isEmpty) return;
+    final boxes = await listTargetMailboxes();
+    final target = boxes
+        .where((b) => b.folderName == targetFolderName)
+        .firstOrNull;
+    if (target == null) {
+      throw JwEmailConnectionException(
+        'Pasta IMAP de destino "$targetFolderName" não encontrada.',
+      );
+    }
+    if (target.path == sourceMailbox) return;
+    await selectMailbox(sourceMailbox);
+    final seq = mail.MessageSequence.fromIds(uids, isUid: true);
+    try {
+      await client.uidMove(seq, targetMailboxPath: target.path);
+    } catch (_) {
+      await client.uidCopy(seq, targetMailboxPath: target.path);
+      await client.uidStore(seq, [mail.MessageFlags.deleted]);
+      await client.expunge();
+    }
+  }
+
+  @override
+  Future<void> deleteUids(
+    List<int> uids, {
+    required String sourceMailbox,
+    bool permanent = false,
+  }) async {
+    if (uids.isEmpty) return;
+    if (!permanent) {
+      final boxes = await listTargetMailboxes();
+      final trash = boxes.where((b) => b.isTrash).firstOrNull;
+      if (trash != null && trash.path != sourceMailbox) {
+        await moveUidsToFolder(
+          uids,
+          sourceMailbox: sourceMailbox,
+          targetFolderName: trash.folderName,
+        );
+        return;
+      }
+    }
+    await selectMailbox(sourceMailbox);
+    final seq = mail.MessageSequence.fromIds(uids, isUid: true);
+    await client.uidStore(seq, [mail.MessageFlags.deleted]);
+    await client.expunge();
+  }
 
   @override
   Future<void> connect(
@@ -509,12 +802,16 @@ class JwImapClient {
     required String username,
     required int uidValidity,
     required int uid,
+    String mailbox = 'INBOX',
   }) {
+    final normalizedMailbox = mailbox.trim().isEmpty
+        ? 'INBOX'
+        : (mailbox.trim().toUpperCase() == 'INBOX' ? 'INBOX' : mailbox.trim());
     final scope = jsonEncode([
       host.trim().toLowerCase(),
       port,
       username.trim(),
-      'INBOX',
+      normalizedMailbox,
       uidValidity,
     ]);
     return 'imap_${crypto.sha256.convert(utf8.encode(scope))}_$uid';
@@ -593,8 +890,7 @@ class JwImapClient {
     return result;
   }
 
-  /// Varre todos os UIDs presentes na INBOX; cada página é entregue antes de
-  /// buscar a próxima, permitindo gravação incremental e retomada após falhas.
+  /// Varre INBOX mantendo a assinatura original para subclasses de teste.
   Stream<List<JwEmailMessage>> fetchRemoteEmailPages({
     String? host,
     int? port,
@@ -603,6 +899,34 @@ class JwImapClient {
     String? accountEmail,
     Duration timeout = const Duration(seconds: 60),
     JwMissingUids? missingUids,
+  }) => fetchAllMailboxPages(
+    host: host,
+    port: port,
+    username: username,
+    password: password,
+    accountEmail: accountEmail,
+    timeout: timeout,
+    missingUids: missingUids,
+  );
+
+  /// Varre INBOX e, quando suportado, as pastas Enviadas, Rascunhos, Spam e Lixeira;
+  /// cada página é entregue antes de buscar a próxima, permitindo gravação incremental.
+  Stream<List<JwEmailMessage>> fetchAllMailboxPages({
+    String? host,
+    int? port,
+    String? username,
+    String? password,
+    String? accountEmail,
+    Duration timeout = const Duration(seconds: 60),
+    JwMissingUids? missingUids,
+    JwMissingMailboxUids? missingMailboxUids,
+    Future<void> Function(
+      String mailboxPath,
+      String folderName,
+      int validity,
+      List<JwImapUidFlag> flags,
+    )?
+    onMailboxFlags,
   }) async* {
     if (username == null ||
         username.trim().isEmpty ||
@@ -638,71 +962,176 @@ class JwImapClient {
         ),
         timeout,
       );
-      final validity = await _imapStage(
-        'abertura da INBOX',
-        session.selectInbox,
-        timeout,
-      );
-      if (validity <= 0) {
-        throw const JwEmailConnectionException('UIDVALIDITY inválido.');
-      }
-      final uids = await _imapStage(
-        'listagem de mensagens',
-        session.searchUids,
-        timeout,
-      );
-      if (uids.any((uid) => uid <= 0) || uids.toSet().length != uids.length) {
-        throw const JwEmailConnectionException('Lista de UIDs IMAP inválida.');
-      }
-      uids.sort();
-      const pageSize = 10; // Tamanho de lote, não limite da caixa.
-      for (var start = 0; start < uids.length; start += pageSize) {
-        final end = start + pageSize < uids.length
-            ? start + pageSize
-            : uids.length;
-        final page = uids.sublist(start, end);
-        final wanted = missingUids == null
-            ? page.toSet()
-            : await missingUids(validity, page);
-        if (!page.toSet().containsAll(wanted)) {
-          throw const JwEmailConnectionException(
-            'Filtro de mensagens IMAP inválido.',
-          );
-        }
-        if (wanted.isEmpty) continue;
-        final fetched = await _imapStage(
-          'leitura de mensagens',
-          () => session.fetchUids(page.where(wanted.contains).toList()),
+      final effectiveAccountEmail =
+          (accountEmail != null && accountEmail.trim().isNotEmpty)
+          ? accountEmail.trim().toLowerCase()
+          : username.trim();
+
+      if (session is JwImapFolderSession) {
+        final mailboxes = await _imapStage(
+          'listagem de pastas IMAP',
+          session.listTargetMailboxes,
           timeout,
         );
-        final received = fetched.map((item) => item.remoteUid).toSet();
-        if (fetched.length != wanted.length ||
-            received.contains(null) ||
-            received.length != wanted.length ||
-            !received.containsAll(wanted)) {
+        for (final box in mailboxes) {
+          final isInbox = box.path.toUpperCase() == 'INBOX';
+          int validity;
+          try {
+            validity = await _imapStage(
+              'abertura da pasta ${box.folderName}',
+              () => isInbox
+                  ? session.selectInbox()
+                  : session.selectMailbox(box.path),
+              timeout,
+            );
+          } catch (e) {
+            if (isInbox) rethrow;
+            AppLogger.warning(
+              'Pasta IMAP ${box.folderName} (${box.path}) indisponível: $e',
+            );
+            continue;
+          }
+          if (validity <= 0) {
+            if (isInbox) {
+              throw const JwEmailConnectionException('UIDVALIDITY inválido.');
+            }
+            continue;
+          }
+          final uidFlags = await _imapStage(
+            'leitura de flags em ${box.folderName}',
+            session.searchUidFlags,
+            timeout,
+          );
+          if (onMailboxFlags != null && uidFlags.isNotEmpty) {
+            await onMailboxFlags(box.path, box.folderName, validity, uidFlags);
+          }
+          final uids = uidFlags.map((f) => f.uid).toList();
+          if (uids.any((uid) => uid <= 0) ||
+              uids.toSet().length != uids.length) {
+            throw const JwEmailConnectionException(
+              'Lista de UIDs IMAP inválida.',
+            );
+          }
+          uids.sort();
+          const pageSize = 10;
+          for (var start = 0; start < uids.length; start += pageSize) {
+            final end = start + pageSize < uids.length
+                ? start + pageSize
+                : uids.length;
+            final page = uids.sublist(start, end);
+            final wanted = missingMailboxUids != null
+                ? await missingMailboxUids(box.path, validity, page)
+                : (missingUids != null
+                      ? await missingUids(validity, page)
+                      : page.toSet());
+            if (!page.toSet().containsAll(wanted)) {
+              throw const JwEmailConnectionException(
+                'Filtro de mensagens IMAP inválido.',
+              );
+            }
+            if (wanted.isEmpty) continue;
+            final fetched = await _imapStage(
+              'leitura de mensagens em ${box.folderName}',
+              () => session.fetchUidsInMailbox(
+                page.where(wanted.contains).toList(),
+                mailbox: box,
+              ),
+              timeout,
+            );
+            final received = fetched.map((item) => item.remoteUid).toSet();
+            if (fetched.length != wanted.length ||
+                received.contains(null) ||
+                received.length != wanted.length ||
+                !received.containsAll(wanted)) {
+              throw const JwEmailConnectionException(
+                'Página IMAP incompleta; sincronize novamente para retomar.',
+              );
+            }
+            yield fetched
+                .map(
+                  (item) => item.copyWith(
+                    id: scopedMessageId(
+                      host: targetHost,
+                      port: targetPort,
+                      username: username.trim(),
+                      uidValidity: validity,
+                      uid: item.remoteUid!,
+                      mailbox: box.path,
+                    ),
+                    accountEmail: effectiveAccountEmail,
+                    folderId: item.folderId ?? box.path,
+                    folderName: item.folderName ?? box.folderName,
+                    isDraft: item.isDraft || box.isDraft,
+                  ),
+                )
+                .toList();
+          }
+        }
+      } else {
+        final validity = await _imapStage(
+          'abertura da INBOX',
+          session.selectInbox,
+          timeout,
+        );
+        if (validity <= 0) {
+          throw const JwEmailConnectionException('UIDVALIDITY inválido.');
+        }
+        final uids = await _imapStage(
+          'listagem de mensagens',
+          session.searchUids,
+          timeout,
+        );
+        if (uids.any((uid) => uid <= 0) || uids.toSet().length != uids.length) {
           throw const JwEmailConnectionException(
-            'Página IMAP incompleta; sincronize novamente para retomar.',
+            'Lista de UIDs IMAP inválida.',
           );
         }
-        final effectiveAccountEmail =
-            (accountEmail != null && accountEmail.trim().isNotEmpty)
-            ? accountEmail.trim().toLowerCase()
-            : username.trim();
-        yield fetched
-            .map(
-              (item) => item.copyWith(
-                id: scopedMessageId(
-                  host: targetHost,
-                  port: targetPort,
-                  username: username.trim(),
-                  uidValidity: validity,
-                  uid: item.remoteUid!,
+        uids.sort();
+        const pageSize = 10; // Tamanho de lote, não limite da caixa.
+        for (var start = 0; start < uids.length; start += pageSize) {
+          final end = start + pageSize < uids.length
+              ? start + pageSize
+              : uids.length;
+          final page = uids.sublist(start, end);
+          final wanted = missingUids == null
+              ? page.toSet()
+              : await missingUids(validity, page);
+          if (!page.toSet().containsAll(wanted)) {
+            throw const JwEmailConnectionException(
+              'Filtro de mensagens IMAP inválido.',
+            );
+          }
+          if (wanted.isEmpty) continue;
+          final fetched = await _imapStage(
+            'leitura de mensagens',
+            () => session.fetchUids(page.where(wanted.contains).toList()),
+            timeout,
+          );
+          final received = fetched.map((item) => item.remoteUid).toSet();
+          if (fetched.length != wanted.length ||
+              received.contains(null) ||
+              received.length != wanted.length ||
+              !received.containsAll(wanted)) {
+            throw const JwEmailConnectionException(
+              'Página IMAP incompleta; sincronize novamente para retomar.',
+            );
+          }
+          yield fetched
+              .map(
+                (item) => item.copyWith(
+                  id: scopedMessageId(
+                    host: targetHost,
+                    port: targetPort,
+                    username: username.trim(),
+                    uidValidity: validity,
+                    uid: item.remoteUid!,
+                  ),
+                  accountEmail: effectiveAccountEmail,
+                  folderName: item.folderName ?? 'Caixa de Entrada',
                 ),
-                accountEmail: effectiveAccountEmail,
-                folderName: item.folderName ?? 'Caixa de Entrada',
-              ),
-            )
-            .toList();
+              )
+              .toList();
+        }
       }
     } on JwEmailException {
       rethrow;
@@ -710,6 +1139,86 @@ class JwImapClient {
       // Não incluir respostas brutas: podem conter credenciais ou mensagens.
       throw const JwEmailConnectionException(
         'Falha na conexão ou na leitura IMAP. Tente novamente.',
+      );
+    } finally {
+      try {
+        await session.close();
+      } catch (_) {}
+    }
+  }
+
+  Future<void> pushReadFlag({
+    required String host,
+    required int port,
+    required String username,
+    required String password,
+    required String mailboxPath,
+    required List<int> uids,
+    required bool isRead,
+    Duration timeout = const Duration(seconds: 30),
+  }) async {
+    if (kIsWeb || uids.isEmpty) return;
+    final session =
+        sessionFactory?.call(timeout) ?? _EnoughMailSession(timeout);
+    if (session is! JwImapFolderSession) return;
+    try {
+      await session.connect(host, port, username, password, timeout);
+      await session.setReadFlag(uids, mailboxPath: mailboxPath, isRead: isRead);
+    } finally {
+      try {
+        await session.close();
+      } catch (_) {}
+    }
+  }
+
+  Future<void> pushMoveToFolder({
+    required String host,
+    required int port,
+    required String username,
+    required String password,
+    required String sourceMailbox,
+    required List<int> uids,
+    required String targetFolderName,
+    Duration timeout = const Duration(seconds: 30),
+  }) async {
+    if (kIsWeb || uids.isEmpty) return;
+    final session =
+        sessionFactory?.call(timeout) ?? _EnoughMailSession(timeout);
+    if (session is! JwImapFolderSession) return;
+    try {
+      await session.connect(host, port, username, password, timeout);
+      await session.moveUidsToFolder(
+        uids,
+        sourceMailbox: sourceMailbox,
+        targetFolderName: targetFolderName,
+      );
+    } finally {
+      try {
+        await session.close();
+      } catch (_) {}
+    }
+  }
+
+  Future<void> pushDeleteUids({
+    required String host,
+    required int port,
+    required String username,
+    required String password,
+    required String sourceMailbox,
+    required List<int> uids,
+    bool permanent = false,
+    Duration timeout = const Duration(seconds: 30),
+  }) async {
+    if (kIsWeb || uids.isEmpty) return;
+    final session =
+        sessionFactory?.call(timeout) ?? _EnoughMailSession(timeout);
+    if (session is! JwImapFolderSession) return;
+    try {
+      await session.connect(host, port, username, password, timeout);
+      await session.deleteUids(
+        uids,
+        sourceMailbox: sourceMailbox,
+        permanent: permanent,
       );
     } finally {
       try {
@@ -1553,28 +2062,104 @@ class JwEmailService {
     final account = username?.trim() ?? '';
     int savedCount = 0;
 
-    await for (final page in imapClient.fetchRemoteEmailPages(
-      host: host,
-      port: port,
-      username: username,
-      password: password,
-      accountEmail: accountEmail,
-      missingUids: (validity, uids) async {
-        final ids = {
-          for (final uid in uids)
-            uid:
-                'email_${JwImapClient.scopedMessageId(host: targetHost, port: targetPort, username: account, uidValidity: validity, uid: uid)}',
-        };
-        final existing = await (db.select(
-          db.inboxEntries,
-        )..where((t) => t.id.isIn(ids.values.toList()))).get();
-        final retained = existing.map((item) => item.id).toSet();
-        return ids.entries
-            .where((item) => !retained.contains(item.value))
-            .map((item) => item.key)
-            .toSet();
-      },
-    )) {
+    Future<Set<int>> handleMissingUids(int validity, List<int> uids) async {
+      final ids = {
+        for (final uid in uids)
+          uid:
+              'email_${JwImapClient.scopedMessageId(host: targetHost, port: targetPort, username: account, uidValidity: validity, uid: uid)}',
+      };
+      final existing = await (db.select(
+        db.inboxEntries,
+      )..where((t) => t.id.isIn(ids.values.toList()))).get();
+      final retained = existing.map((item) => item.id).toSet();
+      return ids.entries
+          .where((item) => !retained.contains(item.value))
+          .map((item) => item.key)
+          .toSet();
+    }
+
+    final Stream<List<JwEmailMessage>> pagesStream =
+        imapClient.runtimeType == JwImapClient
+        ? imapClient.fetchAllMailboxPages(
+            host: host,
+            port: port,
+            username: username,
+            password: password,
+            accountEmail: accountEmail,
+            missingUids: handleMissingUids,
+            missingMailboxUids: (mailboxPath, validity, uids) async {
+              final ids = {
+                for (final uid in uids)
+                  uid:
+                      'email_${JwImapClient.scopedMessageId(host: targetHost, port: targetPort, username: account, uidValidity: validity, uid: uid, mailbox: mailboxPath)}',
+              };
+              final existing = await (db.select(
+                db.inboxEntries,
+              )..where((t) => t.id.isIn(ids.values.toList()))).get();
+              final retained = existing.map((item) => item.id).toSet();
+              return ids.entries
+                  .where((item) => !retained.contains(item.value))
+                  .map((item) => item.key)
+                  .toSet();
+            },
+            onMailboxFlags: (mailboxPath, folderName, validity, flags) async {
+              final entryIds = <int, String>{
+                for (final flag in flags)
+                  flag.uid:
+                      'email_${JwImapClient.scopedMessageId(host: targetHost, port: targetPort, username: account, uidValidity: validity, uid: flag.uid, mailbox: mailboxPath)}',
+              };
+              if (entryIds.isEmpty) return;
+              final existingRows = await (db.select(
+                db.inboxEntries,
+              )..where((t) => t.id.isIn(entryIds.values.toList()))).get();
+              if (existingRows.isEmpty) return;
+              final flagByEntryId = {
+                for (final flag in flags) entryIds[flag.uid]!: flag.isSeen,
+              };
+              await db.transaction(() async {
+                final now = DateTime.now().toUtc();
+                for (final row in existingRows) {
+                  if (row.metadata.isEmpty) continue;
+                  final meta = jsonDecode(row.metadata) as Map<String, dynamic>;
+                  final rawEmail = meta['email'];
+                  if (rawEmail is! Map) continue;
+                  final emailMap = Map<String, dynamic>.from(rawEmail);
+                  final currentIsRead = emailMap['isRead'] as bool? ?? false;
+                  final currentFolder = emailMap['folderName'] as String?;
+                  final remoteIsRead = flagByEntryId[row.id] ?? currentIsRead;
+                  if (currentIsRead == remoteIsRead &&
+                      currentFolder == folderName &&
+                      emailMap['folderId'] == mailboxPath) {
+                    continue;
+                  }
+                  emailMap['isRead'] = remoteIsRead;
+                  emailMap['folderName'] = folderName;
+                  emailMap['folderId'] = mailboxPath;
+                  meta['email'] = emailMap;
+                  final updatedMeta = jsonEncode(meta);
+                  await (db.update(
+                    db.inboxEntries,
+                  )..where((t) => t.id.equals(row.id))).write(
+                    InboxEntriesCompanion(
+                      metadata: drift.Value(updatedMeta),
+                      updatedAt: drift.Value(now),
+                      revision: drift.Value(row.revision + 1),
+                    ),
+                  );
+                }
+              });
+            },
+          )
+        : imapClient.fetchRemoteEmailPages(
+            host: host,
+            port: port,
+            username: username,
+            password: password,
+            accountEmail: accountEmail,
+            missingUids: handleMissingUids,
+          );
+
+    await for (final page in pagesStream) {
       // Cada lote é confirmado antes de solicitar o próximo. Em interrupção,
       // a próxima execução consulta o banco e busca somente UIDs ausentes.
       await db.transaction(() async {
@@ -1588,6 +2173,8 @@ class JwEmailService {
           final sourceType = msg.isHubCommunication
               ? (msg.hubType == 'form' ? 'hub_form' : 'hub_letter')
               : 'email';
+          final persistedAttachments =
+              JwEmailMessage.sanitizeAttachmentsForPersistence(msg.attachments);
           final metadata = {
             'permanentRetention': true,
             'retentionDate': now.toIso8601String(),
@@ -1599,9 +2186,15 @@ class JwEmailService {
                     : (msg.hubType == 'letter' ? 'hub_letter' : 'hub_comms'))
               : 'email';
           final cleanBody = msg.bodyText.isNotEmpty
-              ? EmailHtmlSanitizer.extractPlainText(msg.bodyText)
+              ? EmailHtmlSanitizer.extractPlainText(
+                  msg.bodyText,
+                  cleanMarkdown: true,
+                )
               : (msg.bodyHtml != null
-                    ? EmailHtmlSanitizer.extractPlainText(msg.bodyHtml!)
+                    ? EmailHtmlSanitizer.extractPlainText(
+                        msg.bodyHtml!,
+                        cleanMarkdown: true,
+                      )
                     : '');
           await db
               .into(db.inboxEntries)
@@ -1611,7 +2204,7 @@ class JwEmailService {
                   content: '${msg.subject}\n\n$cleanBody'.trim(),
                   sourceType: drift.Value(sourceType),
                   suggestedCategory: drift.Value(category),
-                  attachments: drift.Value(jsonEncode(msg.attachments)),
+                  attachments: drift.Value(jsonEncode(persistedAttachments)),
                   capturedAt: msg.date.toUtc(),
                   metadata: drift.Value(jsonEncode(metadata)),
                   createdAt: now,
@@ -2007,32 +2600,189 @@ class JwEmailService {
     return content;
   }
 
-  /// Exclui uma mensagem de e-mail (soft-delete seguro preservando integridade local e de sincronização)
-  Future<void> deleteEmail(String emailId) async {
-    final entryId = emailId.startsWith('email_') ? emailId : 'email_$emailId';
-    final now = DateTime.now().toUtc();
-    await (db.update(
-      db.inboxEntries,
-    )..where((t) => t.id.equals(entryId))).write(
-      InboxEntriesCompanion(
-        deletedAt: drift.Value(now),
-        updatedAt: drift.Value(now),
-      ),
-    );
-    await db
-        .into(db.syncQueue)
-        .insert(
-          SyncQueueCompanion.insert(
-            id: const Uuid().v4(),
-            entityType: 'inbox_entries',
-            entityId: entryId,
-            operation: 'UPDATE',
-            payload: jsonEncode({
-              'id': entryId,
-              'deleted_at': now.toIso8601String(),
-            }),
-            createdAt: now,
+  static String _entryIdFor(String emailId) =>
+      emailId.startsWith('email_') ? emailId : 'email_$emailId';
+
+  /// Atualiza o status de leitura (`isRead`) de um ou mais e-mails em transação única.
+  Future<int> setEmailsReadStatus(
+    List<String> emailIds, {
+    required bool isRead,
+  }) async {
+    if (emailIds.isEmpty) return 0;
+    final entryIds = emailIds.map(_entryIdFor).toSet().toList();
+    var updated = 0;
+    await db.transaction(() async {
+      final rows = await (db.select(
+        db.inboxEntries,
+      )..where((t) => t.id.isIn(entryIds))).get();
+      final now = DateTime.now().toUtc();
+      for (final row in rows) {
+        if (row.metadata.isEmpty) continue;
+        final meta = Map<String, dynamic>.from(jsonDecode(row.metadata) as Map);
+        final rawEmail = meta['email'];
+        if (rawEmail is! Map) continue;
+        final emailMap = Map<String, dynamic>.from(rawEmail);
+        if ((emailMap['isRead'] as bool? ?? false) == isRead) continue;
+        emailMap['isRead'] = isRead;
+        emailMap['attachments'] =
+            JwEmailMessage.sanitizeAttachmentsForPersistence(
+              (emailMap['attachments'] as List<dynamic>?)
+                      ?.map((e) => Map<String, dynamic>.from(e as Map))
+                      .toList() ??
+                  const [],
+            );
+        meta['email'] = emailMap;
+        final updatedMeta = jsonEncode(meta);
+        await (db.update(
+          db.inboxEntries,
+        )..where((t) => t.id.equals(row.id))).write(
+          InboxEntriesCompanion(
+            metadata: drift.Value(updatedMeta),
+            updatedAt: drift.Value(now),
+            revision: drift.Value(row.revision + 1),
           ),
         );
+        final refreshed = await (db.select(
+          db.inboxEntries,
+        )..where((t) => t.id.equals(row.id))).getSingle();
+        await db
+            .into(db.syncQueue)
+            .insert(
+              SyncQueueCompanion.insert(
+                id: const Uuid().v4(),
+                entityType: 'inbox_entries',
+                entityId: row.id,
+                operation: 'UPDATE',
+                payload: jsonEncode(refreshed.toJson()),
+                createdAt: now,
+              ),
+            );
+        updated++;
+      }
+    });
+    return updated;
+  }
+
+  /// Move um ou mais e-mails localmente para [targetFolderName], preservando metadados
+  /// e atualizando eventuais novos IDs remotos retornados pelo servidor (ex.: Graph `/move`).
+  Future<int> moveEmailsToFolder(
+    List<String> emailIds, {
+    required String targetFolderName,
+    Map<String, String>? updatedRemoteIds,
+  }) async {
+    if (emailIds.isEmpty) return 0;
+    final entryIds = emailIds.map(_entryIdFor).toSet().toList();
+    var moved = 0;
+    await db.transaction(() async {
+      final rows = await (db.select(
+        db.inboxEntries,
+      )..where((t) => t.id.isIn(entryIds))).get();
+      final now = DateTime.now().toUtc();
+      for (final row in rows) {
+        if (row.metadata.isEmpty) continue;
+        final meta = Map<String, dynamic>.from(jsonDecode(row.metadata) as Map);
+        final rawEmail = meta['email'];
+        if (rawEmail is! Map) continue;
+        final emailMap = Map<String, dynamic>.from(rawEmail);
+        final originalEmailId = emailMap['id']?.toString();
+        final newRemoteId =
+            updatedRemoteIds?[originalEmailId] ?? updatedRemoteIds?[row.id];
+
+        emailMap['folderName'] = targetFolderName;
+        emailMap['isDraft'] = targetFolderName == 'Rascunhos';
+        if (newRemoteId != null && newRemoteId.isNotEmpty) {
+          emailMap['remoteId'] = newRemoteId;
+        }
+        emailMap['attachments'] =
+            JwEmailMessage.sanitizeAttachmentsForPersistence(
+              (emailMap['attachments'] as List<dynamic>?)
+                      ?.map((e) => Map<String, dynamic>.from(e as Map))
+                      .toList() ??
+                  const [],
+            );
+        meta['email'] = emailMap;
+
+        final updatedMeta = jsonEncode(meta);
+        await (db.update(
+          db.inboxEntries,
+        )..where((t) => t.id.equals(row.id))).write(
+          InboxEntriesCompanion(
+            metadata: drift.Value(updatedMeta),
+            updatedAt: drift.Value(now),
+            revision: drift.Value(row.revision + 1),
+          ),
+        );
+        final refreshed = await (db.select(
+          db.inboxEntries,
+        )..where((t) => t.id.equals(row.id))).getSingle();
+        await db
+            .into(db.syncQueue)
+            .insert(
+              SyncQueueCompanion.insert(
+                id: const Uuid().v4(),
+                entityType: 'inbox_entries',
+                entityId: row.id,
+                operation: 'UPDATE',
+                payload: jsonEncode(refreshed.toJson()),
+                createdAt: now,
+              ),
+            );
+        moved++;
+      }
+    });
+    return moved;
+  }
+
+  /// Exclui em lote mensagens de e-mail (soft-delete local; se [moveToTrashOnly]
+  /// for true e a mensagem não estiver na Lixeira, move para Lixeira em vez de ocultar).
+  Future<int> deleteEmails(
+    List<String> emailIds, {
+    bool moveToTrashOnly = false,
+  }) async {
+    if (emailIds.isEmpty) return 0;
+    final entryIds = emailIds.map(_entryIdFor).toSet().toList();
+    if (moveToTrashOnly) {
+      return moveEmailsToFolder(entryIds, targetFolderName: 'Lixeira');
+    }
+    var deleted = 0;
+    await db.transaction(() async {
+      final rows = await (db.select(
+        db.inboxEntries,
+      )..where((t) => t.id.isIn(entryIds))).get();
+      final now = DateTime.now().toUtc();
+      for (final row in rows) {
+        await (db.update(
+          db.inboxEntries,
+        )..where((t) => t.id.equals(row.id))).write(
+          InboxEntriesCompanion(
+            deletedAt: drift.Value(now),
+            updatedAt: drift.Value(now),
+            revision: drift.Value(row.revision + 1),
+          ),
+        );
+        await db
+            .into(db.syncQueue)
+            .insert(
+              SyncQueueCompanion.insert(
+                id: const Uuid().v4(),
+                entityType: 'inbox_entries',
+                entityId: row.id,
+                operation: 'UPDATE',
+                payload: jsonEncode({
+                  'id': row.id,
+                  'deleted_at': now.toIso8601String(),
+                }),
+                createdAt: now,
+              ),
+            );
+        deleted++;
+      }
+    });
+    return deleted;
+  }
+
+  /// Exclui uma mensagem de e-mail (soft-delete seguro preservando integridade local e de sincronização)
+  Future<void> deleteEmail(String emailId) async {
+    await deleteEmails([emailId]);
   }
 }

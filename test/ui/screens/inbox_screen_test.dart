@@ -12,6 +12,7 @@ import 'package:ministerio_pessoal/core/biometric_auth_service.dart';
 import 'package:ministerio_pessoal/database/app_database.dart';
 import 'package:ministerio_pessoal/database/repository.dart';
 import 'package:ministerio_pessoal/inbox/email_account_model.dart';
+import 'package:ministerio_pessoal/inbox/email_sync_coordinator.dart';
 import 'package:ministerio_pessoal/inbox/jw_email_service.dart';
 import 'package:ministerio_pessoal/ui/providers.dart';
 import 'package:ministerio_pessoal/ui/screens/email_contacts_screen.dart';
@@ -914,6 +915,259 @@ void main() {
 
         expect(find.byType(EmailContactsScreen), findsOneWidget);
         expect(find.text('Contatos de E-mail'), findsOneWidget);
+
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+        await db.close();
+        await tester.pump(const Duration(milliseconds: 100));
+      },
+    );
+
+    testWidgets(
+      'TC-INBOX-READ-MARKDOWN-01: Clicar em e-mail marca como lido e limpa ** na prévia da lista',
+      (tester) async {
+        final db = AppDatabase.forTesting(NativeDatabase.memory());
+        final repo = AppRepository(db);
+        tester.view.physicalSize = const Size(1280, 800);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        final coordinator = EmailSyncCoordinator(db);
+        await coordinator.persistSyncedMessages([
+          JwEmailMessage(
+            id: 'unread_md_1',
+            subject: 'Testando',
+            from: 'eduveiga@hotmail.com',
+            to: 'dest@gmail.com',
+            accountEmail: 'eduveiga@hotmail.com',
+            date: DateTime.utc(2026, 11, 24, 12, 0),
+            bodyText: 'Olá mundo! Sistema **incrível**!',
+            bodyHtml: '<p>Olá mundo! Sistema <b>incrível</b>!</p>',
+            isRead: false,
+            folderName: 'Caixa de Entrada',
+          ),
+        ], 'imap');
+
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              databaseProvider.overrideWithValue(db),
+              repositoryProvider.overrideWithValue(repo),
+              jwEmailServiceProvider.overrideWithValue(
+                _TestJwEmailService(
+                  db: db,
+                  biometricAuth: _AlwaysUnlockedBiometricService(),
+                ),
+              ),
+              biometricAuthServiceProvider.overrideWithValue(
+                _AlwaysUnlockedBiometricService(),
+              ),
+            ],
+            child: const MaterialApp(home: InboxScreen()),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('JW Mail'));
+        await tester.pumpAndSettle();
+
+        // Prévia da coluna esquerda não deve conter **
+        expect(find.textContaining('Sistema **incrível**'), findsNothing);
+        expect(find.textContaining('Sistema incrível!'), findsWidgets);
+
+        // Clica no e-mail -> deve marcar como lido no banco
+        await tester.tap(find.text('eduveiga@hotmail.com').first);
+        await tester.pumpAndSettle();
+
+        final row = await (db.select(
+          db.inboxEntries,
+        )..where((t) => t.id.equals('email_unread_md_1'))).getSingle();
+        final emailJson =
+            jsonDecode(row.metadata)['email'] as Map<String, dynamic>;
+        expect(emailJson['isRead'], isTrue);
+
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+        await db.close();
+        await tester.pump(const Duration(milliseconds: 100));
+      },
+    );
+
+    testWidgets(
+      'TC-INBOX-BATCH-01: Seleção múltipla move pasta em lote e exclui mensagens',
+      (tester) async {
+        final db = AppDatabase.forTesting(NativeDatabase.memory());
+        final repo = AppRepository(db);
+        tester.view.physicalSize = const Size(1280, 900);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        final coordinator = EmailSyncCoordinator(db);
+        await coordinator.persistSyncedMessages([
+          JwEmailMessage(
+            id: 'batch_m1',
+            subject: 'Mensagem Um',
+            from: 'um@jw.org',
+            to: 'eu@jw.org',
+            date: DateTime.utc(2026, 11, 24, 10, 0),
+            bodyText: 'Corpo 1',
+            isRead: false,
+            folderName: 'Caixa de Entrada',
+          ),
+          JwEmailMessage(
+            id: 'batch_m2',
+            subject: 'Mensagem Dois',
+            from: 'dois@jw.org',
+            to: 'eu@jw.org',
+            date: DateTime.utc(2026, 11, 24, 9, 0),
+            bodyText: 'Corpo 2',
+            isRead: false,
+            folderName: 'Caixa de Entrada',
+          ),
+        ], 'imap');
+
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              databaseProvider.overrideWithValue(db),
+              repositoryProvider.overrideWithValue(repo),
+              jwEmailServiceProvider.overrideWithValue(
+                _TestJwEmailService(
+                  db: db,
+                  biometricAuth: _AlwaysUnlockedBiometricService(),
+                ),
+              ),
+              biometricAuthServiceProvider.overrideWithValue(
+                _AlwaysUnlockedBiometricService(),
+              ),
+            ],
+            child: const MaterialApp(home: InboxScreen()),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('JW Mail'));
+        await tester.pumpAndSettle();
+
+        // Entra em modo de seleção
+        await tester.tap(find.byKey(const Key('btn_toggle_email_selection')));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byKey(const Key('chk_email_batch_m1')));
+        await tester.tap(find.byKey(const Key('chk_email_batch_m2')));
+        await tester.pumpAndSettle();
+        expect(find.text('2 selecionada(s)'), findsOneWidget);
+
+        // Move em lote para Spam
+        await tester.tap(find.byKey(const Key('btn_batch_move_folder')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('opt_move_folder_Spam')));
+        await tester.pumpAndSettle();
+
+        final rowsAfterMove = await db.select(db.inboxEntries).get();
+        expect(rowsAfterMove, hasLength(2));
+        for (final row in rowsAfterMove) {
+          final emailJson =
+              jsonDecode(row.metadata)['email'] as Map<String, dynamic>;
+          expect(emailJson['folderName'], equals('Spam'));
+        }
+
+        // Seleciona novamente e exclui em lote (move para Lixeira)
+        await tester.tap(find.byKey(const Key('btn_toggle_email_selection')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('btn_batch_select_all_emails')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('btn_batch_delete_emails')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('btn_confirm_delete_emails')));
+        await tester.pumpAndSettle();
+
+        final rowsAfterDelete = await db.select(db.inboxEntries).get();
+        for (final row in rowsAfterDelete) {
+          final emailJson =
+              jsonDecode(row.metadata)['email'] as Map<String, dynamic>;
+          expect(emailJson['folderName'], equals('Lixeira'));
+        }
+
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+        await db.close();
+        await tester.pump(const Duration(milliseconds: 100));
+      },
+    );
+
+    testWidgets(
+      'TC-INBOX-CAPTURES-01: Aba Capturas mantém todos os botões e abre e-mail em tela cheia',
+      (tester) async {
+        final db = AppDatabase.forTesting(NativeDatabase.memory());
+        final repo = AppRepository(db);
+        tester.view.physicalSize = const Size(900, 900);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        final coordinator = EmailSyncCoordinator(db);
+        await coordinator.persistSyncedMessages([
+          JwEmailMessage(
+            id: 'cap_full_1',
+            subject: 'Convite Especial',
+            from: 'remetente@jw.org',
+            to: 'eu@jw.org',
+            date: DateTime.utc(2026, 11, 24),
+            bodyText: 'Conteúdo completo da captura de e-mail.',
+            accountEmail: 'eu@jw.org',
+          ),
+        ], 'imap');
+
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              databaseProvider.overrideWithValue(db),
+              repositoryProvider.overrideWithValue(repo),
+              jwEmailServiceProvider.overrideWithValue(
+                _TestJwEmailService(
+                  db: db,
+                  biometricAuth: _AlwaysUnlockedBiometricService(),
+                ),
+              ),
+              biometricAuthServiceProvider.overrideWithValue(
+                _AlwaysUnlockedBiometricService(),
+              ),
+            ],
+            child: const MaterialApp(home: InboxScreen()),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Todos os 4 botões de conversão permanecem presentes
+        expect(find.text('Virar Tarefa'), findsOneWidget);
+        expect(find.text('Virar Projeto'), findsOneWidget);
+        expect(find.text('Virar Nota'), findsOneWidget);
+        expect(find.text('Virar Pergunta'), findsOneWidget);
+
+        // Botão de leitura em tela cheia presente no card de e-mail
+        final fullBtn = find.byKey(
+          const Key('btn_capture_fullscreen_email_cap_full_1'),
+        );
+        expect(fullBtn, findsOneWidget);
+        await tester.tap(fullBtn);
+        await tester.pumpAndSettle();
+
+        expect(find.text('Convite Especial'), findsWidgets);
+        expect(
+          find.textContaining('Conteúdo completo da captura de e-mail.'),
+          findsWidgets,
+        );
+
+        // Fecha leitor e valida largura estreita (iPhone 360px) sem overflow
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+        tester.view.physicalSize = const Size(360, 780);
+        await tester.pumpAndSettle();
+        expect(fullBtn, findsOneWidget);
+        expect(find.text('Virar Tarefa'), findsOneWidget);
 
         await tester.pumpWidget(const SizedBox.shrink());
         await tester.pumpAndSettle();

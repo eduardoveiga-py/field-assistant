@@ -416,11 +416,16 @@ class MicrosoftOAuthService {
     return null;
   }
 
-  /// Busca mensagens de e-mail das principais pastas do Microsoft Graph com paginação real
+  /// Busca mensagens de e-mail das principais pastas do Microsoft Graph com paginação real.
+  ///
+  /// Quando [knownMessageIds] contém o ID da mensagem, evita baixar anexos novamente,
+  /// retornando apenas os metadados de estado (`isRead`, pasta) para reconciliação.
   Future<List<JwEmailMessage>> fetchMessages({
     required String accountId,
     required String accountEmail,
     int maxResults = 200,
+    Set<String> knownMessageIds = const {},
+    List<String>? folderWarnings,
   }) async {
     final token = await getValidAccessToken(accountId);
     if (token == null || token.isEmpty) {
@@ -457,13 +462,18 @@ class MicrosoftOAuthService {
         var fetchedForFolder = 0;
         final topParam = folderQuota < 50 ? folderQuota : 50;
 
+        final orderByField = folderKey == 'sentitems'
+            ? 'sentDateTime'
+            : 'receivedDateTime';
         String? nextUrl =
             '$graphBaseUrl/me/mailFolders/$folderKey/messages'
             '?\$top=$topParam'
+            '&\$orderby=$orderByField%20desc'
             '&\$select=id,subject,body,from,toRecipients,ccRecipients,bccRecipients,receivedDateTime,sentDateTime,isRead,hasAttachments';
 
         const maxPagesPerFolder = 10;
         var pageCount = 0;
+        var retriedWithoutOrderBy = false;
 
         while (nextUrl != null &&
             nextUrl.isNotEmpty &&
@@ -471,9 +481,18 @@ class MicrosoftOAuthService {
             pageCount < maxPagesPerFolder) {
           pageCount++;
           final uri = Uri.parse(nextUrl);
-          final resp = await _httpClient.get(uri, headers: headers);
+          var resp = await _httpClient.get(uri, headers: headers);
+          if (resp.statusCode == 400 && !retriedWithoutOrderBy) {
+            retriedWithoutOrderBy = true;
+            nextUrl =
+                '$graphBaseUrl/me/mailFolders/$folderKey/messages'
+                '?\$top=$topParam'
+                '&\$select=id,subject,body,from,toRecipients,ccRecipients,bccRecipients,receivedDateTime,sentDateTime,isRead,hasAttachments';
+            resp = await _httpClient.get(Uri.parse(nextUrl), headers: headers);
+          }
           if (resp.statusCode != 200) {
             lastError = 'Microsoft Graph HTTP ${resp.statusCode}: ${resp.body}';
+            folderWarnings?.add('Microsoft ($folderKey): $lastError');
             AppLogger.warning(
               'Falha ao listar mensagens da pasta $folderKey do Graph: $lastError',
             );
@@ -485,6 +504,7 @@ class MicrosoftOAuthService {
           final list = data['value'] as List<dynamic>? ?? [];
           if (list.isEmpty) break;
 
+          var processedInPage = 0;
           for (final item in list) {
             if (item is! Map) continue;
             final msgMap = Map<String, dynamic>.from(item);
@@ -492,14 +512,18 @@ class MicrosoftOAuthService {
             if (id == null || seenIds.contains(id)) continue;
             seenIds.add(id);
 
+            final isKnown = knownMessageIds.contains(id);
             final parsed = parseGraphMessage(
               msgMap,
               accountEmail: accountEmail,
               folderKey: folderKey,
             );
 
-            // Se tem anexos, busca metadados
-            if (parsed != null &&
+            // Se já conhecida no banco local, reconcilia apenas estado (isRead/pasta) sem re-baixar anexos
+            if (parsed != null && isKnown) {
+              messages.add(parsed.copyWith(isMetadataOnly: true));
+              fetchedForFolder++;
+            } else if (parsed != null &&
                 (msgMap['hasAttachments'] as bool? ?? false)) {
               final attachments = await _fetchAttachmentMetadata(
                 messageId: id,
@@ -510,6 +534,11 @@ class MicrosoftOAuthService {
             } else if (parsed != null) {
               messages.add(parsed);
               fetchedForFolder++;
+            }
+
+            processedInPage++;
+            if (kIsWeb && processedInPage % 4 == 0) {
+              await Future<void>.delayed(Duration.zero);
             }
 
             if (fetchedForFolder >= folderQuota) break;
@@ -657,8 +686,10 @@ class MicrosoftOAuthService {
     final bcc = bccList.map(extractAddress).whereType<String>().toList();
 
     DateTime date = DateTime.now();
-    final dateStr =
-        msg['receivedDateTime'] as String? ?? msg['sentDateTime'] as String?;
+    final dateStr = folderKey == 'sentitems'
+        ? (msg['sentDateTime'] as String? ?? msg['receivedDateTime'] as String?)
+        : (msg['receivedDateTime'] as String? ??
+              msg['sentDateTime'] as String?);
     if (dateStr != null) {
       date = DateTime.tryParse(dateStr) ?? DateTime.now();
     }
@@ -804,6 +835,118 @@ class MicrosoftOAuthService {
         'Erro ao enviar e-mail via Microsoft Graph (HTTP ${resp.statusCode}): ${resp.body}',
       );
     }
+  }
+
+  static String _stripEmailPrefix(String id) =>
+      id.startsWith('email_') ? id.substring(6) : id;
+
+  static String _mapFolderNameToGraphId(String targetFolderName) {
+    switch (targetFolderName) {
+      case 'Enviadas':
+      case 'Enviados':
+        return 'sentitems';
+      case 'Rascunhos':
+        return 'drafts';
+      case 'Spam':
+        return 'junkemail';
+      case 'Lixeira':
+        return 'deleteditems';
+      case 'Caixa de Entrada':
+      default:
+        return 'inbox';
+    }
+  }
+
+  /// Atualiza o status `isRead` no Microsoft Graph.
+  Future<bool> markMessageRead({
+    required String accountId,
+    required String messageId,
+    required bool isRead,
+  }) async {
+    final token = await getValidAccessToken(accountId);
+    if (token == null || token.isEmpty) {
+      throw Exception('Conta Microsoft não autenticada.');
+    }
+    final rawId = _stripEmailPrefix(messageId);
+    final resp = await _httpClient.patch(
+      Uri.parse('$graphBaseUrl/me/messages/$rawId'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({'isRead': isRead}),
+    );
+    if (resp.statusCode >= 200 && resp.statusCode < 300) return true;
+    throw Exception(
+      'Microsoft Graph recusou atualização de leitura (HTTP ${resp.statusCode}): ${resp.body}',
+    );
+  }
+
+  /// Move uma mensagem no Microsoft Graph e retorna o novo ID remoto atribuído pela pasta de destino (se houver).
+  Future<String?> moveMessageToFolder({
+    required String accountId,
+    required String messageId,
+    required String targetFolderName,
+  }) async {
+    final token = await getValidAccessToken(accountId);
+    if (token == null || token.isEmpty) {
+      throw Exception('Conta Microsoft não autenticada.');
+    }
+    final rawId = _stripEmailPrefix(messageId);
+    final destinationId = _mapFolderNameToGraphId(targetFolderName);
+    final resp = await _httpClient.post(
+      Uri.parse('$graphBaseUrl/me/messages/$rawId/move'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({'destinationId': destinationId}),
+    );
+    if (resp.statusCode >= 200 && resp.statusCode < 300) {
+      if (resp.body.isNotEmpty) {
+        try {
+          final decoded = jsonDecode(resp.body) as Map<String, dynamic>;
+          return decoded['id'] as String?;
+        } catch (_) {}
+      }
+      return null;
+    }
+    throw Exception(
+      'Microsoft Graph recusou mover mensagem para $targetFolderName (HTTP ${resp.statusCode}): ${resp.body}',
+    );
+  }
+
+  /// Move mensagem para Itens Excluídos (`deleteditems`) ou remove permanentemente no Microsoft Graph.
+  Future<String?> deleteMessage({
+    required String accountId,
+    required String messageId,
+    bool permanent = false,
+  }) async {
+    if (!permanent) {
+      return moveMessageToFolder(
+        accountId: accountId,
+        messageId: messageId,
+        targetFolderName: 'Lixeira',
+      );
+    }
+    final token = await getValidAccessToken(accountId);
+    if (token == null || token.isEmpty) {
+      throw Exception('Conta Microsoft não autenticada.');
+    }
+    final rawId = _stripEmailPrefix(messageId);
+    final resp = await _httpClient.delete(
+      Uri.parse('$graphBaseUrl/me/messages/$rawId'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    if (resp.statusCode == 200 ||
+        resp.statusCode == 202 ||
+        resp.statusCode == 204 ||
+        resp.statusCode == 404) {
+      return null;
+    }
+    throw Exception(
+      'Microsoft Graph recusou exclusão definitiva (HTTP ${resp.statusCode}): ${resp.body}',
+    );
   }
 
   /// Constrói o payload JSON do sendMail para Microsoft Graph

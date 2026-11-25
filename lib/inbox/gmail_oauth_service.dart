@@ -5,6 +5,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 
 import '../core/app_logger.dart';
+import '../core/google_sign_in_initializer.dart';
 import 'email_html_sanitizer.dart';
 import 'jw_email_service.dart';
 import 'oauth_token_store.dart';
@@ -68,16 +69,22 @@ class GmailOAuthService {
     try {
       if (kIsWeb) {
         if (defaultWebClientId.trim().isNotEmpty) {
-          await _googleSignIn.initialize(clientId: defaultWebClientId);
+          await GoogleSignInInitializer.ensureInitialized(
+            _googleSignIn,
+            clientId: defaultWebClientId,
+          );
         }
       } else {
         final isIos = defaultTargetPlatform == TargetPlatform.iOS;
         final iosClientId = defaultIosClientId.trim();
-        await _googleSignIn.initialize(
+        await GoogleSignInInitializer.ensureInitialized(
+          _googleSignIn,
           clientId: isIos && iosClientId.isNotEmpty ? iosClientId : null,
         );
       }
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.warning('Falha ao inicializar GoogleSignIn no Gmail', e, st);
+    }
     _initialized = true;
   }
 
@@ -378,12 +385,18 @@ class GmailOAuthService {
     throw Exception('Falha ao sincronizar Gmail: $error');
   }
 
-  /// Sincroniza e busca mensagens de e-mail do Gmail com paginação real
+  /// Sincroniza e busca mensagens de e-mail do Gmail com paginação real.
+  ///
+  /// Quando [knownMessageIds] contém o ID da mensagem, consulta apenas
+  /// `format=metadata` para reconciliar estado (`isRead`, pasta e labels)
+  /// sem baixar novamente corpo nem anexos.
   Future<List<JwEmailMessage>> fetchMessages({
     required String accountId,
     required String accountEmail,
     int maxResults = 200,
     bool allowInteractiveRefresh = false,
+    Set<String> knownMessageIds = const {},
+    List<String>? folderWarnings,
   }) async {
     final token = await getValidAccessToken(
       accountId,
@@ -447,6 +460,7 @@ class GmailOAuthService {
             if (labelId == 'INBOX' && allMessageRefs.isEmpty) {
               _throwDescriptiveGmailError(lastError);
             }
+            folderWarnings?.add('Gmail ($labelId): $lastError');
             break;
           }
           successCalls++;
@@ -467,8 +481,8 @@ class GmailOAuthService {
         var fetchedForLabel = 0;
         String? lastMessageError;
 
-        // Processa os detalhes das mensagens em lotes paralelos controlados de 6
-        const batchSize = 6;
+        // Processa os detalhes das mensagens em lotes paralelos controlados (menor concorrência na Web)
+        final batchSize = kIsWeb ? 4 : 6;
         for (var i = 0; i < allMessageRefs.length; i += batchSize) {
           final batch = allMessageRefs.sublist(
             i,
@@ -483,10 +497,13 @@ class GmailOAuthService {
             if (seenMessageIds.contains(id)) return null;
             seenMessageIds.add(id);
 
+            final isKnown = knownMessageIds.contains(id);
+
             try {
-              final msgUri = Uri.parse(
-                'https://gmail.googleapis.com/gmail/v1/users/me/messages/$id?format=full',
-              );
+              final msgUrl = isKnown
+                  ? 'https://gmail.googleapis.com/gmail/v1/users/me/messages/$id?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Subject&metadataHeaders=Date'
+                  : 'https://gmail.googleapis.com/gmail/v1/users/me/messages/$id?format=full';
+              final msgUri = Uri.parse(msgUrl);
               final msgResp = await _httpClient.get(
                 msgUri,
                 headers: authHeaders,
@@ -494,6 +511,13 @@ class GmailOAuthService {
               if (msgResp.statusCode == 200) {
                 final msgData =
                     jsonDecode(msgResp.body) as Map<String, dynamic>;
+                if (isKnown) {
+                  return parseGmailMessage(
+                    msgData,
+                    accountEmail: accountEmail,
+                    preferredFolder: mapLabelToFolderName([labelId]),
+                  )?.copyWith(isMetadataOnly: true);
+                }
                 final parsed = await parseGmailMessageAsync(
                   msgData,
                   accountEmail: accountEmail,
@@ -527,6 +551,9 @@ class GmailOAuthService {
               fetchedForLabel++;
             }
           }
+          if (kIsWeb) {
+            await Future<void>.delayed(Duration.zero);
+          }
         }
 
         final currentMsgError = lastMessageError;
@@ -541,6 +568,7 @@ class GmailOAuthService {
       } catch (e, st) {
         if (labelId == 'INBOX') rethrow;
         lastError = e.toString();
+        folderWarnings?.add('Gmail ($labelId): $lastError');
         AppLogger.warning(
           'Erro na chamada da label $labelId do Gmail: $e',
           e,
@@ -723,6 +751,7 @@ class GmailOAuthService {
       attachments: attachments,
       isRead: isRead,
       isDraft: isDraft,
+      labels: labelIds,
     );
   }
 
@@ -810,8 +839,174 @@ class GmailOAuthService {
       attachments: enrichedAttachments,
       isRead: msg.isRead,
       isDraft: msg.isDraft,
+      labels: msg.labels,
       isHubCommunication: msg.isHubCommunication,
       hubType: msg.hubType,
+    );
+  }
+
+  static String _stripEmailPrefix(String id) =>
+      id.startsWith('email_') ? id.substring(6) : id;
+
+  /// Atualiza status de leitura (`UNREAD`) na Gmail REST API.
+  Future<bool> markMessageRead({
+    required String accountId,
+    required String messageId,
+    required bool isRead,
+    bool allowInteractiveRefresh = false,
+  }) async {
+    final token = await getValidAccessToken(
+      accountId,
+      allowInteractiveRefresh: allowInteractiveRefresh,
+    );
+    if (token == null || token.isEmpty) {
+      throw Exception('Conta Gmail não autenticada ou token expirado.');
+    }
+    final rawId = _stripEmailPrefix(messageId);
+    final uri = Uri.parse(
+      'https://gmail.googleapis.com/gmail/v1/users/me/messages/$rawId/modify',
+    );
+    final resp = await _httpClient.post(
+      uri,
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode(
+        isRead
+            ? {
+                'removeLabelIds': ['UNREAD'],
+              }
+            : {
+                'addLabelIds': ['UNREAD'],
+              },
+      ),
+    );
+    if (resp.statusCode == 200) return true;
+    throw Exception(
+      'Gmail recusou atualização de leitura (HTTP ${resp.statusCode}): ${resp.body}',
+    );
+  }
+
+  /// Move mensagem no Gmail entre pastas (`Caixa de Entrada`, `Enviadas`, `Spam`, `Lixeira`).
+  Future<bool> moveMessageToFolder({
+    required String accountId,
+    required String messageId,
+    required String targetFolderName,
+    bool allowInteractiveRefresh = false,
+  }) async {
+    final token = await getValidAccessToken(
+      accountId,
+      allowInteractiveRefresh: allowInteractiveRefresh,
+    );
+    if (token == null || token.isEmpty) {
+      throw Exception('Conta Gmail não autenticada ou token expirado.');
+    }
+    final rawId = _stripEmailPrefix(messageId);
+    final headers = {
+      'Authorization': 'Bearer $token',
+      'Content-Type': 'application/json',
+    };
+
+    if (targetFolderName == 'Lixeira') {
+      final resp = await _httpClient.post(
+        Uri.parse(
+          'https://gmail.googleapis.com/gmail/v1/users/me/messages/$rawId/trash',
+        ),
+        headers: headers,
+      );
+      if (resp.statusCode == 200) return true;
+      throw Exception(
+        'Gmail recusou mover para Lixeira (HTTP ${resp.statusCode}): ${resp.body}',
+      );
+    }
+
+    // Garante saída da Lixeira antes de aplicar outra label
+    final untrashResp = await _httpClient.post(
+      Uri.parse(
+        'https://gmail.googleapis.com/gmail/v1/users/me/messages/$rawId/untrash',
+      ),
+      headers: headers,
+    );
+    if (untrashResp.statusCode != 200 &&
+        untrashResp.statusCode != 400 &&
+        untrashResp.statusCode != 404) {
+      throw Exception(
+        'Gmail recusou restaurar mensagem da Lixeira (HTTP ${untrashResp.statusCode}): ${untrashResp.body}',
+      );
+    }
+
+    final List<String> addLabels;
+    final List<String> removeLabels;
+    switch (targetFolderName) {
+      case 'Spam':
+        addLabels = ['SPAM'];
+        removeLabels = ['INBOX'];
+        break;
+      case 'Enviadas':
+      case 'Enviados':
+        addLabels = ['SENT'];
+        removeLabels = ['SPAM', 'INBOX'];
+        break;
+      case 'Caixa de Entrada':
+      default:
+        addLabels = ['INBOX'];
+        removeLabels = ['SPAM'];
+        break;
+    }
+
+    final resp = await _httpClient.post(
+      Uri.parse(
+        'https://gmail.googleapis.com/gmail/v1/users/me/messages/$rawId/modify',
+      ),
+      headers: headers,
+      body: jsonEncode({
+        'addLabelIds': addLabels,
+        'removeLabelIds': removeLabels,
+      }),
+    );
+    if (resp.statusCode == 200) return true;
+    throw Exception(
+      'Gmail recusou mover para $targetFolderName (HTTP ${resp.statusCode}): ${resp.body}',
+    );
+  }
+
+  /// Move mensagem para Lixeira ou exclui permanentemente na Gmail REST API.
+  Future<bool> deleteMessage({
+    required String accountId,
+    required String messageId,
+    bool permanent = false,
+    bool allowInteractiveRefresh = false,
+  }) async {
+    if (!permanent) {
+      return moveMessageToFolder(
+        accountId: accountId,
+        messageId: messageId,
+        targetFolderName: 'Lixeira',
+        allowInteractiveRefresh: allowInteractiveRefresh,
+      );
+    }
+    final token = await getValidAccessToken(
+      accountId,
+      allowInteractiveRefresh: allowInteractiveRefresh,
+    );
+    if (token == null || token.isEmpty) {
+      throw Exception('Conta Gmail não autenticada ou token expirado.');
+    }
+    final rawId = _stripEmailPrefix(messageId);
+    final resp = await _httpClient.delete(
+      Uri.parse(
+        'https://gmail.googleapis.com/gmail/v1/users/me/messages/$rawId',
+      ),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    if (resp.statusCode == 200 ||
+        resp.statusCode == 204 ||
+        resp.statusCode == 404) {
+      return true;
+    }
+    throw Exception(
+      'Gmail recusou exclusão definitiva (HTTP ${resp.statusCode}): ${resp.body}',
     );
   }
 

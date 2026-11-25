@@ -236,15 +236,34 @@ class _AuthGateShellState extends ConsumerState<AuthGateShell>
 
     final hasSession = (_latestSession ?? client?.auth.currentSession) != null;
     final shouldAuthenticate = hasSession || isOfflineMode;
+    final db = ref.read(databaseProvider);
 
     if (mounted) {
       setState(() {
         _statusMessage = hasSession
-            ? 'Sincronizando registros, calendário e e-mails...'
+            ? (kIsWeb
+                  ? 'Sincronizando registros e calendário...'
+                  : 'Sincronizando registros, calendário e e-mails...')
             : (isOfflineMode
-                  ? 'Carregando dados e sincronizando e-mails...'
+                  ? (kIsWeb
+                        ? 'Carregando dados locais...'
+                        : 'Carregando dados e sincronizando e-mails...')
                   : 'Inicializando Assistente de Campo...');
       });
+    }
+
+    // Saneia eventuais anexos legados com rawBytes antes de ler a fila/sincronização
+    // (evita bloqueios pesados de JSON/IndexedDB ao abrir a PWA na Web).
+    if (shouldAuthenticate) {
+      try {
+        await EmailSyncCoordinator.sanitizeLegacyAttachmentBlobs(db);
+      } catch (e, st) {
+        AppLogger.warning(
+          'Falha ao limpar blobs legados de anexos na inicialização',
+          e,
+          st,
+        );
+      }
     }
 
     // Prepara tarefas de sincronização bidirecional quando autenticado
@@ -288,11 +307,10 @@ class _AuthGateShellState extends ConsumerState<AuthGateShell>
       );
     }
 
-    if (shouldAuthenticate) {
-      // Sincronização em background de e-mails para contas ativas cadastradas
+    if (shouldAuthenticate && !kIsWeb) {
+      // Sincronização em background de e-mails para contas ativas cadastradas (nativo/desktop)
       syncTasks.add(() async {
         try {
-          final db = ref.read(databaseProvider);
           final emailCoordinator = EmailSyncCoordinator(
             db,
             jwEmailService: ref.read(jwEmailServiceProvider),
@@ -359,11 +377,25 @@ class _AuthGateShellState extends ConsumerState<AuthGateShell>
       }
     });
 
-    if (shouldAuthenticate && hasSession) {
-      Future.microtask(() {
-        if (mounted) {
-          ref.read(supabaseSyncServiceProvider).sync();
-          ref.read(calendarSyncCoordinatorProvider).syncAll();
+    if (shouldAuthenticate && kIsWeb) {
+      // Na Web PWA, dispara a sincronização leve de e-mails apenas após sair da Splash
+      // para nunca travar o carregamento inicial nem competir com a tela de boas-vindas.
+      final emailService = ref.read(jwEmailServiceProvider);
+      Future<void>.delayed(const Duration(milliseconds: 900), () async {
+        try {
+          final accounts = await EmailAccountsManager.loadAccounts(db);
+          if (accounts.where((a) => a.isActive).isEmpty) return;
+          final emailCoordinator = EmailSyncCoordinator(
+            db,
+            jwEmailService: emailService,
+          );
+          await emailCoordinator.syncAll(interactive: false, maxPerAccount: 30);
+        } catch (e, st) {
+          AppLogger.warning(
+            'Falha na sincronização pós-abertura de e-mails na Web',
+            e,
+            st,
+          );
         }
       });
     }
