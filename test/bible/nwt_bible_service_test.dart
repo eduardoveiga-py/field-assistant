@@ -264,5 +264,179 @@ void main() {
         equals('Conteúdo sintético do verso dezessete em EPUB.'),
       );
     });
+
+    test('importa estrutura oficial JW EPUB3 sintética (verso 1 sem sup, w_ch, parágrafos contínuos, Salmo singular, livro de 1 capítulo e início no meio do capítulo)', () async {
+      final archive = Archive();
+
+      void addUtf8(String path, String content) {
+        final data = utf8.encode(content);
+        archive.addFile(ArchiveFile(path, data.length, data));
+      }
+
+      addUtf8(
+        'META-INF/container.xml',
+        '''<?xml version="1.0" encoding="UTF-8"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles>
+    <rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/>
+  </rootfiles>
+</container>''',
+      );
+
+      addUtf8('OEBPS/content.opf', '''<?xml version="1.0" encoding="UTF-8"?>
+<package version="3.0" xmlns="http://www.idpf.org/2007/opf">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:title>Bíblia Oficial Sintética JW</dc:title>
+    <dc:language>pt</dc:language>
+  </metadata>
+  <manifest>
+    <item id="nav_bible" href="bibleversenav66_1.xhtml" media-type="application/xhtml+xml"/>
+    <item id="ext_rev" href="1001061170-extracted.xhtml" media-type="application/xhtml+xml"/>
+    <item id="rev1" href="1001061170.xhtml" media-type="application/xhtml+xml"/>
+    <item id="ps3" href="1001061123-split3.xhtml" media-type="application/xhtml+xml"/>
+    <item id="obad" href="1001061135.xhtml" media-type="application/xhtml+xml"/>
+    <item id="jhn8" href="1001061147-split8.xhtml" media-type="application/xhtml+xml"/>
+  </manifest>
+  <spine>
+    <itemref idref="nav_bible"/>
+    <itemref idref="ext_rev"/>
+    <itemref idref="rev1"/>
+    <itemref idref="ps3"/>
+    <itemref idref="obad"/>
+    <itemref idref="jhn8"/>
+  </spine>
+</package>''');
+
+      addUtf8(
+        'OEBPS/bibleversenav66_1.xhtml',
+        '''<?xml version="1.0" encoding="utf-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><title>Apocalipse 1</title></head>
+<body><p class="w_bibleVerse"><a href="1001061170.xhtml#chapter1_verse1">1</a></p></body></html>''',
+      );
+
+      addUtf8(
+        'OEBPS/1001061170-extracted.xhtml',
+        '''<?xml version="1.0" encoding="utf-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><title>Textos extraídos: Apocalipse</title></head>
+<body><div class="groupExt"><p class="sb"><span id="chapter1_verse1"></span>Ignorar extrato.</p></div></body></html>''',
+      );
+
+      addUtf8(
+        'OEBPS/1001061170.xhtml',
+        '''<?xml version="1.0" encoding="utf-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
+<head><title>Apocalipse 1</title></head>
+<body>
+<p class="w_navigation w_biblebookname"><a href="biblebooknav.xhtml">Apocalipse</a> <a href="biblechapternav66.xhtml">1</a></p>
+<header><h1 id="p1"><span id="page1700" class="pageNum" aria-hidden="true">1700</span><strong>APOCALIPSE</strong></h1></header>
+<p id="p2" class="p2 sb"><span id="chapter1"></span><span id="chapter1_verse1"></span><span class="w_ch"><strong>1</strong> </span>Primeiro verso sintetico<span id="fn1"></span><a epub:type="noteref" href="#footnote1">*</a> de Apocalipse. <span id="chapter1_verse2"></span><strong><sup>2</sup></strong>&#x202F;Segundo verso sintetico.</p>
+<p id="p3" class="p3 sb"><span id="chapter1_verse4"></span><strong><sup>4</sup></strong>&#x202F;Inicio do quarto verso.</p>
+<p id="p4" class="p4 sb">Continuacao em outro paragrafo. <span id="chapter1_verse5"></span><strong><sup>5</sup></strong>&#x202F;Quinto verso sintetico.</p>
+<div class="groupFootnote"><aside epub:type="footnote" id="footnote1"><p>Nota de rodape ignorada.</p></aside></div>
+</body></html>''',
+      );
+
+      addUtf8(
+        'OEBPS/1001061123-split3.xhtml',
+        '''<?xml version="1.0" encoding="utf-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head><title>Salmo 3</title></head>
+<body>
+<p class="w_navigation w_biblebookname"><a href="biblebooknav.xhtml">Salmos</a> <a href="biblechapternav19.xhtml">3</a></p>
+<p id="p23" class="p23 sw">Subtitulo editorial ignorado.</p>
+<p id="p24" class="p24 sl"><span id="chapter3"></span><span id="chapter3_verse1"></span><span class="w_ch"><strong>3</strong> </span>Primeira linha poetica.</p>
+<p id="p25" class="p25 sz">Segunda linha poetica continuada.</p>
+</body></html>''',
+      );
+
+      addUtf8(
+        'OEBPS/1001061135.xhtml',
+        '''<?xml version="1.0" encoding="utf-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head><title>Obadias</title></head>
+<body>
+<p class="w_navigation w_biblebookname"><a href="biblebooknav.xhtml">Obadias</a></p>
+<header><h1 id="p1"><strong>OBADIAS</strong></h1></header>
+<p id="p2" class="p2 sb"><span id="chapter1"></span><span id="chapter1_verse1"></span><strong><sup>1</sup></strong>&#x202F;Visao sintetica de livro unico.</p>
+<p id="p3" class="p3 sz">Segunda linha de Obadias.</p>
+</body></html>''',
+      );
+
+      addUtf8(
+        'OEBPS/1001061147-split8.xhtml',
+        '''<?xml version="1.0" encoding="utf-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head><title>João 8</title></head>
+<body>
+<p class="w_navigation w_biblebookname"><a href="biblebooknav.xhtml">João</a> <a href="biblechapternav43.xhtml">8</a></p>
+<p id="p58" class="p58 sb"><span id="chapter8"></span><span id="chapter8_verse12"></span><span class="w_ch"><strong>8</strong> </span><strong><sup>12</sup></strong>&#x202F;Texto sintetico do verso doze.</p>
+</body></html>''',
+      );
+
+      expect(NwtBibleBooks.findByQuery('Salmo 23')?.number, equals(19));
+
+      final epubBytes = Uint8List.fromList(ZipEncoder().encode(archive));
+      final result = await NwtBibleService.importFromBytes(
+        db,
+        bytes: epubBytes,
+        fileName: 'nwt_jw_epub3_sintetico.epub',
+      );
+
+      expect(result.catalog.bookCount, equals(4));
+
+      final rev1 = await NwtBibleService.lookupPassage(
+        db,
+        bookNumber: 66,
+        chapter: 1,
+        verseSpec: '1,2,4,5',
+      );
+      expect(rev1.hasFoundVerses, isTrue);
+      expect(rev1.verses.map((v) => v.number).toList(), equals([1, 2, 4, 5]));
+      expect(
+        rev1.verses[0].text,
+        equals('Primeiro verso sintetico de Apocalipse.'),
+      );
+      expect(rev1.verses[0].text, isNot(contains('1')));
+      expect(rev1.verses[0].text, isNot(contains('*')));
+      expect(
+        rev1.verses[2].text,
+        equals('Inicio do quarto verso. Continuacao em outro paragrafo.'),
+      );
+      expect(rev1.verses[3].text, equals('Quinto verso sintetico.'));
+
+      final ps3 = await NwtBibleService.lookupPassage(
+        db,
+        bookNumber: 19,
+        chapter: 3,
+        verseSpec: '1',
+      );
+      expect(ps3.hasFoundVerses, isTrue);
+      expect(
+        ps3.verses.single.text,
+        equals('Primeira linha poetica. Segunda linha poetica continuada.'),
+      );
+      expect(ps3.verses.single.text, isNot(contains('Subtitulo editorial')));
+
+      final obad1 = await NwtBibleService.lookupPassage(
+        db,
+        bookNumber: 31,
+        chapter: 1,
+        verseSpec: '1',
+      );
+      expect(obad1.hasFoundVerses, isTrue);
+      expect(
+        obad1.verses.single.text,
+        equals('Visao sintetica de livro unico. Segunda linha de Obadias.'),
+      );
+
+      final jhn8 = await NwtBibleService.lookupPassage(
+        db,
+        bookNumber: 43,
+        chapter: 8,
+        verseSpec: '12',
+      );
+      expect(jhn8.hasFoundVerses, isTrue);
+      expect(jhn8.verses.single.text, equals('Texto sintetico do verso doze.'));
+    });
   });
 }

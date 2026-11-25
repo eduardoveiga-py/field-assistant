@@ -172,7 +172,7 @@ class NwtBibleBooks {
       nameEn: 'Psalms',
       code: 'PSA',
       chapterCount: 150,
-      aliases: ['sl', 'sal', 'ps', 'psa', 'psalm'],
+      aliases: ['sl', 'sal', 'salmo', 'ps', 'psa', 'psalm'],
     ),
     NwtBibleBookInfo(
       number: 20,
@@ -609,11 +609,13 @@ class NwtBibleBooks {
       }
     }
 
-    // Fallback por prefixo/contenção quando vem com título do capítulo (ex: "genesis capitulo 1")
+    // Fallback por prefixo/contenção quando vem com título do capítulo (ex: "genesis capitulo 1" ou "salmo 23")
     for (final book in all) {
       final pt = normalizeName(book.namePt);
       final en = normalizeName(book.nameEn);
-      if (norm.startsWith('$pt ') || norm.startsWith('$en ')) {
+      if (norm.startsWith('$pt ') ||
+          norm.startsWith('$en ') ||
+          book.aliases.any((a) => norm.startsWith('$a '))) {
         return book;
       }
     }
