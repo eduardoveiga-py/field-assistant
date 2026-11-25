@@ -175,8 +175,17 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                       if (project.objective != null &&
                           project.objective!.isNotEmpty) ...[
                         const SizedBox(height: 12),
-                        Text(
-                          project.objective!,
+                        MarkdownPreviewText(
+                          text: project.objective!,
+                          selectable: true,
+                          allowHighlights: true,
+                          maxLines: 8,
+                          onContentUpdated: (updated) async {
+                            await projectMgr.updateProject(
+                              project.id,
+                              objective: updated,
+                            );
+                          },
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
@@ -189,8 +198,17 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                       if (project.description != null &&
                           project.description!.isNotEmpty) ...[
                         const SizedBox(height: 6),
-                        Text(
-                          project.description!,
+                        MarkdownPreviewText(
+                          text: project.description!,
+                          selectable: true,
+                          allowHighlights: true,
+                          maxLines: 12,
+                          onContentUpdated: (updated) async {
+                            await projectMgr.updateProject(
+                              project.id,
+                              description: updated,
+                            );
+                          },
                           style: TextStyle(
                             fontSize: 13,
                             color: isDark

@@ -10,6 +10,7 @@ import '../../projects/project_manager.dart';
 import '../../tasks/task_manager.dart';
 import '../providers.dart';
 import '../widgets/adaptive_ministry_sheet.dart';
+import '../widgets/knowledge_item_reader_dialog.dart';
 import '../widgets/managed_text_controllers.dart';
 import '../widgets/markdown_preview_text.dart';
 import '../widgets/rich_markdown_toolbar.dart';
@@ -20,7 +21,14 @@ import 'project_detail_screen.dart';
 /// Tela unificada do Módulo B — Tarefas e Projetos do Field Assistant.
 /// Centraliza tarefas ministeriais, projetos pessoais/teocráticos, prazos e ações rápidas.
 class TasksScreen extends ConsumerStatefulWidget {
-  const TasksScreen({super.key});
+  final int? initialTabIndex;
+  final int navigationEpoch;
+
+  const TasksScreen({
+    super.key,
+    this.initialTabIndex,
+    this.navigationEpoch = 0,
+  });
 
   @override
   ConsumerState<TasksScreen> createState() => _TasksScreenState();
@@ -38,7 +46,12 @@ class _TasksScreenState extends ConsumerState<TasksScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    final safeIdx = (widget.initialTabIndex ?? 0).clamp(0, 4);
+    _tabController = TabController(
+      length: 5,
+      vsync: this,
+      initialIndex: safeIdx,
+    );
     _tabController.addListener(() {
       if (mounted) setState(() {});
     });
@@ -48,6 +61,19 @@ class _TasksScreenState extends ConsumerState<TasksScreen>
         setState(() => _searchQuery = text);
       }
     });
+  }
+
+  @override
+  void didUpdateWidget(covariant TasksScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialTabIndex != null &&
+        (widget.initialTabIndex != oldWidget.initialTabIndex ||
+            widget.navigationEpoch != oldWidget.navigationEpoch)) {
+      final safeIdx = widget.initialTabIndex!.clamp(0, 4);
+      if (_tabController.index != safeIdx) {
+        _tabController.animateTo(safeIdx);
+      }
+    }
   }
 
   @override
@@ -947,6 +973,25 @@ class _TasksScreenState extends ConsumerState<TasksScreen>
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        onTap: () {
+          showKnowledgeItemReader(
+            context,
+            title: task.title,
+            content: task.description ?? '',
+            category: task.category,
+            itemType: 'Tarefa',
+            subtitle: 'Prioridade: ${task.priority}',
+            tags: tags,
+            attachments: attachments,
+            updatedAt: task.updatedAt,
+            allowHighlights: true,
+            onContentUpdated: (updated) async {
+              await taskMgr.updateTask(task.id, description: updated);
+            },
+            onEdit: () => _showEditTaskModal(task),
+            onDelete: () => _confirmDeleteTask(task),
+          );
+        },
         leading: Checkbox(
           value: task.isCompleted,
           activeColor: AppTheme.primaryBlue,

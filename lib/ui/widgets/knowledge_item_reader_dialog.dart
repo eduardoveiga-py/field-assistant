@@ -1,20 +1,25 @@
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/app_theme.dart';
+import '../../references/app_reference.dart';
+import 'app_reference_viewer.dart';
+import 'highlight_text_helper.dart';
 import 'universal_attachment_viewer.dart';
 
-/// Abre a janela dedicada para leitura completa e imersiva de qualquer item da Base de Conhecimento.
+/// Abre a janela dedicada para leitura completa e imersiva de itens do aplicativo,
+/// com suporte a links/referências cruzadas e sublinhado colorido estilo JW Library.
 Future<void> showKnowledgeItemReader(
   BuildContext context, {
   required String title,
   required String content,
   required String category,
-  required String itemType, // 'Nota', 'Dúvida', 'Documento', 'Recurso'
+  required String itemType, // 'Nota', 'Dúvida', 'Documento', 'Recurso', ...
   DateTime? updatedAt,
   List<String> tags = const [],
   List<Map<String, dynamic>> attachments = const [],
@@ -23,6 +28,10 @@ Future<void> showKnowledgeItemReader(
   VoidCallback? onEdit,
   VoidCallback? onDelete,
   VoidCallback? onExport,
+  bool allowHighlights = false,
+  Future<void> Function(String updatedContent)? onContentUpdated,
+  VoidCallback? onJumpToTab,
+  String jumpToTabLabel = 'Ir para a aba',
 }) async {
   await showDialog(
     context: context,
@@ -40,12 +49,42 @@ Future<void> showKnowledgeItemReader(
       onEdit: onEdit,
       onDelete: onDelete,
       onExport: onExport,
+      allowHighlights: allowHighlights,
+      onContentUpdated: onContentUpdated,
+      onJumpToTab: onJumpToTab,
+      jumpToTabLabel: jumpToTabLabel,
     ),
   );
 }
 
-/// Diálogo imersivo com leitor rico em Markdown, imagens inline, links de publicações/vídeos e tags.
-class KnowledgeItemReaderDialog extends StatelessWidget {
+class _ContentSegment {
+  final bool isImage;
+  final int rawStart;
+  final int rawEnd;
+  final String text;
+  final String? imageAlt;
+  final String? imageSrc;
+
+  const _ContentSegment.text({
+    required this.rawStart,
+    required this.rawEnd,
+    required this.text,
+  }) : isImage = false,
+       imageAlt = null,
+       imageSrc = null;
+
+  const _ContentSegment.image({
+    required this.rawStart,
+    required this.rawEnd,
+    required this.imageAlt,
+    required this.imageSrc,
+  }) : isImage = true,
+       text = '';
+}
+
+/// Diálogo imersivo com leitor rico em Markdown, imagens inline, referências cruzadas,
+/// textos bíblicos TNM e sublinhado direto em seleção no estilo JW Library.
+class KnowledgeItemReaderDialog extends StatefulWidget {
   final String title;
   final String content;
   final String category;
@@ -58,6 +97,10 @@ class KnowledgeItemReaderDialog extends StatelessWidget {
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
   final VoidCallback? onExport;
+  final bool allowHighlights;
+  final Future<void> Function(String updatedContent)? onContentUpdated;
+  final VoidCallback? onJumpToTab;
+  final String jumpToTabLabel;
 
   const KnowledgeItemReaderDialog({
     super.key,
@@ -73,10 +116,59 @@ class KnowledgeItemReaderDialog extends StatelessWidget {
     this.onEdit,
     this.onDelete,
     this.onExport,
+    this.allowHighlights = false,
+    this.onContentUpdated,
+    this.onJumpToTab,
+    this.jumpToTabLabel = 'Ir para a aba',
   });
 
+  @override
+  State<KnowledgeItemReaderDialog> createState() =>
+      _KnowledgeItemReaderDialogState();
+}
+
+class _KnowledgeItemReaderDialogState extends State<KnowledgeItemReaderDialog> {
+  late String _content;
+  final List<GestureRecognizer> _recognizers = [];
+
+  // Rastreia seleção ativa em algum segmento de texto para aplicar cor em 1 toque pela barra JW.
+  MappedRichTextResult? _activeSegMap;
+  int _activeSegRawStart = 0;
+  int _activeSegRawEnd = 0;
+  TextSelection? _activeSelection;
+
+  @override
+  void initState() {
+    super.initState();
+    _content = widget.content;
+  }
+
+  @override
+  void didUpdateWidget(covariant KnowledgeItemReaderDialog oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.content != widget.content) {
+      _content = widget.content;
+    }
+  }
+
+  @override
+  void dispose() {
+    _disposeRecognizers();
+    super.dispose();
+  }
+
+  void _disposeRecognizers() {
+    for (final r in _recognizers) {
+      r.dispose();
+    }
+    _recognizers.clear();
+  }
+
+  bool get _canInteractiveHighlight =>
+      widget.allowHighlights && widget.onContentUpdated != null;
+
   IconData _getTypeIcon() {
-    switch (itemType.toLowerCase()) {
+    switch (widget.itemType.toLowerCase()) {
       case 'nota':
         return Icons.note_outlined;
       case 'dúvida':
@@ -87,13 +179,24 @@ class KnowledgeItemReaderDialog extends StatelessWidget {
         return Icons.description_outlined;
       case 'recurso':
         return Icons.link_rounded;
+      case 'tarefa':
+        return Icons.task_alt_outlined;
+      case 'projeto':
+        return Icons.folder_special_outlined;
+      case 'captura':
+        return Icons.inbox_outlined;
+      case 'pesquisa':
+        return Icons.auto_stories_outlined;
+      case 'experiência':
+      case 'experiencia':
+        return Icons.auto_awesome_outlined;
       default:
         return Icons.menu_book_rounded;
     }
   }
 
   Color _getTypeColor() {
-    switch (itemType.toLowerCase()) {
+    switch (widget.itemType.toLowerCase()) {
       case 'nota':
         return const Color(0xFF8B5CF6);
       case 'dúvida':
@@ -104,22 +207,27 @@ class KnowledgeItemReaderDialog extends StatelessWidget {
         return AppTheme.primaryBlue;
       case 'recurso':
         return Colors.teal;
+      case 'tarefa':
+      case 'projeto':
+        return const Color(0xFF10B981);
       default:
         return AppTheme.primaryBlue;
     }
   }
 
-  Future<void> _launchUrlStr(BuildContext context, String urlStr) async {
+  Future<void> _openUrlOrReference(BuildContext context, String urlStr) async {
+    if (AppReferenceHelper.isAppReferenceUrl(urlStr)) {
+      await AppReferenceViewer.openUrl(context, urlStr);
+      return;
+    }
     try {
       final uri = Uri.parse(urlStr);
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Não foi possível abrir o link: $urlStr')),
-          );
-        }
+      } else if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Não foi possível abrir o link: $urlStr')),
+        );
       }
     } catch (e) {
       if (context.mounted) {
@@ -129,10 +237,110 @@ class KnowledgeItemReaderDialog extends StatelessWidget {
     }
   }
 
+  List<_ContentSegment> _splitSegments(String rawText) {
+    final imageRegex = RegExp(
+      r'^!\[([^\]]*)\]\(([^\)]+)\)\s*$',
+      multiLine: true,
+    );
+    final matches = imageRegex.allMatches(rawText).toList();
+    if (matches.isEmpty) {
+      return [
+        _ContentSegment.text(
+          rawStart: 0,
+          rawEnd: rawText.length,
+          text: rawText,
+        ),
+      ];
+    }
+
+    final segments = <_ContentSegment>[];
+    var cursor = 0;
+    for (final m in matches) {
+      if (m.start > cursor) {
+        final slice = rawText.substring(cursor, m.start);
+        if (slice.trim().isNotEmpty) {
+          segments.add(
+            _ContentSegment.text(
+              rawStart: cursor,
+              rawEnd: m.start,
+              text: slice,
+            ),
+          );
+        }
+      }
+      segments.add(
+        _ContentSegment.image(
+          rawStart: m.start,
+          rawEnd: m.end,
+          imageAlt: m.group(1) ?? 'Imagem',
+          imageSrc: m.group(2) ?? '',
+        ),
+      );
+      cursor = m.end;
+      while (cursor < rawText.length &&
+          (rawText[cursor] == '\n' || rawText[cursor] == '\r')) {
+        cursor++;
+      }
+    }
+    if (cursor < rawText.length) {
+      final tail = rawText.substring(cursor);
+      if (tail.trim().isNotEmpty) {
+        segments.add(
+          _ContentSegment.text(
+            rawStart: cursor,
+            rawEnd: rawText.length,
+            text: tail,
+          ),
+        );
+      }
+    }
+    return segments;
+  }
+
+  Future<void> _applyColorToSelection({
+    required _ContentSegment segment,
+    required MappedRichTextResult mapped,
+    required int selStart,
+    required int selEnd,
+    required String? colorHex,
+  }) async {
+    final updatedSegText = HighlightTextHelper.applyUnderlineWithMap(
+      rawText: segment.text,
+      map: mapped,
+      selectionStart: selStart,
+      selectionEnd: selEnd,
+      colorHex: colorHex,
+    );
+    if (updatedSegText == segment.text) return;
+
+    final updatedFull = _content.replaceRange(
+      segment.rawStart,
+      segment.rawEnd,
+      updatedSegText,
+    );
+
+    setState(() {
+      _content = updatedFull;
+      _activeSelection = null;
+      _activeSegMap = null;
+    });
+
+    if (widget.onContentUpdated != null) {
+      await widget.onContentUpdated!(updatedFull);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    _disposeRecognizers();
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final typeColor = _getTypeColor();
+    final hasActiveSelection =
+        _canInteractiveHighlight &&
+        _activeSelection != null &&
+        _activeSelection!.isValid &&
+        !_activeSelection!.isCollapsed &&
+        _activeSegMap != null;
 
     return Dialog(
       backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
@@ -187,7 +395,7 @@ class KnowledgeItemReaderDialog extends StatelessWidget {
                                   borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: Text(
-                                  itemType.toUpperCase(),
+                                  widget.itemType.toUpperCase(),
                                   style: TextStyle(
                                     fontSize: 10,
                                     fontWeight: FontWeight.bold,
@@ -196,32 +404,36 @@ class KnowledgeItemReaderDialog extends StatelessWidget {
                                 ),
                               ),
                               const SizedBox(width: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: (isDark
-                                      ? Colors.white10
-                                      : Colors.black.withValues(alpha: 0.05)),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  category,
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w600,
+                              Flexible(
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
                                     color: isDark
-                                        ? const Color(0xFFCBD5E1)
-                                        : const Color(0xFF475569),
+                                        ? Colors.white10
+                                        : Colors.black.withValues(alpha: 0.05),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    widget.category,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                      color: isDark
+                                          ? const Color(0xFFCBD5E1)
+                                          : const Color(0xFF475569),
+                                    ),
                                   ),
                                 ),
                               ),
-                              if (updatedAt != null) ...[
-                                const Spacer(),
+                              if (widget.updatedAt != null) ...[
+                                const SizedBox(width: 8),
                                 Text(
-                                  'Atualizado em ${updatedAt!.day.toString().padLeft(2, '0')}/${updatedAt!.month.toString().padLeft(2, '0')}/${updatedAt!.year}',
+                                  '${widget.updatedAt!.day.toString().padLeft(2, '0')}/${widget.updatedAt!.month.toString().padLeft(2, '0')}/${widget.updatedAt!.year}',
                                   style: const TextStyle(
                                     fontSize: 11,
                                     color: Colors.grey,
@@ -232,17 +444,18 @@ class KnowledgeItemReaderDialog extends StatelessWidget {
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            title,
+                            widget.title,
                             style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
                               height: 1.25,
                             ),
                           ),
-                          if (subtitle != null && subtitle!.isNotEmpty) ...[
+                          if (widget.subtitle != null &&
+                              widget.subtitle!.isNotEmpty) ...[
                             const SizedBox(height: 4),
                             Text(
-                              subtitle!,
+                              widget.subtitle!,
                               style: TextStyle(
                                 fontSize: 13,
                                 color: isDark
@@ -254,6 +467,22 @@ class KnowledgeItemReaderDialog extends StatelessWidget {
                         ],
                       ),
                     ),
+                    if (widget.onJumpToTab != null)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 4),
+                        child: TextButton.icon(
+                          key: const Key('btn_reader_jump_to_tab'),
+                          icon: const Icon(Icons.open_in_browser, size: 17),
+                          label: Text(
+                            widget.jumpToTabLabel,
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            widget.onJumpToTab!();
+                          },
+                        ),
+                      ),
                     IconButton(
                       icon: const Icon(Icons.close),
                       tooltip: 'Fechar Leitor',
@@ -262,6 +491,146 @@ class KnowledgeItemReaderDialog extends StatelessWidget {
                   ],
                 ),
               ),
+
+              // Barra de Sublinhado JW Library (quando habilitado no módulo)
+              if (_canInteractiveHighlight)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? const Color(0xFF0F1A2E)
+                        : const Color(0xFFF8FAFC),
+                    border: Border(
+                      bottom: BorderSide(
+                        color: isDark ? Colors.white10 : Colors.black12,
+                      ),
+                    ),
+                  ),
+                  child: Wrap(
+                    alignment: WrapAlignment.spaceBetween,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: [
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.border_color_outlined,
+                            size: 14,
+                            color: hasActiveSelection
+                                ? AppTheme.primaryBlue
+                                : Colors.grey,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            hasActiveSelection
+                                ? 'Sublinhar seleção:'
+                                : 'Selecione um trecho abaixo para sublinhar:',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: hasActiveSelection
+                                  ? FontWeight.w600
+                                  : FontWeight.normal,
+                              color: isDark
+                                  ? const Color(0xFFCBD5E1)
+                                  : const Color(0xFF475569),
+                            ),
+                          ),
+                        ],
+                      ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          for (final c in HighlightTextHelper.colors)
+                            Tooltip(
+                              message: 'Sublinhar (${c.label})',
+                              child: InkWell(
+                                key: Key('btn_reader_hl_${c.id}'),
+                                borderRadius: BorderRadius.circular(14),
+                                onTap: hasActiveSelection
+                                    ? () => _applyColorToSelection(
+                                        segment: _ContentSegment.text(
+                                          rawStart: _activeSegRawStart,
+                                          rawEnd: _activeSegRawEnd,
+                                          text: _content.substring(
+                                            _activeSegRawStart,
+                                            _activeSegRawEnd,
+                                          ),
+                                        ),
+                                        mapped: _activeSegMap!,
+                                        selStart: _activeSelection!.start,
+                                        selEnd: _activeSelection!.end,
+                                        colorHex: c.hex,
+                                      )
+                                    : () {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                  'Selecione primeiro um trecho do texto para sublinhar.',
+                                                ),
+                                                duration: Duration(seconds: 2),
+                                              ),
+                                            );
+                                      },
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 4,
+                                    vertical: 4,
+                                  ),
+                                  child: CircleAvatar(
+                                    radius: 9,
+                                    backgroundColor: c.color.withValues(
+                                      alpha: hasActiveSelection ? 1.0 : 0.45,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          Tooltip(
+                            message: 'Remover sublinhado da seleção',
+                            child: IconButton(
+                              key: const Key('btn_reader_hl_clear'),
+                              visualDensity: VisualDensity.compact,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(
+                                minWidth: 28,
+                                minHeight: 28,
+                              ),
+                              icon: Icon(
+                                Icons.format_clear,
+                                size: 17,
+                                color: hasActiveSelection
+                                    ? Colors.redAccent
+                                    : Colors.grey,
+                              ),
+                              onPressed: hasActiveSelection
+                                  ? () => _applyColorToSelection(
+                                      segment: _ContentSegment.text(
+                                        rawStart: _activeSegRawStart,
+                                        rawEnd: _activeSegRawEnd,
+                                        text: _content.substring(
+                                          _activeSegRawStart,
+                                          _activeSegRawEnd,
+                                        ),
+                                      ),
+                                      mapped: _activeSegMap!,
+                                      selStart: _activeSelection!.start,
+                                      selEnd: _activeSelection!.end,
+                                      colorHex: null,
+                                    )
+                                  : null,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
 
               // Barra de Tags e Ações Rápidas
               Container(
@@ -275,11 +644,11 @@ class KnowledgeItemReaderDialog extends StatelessWidget {
                 child: Row(
                   children: [
                     Expanded(
-                      child: tags.isNotEmpty
+                      child: widget.tags.isNotEmpty
                           ? SingleChildScrollView(
                               scrollDirection: Axis.horizontal,
                               child: Row(
-                                children: tags.map((t) {
+                                children: widget.tags.map((t) {
                                   return Padding(
                                     padding: const EdgeInsets.only(right: 6),
                                     child: Chip(
@@ -316,7 +685,7 @@ class KnowledgeItemReaderDialog extends StatelessWidget {
                               ),
                             ),
                     ),
-                    if (url != null && url!.isNotEmpty)
+                    if (widget.url != null && widget.url!.isNotEmpty)
                       IconButton(
                         icon: const Icon(
                           Icons.open_in_new,
@@ -324,14 +693,15 @@ class KnowledgeItemReaderDialog extends StatelessWidget {
                           color: Colors.teal,
                         ),
                         tooltip: 'Abrir link original',
-                        onPressed: () => _launchUrlStr(context, url!),
+                        onPressed: () =>
+                            _openUrlOrReference(context, widget.url!),
                       ),
                     IconButton(
                       icon: const Icon(Icons.copy, size: 18),
                       tooltip: 'Copiar conteúdo',
                       onPressed: () {
                         Clipboard.setData(
-                          ClipboardData(text: '$title\n\n$content'),
+                          ClipboardData(text: '${widget.title}\n\n$_content'),
                         );
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
@@ -342,13 +712,13 @@ class KnowledgeItemReaderDialog extends StatelessWidget {
                         );
                       },
                     ),
-                    if (onExport != null)
+                    if (widget.onExport != null)
                       IconButton(
                         icon: const Icon(Icons.share_outlined, size: 18),
                         tooltip: 'Exportar',
-                        onPressed: onExport,
+                        onPressed: widget.onExport,
                       ),
-                    if (onEdit != null)
+                    if (widget.onEdit != null)
                       IconButton(
                         icon: const Icon(
                           Icons.edit_outlined,
@@ -358,10 +728,10 @@ class KnowledgeItemReaderDialog extends StatelessWidget {
                         tooltip: 'Editar',
                         onPressed: () {
                           Navigator.of(context).pop();
-                          onEdit!();
+                          widget.onEdit!();
                         },
                       ),
-                    if (onDelete != null)
+                    if (widget.onDelete != null)
                       IconButton(
                         icon: const Icon(
                           Icons.delete_outline,
@@ -371,22 +741,22 @@ class KnowledgeItemReaderDialog extends StatelessWidget {
                         tooltip: 'Excluir',
                         onPressed: () {
                           Navigator.of(context).pop();
-                          onDelete!();
+                          widget.onDelete!();
                         },
                       ),
                   ],
                 ),
               ),
 
-              // Conteúdo Formatado em Markdown com Imagens e Links Inline
+              // Conteúdo Formatado em Markdown com Referências Clicáveis e Sublinhado Direto
               Expanded(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.all(20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      _buildRichMarkdownBody(context, content, isDark),
-                      if (attachments.isNotEmpty) ...[
+                      _buildRichMarkdownBody(context, _content, isDark),
+                      if (widget.attachments.isNotEmpty) ...[
                         const SizedBox(height: 24),
                         const Divider(),
                         const Text(
@@ -400,7 +770,7 @@ class KnowledgeItemReaderDialog extends StatelessWidget {
                         Wrap(
                           spacing: 8,
                           runSpacing: 8,
-                          children: attachments.map((att) {
+                          children: widget.attachments.map((att) {
                             final name = att['name']?.toString() ?? 'anexo';
                             final path =
                                 att['path']?.toString() ??
@@ -455,173 +825,92 @@ class KnowledgeItemReaderDialog extends StatelessWidget {
       );
     }
 
-    final lines = rawText.split('\n');
+    final baseStyle = TextStyle(
+      fontSize: 14.5,
+      height: 1.55,
+      color: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF1E293B),
+    );
+
+    final segments = _splitSegments(rawText);
     final widgets = <Widget>[];
 
-    for (int i = 0; i < lines.length; i++) {
-      final line = lines[i];
-      final trimmed = line.trim();
-
-      if (trimmed.isEmpty) {
-        widgets.add(const SizedBox(height: 10));
-        continue;
-      }
-
-      // Imagem Markdown inline: ![legenda](caminho_ou_url)
-      final imgMatch = RegExp(r'^!\[(.*?)\]\((.*?)\)$').firstMatch(trimmed);
-      if (imgMatch != null) {
-        final alt = imgMatch.group(1) ?? 'Imagem';
-        final src = imgMatch.group(2) ?? '';
-        widgets.add(_buildInlineImage(context, src, alt, isDark));
+    for (var i = 0; i < segments.length; i++) {
+      final seg = segments[i];
+      if (seg.isImage) {
+        widgets.add(
+          _buildInlineImage(
+            context,
+            seg.imageSrc ?? '',
+            seg.imageAlt ?? 'Imagem',
+            isDark,
+          ),
+        );
         widgets.add(const SizedBox(height: 12));
         continue;
       }
 
-      // Título Grande: ### Título ou ## ou #
-      if (trimmed.startsWith('### ')) {
-        widgets.add(
-          Padding(
-            padding: const EdgeInsets.only(top: 14, bottom: 6),
-            child: Text(
-              trimmed.substring(4),
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: AppTheme.primaryBlue,
-              ),
-            ),
-          ),
-        );
-        continue;
-      }
-      if (trimmed.startsWith('#### ')) {
-        widgets.add(
-          Padding(
-            padding: const EdgeInsets.only(top: 10, bottom: 4),
-            child: Text(
-              trimmed.substring(5),
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-            ),
-          ),
-        );
-        continue;
-      }
-      if (trimmed.startsWith('# ')) {
-        widgets.add(
-          Padding(
-            padding: const EdgeInsets.only(top: 16, bottom: 8),
-            child: Text(
-              trimmed.substring(2),
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: AppTheme.primaryBlue,
-              ),
-            ),
-          ),
-        );
-        continue;
-      }
+      final mapped = HighlightTextHelper.buildMappedSpans(
+        seg.text,
+        baseStyle,
+        onLinkTap: (url) => _openUrlOrReference(context, url),
+        disposables: _recognizers,
+      );
+      if (mapped.spans.isEmpty) continue;
 
-      // Citação: > citação
-      if (trimmed.startsWith('> ')) {
-        widgets.add(
-          Container(
-            margin: const EdgeInsets.symmetric(vertical: 6),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: BoxDecoration(
-              color: (isDark
-                  ? const Color(0xFF1E293B)
-                  : const Color(0xFFF1F5F9)),
-              border: const Border(
-                left: BorderSide(color: AppTheme.primaryBlue, width: 4),
-              ),
-              borderRadius: const BorderRadius.horizontal(
-                right: Radius.circular(6),
-              ),
-            ),
-            child: Text(
-              trimmed.substring(2),
-              style: TextStyle(
-                fontSize: 13,
-                fontStyle: FontStyle.italic,
-                color: isDark
-                    ? const Color(0xFFCBD5E1)
-                    : const Color(0xFF334155),
-              ),
-            ),
-          ),
-        );
-        continue;
-      }
-
-      // Item de Lista com Marcador: - ou *
-      if (trimmed.startsWith('- [ ] ') || trimmed.startsWith('- [x] ')) {
-        final isChecked = trimmed.startsWith('- [x] ');
-        final itemText = trimmed.substring(6);
-        widgets.add(
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 2),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  isChecked ? Icons.check_box : Icons.check_box_outline_blank,
-                  size: 18,
-                  color: isChecked ? AppTheme.primaryBlue : Colors.grey,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    itemText,
-                    style: TextStyle(
-                      fontSize: 14,
-                      decoration: isChecked ? TextDecoration.lineThrough : null,
-                      color: isChecked ? Colors.grey : null,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-        continue;
-      }
-
-      if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
-        widgets.add(
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 2),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  '• ',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: AppTheme.primaryBlue,
-                  ),
-                ),
-                Expanded(
-                  child: _buildFormattedSpans(
-                    context,
-                    trimmed.substring(2),
-                    isDark,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-        continue;
-      }
-
-      // Linha normal com formatação inline
       widgets.add(
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 2),
-          child: _buildFormattedSpans(context, line, isDark),
+        SelectableText.rich(
+          TextSpan(children: mapped.spans),
+          onSelectionChanged: _canInteractiveHighlight
+              ? (sel, cause) {
+                  setState(() {
+                    _activeSegMap = mapped;
+                    _activeSegRawStart = seg.rawStart;
+                    _activeSegRawEnd = seg.rawEnd;
+                    _activeSelection = sel;
+                  });
+                }
+              : null,
+          contextMenuBuilder: (ctx, editableTextState) {
+            final sel = editableTextState.textEditingValue.selection;
+            final canHighlight =
+                _canInteractiveHighlight && sel.isValid && !sel.isCollapsed;
+            final items = <ContextMenuButtonItem>[
+              ...editableTextState.contextMenuButtonItems,
+              if (canHighlight) ...[
+                for (final c in HighlightTextHelper.colors)
+                  ContextMenuButtonItem(
+                    label: 'Sublinhar (${c.label})',
+                    onPressed: () {
+                      ContextMenuController.removeAny();
+                      _applyColorToSelection(
+                        segment: seg,
+                        mapped: mapped,
+                        selStart: sel.start,
+                        selEnd: sel.end,
+                        colorHex: c.hex,
+                      );
+                    },
+                  ),
+                ContextMenuButtonItem(
+                  label: 'Remover Sublinhado',
+                  onPressed: () {
+                    ContextMenuController.removeAny();
+                    _applyColorToSelection(
+                      segment: seg,
+                      mapped: mapped,
+                      selStart: sel.start,
+                      selEnd: sel.end,
+                      colorHex: null,
+                    );
+                  },
+                ),
+              ],
+            ];
+            return AdaptiveTextSelectionToolbar.buttonItems(
+              anchors: editableTextState.contextMenuAnchors,
+              buttonItems: items,
+            );
+          },
         ),
       );
     }
@@ -715,209 +1004,5 @@ class KnowledgeItemReaderDialog extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  Widget _buildFormattedSpans(BuildContext context, String text, bool isDark) {
-    final baseStyle = TextStyle(
-      fontSize: 14,
-      height: 1.5,
-      color: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF1E293B),
-    );
-
-    // Detecta links em Markdown: [Título](url)
-    final linkRegex = RegExp(r'\[(.*?)\]\((.*?)\)');
-    final matches = linkRegex.allMatches(text).toList();
-
-    if (matches.isEmpty) {
-      return RichText(
-        text: TextSpan(
-          children: _parseInlineFormatting(text, baseStyle, isDark),
-        ),
-      );
-    }
-
-    final children = <InlineSpan>[];
-    int lastEnd = 0;
-
-    for (final match in matches) {
-      if (match.start > lastEnd) {
-        children.addAll(
-          _parseInlineFormatting(
-            text.substring(lastEnd, match.start),
-            baseStyle,
-            isDark,
-          ),
-        );
-      }
-
-      final label = match.group(1) ?? 'Link';
-      final linkUrl = match.group(2) ?? '';
-      final isJwPublication = label.contains('📖');
-      final isJwVideo = label.contains('🎥');
-
-      children.add(
-        WidgetSpan(
-          alignment: PlaceholderAlignment.middle,
-          child: InkWell(
-            onTap: () => _launchUrlStr(context, linkUrl),
-            borderRadius: BorderRadius.circular(6),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              margin: const EdgeInsets.symmetric(horizontal: 2),
-              decoration: BoxDecoration(
-                color: isJwPublication
-                    ? const Color(0xFF4338CA).withValues(alpha: 0.12)
-                    : isJwVideo
-                    ? const Color(0xFFDC2626).withValues(alpha: 0.12)
-                    : AppTheme.primaryBlue.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(
-                  color: isJwPublication
-                      ? const Color(0xFF4338CA)
-                      : isJwVideo
-                      ? const Color(0xFFDC2626)
-                      : AppTheme.primaryBlue,
-                  width: 0.8,
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: isJwPublication
-                          ? const Color(0xFF4338CA)
-                          : isJwVideo
-                          ? const Color(0xFFDC2626)
-                          : AppTheme.primaryBlue,
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  const Icon(
-                    Icons.open_in_new,
-                    size: 12,
-                    color: AppTheme.primaryBlue,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      );
-
-      lastEnd = match.end;
-    }
-
-    if (lastEnd < text.length) {
-      children.addAll(
-        _parseInlineFormatting(text.substring(lastEnd), baseStyle, isDark),
-      );
-    }
-
-    return RichText(text: TextSpan(children: children));
-  }
-
-  List<InlineSpan> _parseInlineFormatting(
-    String text,
-    TextStyle baseStyle,
-    bool isDark,
-  ) {
-    final spans = <InlineSpan>[];
-    final tokenRegex = RegExp(
-      r'(?:<mark style="background:(#[a-fA-F0-9]{6})">([\s\S]*?)</mark>)|(?:\*\*(.+?)\*\*)|(?:\*([^\*]+)\*)|(?:`([^`]+)`)',
-    );
-    final matches = tokenRegex.allMatches(text).toList();
-    if (matches.isEmpty) {
-      spans.add(TextSpan(text: text, style: baseStyle));
-      return spans;
-    }
-
-    int lastEnd = 0;
-    for (final m in matches) {
-      if (m.start > lastEnd) {
-        spans.add(
-          TextSpan(text: text.substring(lastEnd, m.start), style: baseStyle),
-        );
-      }
-
-      if (m.group(1) != null && m.group(2) != null) {
-        // Highlight mark: <mark style="background:#hex">text</mark>
-        final hexStr = m.group(1)!;
-        final markText = m.group(2)!;
-        final parsedColor = int.tryParse(hexStr.replaceFirst('#', '0xFF'));
-        final Color markColor = parsedColor != null
-            ? Color(parsedColor)
-            : Colors.amber;
-        spans.add(
-          WidgetSpan(
-            alignment: PlaceholderAlignment.middle,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-              decoration: BoxDecoration(
-                color: markColor.withValues(alpha: 0.35),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(
-                markText,
-                style: baseStyle.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: isDark ? Colors.white : Colors.black87,
-                ),
-              ),
-            ),
-          ),
-        );
-      } else if (m.group(3) != null) {
-        // Bold: **text**
-        spans.add(
-          TextSpan(
-            text: m.group(3)!,
-            style: baseStyle.copyWith(fontWeight: FontWeight.bold),
-          ),
-        );
-      } else if (m.group(4) != null) {
-        // Italic: *text*
-        spans.add(
-          TextSpan(
-            text: m.group(4)!,
-            style: baseStyle.copyWith(fontStyle: FontStyle.italic),
-          ),
-        );
-      } else if (m.group(5) != null) {
-        // Code: `text`
-        spans.add(
-          WidgetSpan(
-            alignment: PlaceholderAlignment.middle,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-              decoration: BoxDecoration(
-                color: isDark
-                    ? const Color(0xFF334155)
-                    : const Color(0xFFE2E8F0),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(
-                m.group(5)!,
-                style: baseStyle.copyWith(
-                  fontFamily: 'monospace',
-                  fontSize: (baseStyle.fontSize ?? 14) * 0.9,
-                ),
-              ),
-            ),
-          ),
-        );
-      }
-
-      lastEnd = m.end;
-    }
-
-    if (lastEnd < text.length) {
-      spans.add(TextSpan(text: text.substring(lastEnd), style: baseStyle));
-    }
-
-    return spans;
   }
 }

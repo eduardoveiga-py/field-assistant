@@ -1,20 +1,34 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../core/app_theme.dart';
+import '../../database/app_database.dart';
+import '../../references/app_reference.dart';
+import '../providers.dart';
+import 'app_reference_picker_dialog.dart';
+import 'highlight_text_helper.dart';
 import 'managed_text_controllers.dart';
 
 /// Barra de ferramentas de formatação rica e Markdown ágil.
-/// Permite aplicar Negrito, Itálico, Títulos, Listas, Citações,
-/// Textos Bíblicos e Cores em qualquer [TextEditingController].
+/// Permite aplicar Negrito, Itálico, Títulos, Listas, Citações, Referências Internas/Bíblia (TNM)
+/// e Sublinhado Colorido estilo JW Library em qualquer [TextEditingController].
 class RichMarkdownToolbar extends StatelessWidget {
   final TextEditingController controller;
   final VoidCallback? onChanged;
+  final bool enableHighlightPalette;
+  final bool enableCrossReferences;
+  final AppRefCategory initialReferenceCategory;
+  final ValueChanged<AppReferencePickResult>? onReferenceInserted;
 
   const RichMarkdownToolbar({
     super.key,
     required this.controller,
     this.onChanged,
+    this.enableHighlightPalette = true,
+    this.enableCrossReferences = true,
+    this.initialReferenceCategory = AppRefCategory.question,
+    this.onReferenceInserted,
   });
 
   void _wrapSelection({
@@ -77,6 +91,59 @@ class RichMarkdownToolbar extends StatelessWidget {
     onChanged?.call();
   }
 
+  void _removeSelectionHighlight() {
+    final text = controller.text;
+    final selection = controller.selection;
+    if (!selection.isValid || selection.isCollapsed) return;
+    final start = selection.start.clamp(0, text.length);
+    final end = selection.end.clamp(0, text.length);
+    if (end <= start) return;
+    final stripped = HighlightTextHelper.stripHighlightTags(
+      text.substring(start, end),
+    );
+    final newText = text.replaceRange(start, end, stripped);
+    controller.value = TextEditingValue(
+      text: newText,
+      selection: TextSelection.collapsed(offset: start + stripped.length),
+    );
+    onChanged?.call();
+  }
+
+  Future<void> _openReferencePicker(
+    BuildContext context, {
+    AppRefCategory? overrideCategory,
+  }) async {
+    AppDatabase? db;
+    try {
+      db = ProviderScope.containerOf(
+        context,
+        listen: false,
+      ).read(databaseProvider);
+    } catch (_) {
+      db = null;
+    }
+    if (db == null) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Banco local indisponível neste contexto para listar referências.',
+            ),
+          ),
+        );
+      }
+      return;
+    }
+    final picked = await showAppReferencePickerDialog(
+      context,
+      db: db,
+      initialCategory: overrideCategory ?? initialReferenceCategory,
+    );
+    if (picked == null) return;
+    _wrapSelection(prefix: '${picked.markdownToken} ', suffix: '');
+    onReferenceInserted?.call(picked);
+  }
+
   void _showColorPicker(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -90,74 +157,73 @@ class RichMarkdownToolbar extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Cor do Destaque',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              const Row(
+                children: [
+                  Icon(
+                    Icons.border_color_outlined,
+                    size: 18,
+                    color: AppTheme.primaryBlue,
+                  ),
+                  SizedBox(width: 8),
+                  Text(
+                    'Sublinhar com Cor (estilo JW Library)',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                ],
               ),
               const SizedBox(height: 12),
               Wrap(
-                spacing: 12,
+                spacing: 10,
                 runSpacing: 10,
                 children: [
-                  _colorOption(
-                    label: 'Amarelo',
-                    color: Colors.amber,
+                  for (final item in HighlightTextHelper.colors)
+                    _colorOption(
+                      label: item.label,
+                      color: item.color,
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        _wrapSelection(
+                          prefix: '<u style="color:${item.hex}">',
+                          suffix: '</u>',
+                          defaultText: 'destaque',
+                        );
+                      },
+                    ),
+                  InkWell(
                     onTap: () {
                       Navigator.pop(ctx);
-                      _wrapSelection(
-                        prefix: '<mark style="background:#fef08a">',
-                        suffix: '</mark>',
-                        defaultText: 'destaque',
-                      );
+                      _removeSelectionHighlight();
                     },
-                  ),
-                  _colorOption(
-                    label: 'Azul',
-                    color: Colors.lightBlue,
-                    onTap: () {
-                      Navigator.pop(ctx);
-                      _wrapSelection(
-                        prefix: '<mark style="background:#bae6fd">',
-                        suffix: '</mark>',
-                        defaultText: 'destaque',
-                      );
-                    },
-                  ),
-                  _colorOption(
-                    label: 'Verde',
-                    color: Colors.lightGreen,
-                    onTap: () {
-                      Navigator.pop(ctx);
-                      _wrapSelection(
-                        prefix: '<mark style="background:#bbf7d0">',
-                        suffix: '</mark>',
-                        defaultText: 'destaque',
-                      );
-                    },
-                  ),
-                  _colorOption(
-                    label: 'Rosa / Roxo',
-                    color: Colors.purpleAccent,
-                    onTap: () {
-                      Navigator.pop(ctx);
-                      _wrapSelection(
-                        prefix: '<mark style="background:#fbcfe8">',
-                        suffix: '</mark>',
-                        defaultText: 'destaque',
-                      );
-                    },
-                  ),
-                  _colorOption(
-                    label: 'Laranja',
-                    color: Colors.orangeAccent,
-                    onTap: () {
-                      Navigator.pop(ctx);
-                      _wrapSelection(
-                        prefix: '<mark style="background:#fed7aa">',
-                        suffix: '</mark>',
-                        defaultText: 'destaque',
-                      );
-                    },
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.redAccent),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.format_clear,
+                            size: 15,
+                            color: Colors.redAccent,
+                          ),
+                          SizedBox(width: 6),
+                          Text(
+                            'Remover',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              color: Colors.redAccent,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -266,18 +332,34 @@ class RichMarkdownToolbar extends StatelessWidget {
             const VerticalDivider(width: 16, indent: 8, endIndent: 8),
             _toolbarButton(
               icon: Icons.menu_book_outlined,
-              tooltip: 'Texto Bíblico (📖 Romanos 12:12)',
-              onTap: () => _wrapSelection(
-                prefix: '📖 ',
-                suffix: '',
-                defaultText: 'Texto bíblico',
+              tooltip: enableCrossReferences
+                  ? 'Referência Bíblica TNM (Popup)'
+                  : 'Texto Bíblico (📖 Romanos 12:12)',
+              onTap: enableCrossReferences
+                  ? () => _openReferencePicker(
+                      context,
+                      overrideCategory: AppRefCategory.bible,
+                    )
+                  : () => _wrapSelection(
+                      prefix: '📖 ',
+                      suffix: '',
+                      defaultText: 'Texto bíblico',
+                    ),
+            ),
+            if (enableCrossReferences)
+              _toolbarButton(
+                key: const Key('btn_toolbar_insert_ref'),
+                icon: Icons.bookmark_add_outlined,
+                tooltip: 'Inserir Referência de Abas / Gravuras / TNM',
+                onTap: () => _openReferencePicker(context),
               ),
-            ),
-            _toolbarButton(
-              icon: Icons.palette_outlined,
-              tooltip: 'Cor de Destaque',
-              onTap: () => _showColorPicker(context),
-            ),
+            if (enableHighlightPalette)
+              _toolbarButton(
+                key: const Key('btn_toolbar_highlight_color'),
+                icon: Icons.border_color_outlined,
+                tooltip: 'Sublinhar com Cor (estilo JW Library)',
+                onTap: () => _showColorPicker(context),
+              ),
             const VerticalDivider(width: 16, indent: 8, endIndent: 8),
             _toolbarButton(
               icon: Icons.add_photo_alternate_outlined,
@@ -336,6 +418,29 @@ class RichMarkdownToolbar extends StatelessWidget {
                 ),
               ),
               const Divider(),
+              if (enableCrossReferences) ...[
+                ListTile(
+                  leading: const CircleAvatar(
+                    backgroundColor: AppTheme.accentTeal,
+                    child: Icon(
+                      Icons.bookmark_add_outlined,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                  title: const Text(
+                    'Referência Interna do App / Gravura / Bíblia',
+                  ),
+                  subtitle: const Text(
+                    'Nota, Dúvida, Documento, Gravura, Tarefa, Projeto, Inbox ou TNM',
+                  ),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _openReferencePicker(context);
+                  },
+                ),
+                const Divider(),
+              ],
               ListTile(
                 leading: const Icon(
                   Icons.photo_library_outlined,
@@ -502,6 +607,29 @@ class RichMarkdownToolbar extends StatelessWidget {
                 ),
               ),
               const Divider(),
+              if (enableCrossReferences) ...[
+                ListTile(
+                  leading: const CircleAvatar(
+                    backgroundColor: AppTheme.accentTeal,
+                    child: Icon(
+                      Icons.bookmark_add_outlined,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                  title: const Text(
+                    'Referência Interna do App / Gravura / Bíblia',
+                  ),
+                  subtitle: const Text(
+                    'Nota, Dúvida, Documento, Gravura, Tarefa, Projeto, Inbox ou TNM',
+                  ),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _openReferencePicker(context);
+                  },
+                ),
+                const Divider(),
+              ],
               ListTile(
                 leading: const CircleAvatar(
                   backgroundColor: Color(0xFF4338CA),
@@ -638,6 +766,7 @@ class RichMarkdownToolbar extends StatelessWidget {
   }
 
   Widget _toolbarButton({
+    Key? key,
     required IconData icon,
     required String tooltip,
     required VoidCallback onTap,
@@ -645,6 +774,7 @@ class RichMarkdownToolbar extends StatelessWidget {
     return Tooltip(
       message: tooltip,
       child: Material(
+        key: key,
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(6),

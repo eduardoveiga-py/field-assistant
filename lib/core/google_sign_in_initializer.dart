@@ -12,6 +12,15 @@ class GoogleSignInInitializer {
 
   static final Map<GoogleSignIn, Future<void>> _inFlight = {};
   static final Set<GoogleSignIn> _initialized = {};
+  static bool _hasPromptedWebSession = false;
+
+  /// Evita que múltiplos serviços (Gmail + Google Calendar) disparem o seletor
+  /// FedCM / One-Tap do Google repetidas vezes na mesma sessão Web.
+  static bool get hasPromptedWebSession => _hasPromptedWebSession;
+
+  static void markWebSessionPrompted() {
+    _hasPromptedWebSession = true;
+  }
 
   static Future<void> ensureInitialized(
     GoogleSignIn googleSignIn, {
@@ -47,6 +56,7 @@ class GoogleSignInInitializer {
 
   /// Clears cached initialization state for tests that swap or mock instances.
   static void resetForTesting([GoogleSignIn? googleSignIn]) {
+    _hasPromptedWebSession = false;
     if (googleSignIn == null) {
       _initialized.clear();
       _inFlight.clear();

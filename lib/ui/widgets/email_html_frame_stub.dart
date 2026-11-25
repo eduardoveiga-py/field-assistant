@@ -5,6 +5,8 @@ import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../inbox/email_html_sanitizer.dart';
+import '../../references/app_reference.dart';
+import 'app_reference_viewer.dart';
 
 /// Renderizador de e-mail profissional para Mobile (Android/iOS) e Desktop (Windows/macOS/Linux).
 /// Utiliza `HtmlWidget` nativo dentro de um container com tema claro `#FFFFFF`,
@@ -98,6 +100,10 @@ class EmailHtmlFrame extends StatelessWidget {
               return null;
             },
             onTapUrl: (url) async {
+              if (AppReferenceHelper.isAppReferenceUrl(url)) {
+                await AppReferenceViewer.openUrl(context, url);
+                return true;
+              }
               final uri = Uri.tryParse(url);
               if (uri != null && await canLaunchUrl(uri)) {
                 await launchUrl(uri, mode: LaunchMode.externalApplication);

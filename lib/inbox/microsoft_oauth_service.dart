@@ -354,11 +354,16 @@ class MicrosoftOAuthService {
   }
 
   /// Retorna um token de acesso válido, renovando automaticamente se expirando
-  Future<String?> getValidAccessToken(String accountId) async {
+  Future<String?> getValidAccessToken(
+    String accountId, {
+    bool forceRefresh = false,
+  }) async {
     final bundle = await _tokenStore.readTokenBundle(accountId);
     if (bundle == null) return null;
 
-    if (!bundle.isExpiredOrExpiringSoon && bundle.accessToken.isNotEmpty) {
+    if (!forceRefresh &&
+        !bundle.isExpiredOrExpiringSoon &&
+        bundle.accessToken.isNotEmpty) {
       return bundle.accessToken;
     }
 
@@ -366,7 +371,7 @@ class MicrosoftOAuthService {
     final refreshToken = bundle.refreshToken;
     if (refreshToken == null || refreshToken.isEmpty) {
       // Sem refresh_token, retorna o token atual se ainda dentro do prazo absoluto
-      if (DateTime.now().isBefore(bundle.expiresAt)) {
+      if (!forceRefresh && DateTime.now().isBefore(bundle.expiresAt)) {
         return bundle.accessToken;
       }
       return null;
@@ -405,10 +410,17 @@ class MicrosoftOAuthService {
         await _tokenStore.saveTokenBundle(accountId, updated);
         return newAccessToken;
       }
-    } catch (_) {}
+      AppLogger.warning(
+        'Microsoft Graph refresh_token recusado (HTTP ${resp.statusCode})',
+        null,
+      );
+    } catch (e, st) {
+      AppLogger.warning('Falha ao renovar access_token da Microsoft', e, st);
+    }
 
     // Fallback: se a renovação falhar por rede temporária mas o token ainda não venceu
-    if (DateTime.now().isBefore(bundle.expiresAt) &&
+    if (!forceRefresh &&
+        DateTime.now().isBefore(bundle.expiresAt) &&
         bundle.accessToken.isNotEmpty) {
       return bundle.accessToken;
     }
@@ -840,6 +852,79 @@ class MicrosoftOAuthService {
   static String _stripEmailPrefix(String id) =>
       id.startsWith('email_') ? id.substring(6) : id;
 
+  /// Identifica UUIDs ou IDs sintéticos locais que não correspondem a um ItemId real do Graph.
+  static bool isSyntheticLocalId(String rawId) {
+    final clean = _stripEmailPrefix(rawId).trim();
+    if (clean.isEmpty) return true;
+    final lower = clean.toLowerCase();
+    if (lower.startsWith('sent_') ||
+        lower.startsWith('draft_') ||
+        lower.startsWith('local_') ||
+        lower.startsWith('temp_') ||
+        lower.startsWith('mock_')) {
+      return true;
+    }
+    return RegExp(
+      r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+    ).hasMatch(lower);
+  }
+
+  /// Tenta localizar em `sentitems` o ItemId real de um e-mail enviado recentemente pelo app.
+  Future<String?> findRecentSentMessageId({
+    required String accountId,
+    required String subject,
+    DateTime? sentAfterUtc,
+  }) async {
+    final token = await getValidAccessToken(accountId);
+    if (token == null || token.isEmpty) return null;
+
+    try {
+      final uri = Uri.parse(
+        '$graphBaseUrl/me/mailFolders/sentitems/messages'
+        '?\$top=10&\$orderby=sentDateTime%20desc&\$select=id,subject,sentDateTime',
+      );
+      final resp = await _httpClient
+          .get(
+            uri,
+            headers: {
+              'Authorization': 'Bearer $token',
+              'Accept': 'application/json',
+            },
+          )
+          .timeout(const Duration(seconds: 4));
+
+      if (resp.statusCode != 200) return null;
+      final decoded = jsonDecode(resp.body) as Map<String, dynamic>;
+      final list = decoded['value'] as List<dynamic>? ?? [];
+      final targetSub = subject.trim().toLowerCase();
+
+      for (final item in list) {
+        if (item is! Map) continue;
+        final id = item['id']?.toString() ?? '';
+        if (id.isEmpty) continue;
+        final itemSub = (item['subject']?.toString() ?? '')
+            .trim()
+            .toLowerCase();
+        if (targetSub.isNotEmpty && itemSub != targetSub) continue;
+        if (sentAfterUtc != null) {
+          final dtRaw = item['sentDateTime']?.toString();
+          final dt = dtRaw != null ? DateTime.tryParse(dtRaw)?.toUtc() : null;
+          if (dt != null &&
+              dt.difference(sentAfterUtc.toUtc()).inMinutes.abs() > 15) {
+            continue;
+          }
+        }
+        return id;
+      }
+    } catch (e, st) {
+      AppLogger.debug(
+        'Não foi possível resolver ItemId em sentitems para "$subject": $e',
+        st,
+      );
+    }
+    return null;
+  }
+
   static String _mapFolderNameToGraphId(String targetFolderName) {
     switch (targetFolderName) {
       case 'Enviadas':
@@ -863,19 +948,37 @@ class MicrosoftOAuthService {
     required String messageId,
     required bool isRead,
   }) async {
-    final token = await getValidAccessToken(accountId);
+    var token = await getValidAccessToken(accountId);
     if (token == null || token.isEmpty) {
       throw Exception('Conta Microsoft não autenticada.');
     }
-    final rawId = _stripEmailPrefix(messageId);
-    final resp = await _httpClient.patch(
-      Uri.parse('$graphBaseUrl/me/messages/$rawId'),
+    final rawId = Uri.encodeComponent(_stripEmailPrefix(messageId));
+    final url = Uri.parse('$graphBaseUrl/me/messages/$rawId');
+    var resp = await _httpClient.patch(
+      url,
       headers: {
         'Authorization': 'Bearer $token',
         'Content-Type': 'application/json',
       },
       body: jsonEncode({'isRead': isRead}),
     );
+    if (resp.statusCode == 401) {
+      final refreshed = await getValidAccessToken(
+        accountId,
+        forceRefresh: true,
+      );
+      if (refreshed != null && refreshed.isNotEmpty) {
+        token = refreshed;
+        resp = await _httpClient.patch(
+          url,
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode({'isRead': isRead}),
+        );
+      }
+    }
     if (resp.statusCode >= 200 && resp.statusCode < 300) return true;
     throw Exception(
       'Microsoft Graph recusou atualização de leitura (HTTP ${resp.statusCode}): ${resp.body}',
@@ -888,20 +991,38 @@ class MicrosoftOAuthService {
     required String messageId,
     required String targetFolderName,
   }) async {
-    final token = await getValidAccessToken(accountId);
+    var token = await getValidAccessToken(accountId);
     if (token == null || token.isEmpty) {
       throw Exception('Conta Microsoft não autenticada.');
     }
-    final rawId = _stripEmailPrefix(messageId);
+    final rawId = Uri.encodeComponent(_stripEmailPrefix(messageId));
     final destinationId = _mapFolderNameToGraphId(targetFolderName);
-    final resp = await _httpClient.post(
-      Uri.parse('$graphBaseUrl/me/messages/$rawId/move'),
+    final url = Uri.parse('$graphBaseUrl/me/messages/$rawId/move');
+    var resp = await _httpClient.post(
+      url,
       headers: {
         'Authorization': 'Bearer $token',
         'Content-Type': 'application/json',
       },
       body: jsonEncode({'destinationId': destinationId}),
     );
+    if (resp.statusCode == 401) {
+      final refreshed = await getValidAccessToken(
+        accountId,
+        forceRefresh: true,
+      );
+      if (refreshed != null && refreshed.isNotEmpty) {
+        token = refreshed;
+        resp = await _httpClient.post(
+          url,
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode({'destinationId': destinationId}),
+        );
+      }
+    }
     if (resp.statusCode >= 200 && resp.statusCode < 300) {
       if (resp.body.isNotEmpty) {
         try {
@@ -929,15 +1050,29 @@ class MicrosoftOAuthService {
         targetFolderName: 'Lixeira',
       );
     }
-    final token = await getValidAccessToken(accountId);
+    var token = await getValidAccessToken(accountId);
     if (token == null || token.isEmpty) {
       throw Exception('Conta Microsoft não autenticada.');
     }
-    final rawId = _stripEmailPrefix(messageId);
-    final resp = await _httpClient.delete(
-      Uri.parse('$graphBaseUrl/me/messages/$rawId'),
+    final rawId = Uri.encodeComponent(_stripEmailPrefix(messageId));
+    final url = Uri.parse('$graphBaseUrl/me/messages/$rawId');
+    var resp = await _httpClient.delete(
+      url,
       headers: {'Authorization': 'Bearer $token'},
     );
+    if (resp.statusCode == 401) {
+      final refreshed = await getValidAccessToken(
+        accountId,
+        forceRefresh: true,
+      );
+      if (refreshed != null && refreshed.isNotEmpty) {
+        token = refreshed;
+        resp = await _httpClient.delete(
+          url,
+          headers: {'Authorization': 'Bearer $token'},
+        );
+      }
+    }
     if (resp.statusCode == 200 ||
         resp.statusCode == 202 ||
         resp.statusCode == 204 ||

@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'package:collection/collection.dart';
 import 'package:drift/drift.dart' as drift;
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -27,6 +28,8 @@ import '../../inbox/inbox_manager.dart';
 import '../../inbox/jw_email_service.dart';
 import '../../inbox/gmail_oauth_service.dart';
 import '../../inbox/microsoft_oauth_service.dart';
+import '../../inbox/oauth_token_store.dart';
+import '../../references/app_reference.dart';
 import '../../research/research_manager.dart';
 import '../../sync/supabase_sync_service.dart';
 import '../../voice_notes/audio_recording_service.dart';
@@ -34,7 +37,9 @@ import '../providers.dart';
 import 'email_contacts_screen.dart';
 import 'settings_screen.dart';
 import '../widgets/adaptive_ministry_sheet.dart';
+import '../widgets/app_reference_viewer.dart';
 import '../widgets/email_html_frame.dart';
+import '../widgets/knowledge_item_reader_dialog.dart';
 import '../widgets/managed_text_controllers.dart';
 import '../widgets/markdown_preview_text.dart';
 import '../widgets/quick_capture_sheet.dart';
@@ -47,7 +52,14 @@ import '../widgets/universal_attachment_viewer.dart';
 /// visualização de anexos, e-mail teocrático JW.org (retenção permanente imune à purga de 90 dias),
 /// correspondências restritas do Hub (com biometria) e pipeline de triagem/conversão sem perda de dados.
 class InboxScreen extends ConsumerStatefulWidget {
-  const InboxScreen({super.key});
+  final int? initialTabIndex;
+  final int navigationEpoch;
+
+  const InboxScreen({
+    super.key,
+    this.initialTabIndex,
+    this.navigationEpoch = 0,
+  });
 
   @override
   ConsumerState<InboxScreen> createState() => _InboxScreenState();
@@ -80,6 +92,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
   String _selectedCaptureAccount = '__all__';
   List<EmailAccount> _cachedAccounts = const [];
   Future<List<EmailAccount>>? _accountsFuture;
+  final Map<String, DateTime> _lastAuthWarnAt = {};
 
   Future<List<EmailAccount>> _getAccountsFuture() {
     final db = ref.read(repositoryProvider).db;
@@ -102,7 +115,12 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
   void initState() {
     super.initState();
     _loadCachedAccounts();
-    _tabController = TabController(length: 3, vsync: this);
+    final safeIdx = (widget.initialTabIndex ?? 0).clamp(0, 2);
+    _tabController = TabController(
+      length: 3,
+      vsync: this,
+      initialIndex: safeIdx,
+    );
     _tabController.addListener(() {
       if (mounted) setState(() {});
     });
@@ -145,6 +163,19 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
       await coordinator.syncAll(interactive: false);
       if (mounted) setState(() {});
     } catch (_) {}
+  }
+
+  @override
+  void didUpdateWidget(covariant InboxScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialTabIndex != null &&
+        (widget.initialTabIndex != oldWidget.initialTabIndex ||
+            widget.navigationEpoch != oldWidget.navigationEpoch)) {
+      final safeIdx = widget.initialTabIndex!.clamp(0, 2);
+      if (_tabController.index != safeIdx) {
+        _tabController.animateTo(safeIdx);
+      }
+    }
   }
 
   @override
@@ -317,25 +348,20 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
 
       if (mounted) {
         if (res.failedDetails.isNotEmpty && res.accountsSynced == 0) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Falha na sincronização de e-mail:\n${res.failedDetails.join('\n')}',
-              ),
-              backgroundColor: Theme.of(context).colorScheme.error,
-              duration: const Duration(seconds: 6),
-            ),
+          await _showSyncOrMutationErrorSnackBar(
+            warnings: [
+              'Falha na sincronização de e-mail:\n${res.failedDetails.join('\n')}',
+            ],
+            isError: true,
+            duration: const Duration(seconds: 6),
           );
         } else if (res.accountsSynced > 0 && res.failedDetails.isNotEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Sincronização parcial: ${res.totalMessagesSaved} nova(s) mensagem(ns) de ${res.accountsSynced} conta(s). '
-                'Falhas:\n${res.failedDetails.join('\n')}',
-              ),
-              backgroundColor: Colors.orange.shade800,
-              duration: const Duration(seconds: 6),
-            ),
+          await _showSyncOrMutationErrorSnackBar(
+            warnings: [
+              'Sincronização parcial: ${res.totalMessagesSaved} nova(s) mensagem(ns) de ${res.accountsSynced} conta(s). '
+                  'Falhas:\n${res.failedDetails.join('\n')}',
+            ],
+            duration: const Duration(seconds: 6),
           );
         } else if (res.accountsSynced > 0) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -843,33 +869,19 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
       );
     }
 
-    final hasMarkdown =
-        entry.content.contains('##') ||
-        entry.content.contains('| ---') ||
-        entry.content.contains('|:---') ||
-        entry.content.contains('**') ||
-        entry.content.contains('* ') ||
-        entry.content.contains('- ') ||
-        entry.content.contains('[');
-
-    if (hasMarkdown) {
-      return SelectionArea(
-        child: MarkdownPreviewText(
-          text: entry.content,
-          style: TextStyle(
-            fontSize: 15,
-            height: 1.55,
-            color: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF1E293B),
-          ),
-        ),
-      );
-    }
-
-    return SelectableText(
-      entry.content,
+    return MarkdownPreviewText(
+      text: entry.content,
+      selectable: true,
+      allowHighlights: true,
+      maxLines: 120,
+      onContentUpdated: (updated) async {
+        await ref
+            .read(inboxManagerProvider)
+            .updateEntry(entry.id, content: updated);
+      },
       style: TextStyle(
         fontSize: 15,
-        height: 1.5,
+        height: 1.55,
         color: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF1E293B),
       ),
     );
@@ -1040,6 +1052,49 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                         context,
                         emailMsg,
                         _cachedAccounts,
+                      );
+                    },
+                  ),
+                  const SizedBox(width: 4),
+                ] else ...[
+                  IconButton(
+                    key: Key('btn_capture_reader_${entry.id}'),
+                    icon: const Icon(
+                      Icons.chrome_reader_mode_outlined,
+                      size: 16,
+                      color: AppTheme.primaryBlue,
+                    ),
+                    tooltip: 'Ler e sublinhar captura',
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 28,
+                      minHeight: 28,
+                    ),
+                    style: IconButton.styleFrom(
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      minimumSize: const Size(28, 28),
+                      padding: EdgeInsets.zero,
+                    ),
+                    onPressed: () {
+                      final inboxMgr = ref.read(inboxManagerProvider);
+                      showKnowledgeItemReader(
+                        context,
+                        title: _resolveCategoryLabel(entry),
+                        content: entry.content,
+                        category: entry.suggestedCategory ?? 'Captura',
+                        itemType: 'Captura Inbox',
+                        subtitle: _formatDate(entry.capturedAt),
+                        attachments: attachmentsList,
+                        updatedAt: entry.updatedAt,
+                        allowHighlights: true,
+                        onContentUpdated: (updated) async {
+                          await inboxMgr.updateEntry(
+                            entry.id,
+                            content: updated,
+                          );
+                        },
+                        onDelete: () => inboxMgr.softDeleteEntry(entry.id),
                       );
                     },
                   ),
@@ -1218,10 +1273,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
               ),
             ] else ...[
               MarkdownPreviewText(
-                text: EmailHtmlSanitizer.extractPlainText(
-                  entry.content,
-                  cleanMarkdown: true,
-                ),
+                text: entry.content,
+                maxLines: 6,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
@@ -3917,6 +3971,79 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
     );
   }
 
+  Widget _buildEmailReferencesBar(JwEmailMessage msg, bool isDark) {
+    final sources = '${msg.bodyText}\n${msg.bodyHtml ?? ''}';
+    final refs = <({String label, String url})>[];
+    final seen = <String>{};
+
+    for (final m in RegExp(
+      r'\[([^\]]+)\]\((app://ref/[^\)]+)\)',
+    ).allMatches(sources)) {
+      final url = m.group(2)?.trim() ?? '';
+      final label = m.group(1)?.trim() ?? 'Referência';
+      if (url.isNotEmpty && seen.add(url)) {
+        refs.add((label: label, url: url));
+      }
+    }
+    for (final m in RegExp(
+      r'href=["\x27](app://ref/[^"\x27]+)["\x27][^>]*>([^<]+)<',
+      caseSensitive: false,
+    ).allMatches(sources)) {
+      final url = m.group(1)?.trim() ?? '';
+      final label = m.group(2)?.trim() ?? 'Referência';
+      if (url.isNotEmpty && seen.add(url)) {
+        refs.add((label: label, url: url));
+      }
+    }
+
+    if (refs.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppTheme.accentTeal.withValues(alpha: 0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(
+                Icons.bookmark_outline,
+                size: 15,
+                color: AppTheme.accentTeal,
+              ),
+              SizedBox(width: 6),
+              Text(
+                'Referências do App neste E-mail:',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: refs.map((r) {
+              return ActionChip(
+                avatar: const Icon(
+                  Icons.open_in_new,
+                  size: 14,
+                  color: AppTheme.accentTeal,
+                ),
+                label: Text(r.label, style: const TextStyle(fontSize: 12)),
+                onPressed: () => AppReferenceViewer.openUrl(context, r.url),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildOutlookDetailPane(
     JwEmailMessage msg,
     bool isDark,
@@ -4176,6 +4303,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                     html: msg.bodyHtml,
                     isDark: isDark,
                   ),
+                  _buildEmailReferencesBar(msg, isDark),
                   if (msg.attachments.isNotEmpty) ...[
                     const SizedBox(height: 24),
                     const Divider(),
@@ -4441,6 +4569,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                           isDark: isDark,
                           attachments: msg.attachments,
                         ),
+                        _buildEmailReferencesBar(msg, isDark),
                         if (msg.attachments.isNotEmpty) ...[
                           const SizedBox(height: 20),
                           const Text(
@@ -5406,7 +5535,106 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                         ),
                         const SizedBox(height: 6),
                         if (!isHtmlPreview) ...[
-                          RichMarkdownToolbar(controller: contentCtrl),
+                          RichMarkdownToolbar(
+                            controller: contentCtrl,
+                            enableHighlightPalette: false,
+                            enableCrossReferences: true,
+                            onReferenceInserted: (picked) async {
+                              final imgData =
+                                  picked.candidate?.previewImageData;
+                              if (picked.category == AppRefCategory.picture &&
+                                  imgData != null &&
+                                  imgData.isNotEmpty &&
+                                  ctx.mounted) {
+                                final shouldAttach = await showDialog<bool>(
+                                  context: ctx,
+                                  builder: (dCtx) => AlertDialog(
+                                    title: const Text(
+                                      'Anexar gravura ao e-mail?',
+                                    ),
+                                    content: Text(
+                                      'Deseja anexar "${picked.candidate?.title ?? 'Gravura'}" como imagem neste e-mail para o destinatário?',
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.pop(dCtx, false),
+                                        child: const Text('Somente referência'),
+                                      ),
+                                      FilledButton(
+                                        onPressed: () =>
+                                            Navigator.pop(dCtx, true),
+                                        child: const Text('Anexar Imagem'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                if (shouldAttach == true) {
+                                  String b64 = '';
+                                  int size = 0;
+                                  var mime = 'image/jpeg';
+                                  var ext = 'jpg';
+                                  if (imgData.startsWith('data:image')) {
+                                    final headerEnd = imgData.indexOf(
+                                      'base64,',
+                                    );
+                                    if (headerEnd != -1) {
+                                      b64 = imgData.substring(headerEnd + 7);
+                                      final header = imgData
+                                          .substring(0, headerEnd)
+                                          .toLowerCase();
+                                      if (header.contains('png')) {
+                                        mime = 'image/png';
+                                        ext = 'png';
+                                      }
+                                      try {
+                                        size = base64Decode(b64).length;
+                                      } catch (_) {}
+                                    }
+                                  } else if (!kIsWeb &&
+                                      !imgData.startsWith('http') &&
+                                      !imgData.startsWith('assets/')) {
+                                    try {
+                                      final file = File(imgData);
+                                      if (await file.exists()) {
+                                        final bytes = await file.readAsBytes();
+                                        b64 = base64.encode(bytes);
+                                        size = bytes.length;
+                                        if (imgData.toLowerCase().endsWith(
+                                          '.png',
+                                        )) {
+                                          mime = 'image/png';
+                                          ext = 'png';
+                                        }
+                                      }
+                                    } catch (e, st) {
+                                      AppLogger.debug(
+                                        'Falha ao anexar gravura referenciada: $e',
+                                        st,
+                                      );
+                                    }
+                                  }
+                                  if (b64.isNotEmpty) {
+                                    final safeTitle =
+                                        (picked.candidate?.title ?? 'gravura')
+                                            .replaceAll(
+                                              RegExp(r'[^a-zA-Z0-9_-]'),
+                                              '_',
+                                            );
+                                    attachments.add({
+                                      'name': '$safeTitle.$ext',
+                                      'size': size,
+                                      'path': '$safeTitle.$ext',
+                                      'base64': b64,
+                                      'contentType': mime,
+                                      'type': ext,
+                                    });
+                                    setSheetState(() {});
+                                  }
+                                }
+                              }
+                            },
+                          ),
                           const SizedBox(height: 6),
                           TextField(
                             key: const ValueKey('compose_content_field'),
@@ -5629,27 +5857,28 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                             bccCtrl.text,
                                           );
                                       final rawText = contentCtrl.text.trim();
-                                      final baseCleanHtml =
+                                      final baseLocalHtml =
                                           EmailHtmlSanitizer.markdownToCleanHtml(
                                             rawText,
+                                            preserveAppRefLinks: true,
                                           );
                                       final baseCleanPlain =
                                           EmailHtmlSanitizer.markdownToCleanPlainText(
                                             rawText,
                                           );
-                                      final String finalHtmlBody;
+                                      final String localHtmlBody;
                                       final String finalPlainBody;
                                       if (includeSignature &&
                                           selectedAccount?.signatureHtml
                                                   .trim()
                                                   .isNotEmpty ==
                                               true) {
-                                        finalHtmlBody =
-                                            '$baseCleanHtml<br><br>--<br>${selectedAccount!.signatureHtml}';
+                                        localHtmlBody =
+                                            '$baseLocalHtml<br><br>--<br>${selectedAccount!.signatureHtml}';
                                         finalPlainBody =
                                             '$baseCleanPlain\n\n--\n${EmailHtmlSanitizer.extractPlainText(selectedAccount!.signatureHtml, cleanMarkdown: true)}';
                                       } else {
-                                        finalHtmlBody = baseCleanHtml;
+                                        localHtmlBody = baseLocalHtml;
                                         finalPlainBody = baseCleanPlain;
                                       }
 
@@ -5689,8 +5918,8 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                         bcc: bccList,
                                         date: DateTime.now(),
                                         bodyText: finalPlainBody,
-                                        bodyHtml: finalHtmlBody.isNotEmpty
-                                            ? finalHtmlBody
+                                        bodyHtml: localHtmlBody.isNotEmpty
+                                            ? localHtmlBody
                                             : null,
                                         attachments: attachments,
                                         isDraft: true,
@@ -5735,12 +5964,19 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                       final baseCleanHtml =
                                           EmailHtmlSanitizer.markdownToCleanHtml(
                                             rawText,
+                                            preserveAppRefLinks: false,
+                                          );
+                                      final baseLocalHtml =
+                                          EmailHtmlSanitizer.markdownToCleanHtml(
+                                            rawText,
+                                            preserveAppRefLinks: true,
                                           );
                                       final baseCleanPlain =
                                           EmailHtmlSanitizer.markdownToCleanPlainText(
                                             rawText,
                                           );
                                       final String finalHtmlBody;
+                                      final String localHtmlBody;
                                       final String finalPlainBody;
                                       if (includeSignature &&
                                           selectedAccount?.signatureHtml
@@ -5749,10 +5985,13 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                               true) {
                                         finalHtmlBody =
                                             '$baseCleanHtml<br><br>--<br>${selectedAccount!.signatureHtml}';
+                                        localHtmlBody =
+                                            '$baseLocalHtml<br><br>--<br>${selectedAccount!.signatureHtml}';
                                         finalPlainBody =
                                             '$baseCleanPlain\n\n--\n${EmailHtmlSanitizer.extractPlainText(selectedAccount!.signatureHtml, cleanMarkdown: true)}';
                                       } else {
                                         finalHtmlBody = baseCleanHtml;
+                                        localHtmlBody = baseLocalHtml;
                                         finalPlainBody = baseCleanPlain;
                                       }
                                       final bodyText = finalPlainBody;
@@ -5816,27 +6055,34 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                                       .incomingProtocol ==
                                                   'gmail_api') {
                                             final service = GmailOAuthService();
-                                            await service.sendEmail(
-                                              accountId: selectedAccount!.id,
-                                              from: selectedAccount!.email,
-                                              to: JwSmtpClient.parseRecipients(
-                                                to,
-                                              ),
-                                              cc: ccList,
-                                              bcc: bccList,
-                                              subject: subject,
-                                              bodyText: bodyText,
-                                              bodyHtml: finalHtmlBody.isNotEmpty
-                                                  ? finalHtmlBody
-                                                  : null,
-                                              attachments: attachments,
-                                            );
+                                            final remoteSentId = await service
+                                                .sendEmail(
+                                                  accountId:
+                                                      selectedAccount!.id,
+                                                  from: selectedAccount!.email,
+                                                  to: JwSmtpClient.parseRecipients(
+                                                    to,
+                                                  ),
+                                                  cc: ccList,
+                                                  bcc: bccList,
+                                                  subject: subject,
+                                                  bodyText: bodyText,
+                                                  bodyHtml:
+                                                      finalHtmlBody.isNotEmpty
+                                                      ? finalHtmlBody
+                                                      : null,
+                                                  attachments: attachments,
+                                                );
 
                                             final now = DateTime.now().toUtc();
+                                            final effectiveId =
+                                                (remoteSentId != null &&
+                                                    remoteSentId.isNotEmpty)
+                                                ? remoteSentId
+                                                : (existingDraft?.id ??
+                                                      const Uuid().v4());
                                             final sentMsg = JwEmailMessage(
-                                              id:
-                                                  existingDraft?.id ??
-                                                  const Uuid().v4(),
+                                              id: effectiveId,
                                               accountEmail:
                                                   selectedAccount!.email,
                                               folderName: 'Enviadas',
@@ -5847,8 +6093,8 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                               bcc: bccList,
                                               date: now,
                                               bodyText: bodyText,
-                                              bodyHtml: finalHtmlBody.isNotEmpty
-                                                  ? finalHtmlBody
+                                              bodyHtml: localHtmlBody.isNotEmpty
+                                                  ? localHtmlBody
                                                   : null,
                                               attachments: attachments,
                                               isRead: true,
@@ -5857,13 +6103,42 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                               tags: tags,
                                             );
 
+                                            final sentEmailMap = sentMsg
+                                                .toJson();
+                                            if (remoteSentId != null &&
+                                                remoteSentId.isNotEmpty) {
+                                              sentEmailMap['remoteId'] =
+                                                  remoteSentId;
+                                            } else {
+                                              sentEmailMap['isLocalSentOnly'] =
+                                                  true;
+                                            }
+
                                             final metadata = {
                                               'permanentRetention': true,
                                               'isDraft': false,
                                               'sentAt': now.toIso8601String(),
                                               'protocol': 'gmail_api',
-                                              'email': sentMsg.toJson(),
+                                              'email': sentEmailMap,
                                             };
+
+                                            if (existingDraft != null &&
+                                                existingDraft.id !=
+                                                    effectiveId) {
+                                              final oldDraftKey =
+                                                  existingDraft.id.startsWith(
+                                                    'email_',
+                                                  )
+                                                  ? existingDraft.id
+                                                  : 'email_${existingDraft.id}';
+                                              await (db.delete(db.inboxEntries)
+                                                    ..where(
+                                                      (t) => t.id.equals(
+                                                        oldDraftKey,
+                                                      ),
+                                                    ))
+                                                  .go();
+                                            }
 
                                             final entryId =
                                                 'email_${sentMsg.id}';
@@ -5950,10 +6225,21 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                             );
 
                                             final now = DateTime.now().toUtc();
+                                            final remoteSentId = await service
+                                                .findRecentSentMessageId(
+                                                  accountId:
+                                                      selectedAccount!.id,
+                                                  subject: subject,
+                                                  sentAfterUtc: now,
+                                                );
+                                            final effectiveId =
+                                                (remoteSentId != null &&
+                                                    remoteSentId.isNotEmpty)
+                                                ? remoteSentId
+                                                : (existingDraft?.id ??
+                                                      const Uuid().v4());
                                             final sentMsg = JwEmailMessage(
-                                              id:
-                                                  existingDraft?.id ??
-                                                  const Uuid().v4(),
+                                              id: effectiveId,
                                               accountEmail:
                                                   selectedAccount!.email,
                                               folderName: 'Enviadas',
@@ -5964,8 +6250,8 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                               bcc: bccList,
                                               date: now,
                                               bodyText: bodyText,
-                                              bodyHtml: finalHtmlBody.isNotEmpty
-                                                  ? finalHtmlBody
+                                              bodyHtml: localHtmlBody.isNotEmpty
+                                                  ? localHtmlBody
                                                   : null,
                                               attachments: attachments,
                                               isRead: true,
@@ -5974,13 +6260,42 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                               tags: tags,
                                             );
 
+                                            final sentEmailMap = sentMsg
+                                                .toJson();
+                                            if (remoteSentId != null &&
+                                                remoteSentId.isNotEmpty) {
+                                              sentEmailMap['remoteId'] =
+                                                  remoteSentId;
+                                            } else {
+                                              sentEmailMap['isLocalSentOnly'] =
+                                                  true;
+                                            }
+
                                             final metadata = {
                                               'permanentRetention': true,
                                               'isDraft': false,
                                               'sentAt': now.toIso8601String(),
                                               'protocol': 'microsoft_graph',
-                                              'email': sentMsg.toJson(),
+                                              'email': sentEmailMap,
                                             };
+
+                                            if (existingDraft != null &&
+                                                existingDraft.id !=
+                                                    effectiveId) {
+                                              final oldDraftKey =
+                                                  existingDraft.id.startsWith(
+                                                    'email_',
+                                                  )
+                                                  ? existingDraft.id
+                                                  : 'email_${existingDraft.id}';
+                                              await (db.delete(db.inboxEntries)
+                                                    ..where(
+                                                      (t) => t.id.equals(
+                                                        oldDraftKey,
+                                                      ),
+                                                    ))
+                                                  .go();
+                                            }
 
                                             final entryId =
                                                 'email_${sentMsg.id}';
@@ -6108,8 +6423,8 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                               bcc: bccList,
                                               date: now,
                                               bodyText: bodyText,
-                                              bodyHtml: finalHtmlBody.isNotEmpty
-                                                  ? finalHtmlBody
+                                              bodyHtml: localHtmlBody.isNotEmpty
+                                                  ? localHtmlBody
                                                   : null,
                                               attachments: attachments,
                                               isRead: true,
@@ -6782,6 +7097,114 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
     }
   }
 
+  Future<void> _reconnectAccountFromInbox(EmailAccount acc) async {
+    try {
+      final db = ref.read(repositoryProvider).db;
+      OAuthTokenBundle? newBundle;
+      if (acc.isGmailApi) {
+        final res = await GmailOAuthService().authenticateUser();
+        newBundle = res?.tokenBundle;
+      } else if (acc.isMicrosoftGraph) {
+        final res = await MicrosoftOAuthService().authenticateUser();
+        newBundle = res?.tokenBundle;
+      }
+      if (newBundle == null) return;
+      await const OAuthTokenStore().saveTokenBundle(acc.id, newBundle);
+      _lastAuthWarnAt.remove(acc.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${acc.name} reconectada! Sincronizando alterações pendentes...',
+          ),
+          backgroundColor: AppTheme.successGreen,
+        ),
+      );
+      unawaited(
+        EmailSyncCoordinator(
+          db,
+          jwEmailService: ref.read(jwEmailServiceProvider),
+        ).syncAll(interactive: true),
+      );
+    } catch (e, st) {
+      AppLogger.warning('Falha ao reconectar conta ${acc.name}', e, st);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Não foi possível reconectar ${acc.name}: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _showSyncOrMutationErrorSnackBar({
+    required List<String> warnings,
+    bool passive = false,
+    bool isError = false,
+    Duration duration = const Duration(seconds: 4),
+    String prefix = '',
+  }) async {
+    if (!mounted || warnings.isEmpty) return;
+    final primaryText = warnings.first;
+    final lower = primaryText.toLowerCase();
+    final isAuthIssue =
+        lower.contains('expirad') ||
+        lower.contains('autentica') ||
+        lower.contains('reconectar') ||
+        lower.contains('401') ||
+        lower.contains('token');
+
+    EmailAccount? matchedOAuthAcc;
+    if (isAuthIssue) {
+      final db = ref.read(repositoryProvider).db;
+      final accounts = _cachedAccounts.isNotEmpty
+          ? _cachedAccounts
+          : await EmailAccountsManager.loadAccounts(db);
+      for (final acc in accounts) {
+        if (!acc.isOAuth) continue;
+        if (lower.contains(acc.name.toLowerCase()) ||
+            lower.contains(acc.email.toLowerCase()) ||
+            (acc.isGmailApi && lower.contains('gmail')) ||
+            (acc.isMicrosoftGraph &&
+                (lower.contains('microsoft') ||
+                    lower.contains('outlook') ||
+                    lower.contains('hotmail')))) {
+          matchedOAuthAcc = acc;
+          break;
+        }
+      }
+      if (passive && matchedOAuthAcc != null) {
+        final lastAt = _lastAuthWarnAt[matchedOAuthAcc.id];
+        if (lastAt != null &&
+            DateTime.now().difference(lastAt) < const Duration(seconds: 30)) {
+          return;
+        }
+        _lastAuthWarnAt[matchedOAuthAcc.id] = DateTime.now();
+      }
+    }
+
+    if (!mounted) return;
+    final displayText = prefix.isNotEmpty ? '$prefix$primaryText' : primaryText;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(displayText),
+        backgroundColor: isError
+            ? Theme.of(context).colorScheme.error
+            : Colors.orange.shade800,
+        duration: duration,
+        action: matchedOAuthAcc != null
+            ? SnackBarAction(
+                label: 'Reconectar',
+                textColor: Colors.white,
+                onPressed: () => _reconnectAccountFromInbox(matchedOAuthAcc!),
+              )
+            : null,
+      ),
+    );
+  }
+
   Future<void> _markEmailsReadStatus(
     List<JwEmailMessage> targets, {
     required bool isRead,
@@ -6794,7 +7217,11 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
         db,
         jwEmailService: ref.read(jwEmailServiceProvider),
       );
-      final res = await coordinator.updateReadStatus(targets, isRead: isRead);
+      final res = await coordinator.updateReadStatus(
+        targets,
+        isRead: isRead,
+        interactive: showFeedback,
+      );
       if (!mounted) return;
       if (showFeedback) {
         setState(() {
@@ -6803,11 +7230,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
         });
       }
       if (res.warnings.isNotEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(res.warnings.first),
-            backgroundColor: Colors.orange.shade800,
-          ),
+        await _showSyncOrMutationErrorSnackBar(
+          warnings: res.warnings,
+          passive: !showFeedback,
         );
       } else if (showFeedback) {
         final label = isRead ? 'lida(s)' : 'não lida(s)';
@@ -6882,6 +7307,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
       final res = await coordinator.moveMessagesToFolder(
         targets,
         targetFolderName: destination,
+        interactive: true,
       );
       if (!mounted) return;
       setState(() {
@@ -6891,23 +7317,26 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
           _stickyOpenedEmailId = null;
         }
       });
-      final syncNote = res.remoteSynced > 0
-          ? ' e atualizado no servidor.'
-          : (res.warnings.isNotEmpty
-                ? '. ${res.warnings.first}'
-                : (res.hasReadOnlyAccountNotice
-                      ? ' (movido localmente; servidor Exchange/Hub somente leitura).'
-                      : '.'));
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '${targets.length} mensagem(ns) movida(s) para "$destination"$syncNote',
+      if (res.warnings.isNotEmpty) {
+        await _showSyncOrMutationErrorSnackBar(
+          warnings: res.warnings,
+          prefix:
+              '${targets.length} mensagem(ns) movida(s) para "$destination". ',
+        );
+      } else {
+        final syncNote = res.remoteSynced > 0
+            ? ' e atualizado no servidor.'
+            : (res.hasReadOnlyAccountNotice
+                  ? ' (movido localmente; servidor Exchange/Hub somente leitura).'
+                  : '.');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${targets.length} mensagem(ns) movida(s) para "$destination"$syncNote',
+            ),
           ),
-          backgroundColor: res.warnings.isNotEmpty
-              ? Colors.orange.shade800
-              : null,
-        ),
-      );
+        );
+      }
     } catch (e, st) {
       AppLogger.warning('Falha ao mover e-mails para $destination', e, st);
       if (mounted) {
@@ -6964,7 +7393,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
         db,
         jwEmailService: ref.read(jwEmailServiceProvider),
       );
-      final res = await coordinator.deleteMessages(targets);
+      final res = await coordinator.deleteMessages(targets, interactive: true);
       if (!mounted) return;
       setState(() {
         _isEmailSelectionMode = false;
@@ -6977,16 +7406,15 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
       final msg = allInTrash
           ? '${targets.length} e-mail(s) excluído(s) definitivamente.'
           : '${targets.length} e-mail(s) movido(s) para a Lixeira.';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            res.warnings.isNotEmpty ? '$msg ${res.warnings.first}' : msg,
-          ),
-          backgroundColor: res.warnings.isNotEmpty
-              ? Colors.orange.shade800
-              : null,
-        ),
-      );
+      if (res.warnings.isNotEmpty) {
+        await _showSyncOrMutationErrorSnackBar(
+          warnings: res.warnings,
+          prefix: '$msg ',
+        );
+      } else {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(msg)));
+      }
     } catch (e, st) {
       AppLogger.warning('Falha ao excluir e-mails', e, st);
       if (mounted) {
@@ -7035,7 +7463,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
 
 /// Visualizador profissional de corpo de e-mail com tipografia limpa,
 /// blocos estilizados de respostas (> citação) e limpeza garantida de tags de markdown.
-class _ProfessionalEmailBodyView extends StatelessWidget {
+class _ProfessionalEmailBodyView extends StatefulWidget {
   final String text;
   final String? html;
   final bool isDark;
@@ -7048,11 +7476,33 @@ class _ProfessionalEmailBodyView extends StatelessWidget {
     this.attachments = const [],
   });
 
+  @override
+  State<_ProfessionalEmailBodyView> createState() =>
+      _ProfessionalEmailBodyViewState();
+}
+
+class _ProfessionalEmailBodyViewState
+    extends State<_ProfessionalEmailBodyView> {
+  final List<GestureRecognizer> _recognizers = [];
+
+  @override
+  void dispose() {
+    _disposeRecognizers();
+    super.dispose();
+  }
+
+  void _disposeRecognizers() {
+    for (final r in _recognizers) {
+      r.dispose();
+    }
+    _recognizers.clear();
+  }
+
   static String _cleanHtmlAndEntities(String raw) {
     return EmailHtmlSanitizer.extractPlainText(raw);
   }
 
-  static List<InlineSpan> _parseSpans(String rawText, TextStyle baseStyle) {
+  List<InlineSpan> _parseSpans(String rawText, TextStyle baseStyle) {
     final cleaned = _cleanHtmlAndEntities(rawText);
     final spans = <InlineSpan>[];
     final tokenRegex = RegExp(
@@ -7133,9 +7583,17 @@ class _ProfessionalEmailBodyView extends StatelessWidget {
           ),
         );
       } else if (m.group(16) != null) {
+        final url = m.group(17) ?? '';
+        TapGestureRecognizer? rec;
+        if (url.isNotEmpty) {
+          rec = TapGestureRecognizer()
+            ..onTap = () => AppReferenceViewer.openUrl(context, url);
+          _recognizers.add(rec);
+        }
         spans.add(
           TextSpan(
             text: m.group(16)!,
+            recognizer: rec,
             style: baseStyle.copyWith(
               color: AppTheme.primaryBlue,
               decoration: TextDecoration.underline,
@@ -7157,6 +7615,11 @@ class _ProfessionalEmailBodyView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    _disposeRecognizers();
+    final isDark = widget.isDark;
+    final html = widget.html;
+    final text = widget.text;
+    final attachments = widget.attachments;
     final baseStyle = TextStyle(
       fontSize: 14.5,
       height: 1.55,
@@ -7164,10 +7627,10 @@ class _ProfessionalEmailBodyView extends StatelessWidget {
       color: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF1E293B),
     );
 
-    if (html != null && html!.trim().isNotEmpty) {
-      final cleanHtml = EmailHtmlSanitizer.sanitizeHtmlForDisplay(html!);
+    if (html != null && html.trim().isNotEmpty) {
+      final cleanHtml = EmailHtmlSanitizer.sanitizeHtmlForDisplay(html);
       if (cleanHtml.isNotEmpty) {
-        return EmailHtmlFrame(html: html!, attachments: attachments);
+        return EmailHtmlFrame(html: html, attachments: attachments);
       }
     }
 

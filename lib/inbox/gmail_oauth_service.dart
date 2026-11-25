@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -35,6 +36,12 @@ class GmailOAuthService {
       'https://www.googleapis.com/auth/gmail.send';
   static const String userEmailScope =
       'https://www.googleapis.com/auth/userinfo.email';
+  static const String calendarScope =
+      'https://www.googleapis.com/auth/calendar';
+  static const String calendarReadonlyScope =
+      'https://www.googleapis.com/auth/calendar.readonly';
+
+  static const String calendarTokenBundleKey = 'google_calendar_oauth_tokens';
 
   static const List<String> defaultScopes = [
     gmailModifyScope,
@@ -206,83 +213,232 @@ class GmailOAuthService {
     return result?.tokenBundle;
   }
 
+  /// Restaura e persiste tokens Google (Gmail + Google Calendar opcionalmente)
+  /// já na SplashScreen para evitar reautenticações repetidas durante a sessão.
+  ///
+  /// Executa primeiro em modo silencioso; na Web PWA, caso algum serviço Google
+  /// esteja expirado/desconectado no dispositivo atual, dispara no máximo UMA
+  /// tentativa via FedCM (`attemptLightweightAuthentication`) por sessão.
+  Future<bool> warmUpSessionOnSplash({
+    required List<({String id, String email})> gmailAccounts,
+    bool includeCalendar = false,
+  }) async {
+    if (gmailAccounts.isEmpty && !includeCalendar) return false;
+
+    final gmailNeedingRefresh = <({String id, String email})>[];
+    for (final acc in gmailAccounts) {
+      final b = await _tokenStore.readTokenBundle(acc.id);
+      if (b == null || b.isExpiredOrExpiringSoon || b.accessToken.isEmpty) {
+        gmailNeedingRefresh.add(acc);
+      }
+    }
+
+    var calendarNeedsRefresh = false;
+    if (includeCalendar) {
+      final calBundle = await _tokenStore.readNamedTokenBundle(
+        calendarTokenBundleKey,
+      );
+      calendarNeedsRefresh =
+          calBundle == null ||
+          calBundle.isExpiredOrExpiringSoon ||
+          calBundle.accessToken.isEmpty;
+    }
+
+    if (gmailNeedingRefresh.isEmpty && !calendarNeedsRefresh) {
+      return true;
+    }
+
+    await _ensureInitialized();
+    final combinedScopes = <String>{
+      if (gmailAccounts.isNotEmpty) ...defaultScopes,
+      if (includeCalendar) ...[
+        calendarScope,
+        calendarReadonlyScope,
+        userEmailScope,
+      ],
+    }.toList();
+
+    Future<bool> saveTokenForConnectedServices(
+      String? token, {
+      String? signedEmail,
+    }) async {
+      if (token == null || token.isEmpty) return false;
+      var effectiveEmail = signedEmail?.trim().toLowerCase() ?? '';
+      if (effectiveEmail.isEmpty) {
+        try {
+          final resp = await _httpClient
+              .get(
+                Uri.parse('https://www.googleapis.com/oauth2/v2/userinfo'),
+                headers: {'Authorization': 'Bearer $token'},
+              )
+              .timeout(const Duration(seconds: 3));
+          if (resp.statusCode == 200) {
+            final data = jsonDecode(resp.body) as Map<String, dynamic>;
+            effectiveEmail = (data['email'] as String? ?? '')
+                .trim()
+                .toLowerCase();
+          }
+        } catch (e, st) {
+          AppLogger.debug('Falha ao ler userinfo no warmUp da Splash: $e', st);
+        }
+      }
+
+      final nowPlus55 = DateTime.now().add(const Duration(minutes: 55));
+      for (final acc in gmailNeedingRefresh) {
+        if (effectiveEmail.isEmpty ||
+            acc.email.trim().toLowerCase() == effectiveEmail) {
+          await _tokenStore.saveTokenBundle(
+            acc.id,
+            OAuthTokenBundle(
+              accessToken: token,
+              expiresAt: nowPlus55,
+              scopes: defaultScopes,
+            ),
+          );
+        }
+      }
+      if (includeCalendar) {
+        await _tokenStore.saveNamedTokenBundle(
+          calendarTokenBundleKey,
+          OAuthTokenBundle(
+            accessToken: token,
+            expiresAt: nowPlus55,
+            scopes: const [
+              calendarScope,
+              calendarReadonlyScope,
+              userEmailScope,
+            ],
+          ),
+        );
+      }
+      return true;
+    }
+
+    // 1. Tentativa silenciosa primeiro (zero UI)
+    try {
+      final headers = await _googleSignIn.authorizationClient
+          .authorizationHeaders(combinedScopes, promptIfNecessary: false)
+          .timeout(const Duration(seconds: 3), onTimeout: () => null);
+      final silentToken = _extractBearerToken(headers);
+      if (await saveTokenForConnectedServices(silentToken)) {
+        return true;
+      }
+    } catch (e, st) {
+      AppLogger.debug(
+        'Warm-up silencioso Google na Splash não obteve token: $e',
+        st,
+      );
+    }
+
+    // 2. Uma única tentativa lightweight (One-Tap / FedCM) na Splash por sessão
+    if (!GoogleSignInInitializer.hasPromptedWebSession) {
+      GoogleSignInInitializer.markWebSessionPrompted();
+      try {
+        final account = await _googleSignIn
+            .attemptLightweightAuthentication()
+            ?.timeout(const Duration(seconds: 4), onTimeout: () => null);
+        if (account != null) {
+          final headers = await account.authorizationClient
+              .authorizationHeaders(combinedScopes, promptIfNecessary: false)
+              .timeout(const Duration(seconds: 3), onTimeout: () => null);
+          final tok = _extractBearerToken(headers);
+          if (await saveTokenForConnectedServices(
+            tok,
+            signedEmail: account.email,
+          )) {
+            return true;
+          }
+        }
+      } catch (e, st) {
+        AppLogger.debug(
+          'Warm-up lightweight Google na Splash encerrado sem sessão: $e',
+          st,
+        );
+      }
+    }
+    return false;
+  }
+
   /// Retorna um token de acesso válido, renovando silenciosamente ou interativamente (se permitido)
   Future<String?> getValidAccessToken(
     String accountId, {
     bool allowInteractiveRefresh = false,
   }) async {
     final bundle = await _tokenStore.readTokenBundle(accountId);
-    if (bundle == null) return null;
 
-    if (!bundle.isExpiredOrExpiringSoon && bundle.accessToken.isNotEmpty) {
+    if (bundle != null &&
+        !bundle.isExpiredOrExpiringSoon &&
+        bundle.accessToken.isNotEmpty) {
       return bundle.accessToken;
     }
 
     await _ensureInitialized();
+
+    Future<String?> saveAndReturn(String? newToken) async {
+      if (newToken == null || newToken.isEmpty) return null;
+      final updated = OAuthTokenBundle(
+        accessToken: newToken,
+        refreshToken: bundle?.refreshToken,
+        expiresAt: DateTime.now().add(const Duration(hours: 1)),
+        scopes: (bundle != null && bundle.scopes.isNotEmpty)
+            ? bundle.scopes
+            : defaultScopes,
+      );
+      await _tokenStore.saveTokenBundle(accountId, updated);
+      return newToken;
+    }
+
     try {
       if (kIsWeb) {
-        // 1. Tentativa silenciosa via lightweight
-        try {
-          final account = await _googleSignIn
-              .attemptLightweightAuthentication();
-          if (account != null) {
-            final headers = await account.authorizationClient
-                .authorizationHeaders(defaultScopes, promptIfNecessary: false);
-            final newToken = _extractBearerToken(headers);
-            if (newToken != null && newToken.isNotEmpty) {
-              final updated = OAuthTokenBundle(
-                accessToken: newToken,
-                refreshToken: bundle.refreshToken,
-                expiresAt: DateTime.now().add(const Duration(hours: 1)),
-                scopes: bundle.scopes.isNotEmpty
-                    ? bundle.scopes
-                    : defaultScopes,
-              );
-              await _tokenStore.saveTokenBundle(accountId, updated);
-              return newToken;
-            }
-          }
-        } catch (_) {}
-
-        // 2. Tentativa silenciosa via authorizationHeaders promptIfNecessary: false
+        // 1. Renovação estritamente silenciosa na Web (NÃO dispara FedCM One-Tap
+        // nem popup de escolha de conta ao apenas clicar em um e-mail).
         try {
           final headers = await _googleSignIn.authorizationClient
               .authorizationHeaders(defaultScopes, promptIfNecessary: false);
-          final newToken = _extractBearerToken(headers);
-          if (newToken != null && newToken.isNotEmpty) {
-            final updated = OAuthTokenBundle(
-              accessToken: newToken,
-              refreshToken: bundle.refreshToken,
-              expiresAt: DateTime.now().add(const Duration(hours: 1)),
-              scopes: bundle.scopes.isNotEmpty ? bundle.scopes : defaultScopes,
-            );
-            await _tokenStore.saveTokenBundle(accountId, updated);
-            return newToken;
-          }
-        } catch (_) {}
+          final saved = await saveAndReturn(_extractBearerToken(headers));
+          if (saved != null) return saved;
+        } catch (e, st) {
+          AppLogger.debug(
+            'Renovação silenciosa Web do Gmail indisponível no momento: $e',
+            st,
+          );
+        }
 
-        // 3. Interativo (apenas quando permitido)
+        // 2. Interativo (apenas quando acionado explicitamente pelo usuário)
         if (allowInteractiveRefresh) {
           try {
             final headers = await _googleSignIn.authorizationClient
                 .authorizationHeaders(defaultScopes, promptIfNecessary: true);
-            final newToken = _extractBearerToken(headers);
-            if (newToken != null && newToken.isNotEmpty) {
-              final updated = OAuthTokenBundle(
-                accessToken: newToken,
-                refreshToken: bundle.refreshToken,
-                expiresAt: DateTime.now().add(const Duration(hours: 1)),
-                scopes: bundle.scopes.isNotEmpty
-                    ? bundle.scopes
-                    : defaultScopes,
-              );
-              await _tokenStore.saveTokenBundle(accountId, updated);
-              return newToken;
-            }
-          } catch (_) {}
+            final saved = await saveAndReturn(_extractBearerToken(headers));
+            if (saved != null) return saved;
+          } catch (e, st) {
+            AppLogger.debug(
+              'Falha na reautorização direta GIS Web; tentando authenticate(): $e',
+              st,
+            );
+          }
+
+          try {
+            final account =
+                await _googleSignIn.attemptLightweightAuthentication() ??
+                await _googleSignIn.authenticate(scopeHint: defaultScopes);
+            final headers = await account.authorizationClient
+                .authorizationHeaders(defaultScopes, promptIfNecessary: true);
+            final saved = await saveAndReturn(_extractBearerToken(headers));
+            if (saved != null) return saved;
+          } catch (e, st) {
+            AppLogger.warning(
+              'Falha ao renovar sessão Web do Gmail interativamente',
+              e,
+              st,
+            );
+          }
         }
       } else {
         // Mobile silencioso
+        if (bundle == null && !allowInteractiveRefresh) {
+          return null;
+        }
         final account = await _googleSignIn.attemptLightweightAuthentication();
         if (account != null) {
           String? newToken;
@@ -291,16 +447,8 @@ class GmailOAuthService {
                 .authorizationHeaders(defaultScopes, promptIfNecessary: false);
             newToken = _extractBearerToken(headers);
           } catch (_) {}
-          if (newToken != null && newToken.isNotEmpty) {
-            final updated = OAuthTokenBundle(
-              accessToken: newToken,
-              refreshToken: bundle.refreshToken,
-              expiresAt: DateTime.now().add(const Duration(hours: 1)),
-              scopes: bundle.scopes.isNotEmpty ? bundle.scopes : defaultScopes,
-            );
-            await _tokenStore.saveTokenBundle(accountId, updated);
-            return newToken;
-          }
+          final saved = await saveAndReturn(newToken);
+          if (saved != null) return saved;
         }
 
         // Mobile interativo se permitido
@@ -311,30 +459,28 @@ class GmailOAuthService {
             );
             final headers = await authenticated.authorizationClient
                 .authorizationHeaders(defaultScopes, promptIfNecessary: true);
-            final newToken = _extractBearerToken(headers);
-            if (newToken != null && newToken.isNotEmpty) {
-              final updated = OAuthTokenBundle(
-                accessToken: newToken,
-                refreshToken: bundle.refreshToken,
-                expiresAt: DateTime.now().add(const Duration(hours: 1)),
-                scopes: bundle.scopes.isNotEmpty
-                    ? bundle.scopes
-                    : defaultScopes,
-              );
-              await _tokenStore.saveTokenBundle(accountId, updated);
-              return newToken;
-            }
-          } catch (_) {}
+            final saved = await saveAndReturn(_extractBearerToken(headers));
+            if (saved != null) return saved;
+          } catch (e, st) {
+            AppLogger.warning(
+              'Falha ao renovar sessão mobile do Gmail interativamente',
+              e,
+              st,
+            );
+          }
         }
       }
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.warning('Erro inesperado ao renovar token do Gmail', e, st);
+    }
 
     // Fallback: se ainda estiver dentro do prazo real de expiração
-    if (DateTime.now().isBefore(bundle.expiresAt) &&
+    if (bundle != null &&
+        DateTime.now().isBefore(bundle.expiresAt) &&
         bundle.accessToken.isNotEmpty) {
       return bundle.accessToken;
     }
-    if (bundle.isExpired) {
+    if (bundle == null || bundle.isExpired) {
       return null;
     }
     return bundle.accessToken.isNotEmpty ? bundle.accessToken : null;
@@ -862,7 +1008,7 @@ class GmailOAuthService {
     if (token == null || token.isEmpty) {
       throw Exception('Conta Gmail não autenticada ou token expirado.');
     }
-    final rawId = _stripEmailPrefix(messageId);
+    final rawId = Uri.encodeComponent(_stripEmailPrefix(messageId));
     final uri = Uri.parse(
       'https://gmail.googleapis.com/gmail/v1/users/me/messages/$rawId/modify',
     );
@@ -902,7 +1048,7 @@ class GmailOAuthService {
     if (token == null || token.isEmpty) {
       throw Exception('Conta Gmail não autenticada ou token expirado.');
     }
-    final rawId = _stripEmailPrefix(messageId);
+    final rawId = Uri.encodeComponent(_stripEmailPrefix(messageId));
     final headers = {
       'Authorization': 'Bearer $token',
       'Content-Type': 'application/json',
@@ -993,7 +1139,7 @@ class GmailOAuthService {
     if (token == null || token.isEmpty) {
       throw Exception('Conta Gmail não autenticada ou token expirado.');
     }
-    final rawId = _stripEmailPrefix(messageId);
+    final rawId = Uri.encodeComponent(_stripEmailPrefix(messageId));
     final resp = await _httpClient.delete(
       Uri.parse(
         'https://gmail.googleapis.com/gmail/v1/users/me/messages/$rawId',
@@ -1061,8 +1207,8 @@ class GmailOAuthService {
     return decodeBase64UrlBytes(rawBase64);
   }
 
-  /// Envia um e-mail via Gmail REST API montando mensagem RFC 2822
-  Future<void> sendEmail({
+  /// Envia um e-mail via Gmail REST API montando mensagem RFC 2822 e retorna o ID remoto gerado (se disponível).
+  Future<String?> sendEmail({
     required String accountId,
     required String from,
     required List<String> to,
@@ -1073,9 +1219,12 @@ class GmailOAuthService {
     String? bodyHtml,
     List<Map<String, dynamic>>? attachments,
   }) async {
-    final token = await getValidAccessToken(accountId);
+    final token = await getValidAccessToken(
+      accountId,
+      allowInteractiveRefresh: true,
+    );
     if (token == null || token.isEmpty) {
-      throw Exception('Conta Gmail não autenticada.');
+      throw Exception('Conta Gmail não autenticada ou sessão expirada.');
     }
 
     final rfc2822 = buildRfc2822(
@@ -1109,6 +1258,22 @@ class GmailOAuthService {
         'Erro ao enviar e-mail via Gmail REST API (HTTP ${resp.statusCode}): ${resp.body}',
       );
     }
+
+    if (resp.body.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(resp.body);
+        if (decoded is Map && decoded['id'] != null) {
+          final id = decoded['id'].toString().trim();
+          if (id.isNotEmpty) return id;
+        }
+      } catch (e, st) {
+        AppLogger.debug(
+          'Falha ao ler id retornado em sendEmail do Gmail: $e',
+          st,
+        );
+      }
+    }
+    return null;
   }
 
   /// Constrói mensagem compatível com RFC 2822

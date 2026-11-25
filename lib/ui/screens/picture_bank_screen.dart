@@ -9,7 +9,10 @@ import 'package:uuid/uuid.dart';
 
 import '../../core/app_theme.dart';
 import '../../picture_bank/picture_entry_model.dart';
+import '../../references/app_reference.dart';
 import '../providers.dart';
+import '../widgets/markdown_preview_text.dart';
+import '../widgets/rich_markdown_toolbar.dart';
 
 /// Tela da Aba "Banco de Gravuras" do Field Assistant.
 /// Galeria visual com pesquisa, filtros por tags e visualizador maximizado
@@ -251,8 +254,16 @@ class _PictureBankScreenState extends ConsumerState<PictureBankScreen> {
                   ),
 
                   const SizedBox(height: 12),
+                  RichMarkdownToolbar(
+                    controller: captionCtrl,
+                    initialReferenceCategory: AppRefCategory.picture,
+                    onChanged: () => setSheetState(() {}),
+                  ),
+                  const SizedBox(height: 6),
                   TextField(
                     controller: captionCtrl,
+                    minLines: 1,
+                    maxLines: 4,
                     decoration: const InputDecoration(
                       labelText: 'Legenda da Foto / Gravura *',
                       hintText: 'Ex: Visita na comunidade Betânia / Ilustração Bíblica',
@@ -357,6 +368,14 @@ class _PictureBankScreenState extends ConsumerState<PictureBankScreen> {
       MaterialPageRoute(
         builder: (_) => PictureDetailViewerScreen(
           picture: picture,
+          onCaptionUpdated: (updated) async {
+            final db = ref.read(repositoryProvider).db;
+            await PictureBankManager.savePicture(
+              db,
+              picture.copyWith(caption: updated, updatedAt: DateTime.now()),
+            );
+            await _loadPictures();
+          },
           onDelete: () async {
             final db = ref.read(repositoryProvider).db;
             await PictureBankManager.deletePicture(db, picture.id);
@@ -584,8 +603,8 @@ class _PictureBankScreenState extends ConsumerState<PictureBankScreen> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(
-                                      pic.caption,
+                                    MarkdownPreviewText(
+                                      text: pic.caption,
                                       style: const TextStyle(
                                         fontWeight: FontWeight.bold,
                                         fontSize: 13,
@@ -653,7 +672,7 @@ class _PictureBankScreenState extends ConsumerState<PictureBankScreen> {
           ),
         ),
       );
-    } else {
+    } else if (!kIsWeb) {
       final file = File(data);
       if (file.existsSync()) {
         return Image.file(file, fit: BoxFit.cover);
@@ -666,12 +685,16 @@ class _PictureBankScreenState extends ConsumerState<PictureBankScreen> {
 /// Visualizador em tela cheia com zoom interativo ilimitado (pinch-to-zoom e pan contínuo)
 class PictureDetailViewerScreen extends StatefulWidget {
   final PictureEntry picture;
-  final VoidCallback onDelete;
+  final VoidCallback? onDelete;
+  final VoidCallback? onJumpToTab;
+  final Future<void> Function(String updatedCaption)? onCaptionUpdated;
 
   const PictureDetailViewerScreen({
     super.key,
     required this.picture,
-    required this.onDelete,
+    this.onDelete,
+    this.onJumpToTab,
+    this.onCaptionUpdated,
   });
 
   @override
@@ -682,6 +705,21 @@ class PictureDetailViewerScreen extends StatefulWidget {
 class _PictureDetailViewerScreenState extends State<PictureDetailViewerScreen> {
   final TransformationController _controller = TransformationController();
   bool _showOverlay = true;
+  late String _caption;
+
+  @override
+  void initState() {
+    super.initState();
+    _caption = widget.picture.caption;
+  }
+
+  @override
+  void didUpdateWidget(covariant PictureDetailViewerScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.picture.caption != widget.picture.caption) {
+      _caption = widget.picture.caption;
+    }
+  }
 
   @override
   void dispose() {
@@ -760,7 +798,7 @@ class _PictureDetailViewerScreenState extends State<PictureDetailViewerScreen> {
                     ),
                     Expanded(
                       child: Text(
-                        widget.picture.caption,
+                        MarkdownPreviewText.cleanMarkdown(_caption),
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 16,
@@ -785,41 +823,54 @@ class _PictureDetailViewerScreenState extends State<PictureDetailViewerScreen> {
                       tooltip: 'Restaurar Tamanho Original',
                       onPressed: _resetZoom,
                     ),
-                    IconButton(
-                      icon: const Icon(
-                        Icons.delete_outline,
-                        color: Colors.redAccent,
-                      ),
-                      tooltip: 'Excluir Gravura',
-                      onPressed: () async {
-                        final confirm = await showDialog<bool>(
-                          context: context,
-                          builder: (ctx) => AlertDialog(
-                            title: const Text('Excluir gravura?'),
-                            content: const Text(
-                              'Tem certeza que deseja remover esta gravura do banco?',
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(ctx, false),
-                                child: const Text('Cancelar'),
-                              ),
-                              FilledButton(
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: Colors.red,
-                                ),
-                                onPressed: () => Navigator.pop(ctx, true),
-                                child: const Text('Excluir'),
-                              ),
-                            ],
-                          ),
-                        );
-                        if (confirm == true && mounted && context.mounted) {
-                          widget.onDelete();
+                    if (widget.onJumpToTab != null)
+                      IconButton(
+                        icon: const Icon(
+                          Icons.open_in_browser,
+                          color: Colors.white,
+                        ),
+                        tooltip: 'Ir para Banco de Gravuras',
+                        onPressed: () {
                           Navigator.pop(context);
-                        }
-                      },
-                    ),
+                          widget.onJumpToTab!();
+                        },
+                      ),
+                    if (widget.onDelete != null)
+                      IconButton(
+                        icon: const Icon(
+                          Icons.delete_outline,
+                          color: Colors.redAccent,
+                        ),
+                        tooltip: 'Excluir Gravura',
+                        onPressed: () async {
+                          final confirm = await showDialog<bool>(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              title: const Text('Excluir gravura?'),
+                              content: const Text(
+                                'Tem certeza que deseja remover esta gravura do banco?',
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(ctx, false),
+                                  child: const Text('Cancelar'),
+                                ),
+                                FilledButton(
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: Colors.red,
+                                  ),
+                                  onPressed: () => Navigator.pop(ctx, true),
+                                  child: const Text('Excluir'),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (confirm == true && mounted && context.mounted) {
+                            widget.onDelete!();
+                            Navigator.pop(context);
+                          }
+                        },
+                      ),
                   ],
                 ),
               ),
@@ -849,8 +900,16 @@ class _PictureDetailViewerScreenState extends State<PictureDetailViewerScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      widget.picture.caption,
+                    MarkdownPreviewText(
+                      text: _caption,
+                      selectable: widget.onCaptionUpdated != null,
+                      allowHighlights: widget.onCaptionUpdated != null,
+                      onContentUpdated: widget.onCaptionUpdated == null
+                          ? null
+                          : (updated) async {
+                              setState(() => _caption = updated);
+                              await widget.onCaptionUpdated!(updated);
+                            },
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 16,
