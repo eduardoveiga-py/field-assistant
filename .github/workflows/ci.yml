@@ -178,7 +178,7 @@ jobs:
         run: python3 tool/ci_coverage_check.py coverage/lcov.info --enforce-crypto-min=90
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v7
         with:
           files: coverage/lcov.info
           fail_ci_if_error: false
