@@ -876,9 +876,10 @@ class TodayScreen extends ConsumerWidget {
                 isFeatureEnabledProvider(AppFeature.inbox),
               );
               if (!inboxEnabled) return const SizedBox.shrink();
-              final countAsync = ref.watch(unprocessedInboxCountProvider);
+              final countAsync = ref.watch(unreadEmailsCountProvider);
               final count = countAsync.value ?? 0;
               return IconButton(
+                key: const Key('btn_today_inbox_unread_badge'),
                 visualDensity: VisualDensity.compact,
                 icon: Badge(
                   isLabelVisible: count > 0,
@@ -888,7 +889,9 @@ class TodayScreen extends ConsumerWidget {
                   label: Text('$count'),
                   child: const Icon(Icons.all_inbox_rounded, size: 20),
                 ),
-                tooltip: 'Inbox Universal ($count pendentes)',
+                tooltip: count > 0
+                    ? 'Inbox ($count ${count == 1 ? 'e-mail não lido' : 'e-mails não lidos'})'
+                    : 'Inbox (nenhum e-mail não lido)',
                 onPressed: () {
                   Navigator.push(
                     context,

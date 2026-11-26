@@ -2326,6 +2326,32 @@ class JwEmailService {
     });
   }
 
+  /// Indica se uma mensagem retida representa um e-mail não lido da Caixa de Entrada.
+  static bool isInboxUnreadEmail(JwEmailMessage msg) {
+    if (msg.isRead || msg.isDraft) return false;
+    if (msg.labels.contains('SENT')) return false;
+    final fn = (msg.folderName ?? '').toLowerCase();
+    if (fn.contains('enviad') ||
+        fn.contains('sent') ||
+        fn.contains('lixeir') ||
+        fn.contains('trash') ||
+        fn.contains('delet') ||
+        fn.contains('rascunh') ||
+        fn.contains('draft') ||
+        fn.contains('spam') ||
+        fn.contains('junk') ||
+        fn.contains('lixo eletr')) {
+      return false;
+    }
+    return true;
+  }
+
+  /// Observa reativamente a quantidade de e-mails não lidos na Caixa de Entrada.
+  Stream<int> watchUnreadEmailsCount() {
+    return watchRetainedEmails(hubOnly: false)
+        .map((messages) => messages.where(isInboxUnreadEmail).length);
+  }
+
   /// Salva rascunho de e-mail teocrático de forma transacional com controle de revisão e snapshot `_base`.
   Future<void> saveDraft(JwEmailMessage draft) async {
     final entryId = 'email_draft_${draft.id}';
