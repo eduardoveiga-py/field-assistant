@@ -308,7 +308,9 @@ class KnowledgeNoteListCard extends StatelessWidget {
                           ),
                           const SizedBox(height: 8),
                           MarkdownPreviewText(
-                            text: note.content,
+                            text: SecondBrainBlockParser.toInlinePreviewMarkup(
+                              note.content,
+                            ),
                             maxLines: 3,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
@@ -1212,9 +1214,13 @@ class KnowledgeQuestionCard extends StatelessWidget {
                           ),
                           child: MarkdownPreviewText(
                             text: hasAnswer
-                                ? question.answer!
+                                ? SecondBrainBlockParser.toInlinePreviewMarkup(
+                                    question.answer!,
+                                  )
                                 : (question.context?.trim().isNotEmpty == true
-                                      ? question.context!
+                                      ? SecondBrainBlockParser.toInlinePreviewMarkup(
+                                          question.context!,
+                                        )
                                       : 'Toque para ler detalhes ou registrar resposta bíblica.'),
                             maxLines: 3,
                             overflow: TextOverflow.ellipsis,
@@ -1408,7 +1414,9 @@ class KnowledgeDocumentCard extends StatelessWidget {
                     doc.description!.trim().isNotEmpty) ...[
                   const SizedBox(height: 10),
                   MarkdownPreviewText(
-                    text: doc.description!,
+                    text: SecondBrainBlockParser.toInlinePreviewMarkup(
+                      doc.description!,
+                    ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -1593,10 +1601,11 @@ class KnowledgeResourceCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 10),
                 MarkdownPreviewText(
-                  text:
-                      resource.description ??
-                      resource.url ??
-                      resource.resourceType,
+                  text: SecondBrainBlockParser.toInlinePreviewMarkup(
+                    resource.description ??
+                        resource.url ??
+                        resource.resourceType,
+                  ),
                   style: TextStyle(
                     fontSize: 13,
                     height: 1.45,

@@ -410,16 +410,37 @@ class EmailHtmlSanitizer {
   /// incluindo marcadores residuais (`**`, `*`, `__`, `~~`, `` ` ``) truncados.
   static String stripMarkdown(String raw) {
     if (raw.isEmpty) return raw;
-    var text = raw;
+    var text = raw.replaceAll('\r\n', '\n');
     text = text.replaceAllMapped(
       RegExp(
-        r'<(?:u|mark)(?:\s+[^>]*)?>([\s\S]*?)</(?:u|mark)>',
+        r'<details\b[^>]*>\s*<summary\b[^>]*>([\s\S]*?)</summary>\s*([\s\S]*?)\s*</details>',
         caseSensitive: false,
       ),
-      (m) => m.group(1) ?? '',
+      (m) => '${m.group(1) ?? ''}\n${m.group(2) ?? ''}',
+    );
+    text = text.replaceAll(
+      RegExp(r'^:::toggle\s+', multiLine: true, caseSensitive: false),
+      '',
+    );
+    text = text.replaceAll(RegExp(r'^:::\s*$', multiLine: true), '');
+    text = text.replaceAll(
+      RegExp(
+        r'^>\s*\[!(?:NOTE|TIP|IMPORTANT|WARNING)\]\s*',
+        multiLine: true,
+        caseSensitive: false,
+      ),
+      '',
+    );
+    text = text.replaceAll(
+      RegExp(r'</?(?:u|mark)(?:\s+[^>]*)?>', caseSensitive: false),
+      '',
     );
     text = text.replaceAll(_markdownTableDividerRegex, '');
     text = text.replaceAll(_markdownImageRegex, '');
+    text = text.replaceAllMapped(
+      RegExp(r'\[\[([^\[\]\n|]+)(?:\|([^\[\]\n]+))?\]\]'),
+      (m) => (m.group(2) ?? m.group(1) ?? '').trim(),
+    );
     text = text.replaceAllMapped(_markdownLinkRegex, (m) => m.group(1) ?? '');
     text = text.replaceAllMapped(
       _markdownCodeBlockRegex,

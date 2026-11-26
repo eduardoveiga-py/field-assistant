@@ -86,9 +86,14 @@ class HighlightTextHelper {
     caseSensitive: false,
   );
 
+  static final RegExp _strayHighlightTagRegex = RegExp(
+    r'</?(?:u|mark)(?:\s+[^>]*)?>',
+    caseSensitive: false,
+  );
+
   static final RegExp inlineTokenRegex = RegExp(
-    r'(?:<u(?:\s+style="(?:(?:text-decoration-)?color:\s*)(#[a-fA-F0-9]{6})")?>([\s\S]*?)</u>)'
-    r'|(?:<mark(?:\s+style="background:\s*(#[a-fA-F0-9]{6})")?>([\s\S]*?)</mark>)'
+    r'(?:<u(?:\s+(?:[^>]*?(?:text-decoration-)?color:\s*(#?[a-fA-F0-9]{6}))?[^>]*)?>([\s\S]*?)</u>)'
+    r'|(?:<mark(?:\s+(?:[^>]*?background(?:-color)?:\s*(#?[a-fA-F0-9]{6}))?[^>]*)?>([\s\S]*?)</mark>)'
     r'|(?:\*\*\*([^\*]+?)\*\*\*)'
     r'|(?:\*\*([^\*]+?)\*\*)'
     r'|(?<!\*)\*([^\*\s\n](?:[^\*\n]*?[^\*\s\n])?)\*(?!\*)'
@@ -124,6 +129,7 @@ class HighlightTextHelper {
       if (updated == out) break;
       out = updated;
     }
+    out = out.replaceAll(_strayHighlightTagRegex, '');
     return out;
   }
 
@@ -215,19 +221,33 @@ class HighlightTextHelper {
         }
 
         if (m.group(2) != null) {
-          // <u style="color:#hex">text</u> -> preenchimento integral estilo JW Library
-          final hlColor = parseHexColor(m.group(1));
+          // <u style="color:#hex">text</u> -> preenchimento integral estilo JW Library; <u>text</u> -> sublinhado
+          final rawHex = m.group(1);
           final innerText = m.group(2)!;
           final innerIdx = slice.indexOf(innerText, m.start);
           final innerStart = sliceOffset + (innerIdx >= 0 ? innerIdx : m.start);
+          final TextStyle nextStyle;
+          if (rawHex != null) {
+            final hlColor = parseHexColor(rawHex);
+            nextStyle = currentStyle.copyWith(
+              backgroundColor: hlColor.withValues(alpha: isDark ? 0.42 : 0.34),
+            );
+          } else {
+            nextStyle = currentStyle.copyWith(
+              decoration: currentStyle.decoration == TextDecoration.lineThrough
+                  ? TextDecoration.combine([
+                      TextDecoration.underline,
+                      TextDecoration.lineThrough,
+                    ])
+                  : TextDecoration.underline,
+            );
+          }
           parseInline(
             innerText,
-            currentStyle.copyWith(
-              backgroundColor: hlColor.withValues(alpha: isDark ? 0.42 : 0.34),
-            ),
+            nextStyle,
             innerStart,
             inheritedRecognizer: inheritedRecognizer,
-            hasActiveHighlight: true,
+            hasActiveHighlight: rawHex != null || hasActiveHighlight,
           );
         } else if (m.group(4) != null) {
           // <mark style="background:#hex">text</mark>

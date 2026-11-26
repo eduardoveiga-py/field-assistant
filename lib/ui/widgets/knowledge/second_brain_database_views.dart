@@ -1,10 +1,13 @@
+import 'dart:async' show unawaited;
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
 import '../../../core/app_theme.dart';
 import '../../../database/app_database.dart';
+import '../markdown_preview_text.dart';
 import 'knowledge_ui_components.dart';
+import 'rich_block_markdown_view.dart';
 
 /// Modos de visualização estilo Banco de Dados do Notion para Notas.
 enum NotesDatabaseViewMode {
@@ -272,161 +275,325 @@ class NotesKanbanView extends StatelessWidget {
             : const Color(0xFFF1F5F9);
         final cardBg = isDark ? const Color(0xFF151E32) : Colors.white;
 
-        return Container(
-          width: 285,
-          decoration: BoxDecoration(
-            color: colBg,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.08)
-                  : const Color(0xFFE2E8F0),
-            ),
-          ),
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 10, 8, 8),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 10,
-                      height: 10,
-                      decoration: BoxDecoration(
-                        color: colColor,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        '${NotePropertyMeta.statusLabel(colStatus)} (${colNotes.length})',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 13.5,
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.add, size: 18),
-                      tooltip: 'Nova nota nesta coluna',
-                      visualDensity: VisualDensity.compact,
-                      onPressed: () => onCreateInStatus(colStatus),
-                    ),
-                  ],
+        return DragTarget<KnowledgeNoteEntry>(
+          key: Key('kanban_col_$colStatus'),
+          onWillAcceptWithDetails: (details) =>
+              NotePropertyMeta.fromJson(details.data.propertiesJson).status !=
+              colStatus,
+          onAcceptWithDetails: (details) {
+            unawaited(onChangeStatus(details.data, colStatus));
+          },
+          builder: (context, candidateData, rejectedData) {
+            final isHovering = candidateData.isNotEmpty;
+            return AnimatedContainer(
+              duration: const Duration(milliseconds: 140),
+              width: 285,
+              decoration: BoxDecoration(
+                color: isHovering
+                    ? colColor.withValues(alpha: isDark ? 0.16 : 0.09)
+                    : colBg,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: isHovering
+                      ? colColor
+                      : (isDark
+                            ? Colors.white.withValues(alpha: 0.08)
+                            : const Color(0xFFE2E8F0)),
+                  width: isHovering ? 2 : 1,
                 ),
               ),
-              const Divider(height: 1),
-              Expanded(
-                child: colNotes.isEmpty
-                    ? Center(
-                        child: Text(
-                          'Nenhum cartão',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isDark
-                                ? const Color(0xFF64748B)
-                                : const Color(0xFF94A3B8),
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 10, 8, 8),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 10,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            color: colColor,
+                            shape: BoxShape.circle,
                           ),
                         ),
-                      )
-                    : ListView.separated(
-                        padding: const EdgeInsets.all(10),
-                        itemCount: colNotes.length,
-                        separatorBuilder: (_, _) => const SizedBox(height: 8),
-                        itemBuilder: (ctx, i) {
-                          final n = colNotes[i];
-                          final area = n.areaId != null
-                              ? areasById[n.areaId!]
-                              : null;
-                          final tags = _decodeNoteTags(n.tags);
-                          return Material(
-                            color: cardBg,
-                            borderRadius: BorderRadius.circular(12),
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(12),
-                              onTap: () => onOpenNote(n),
-                              child: Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: isDark
-                                        ? Colors.white.withValues(alpha: 0.08)
-                                        : const Color(0xFFE2E8F0),
-                                  ),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            n.title,
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.w700,
-                                              fontSize: 13.5,
-                                            ),
-                                          ),
-                                        ),
-                                        PopupMenuButton<String>(
-                                          tooltip: 'Mover coluna',
-                                          icon: const Icon(
-                                            Icons.swap_horiz_rounded,
-                                            size: 18,
-                                          ),
-                                          padding: EdgeInsets.zero,
-                                          onSelected: (target) =>
-                                              onChangeStatus(n, target),
-                                          itemBuilder: (_) => [
-                                            for (final s in columnsOrder)
-                                              if (s != colStatus)
-                                                PopupMenuItem(
-                                                  value: s,
-                                                  child: Text(
-                                                    'Mover para ${NotePropertyMeta.statusLabel(s)}',
-                                                  ),
-                                                ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                    if (area != null || tags.isNotEmpty) ...[
-                                      const SizedBox(height: 8),
-                                      Wrap(
-                                        spacing: 6,
-                                        runSpacing: 4,
-                                        children: [
-                                          if (area != null)
-                                            KnowledgePillBadge(
-                                              label: area.name,
-                                              color: _parseAreaColor(
-                                                area.colorHex,
-                                              ),
-                                              isDark: isDark,
-                                            ),
-                                          for (final t in tags.take(2))
-                                            KnowledgePillBadge(
-                                              label: '#$t',
-                                              color: AppTheme.primaryBlue,
-                                              isDark: isDark,
-                                            ),
-                                        ],
-                                      ),
-                                    ],
-                                  ],
-                                ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '${NotePropertyMeta.statusLabel(colStatus)} (${colNotes.length})',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 13.5,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.add, size: 18),
+                          tooltip: 'Nova nota nesta coluna',
+                          visualDensity: VisualDensity.compact,
+                          onPressed: () => onCreateInStatus(colStatus),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (isHovering)
+                    Container(
+                      margin: const EdgeInsets.fromLTRB(10, 0, 10, 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: colColor.withValues(alpha: isDark ? 0.24 : 0.14),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: colColor.withValues(alpha: 0.45),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.move_to_inbox_rounded,
+                            size: 14,
+                            color: colColor,
+                          ),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              'Soltar em ${NotePropertyMeta.statusLabel(colStatus)}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
+                                color: colColor,
                               ),
                             ),
-                          );
-                        },
+                          ),
+                        ],
                       ),
+                    ),
+                  const Divider(height: 1),
+                  Expanded(
+                    child: colNotes.isEmpty
+                        ? Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    isHovering
+                                        ? Icons.add_circle_outline_rounded
+                                        : Icons.drag_indicator_rounded,
+                                    size: 22,
+                                    color: isHovering
+                                        ? colColor
+                                        : (isDark
+                                              ? const Color(0xFF475569)
+                                              : const Color(0xFF94A3B8)),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    isHovering
+                                        ? 'Solte aqui para mover'
+                                        : 'Nenhum cartão\n(arraste para cá)',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: isHovering
+                                          ? colColor
+                                          : (isDark
+                                                ? const Color(0xFF64748B)
+                                                : const Color(0xFF94A3B8)),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                        : ListView.separated(
+                            padding: const EdgeInsets.all(10),
+                            itemCount: colNotes.length,
+                            separatorBuilder: (_, _) =>
+                                const SizedBox(height: 8),
+                            itemBuilder: (ctx, i) {
+                              final n = colNotes[i];
+                              final area = n.areaId != null
+                                  ? areasById[n.areaId!]
+                                  : null;
+                              final tags = _decodeNoteTags(n.tags);
+                              final previewMarkup =
+                                  SecondBrainBlockParser.toInlinePreviewMarkup(
+                                    n.content,
+                                  );
+
+                              Widget buildCard({bool isFeedback = false}) {
+                                return Material(
+                                  color: cardBg,
+                                  elevation: isFeedback ? 8 : 0,
+                                  borderRadius: BorderRadius.circular(12),
+                                  clipBehavior: Clip.antiAlias,
+                                  child: InkWell(
+                                    borderRadius: BorderRadius.circular(12),
+                                    onTap: isFeedback
+                                        ? null
+                                        : () => onOpenNote(n),
+                                    child: Container(
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: isFeedback
+                                              ? colColor
+                                              : (isDark
+                                                    ? Colors.white.withValues(
+                                                        alpha: 0.08,
+                                                      )
+                                                    : const Color(0xFFE2E8F0)),
+                                          width: isFeedback ? 1.5 : 1,
+                                        ),
+                                      ),
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Padding(
+                                                padding: const EdgeInsets.only(
+                                                  top: 2,
+                                                  right: 6,
+                                                ),
+                                                child: MouseRegion(
+                                                  cursor:
+                                                      SystemMouseCursors.grab,
+                                                  child: Icon(
+                                                    Icons
+                                                        .drag_indicator_rounded,
+                                                    size: 16,
+                                                    color: isDark
+                                                        ? const Color(
+                                                            0xFF64748B,
+                                                          )
+                                                        : const Color(
+                                                            0xFF94A3B8,
+                                                          ),
+                                                  ),
+                                                ),
+                                              ),
+                                              Expanded(
+                                                child: Text(
+                                                  n.title,
+                                                  maxLines: 2,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.w700,
+                                                    fontSize: 13.5,
+                                                  ),
+                                                ),
+                                              ),
+                                              if (!isFeedback)
+                                                PopupMenuButton<String>(
+                                                  tooltip: 'Mover coluna',
+                                                  icon: const Icon(
+                                                    Icons.swap_horiz_rounded,
+                                                    size: 18,
+                                                  ),
+                                                  padding: EdgeInsets.zero,
+                                                  onSelected: (target) =>
+                                                      onChangeStatus(n, target),
+                                                  itemBuilder: (_) => [
+                                                    for (final s
+                                                        in columnsOrder)
+                                                      if (s != colStatus)
+                                                        PopupMenuItem(
+                                                          value: s,
+                                                          child: Text(
+                                                            'Mover para ${NotePropertyMeta.statusLabel(s)}',
+                                                          ),
+                                                        ),
+                                                  ],
+                                                ),
+                                            ],
+                                          ),
+                                          if (previewMarkup.isNotEmpty) ...[
+                                            const SizedBox(height: 6),
+                                            MarkdownPreviewText(
+                                              text: previewMarkup,
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                height: 1.35,
+                                                color: isDark
+                                                    ? const Color(0xFF94A3B8)
+                                                    : const Color(0xFF64748B),
+                                              ),
+                                            ),
+                                          ],
+                                          if (area != null ||
+                                              tags.isNotEmpty) ...[
+                                            const SizedBox(height: 8),
+                                            Wrap(
+                                              spacing: 6,
+                                              runSpacing: 4,
+                                              children: [
+                                                if (area != null)
+                                                  KnowledgePillBadge(
+                                                    label: area.name,
+                                                    color: _parseAreaColor(
+                                                      area.colorHex,
+                                                    ),
+                                                    isDark: isDark,
+                                                  ),
+                                                for (final t in tags.take(2))
+                                                  KnowledgePillBadge(
+                                                    label: '#$t',
+                                                    color: AppTheme.primaryBlue,
+                                                    isDark: isDark,
+                                                  ),
+                                              ],
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }
+
+                              final card = buildCard();
+                              return Draggable<KnowledgeNoteEntry>(
+                                key: Key('kanban_card_${n.id}'),
+                                data: n,
+                                feedback: Material(
+                                  color: Colors.transparent,
+                                  child: SizedBox(
+                                    width: 265,
+                                    child: Opacity(
+                                      opacity: 0.94,
+                                      child: buildCard(isFeedback: true),
+                                    ),
+                                  ),
+                                ),
+                                childWhenDragging: Opacity(
+                                  opacity: 0.32,
+                                  child: card,
+                                ),
+                                child: card,
+                              );
+                            },
+                          ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -475,10 +642,9 @@ class NotesGalleryView extends StatelessWidget {
             : style.accent;
         final meta = NotePropertyMeta.fromJson(note.propertiesJson);
         final tags = _decodeNoteTags(note.tags);
-        final preview = note.content
-            .replaceAll(RegExp(r'[#*`>\[\]]+'), ' ')
-            .replaceAll(RegExp(r'\s+'), ' ')
-            .trim();
+        final previewMarkup = SecondBrainBlockParser.toInlinePreviewMarkup(
+          note.content,
+        );
 
         return Material(
           color: surface,
@@ -550,18 +716,31 @@ class NotesGalleryView extends StatelessWidget {
                           ),
                           const SizedBox(height: 6),
                           Expanded(
-                            child: Text(
-                              preview.isEmpty ? 'Sem conteúdo' : preview,
-                              maxLines: 3,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 12,
-                                height: 1.4,
-                                color: isDark
-                                    ? const Color(0xFF94A3B8)
-                                    : const Color(0xFF64748B),
-                              ),
-                            ),
+                            child: previewMarkup.isEmpty
+                                ? Text(
+                                    'Sem conteúdo',
+                                    maxLines: 3,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      height: 1.4,
+                                      color: isDark
+                                          ? const Color(0xFF94A3B8)
+                                          : const Color(0xFF64748B),
+                                    ),
+                                  )
+                                : MarkdownPreviewText(
+                                    text: previewMarkup,
+                                    maxLines: 3,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      height: 1.4,
+                                      color: isDark
+                                          ? const Color(0xFF94A3B8)
+                                          : const Color(0xFF64748B),
+                                    ),
+                                  ),
                           ),
                           Wrap(
                             spacing: 6,

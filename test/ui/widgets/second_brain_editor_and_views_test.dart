@@ -7,10 +7,13 @@ import 'package:ministerio_pessoal/core/biometric_auth_service.dart';
 import 'package:ministerio_pessoal/database/app_database.dart';
 import 'package:ministerio_pessoal/database/repository.dart';
 import 'package:ministerio_pessoal/knowledge/knowledge_manager.dart';
+import 'package:ministerio_pessoal/knowledge/knowledge_search_common.dart';
 import 'package:ministerio_pessoal/ui/providers.dart';
 import 'package:ministerio_pessoal/ui/screens/knowledge_base_screen.dart';
 import 'package:ministerio_pessoal/ui/widgets/knowledge/rich_block_markdown_view.dart';
 import 'package:ministerio_pessoal/ui/widgets/knowledge/second_brain_rich_editor.dart';
+import 'package:ministerio_pessoal/ui/widgets/markdown_preview_text.dart';
+import 'package:ministerio_pessoal/ui/widgets/rich_formatted_editing_controller.dart';
 
 class _UnlockedBiometric extends BiometricAuthService {
   @override
@@ -278,6 +281,236 @@ Conteúdo oculto do toggle.
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
         expect(find.text('Apresentação Breve'), findsOneWidget);
+
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+        dbClosed = true;
+        await db.close();
+        await tester.pump(const Duration(milliseconds: 100));
+      },
+    );
+
+    testWidgets(
+      'Visualização (Galeria/Kanban/SM-2/Busca) e Edição nunca exibem tags <u>, <details> ou URLs app://ref cruas',
+      (tester) async {
+        final db = AppDatabase.forTesting(NativeDatabase.memory());
+        final km = KnowledgeManager(db: db);
+        var dbClosed = false;
+        addTearDown(() async {
+          if (!dbClosed) await db.close();
+        });
+
+        const richNoteA =
+            '[📖 Mateus 7:12 (TNM)](app://ref/bible/40/7/12) '
+            '[📖 João 3:1-5 (TNM)](app://ref/bible/43/3/1-5)\n'
+            'Teste de <u style="color:#F97316">conteudo</u>';
+        const richNoteB =
+            '<u style="color:#EC4899">Testando</u> minha nova '
+            '<u style="color: #EAB308;">nota</u> e '
+            '<u style="color: 3B82F6">formatação</u>!\n'
+            '> [!TIP] Aplicação no campo\n'
+            '<details><summary>Detalhes Extras</summary>Ponto interno.</details>';
+
+        await km.createNote(
+          title: 'Teste 2',
+          content: richNoteA,
+          nextReviewAt: DateTime.now().toUtc().subtract(
+            const Duration(hours: 2),
+          ),
+        );
+        await km.createNote(title: 'Teste', content: richNoteB);
+
+        // 1. Verifica edição limpa via RichFormattedEditingController.fromMarkup
+        final ctrlA = RichFormattedEditingController.fromMarkup(richNoteA);
+        final ctrlB = RichFormattedEditingController.fromMarkup(richNoteB);
+        addTearDown(() {
+          ctrlA.dispose();
+          ctrlB.dispose();
+        });
+        expect(ctrlA.text, contains('Mateus 7:12 (TNM)'));
+        expect(ctrlA.text, contains('conteudo'));
+        expect(ctrlA.text, isNot(contains('<u')));
+        expect(ctrlA.text, isNot(contains('app://ref/')));
+        expect(ctrlB.text, contains('Testando minha nova nota e formatação!'));
+        expect(ctrlB.text, isNot(contains('<u')));
+        expect(ctrlB.text, isNot(contains('</u>')));
+        expect(ctrlB.text, isNot(contains('<details>')));
+        expect(ctrlB.text, isNot(contains('<summary>')));
+
+        // Roundtrip preserva URLs e cores internamente sem vazar na edição
+        final roundtripA = ctrlA.toMarkup();
+        expect(roundtripA, contains('app://ref/bible/40/7/12'));
+        expect(roundtripA, contains('#F97316'));
+
+        // 2. Verifica limpeza em snippet de busca e cleanMarkdown
+        final snippetB = KnowledgeSearchCommon.buildSnippet(richNoteB);
+        expect(snippetB, contains('Testando'));
+        expect(snippetB, isNot(contains('<u')));
+        expect(snippetB, isNot(contains('color:')));
+        expect(snippetB, isNot(contains('[!TIP]')));
+        final cleanA = MarkdownPreviewText.cleanMarkdown(richNoteA);
+        expect(cleanA, isNot(contains('app://ref/')));
+        expect(cleanA, isNot(contains('<u')));
+
+        // 3. Verifica Galeria, Kanban e SM-2 na UI real sem tags/URLs cruas
+        tester.view.physicalSize = const Size(1280, 900);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              databaseProvider.overrideWithValue(db),
+              repositoryProvider.overrideWithValue(AppRepository(db)),
+              biometricAuthServiceProvider.overrideWithValue(
+                _UnlockedBiometric(),
+              ),
+            ],
+            child: const MaterialApp(home: KnowledgeBaseScreen()),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        for (final chipKey in const [
+          'view_mode_chip_gallery',
+          'view_mode_chip_kanban',
+        ]) {
+          await tester.tap(find.byKey(Key(chipKey)));
+          await tester.pumpAndSettle();
+
+          expect(
+            find.textContaining('Mateus 7:12 (TNM)', findRichText: true),
+            findsWidgets,
+          );
+          expect(
+            find.textContaining('Testando', findRichText: true),
+            findsWidgets,
+          );
+          expect(find.textContaining('<u', findRichText: true), findsNothing);
+          expect(find.textContaining('</u>', findRichText: true), findsNothing);
+          expect(
+            find.textContaining('app://ref/', findRichText: true),
+            findsNothing,
+          );
+          expect(
+            find.textContaining('color:', findRichText: true),
+            findsNothing,
+          );
+          expect(
+            find.textContaining('<details>', findRichText: true),
+            findsNothing,
+          );
+        }
+
+        // Abre Revisão Semanal e revela o cartão SM-2
+        await tester.tap(find.byKey(const Key('btn_kb_weekly_review')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Mostrar resposta / notas'));
+        await tester.pumpAndSettle();
+        expect(
+          find.textContaining('Mateus 7:12 (TNM)', findRichText: true),
+          findsWidgets,
+        );
+        expect(find.textContaining('<u', findRichText: true), findsNothing);
+        expect(
+          find.textContaining('app://ref/', findRichText: true),
+          findsNothing,
+        );
+
+        await tester.tap(find.text('Concluir'));
+        await tester.pumpAndSettle();
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+        dbClosed = true;
+        await db.close();
+        await tester.pump(const Duration(milliseconds: 100));
+      },
+    );
+
+    testWidgets(
+      'Kanban permite puxar e arrastar cartões entre colunas de status atualizando o banco',
+      (tester) async {
+        final db = AppDatabase.forTesting(NativeDatabase.memory());
+        final km = KnowledgeManager(db: db);
+        var dbClosed = false;
+        addTearDown(() async {
+          if (!dbClosed) await db.close();
+        });
+
+        final note = await km.createNote(
+          title: 'Cartão Arrastável',
+          content: 'Preparar argumento com <u style="color:#10B981">texto-chave</u>.',
+          properties: {'status': 'rascunho', 'priority': 'alta'},
+        );
+
+        tester.view.physicalSize = const Size(1400, 900);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              databaseProvider.overrideWithValue(db),
+              repositoryProvider.overrideWithValue(AppRepository(db)),
+              biometricAuthServiceProvider.overrideWithValue(
+                _UnlockedBiometric(),
+              ),
+            ],
+            child: const MaterialApp(home: KnowledgeBaseScreen()),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byKey(const Key('view_mode_chip_kanban')));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Rascunho (1)'), findsOneWidget);
+        expect(find.text('Em Estudo (0)'), findsOneWidget);
+
+        // Puxa o cartão da coluna Rascunho para a coluna Em Estudo
+        final cardFinder = find.byKey(Key('kanban_card_${note.id}'));
+        final targetStudy = find.byKey(const Key('kanban_col_em_estudo'));
+        final startPos = tester.getCenter(cardFinder);
+        final endPos = tester.getCenter(targetStudy);
+        await tester.timedDragFrom(
+          startPos,
+          endPos - startPos,
+          const Duration(milliseconds: 300),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Rascunho (0)'), findsOneWidget);
+        expect(find.text('Em Estudo (1)'), findsOneWidget);
+
+        var updated = await (db.select(
+          db.knowledgeNotes,
+        )..where((t) => t.id.equals(note.id))).getSingle();
+        expect(
+          KnowledgeManager.decodeProperties(updated.propertiesJson)['status'],
+          'em_estudo',
+        );
+
+        // Arrasta agora para coluna vazia Concluído
+        final targetDone = find.byKey(const Key('kanban_col_concluido'));
+        final start2 = tester.getCenter(cardFinder);
+        final end2 = tester.getCenter(targetDone);
+        await tester.timedDragFrom(
+          start2,
+          end2 - start2,
+          const Duration(milliseconds: 300),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Em Estudo (0)'), findsOneWidget);
+        expect(find.text('Concluído (1)'), findsOneWidget);
+
+        updated = await (db.select(
+          db.knowledgeNotes,
+        )..where((t) => t.id.equals(note.id))).getSingle();
+        expect(
+          KnowledgeManager.decodeProperties(updated.propertiesJson)['status'],
+          'concluido',
+        );
 
         await tester.pumpWidget(const SizedBox.shrink());
         await tester.pumpAndSettle();

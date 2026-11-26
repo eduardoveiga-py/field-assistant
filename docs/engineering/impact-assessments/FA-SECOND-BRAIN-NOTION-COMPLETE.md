@@ -78,3 +78,30 @@ Unificado com `FA-WEB-E2EE-EMAIL-SYNC` em **uma única migração atômica v8 ->
   - Autocomplete `[[` e menu `/` slash no editor;
   - Blocos ricos (`toggle`, `callout`, `tabela`, `checklist` interativa clicável);
   - Alternância de visualizações (`Lista`, `Tabela`, `Kanban`, `Galeria`) na `KnowledgeBaseScreen`.
+
+---
+
+## 5. Correção de Formatação em Visualização/Edição & Kanban Drag & Drop (Pós-PR #66 Review)
+
+### 5.1 Causa-Raiz Identificada na Exibição & Edição
+1. **`NotesGalleryView` (`lib/ui/widgets/knowledge/second_brain_database_views.dart`):** usava sanitização manual `.replaceAll(RegExp(r'[#*`>\[\]]+'), ' ')` + `Text(preview)`, arrancando `#`, `>`, `[` e `]` de `<u style="color:#hex">...</u>` e `[rótulo](app://ref/...)`, exibindo HTML malformado (`<u style="color: F973...`) e URIs cruas (`(app://ref/...)`).
+2. **`KnowledgeSearchCommon.buildSnippet` (`lib/knowledge/knowledge_search_common.dart`):** também executava `.replaceAll(RegExp(r'[#*`>_]+'), ' ')` sem remover `<u...>` / `<mark...>` nem sintaxe Notion (`:::toggle`, `[!TIP]`, `|---|`).
+3. **`SecondBrainDialogs` (`lib/ui/widgets/knowledge/second_brain_dialogs.dart`):** a prévia da Inbox na Revisão Semanal (`Text(item.content)`) e o reveal do cartão SM-2 (`Text(revealBody)`) exibiam texto bruto sem renderização rica/limpa.
+4. **`HighlightTextHelper` / `MarkdownPreviewText.cleanMarkdown` / `RichFormattedEditingController.fromMarkup`:** variações de atributos HTML (`;`, espaços, aspas simples, `#` opcional, `<u>` simples) e tags `<details><summary>` / `<br>` em notas editadas podiam escapar sem renderização rica/limpeza completa.
+
+### 5.2 Design da Correção & Novo Kanban Drag & Drop
+- **Exibição e edição unificadas sem tags/URLs cruas:**
+  - `NotesGalleryView` e `NotesKanbanView` passam a renderizar prévia rica via `MarkdownPreviewText`.
+  - `_buildSm2Card` (Revisão Semanal) usa `RichBlockMarkdownView`; itens de triagem da Inbox e rótulos de acessibilidade usam `MarkdownPreviewText.cleanMarkdown(...)`.
+  - `KnowledgeSearchCommon.buildSnippet` delega para `MarkdownPreviewText.cleanMarkdown(...)`.
+  - `MarkdownPreviewText.cleanMarkdown` higieniza também blocos Notion (`:::toggle`, `:::`, `[!NOTE|TIP|IMPORTANT|WARNING]`, divisores de tabela GFM `|---|`, wikilinks `[[A|B]]`) e tags `<u>`/`<mark>` residuais.
+  - `HighlightTextHelper.inlineTokenRegex` tolera espaços/ponto-e-vírgula/aspas simples/`#` opcional em `<u style=...>` / `<mark style=...>` e suporta `<u>` puro; `RichFormattedEditingController.fromMarkup` normaliza `<br>` e `<details><summary>` antes do parser inline para nunca exibir HTML cru durante a edição.
+- **Kanban Drag & Drop (`NotesKanbanView`):**
+  - Colunas envolvidas em `DragTarget<KnowledgeNoteEntry>` com destaque visual ao passar sobre outra coluna (aceita mover inclusive para colunas vazias).
+  - Cartões envolvidos em `Draggable<KnowledgeNoteEntry>` com grip visual `Icons.drag_indicator_rounded`, preview fantasma ao arrastar (`childWhenDragging`), card flutuante no `feedback`, clique mantido via `InkWell.onTap`, e menu acessível `⇄` preservado para leitores de tela/navegação por teclado.
+
+### 5.3 Novos Casos de Teste Planejados
+- `test/ui/widgets/second_brain_editor_and_views_test.dart`:
+  - Validar que `NotesGalleryView`, `NotesKanbanView`, Revisão Semanal SM-2 e Busca FTS5/Global **nunca** exibem `<u`, `<mark`, `app://ref/` ou `<details>` crus;
+  - Validar roundtrip completo em `RichFormattedEditingController.fromMarkup` (edição sem tags HTML/Markdown cruas mesmo com `;`/espaços/`<details>`);
+  - Validar Drag & Drop no `NotesKanbanView` arrastando cartão de `Rascunho` para `Em Estudo` (e para coluna vazia `Concluído`), verificando atualização de status no Drift DB.

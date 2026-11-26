@@ -41,7 +41,7 @@ class _ExperiencesScreenState extends ConsumerState<ExperiencesScreen> {
         '📅 Data: $dtFormatted\n'
         '${exp.locationOrModality != null ? "Modalidade: ${exp.locationOrModality}\n" : ""}'
         '${exp.tags.isNotEmpty ? "Tags: ${exp.tags.join(', ')}\n" : ""}\n'
-        '${exp.content}';
+        '${MarkdownPreviewText.cleanMarkdown(exp.content)}';
 
     Clipboard.setData(ClipboardData(text: text));
     ScaffoldMessenger.of(context).showSnackBar(

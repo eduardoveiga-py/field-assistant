@@ -977,7 +977,8 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                       final isSelected = _selectedEntryId == entry.id;
                       return Semantics(
                         selected: isSelected,
-                        label: 'Captura rápida: ${entry.content}',
+                        label:
+                            'Captura rápida: ${MarkdownPreviewText.cleanMarkdown(entry.content)}',
                         child: GestureDetector(
                           onTap: () =>
                               setState(() => _selectedEntryId = entry.id),
