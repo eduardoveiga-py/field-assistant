@@ -191,11 +191,26 @@ class RichFormattedEditingController extends TextEditingController {
       return '';
     });
 
+    final sanitizedBlocks = withoutImages
+        .replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n')
+        .replaceAllMapped(
+          RegExp(
+            r'<details\b[^>]*>\s*<summary\b[^>]*>([\s\S]*?)</summary>\s*([\s\S]*?)\s*</details>',
+            caseSensitive: false,
+          ),
+          (m) {
+            final sum = HighlightTextHelper.stripHighlightTags(m.group(1) ?? '')
+                .trim();
+            final body = (m.group(2) ?? '').trim();
+            return ':::toggle ${sum.isEmpty ? 'Detalhes' : sum}\n$body\n:::';
+          },
+        );
+
     final outBuf = StringBuffer();
     final spans = <RichStyleSpan>[];
     final lineStyles = <int, RichBlockStyle>{};
 
-    final lines = withoutImages.replaceAll('\r\n', '\n').split('\n');
+    final lines = sanitizedBlocks.replaceAll('\r\n', '\n').split('\n');
     for (var i = 0; i < lines.length; i++) {
       var line = lines[i];
       if (i > 0) outBuf.write('\n');
@@ -285,20 +300,26 @@ class RichFormattedEditingController extends TextEditingController {
         }
       }
 
-      if (m.group(1) != null || m.group(2) != null) {
-        // <u style="color:#hex">inner</u>
-        final hex = m.group(1) ?? '#EAB308';
+      if (m.group(2) != null) {
+        // <u style="color:#hex">inner</u> -> highlight colorido; <u>inner</u> -> sublinhado
+        final rawHex = m.group(1);
+        final hex = rawHex == null
+            ? null
+            : (rawHex.startsWith('#') ? rawHex : '#$rawHex');
         final inner = m.group(2) ?? '';
         _parseInlineMarkupIntoBuffer(
           inner,
           baseOffset: baseOffset,
           outBuf: outBuf,
           outSpans: outSpans,
-          inherited: inherited.copyWith(highlightHex: hex),
+          inherited: hex != null
+              ? inherited.copyWith(highlightHex: hex)
+              : inherited.copyWith(underline: true),
         );
-      } else if (m.group(3) != null || m.group(4) != null) {
+      } else if (m.group(4) != null) {
         // <mark style="background:#hex">inner</mark>
-        final hex = m.group(3) ?? '#EAB308';
+        final rawHex = m.group(3) ?? '#EAB308';
+        final hex = rawHex.startsWith('#') ? rawHex : '#$rawHex';
         final inner = m.group(4) ?? '';
         _parseInlineMarkupIntoBuffer(
           inner,

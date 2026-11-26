@@ -595,263 +595,271 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
               );
             }
 
-            if (_notesViewMode == NotesDatabaseViewMode.table) {
-              return Column(
-                children: [
-                  viewSwitcherBar,
-                  Expanded(
-                    child: NotesTableView(
-                      notes: notes,
-                      areasById: areasById,
-                      isDark: isDark,
-                      formatDate: _formatDate,
-                      onOpenNote: openSingleNote,
-                    ),
-                  ),
-                ],
-              );
-            }
-
-            if (_notesViewMode == NotesDatabaseViewMode.kanban) {
-              return Column(
-                children: [
-                  viewSwitcherBar,
-                  Expanded(
-                    child: NotesKanbanView(
-                      notes: notes,
-                      areasById: areasById,
-                      isDark: isDark,
-                      onOpenNote: openSingleNote,
-                      onChangeStatus: (note, newStatus) async {
-                        final props = KnowledgeManager.decodeProperties(
-                          note.propertiesJson,
+            return Column(
+              children: [
+                viewSwitcherBar,
+                Expanded(
+                  child: Builder(
+                    builder: (context) {
+                      if (_notesViewMode == NotesDatabaseViewMode.table) {
+                        return NotesTableView(
+                          notes: notes,
+                          areasById: areasById,
+                          isDark: isDark,
+                          formatDate: _formatDate,
+                          onOpenNote: openSingleNote,
                         );
-                        props['status'] = newStatus;
-                        await km.updateNote(note.id, properties: props);
-                      },
-                      onCreateInStatus: (status) =>
-                          _showCreateNoteModal(initialStatus: status),
-                    ),
-                  ),
-                ],
-              );
-            }
+                      }
 
-            if (_notesViewMode == NotesDatabaseViewMode.gallery) {
-              return Column(
-                children: [
-                  viewSwitcherBar,
-                  Expanded(
-                    child: NotesGalleryView(
-                      notes: notes,
-                      areasById: areasById,
-                      isDark: isDark,
-                      formatDate: _formatDate,
-                      onOpenNote: openSingleNote,
-                    ),
-                  ),
-                ],
-              );
-            }
-
-            return LayoutBuilder(
-              builder: (context, constraints) {
-                final isWide = constraints.maxWidth >= 900;
-                KnowledgeNoteEntry? selectedNote;
-                if (_selectedNoteId != null) {
-                  for (final n in notes) {
-                    if (n.id == _selectedNoteId) {
-                      selectedNote = n;
-                      break;
-                    }
-                  }
-                }
-
-                final listPane = Column(
-                  children: [
-                    viewSwitcherBar,
-                    Expanded(
-                      child: ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 92),
-                        itemCount: notes.length,
-                        separatorBuilder: (ctx, i) =>
-                            const SizedBox(height: 10),
-                        itemBuilder: (ctx, i) {
-                          final note = notes[i];
-                          List<String> noteTags = [];
-                          try {
-                            noteTags = (jsonDecode(note.tags) as List)
-                                .map((e) => e.toString())
-                                .where((t) => !t.startsWith('research:'))
-                                .toList();
-                          } catch (e, st) {
-                            AppLogger.debug(
-                              'Falha ao exibir tags da nota (${note.id}): $e',
-                              st,
+                      if (_notesViewMode == NotesDatabaseViewMode.kanban) {
+                        return NotesKanbanView(
+                          notes: notes,
+                          areasById: areasById,
+                          isDark: isDark,
+                          onOpenNote: openSingleNote,
+                          onChangeStatus: (note, newStatus) async {
+                            final props = KnowledgeManager.decodeProperties(
+                              note.propertiesJson,
                             );
+                            props['status'] = newStatus;
+                            await km.updateNote(note.id, properties: props);
+                          },
+                          onCreateInStatus: (status) =>
+                              _showCreateNoteModal(initialStatus: status),
+                        );
+                      }
+
+                      if (_notesViewMode == NotesDatabaseViewMode.gallery) {
+                        return NotesGalleryView(
+                          notes: notes,
+                          areasById: areasById,
+                          isDark: isDark,
+                          formatDate: _formatDate,
+                          onOpenNote: openSingleNote,
+                        );
+                      }
+
+                      return LayoutBuilder(
+                        builder: (context, constraints) {
+                          final isWide = constraints.maxWidth >= 900;
+                          KnowledgeNoteEntry? selectedNote;
+                          if (_selectedNoteId != null) {
+                            for (final n in notes) {
+                              if (n.id == _selectedNoteId) {
+                                selectedNote = n;
+                                break;
+                              }
+                            }
                           }
 
-                          final isSelectedInSplit =
-                              isWide && _selectedNoteId == note.id;
-                          return KnowledgeNoteListCard(
-                            note: note,
-                            tags: noteTags,
-                            formattedDate: _formatDate(note.updatedAt),
-                            isSelected: isSelectedInSplit,
-                            isDark: isDark,
-                            onTap: () {
-                              if (isWide) {
-                                setState(() => _selectedNoteId = note.id);
-                                return;
+                          final listPane = ListView.separated(
+                            padding: const EdgeInsets.fromLTRB(16, 12, 16, 92),
+                            itemCount: notes.length,
+                            separatorBuilder: (ctx, i) =>
+                                const SizedBox(height: 10),
+                            itemBuilder: (ctx, i) {
+                              final note = notes[i];
+                              List<String> noteTags = [];
+                              try {
+                                noteTags = (jsonDecode(note.tags) as List)
+                                    .map((e) => e.toString())
+                                    .where((t) => !t.startsWith('research:'))
+                                    .toList();
+                              } catch (e, st) {
+                                AppLogger.debug(
+                                  'Falha ao exibir tags da nota (${note.id}): $e',
+                                  st,
+                                );
                               }
-                              openSingleNote(note);
-                            },
-                            trailingMenu: PopupMenuButton<String>(
-                              icon: const Icon(Icons.more_vert, size: 20),
-                              onSelected: (val) {
-                                if (val == 'pin') km.togglePinNote(note.id);
-                                if (val == 'edit') _showEditNoteModal(note);
-                                if (val == 'research') {
-                                  _transformNoteToResearch(note);
-                                }
-                                if (val == 'export_pdf') _exportNotePdf(note);
-                                if (val == 'export') _exportNote(note);
-                                if (val == 'delete') km.softDeleteNote(note.id);
-                              },
-                              itemBuilder: (ctx) => [
-                                PopupMenuItem(
-                                  value: 'pin',
-                                  child: Text(
-                                    note.isPinned
-                                        ? 'Desafixar'
-                                        : 'Fixar no Topo',
-                                  ),
-                                ),
-                                const PopupMenuItem(
-                                  value: 'edit',
-                                  child: Text('Editar Nota'),
-                                ),
-                                const PopupMenuItem(
-                                  value: 'research',
-                                  child: Text('Transformar em Pesquisa'),
-                                ),
-                                const PopupMenuItem(
-                                  value: 'export_pdf',
-                                  child: Text('Baixar PDF (.pdf)'),
-                                ),
-                                const PopupMenuItem(
-                                  value: 'export',
-                                  child: Text('Exportar Nota'),
-                                ),
-                                const PopupMenuItem(
-                                  value: 'delete',
-                                  child: Text(
-                                    'Excluir Nota',
-                                    style: TextStyle(color: Colors.redAccent),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                );
 
-                if (!isWide) {
-                  return listPane;
-                }
-
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    SizedBox(width: 400, child: listPane),
-                    const VerticalDivider(width: 1),
-                    Expanded(
-                      child: selectedNote == null
-                          ? Container(
-                              color: isDark
-                                  ? const Color(0xFF090D16)
-                                  : const Color(0xFFF1F5F9),
-                              child: Center(
-                                child: Semantics(
-                                  label: 'Selecione uma nota para leitura completa',
-                                  child: Container(
-                                    constraints: const BoxConstraints(
-                                      maxWidth: 360,
-                                    ),
-                                    padding: const EdgeInsets.all(28),
-                                    decoration: BoxDecoration(
-                                      color: isDark
-                                          ? const Color(0xFF111827)
-                                          : Colors.white,
-                                      borderRadius: BorderRadius.circular(20),
-                                      border: Border.all(
-                                        color: isDark
-                                            ? Colors.white.withValues(
-                                                alpha: 0.08,
-                                              )
-                                            : const Color(0xFFE2E8F0),
+                              final isSelectedInSplit =
+                                  isWide && _selectedNoteId == note.id;
+                              return KnowledgeNoteListCard(
+                                note: note,
+                                tags: noteTags,
+                                formattedDate: _formatDate(note.updatedAt),
+                                isSelected: isSelectedInSplit,
+                                isDark: isDark,
+                                onTap: () {
+                                  if (isWide) {
+                                    setState(() => _selectedNoteId = note.id);
+                                    return;
+                                  }
+                                  openSingleNote(note);
+                                },
+                                trailingMenu: PopupMenuButton<String>(
+                                  icon: const Icon(Icons.more_vert, size: 20),
+                                  onSelected: (val) {
+                                    if (val == 'pin') {
+                                      km.togglePinNote(note.id);
+                                    }
+                                    if (val == 'edit') {
+                                      _showEditNoteModal(note);
+                                    }
+                                    if (val == 'research') {
+                                      _transformNoteToResearch(note);
+                                    }
+                                    if (val == 'export_pdf') {
+                                      _exportNotePdf(note);
+                                    }
+                                    if (val == 'export') {
+                                      _exportNote(note);
+                                    }
+                                    if (val == 'delete') {
+                                      km.softDeleteNote(note.id);
+                                    }
+                                  },
+                                  itemBuilder: (ctx) => [
+                                    PopupMenuItem(
+                                      value: 'pin',
+                                      child: Text(
+                                        note.isPinned
+                                            ? 'Desafixar'
+                                            : 'Fixar no Topo',
                                       ),
                                     ),
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Container(
-                                          padding: const EdgeInsets.all(16),
-                                          decoration: BoxDecoration(
-                                            color: AppTheme.primaryBlue
-                                                .withValues(alpha: 0.14),
-                                            shape: BoxShape.circle,
-                                          ),
-                                          child: const Icon(
-                                            Icons.menu_book_rounded,
-                                            size: 36,
-                                            color: AppTheme.primaryBlue,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 16),
-                                        Text(
-                                          'Selecione uma nota para leitura completa',
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                            color: isDark
-                                                ? const Color(0xFFE2E8F0)
-                                                : AppTheme.textDark,
-                                            fontSize: 15.5,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 6),
-                                        Text(
-                                          'Toque em um cartão à esquerda para ler referências bíblicas, blocos estilo Notion, backlinks e subpáginas.',
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                            color: isDark
-                                                ? const Color(0xFF94A3B8)
-                                                : AppTheme.textMuted,
-                                            fontSize: 12.5,
-                                            height: 1.45,
-                                          ),
-                                        ),
-                                      ],
+                                    const PopupMenuItem(
+                                      value: 'edit',
+                                      child: Text('Editar Nota'),
                                     ),
-                                  ),
+                                    const PopupMenuItem(
+                                      value: 'research',
+                                      child: Text('Transformar em Pesquisa'),
+                                    ),
+                                    const PopupMenuItem(
+                                      value: 'export_pdf',
+                                      child: Text('Baixar PDF (.pdf)'),
+                                    ),
+                                    const PopupMenuItem(
+                                      value: 'export',
+                                      child: Text('Exportar Nota'),
+                                    ),
+                                    const PopupMenuItem(
+                                      value: 'delete',
+                                      child: Text(
+                                        'Excluir Nota',
+                                        style: TextStyle(
+                                          color: Colors.redAccent,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
+                              );
+                            },
+                          );
+
+                          if (!isWide) {
+                            return listPane;
+                          }
+
+                          return Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              SizedBox(width: 400, child: listPane),
+                              const VerticalDivider(width: 1),
+                              Expanded(
+                                child: selectedNote == null
+                                    ? Container(
+                                        color: isDark
+                                            ? const Color(0xFF090D16)
+                                            : const Color(0xFFF1F5F9),
+                                        child: Center(
+                                          child: Semantics(
+                                            label: 'Selecione uma nota para leitura completa',
+                                            child: Container(
+                                              constraints: const BoxConstraints(
+                                                maxWidth: 360,
+                                              ),
+                                              padding: const EdgeInsets.all(28),
+                                              decoration: BoxDecoration(
+                                                color: isDark
+                                                    ? const Color(0xFF111827)
+                                                    : Colors.white,
+                                                borderRadius:
+                                                    BorderRadius.circular(20),
+                                                border: Border.all(
+                                                  color: isDark
+                                                      ? Colors.white.withValues(
+                                                          alpha: 0.08,
+                                                        )
+                                                      : const Color(0xFFE2E8F0),
+                                                ),
+                                              ),
+                                              child: Column(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Container(
+                                                    padding:
+                                                        const EdgeInsets.all(
+                                                          16,
+                                                        ),
+                                                    decoration: BoxDecoration(
+                                                      color: AppTheme
+                                                          .primaryBlue
+                                                          .withValues(
+                                                            alpha: 0.14,
+                                                          ),
+                                                      shape: BoxShape.circle,
+                                                    ),
+                                                    child: const Icon(
+                                                      Icons.menu_book_rounded,
+                                                      size: 36,
+                                                      color:
+                                                          AppTheme.primaryBlue,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 16),
+                                                  Text(
+                                                    'Selecione uma nota para leitura completa',
+                                                    textAlign: TextAlign.center,
+                                                    style: TextStyle(
+                                                      color: isDark
+                                                          ? const Color(
+                                                              0xFFE2E8F0,
+                                                            )
+                                                          : AppTheme.textDark,
+                                                      fontSize: 15.5,
+                                                      fontWeight:
+                                                          FontWeight.w700,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 6),
+                                                  Text(
+                                                    'Toque em um cartão à esquerda para ler referências bíblicas, blocos estilo Notion, backlinks e subpáginas.',
+                                                    textAlign: TextAlign.center,
+                                                    style: TextStyle(
+                                                      color: isDark
+                                                          ? const Color(
+                                                              0xFF94A3B8,
+                                                            )
+                                                          : AppTheme.textMuted,
+                                                      fontSize: 12.5,
+                                                      height: 1.45,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      )
+                                    : _buildNoteDetailSidePane(
+                                        context,
+                                        km,
+                                        selectedNote,
+                                        areasById,
+                                        isDark,
+                                      ),
                               ),
-                            )
-                          : _buildNoteDetailSidePane(
-                              context,
-                              km,
-                              selectedNote,
-                              areasById,
-                              isDark,
-                            ),
-                    ),
-                  ],
-                );
-              },
+                            ],
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
             );
           },
         );

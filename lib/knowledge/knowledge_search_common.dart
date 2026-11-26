@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import '../database/app_database.dart';
+import '../inbox/email_html_sanitizer.dart';
 
 /// Item de resultado em busca unificada na Base de Conhecimento
 class KnowledgeSearchResult {
@@ -134,15 +135,10 @@ class KnowledgeSearchCommon {
     List<String> queryTokens = const [],
     int maxLength = 150,
   }) {
-    final cleaned = rawBody
-        .replaceAll(RegExp(r'!\[[^\]]*\]\([^)]*\)'), '')
-        .replaceAllMapped(
-          RegExp(r'\[([^\]]+)\]\([^)]+\)'),
-          (m) => m.group(1) ?? '',
-        )
-        .replaceAll(RegExp(r'[#*`>_]+'), ' ')
-        .replaceAll(RegExp(r'\s+'), ' ')
-        .trim();
+    final cleaned = EmailHtmlSanitizer.extractPlainText(
+      rawBody,
+      cleanMarkdown: true,
+    ).replaceAll(RegExp(r'\s+'), ' ').trim();
     if (cleaned.isEmpty) return '';
 
     if (queryTokens.isNotEmpty && cleaned.length > maxLength) {

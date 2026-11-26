@@ -95,6 +95,57 @@ class SecondBrainBlockParser {
     return parse(norm).any((b) => b is TableSecondBrainBlock);
   }
 
+  /// Normaliza diretivas de bloco (`:::toggle`, `<details>`, `[!TIP]`, separadores GFM `|---|`, `[[wikilink]]`)
+  /// para pré-visualização inline em cartões sem perder tags `<u>`/`<mark>` nem links `[rótulo](url)`.
+  static String toInlinePreviewMarkup(String raw) {
+    if (raw.trim().isEmpty) return '';
+    var out = raw.replaceAll('\r\n', '\n');
+    out = out.replaceAllMapped(
+      RegExp(
+        r'<details\b[^>]*>\s*<summary\b[^>]*>([\s\S]*?)</summary>\s*([\s\S]*?)\s*</details>',
+        caseSensitive: false,
+      ),
+      (m) => '▸ **${(m.group(1) ?? '').trim()}**\n${(m.group(2) ?? '').trim()}',
+    );
+    out = out.replaceAllMapped(
+      RegExp(r'^:::toggle\s+(.+)$', multiLine: true, caseSensitive: false),
+      (m) => '▸ **${(m.group(1) ?? '').trim()}**',
+    );
+    out = out.replaceAll(RegExp(r'^:::\s*$', multiLine: true), '');
+    out = out.replaceAllMapped(
+      RegExp(
+        r'^>\s*\[!(NOTE|TIP|IMPORTANT|WARNING)\]\s*',
+        multiLine: true,
+        caseSensitive: false,
+      ),
+      (m) {
+        final label = switch ((m.group(1) ?? '').toUpperCase()) {
+          'TIP' => 'Dica',
+          'IMPORTANT' => 'Importante',
+          'WARNING' => 'Atenção',
+          _ => 'Nota',
+        };
+        return '**$label:** ';
+      },
+    );
+    out = out.replaceAll(
+      RegExp(
+        r'^\s*\|?\s*:?-{2,}:?(?:\s*\|\s*:?-{2,}:?)*\s*\|?\s*$',
+        multiLine: true,
+      ),
+      '',
+    );
+    out = out.replaceAllMapped(
+      RegExp(r'!\[([^\]]*)\]\([^\)]+\)'),
+      (m) => (m.group(1) ?? '').trim(),
+    );
+    out = out.replaceAllMapped(
+      RegExp(r'\[\[([^\[\]\n|]+)(?:\|([^\[\]\n]+))?\]\]'),
+      (m) => (m.group(2) ?? m.group(1) ?? '').trim(),
+    );
+    return out.replaceAll(RegExp(r'\n{2,}'), '\n').trim();
+  }
+
   static List<SecondBrainBlock> parse(String raw) {
     if (raw.trim().isEmpty) return const [];
     final lines = raw.replaceAll('\r\n', '\n').split('\n');

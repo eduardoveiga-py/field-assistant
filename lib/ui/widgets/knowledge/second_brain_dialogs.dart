@@ -10,6 +10,8 @@ import '../../../knowledge/knowledge_manager.dart';
 import '../../../knowledge/notion_import_parser.dart';
 import '../../../knowledge/second_brain_review_service.dart';
 import '../../../sync/media_bytes.dart';
+import '../markdown_preview_text.dart';
+import 'rich_block_markdown_view.dart';
 
 /// Abre o gerenciador de Áreas P.A.R.A. (criar, editar cor/nome e excluir).
 Future<void> showManageAreasDialog(
@@ -393,7 +395,8 @@ class _WeeklyReviewModalState extends State<_WeeklyReviewModal> {
                           contentPadding: EdgeInsets.zero,
                           leading: const Icon(Icons.inbox_outlined, size: 18),
                           title: Text(
-                            item.content.replaceAll('\n', ' '),
+                            MarkdownPreviewText.cleanMarkdown(item.content)
+                                .replaceAll('\n', ' '),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -545,12 +548,23 @@ class _WeeklyReviewModalState extends State<_WeeklyReviewModal> {
               )
             else ...[
               const SizedBox(height: 6),
-              Text(
-                revealBody.isEmpty ? '(Sem corpo detalhado)' : revealBody,
-                maxLines: 6,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 12.5),
-              ),
+              if (revealBody.trim().isEmpty)
+                const Text(
+                  '(Sem corpo detalhado)',
+                  style: TextStyle(fontSize: 12.5, color: Colors.grey),
+                )
+              else
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 220),
+                  child: SingleChildScrollView(
+                    child: RichBlockMarkdownView(
+                      text: revealBody,
+                      isDark: Theme.of(context).brightness == Brightness.dark,
+                      allowHighlights: false,
+                      style: const TextStyle(fontSize: 12.5, height: 1.45),
+                    ),
+                  ),
+                ),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 6,

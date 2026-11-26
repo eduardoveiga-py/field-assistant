@@ -37,18 +37,51 @@ class MarkdownPreviewText extends StatefulWidget {
   static String cleanMarkdown(String raw) {
     if (raw.isEmpty) return '';
 
-    String cleaned = raw;
+    String cleaned = raw.replaceAll('\r\n', '\n');
+    // Normaliza blocos expansíveis HTML <details>/<summary> e diretivas Notion
+    cleaned = cleaned.replaceAllMapped(
+      RegExp(
+        r'<details\b[^>]*>\s*<summary\b[^>]*>([\s\S]*?)</summary>\s*([\s\S]*?)\s*</details>',
+        caseSensitive: false,
+      ),
+      (m) => '${m.group(1) ?? ''}\n${m.group(2) ?? ''}',
+    );
+    cleaned = cleaned.replaceAll(
+      RegExp(r'^:::toggle\s+', multiLine: true, caseSensitive: false),
+      '',
+    );
+    cleaned = cleaned.replaceAll(RegExp(r'^:::\s*$', multiLine: true), '');
+    cleaned = cleaned.replaceAll(
+      RegExp(
+        r'^>\s*\[!(?:NOTE|TIP|IMPORTANT|WARNING)\]\s*',
+        multiLine: true,
+        caseSensitive: false,
+      ),
+      '',
+    );
+    cleaned = cleaned.replaceAll(
+      RegExp(
+        r'^\s*\|?\s*:?-{2,}:?(?:\s*\|\s*:?-{2,}:?)*\s*\|?\s*$',
+        multiLine: true,
+      ),
+      '',
+    );
     // Remove imagens: ![alt](url) -> alt
     cleaned = cleaned.replaceAllMapped(
       RegExp(r'!\[([^\]]*)\]\([^\)]+\)'),
       (m) => m.group(1) ?? '',
     );
-    // Transforma links: [label](url) -> label
+    // Transforma wikilinks [[Título|Apelido]] -> Apelido ou [[Título]] -> Título
+    cleaned = cleaned.replaceAllMapped(
+      RegExp(r'\[\[([^\[\]\n|]+)(?:\|([^\[\]\n]+))?\]\]'),
+      (m) => (m.group(2) ?? m.group(1) ?? '').trim(),
+    );
+    // Transforma links: [label](url) -> label (inclusive labels com tags internas)
     cleaned = cleaned.replaceAllMapped(
       RegExp(r'\[([^\]]+)\]\([^\)]+\)'),
       (m) => m.group(1) ?? '',
     );
-    // Remove tags HTML como <mark...>...</mark> e <u...></u>
+    // Remove tags HTML como <mark...>...</mark>, <u...></u> e quaisquer resíduos
     cleaned = HighlightTextHelper.stripHighlightTags(cleaned);
     cleaned = cleaned.replaceAll(RegExp(r'<[^>]+>'), '');
     // Remove negrito e itálico: ***text***, **text**, *text*, __text__, _text_
