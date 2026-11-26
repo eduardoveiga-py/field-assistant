@@ -1,16 +1,24 @@
-import 'package:file_picker/file_picker.dart';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../bible/nwt_bible_books.dart';
 import '../../bible/nwt_bible_service.dart';
-import '../../core/app_theme.dart';
 import '../../database/app_database.dart';
 import 'highlight_text_helper.dart';
 import 'jw_highlight_floating_toolbar.dart';
 
-/// Abre o popup interativo de leitura de passagem bíblica (Tradução do Novo Mundo).
+typedef _BibleSlice = ({
+  int number,
+  String rawMarkup,
+  MappedRichTextResult mapped,
+  int docStart,
+  int docEnd,
+});
+
+/// Abre o popup interativo de leitura de passagem bíblica (com suporte a 1 ou mais traduções).
 Future<void> showBibleVersePopup(
   BuildContext context, {
   required AppDatabase db,
@@ -30,8 +38,8 @@ Future<void> showBibleVersePopup(
   );
 }
 
-/// Diálogo offline-first para leitura de textos bíblicos TNM importados localmente
-/// (via `.epub` do jw.org ou `.json`) ou cadastrados manualmente pelo usuário.
+/// Diálogo offline-first para leitura e comparação de textos bíblicos importados em Configurações
+/// (ou salvos manualmente pelo usuário), sem botões de importação direta no popup.
 class BibleVersePopupDialog extends StatefulWidget {
   final AppDatabase db;
   final int bookNumber;
@@ -51,15 +59,14 @@ class BibleVersePopupDialog extends StatefulWidget {
 }
 
 class _BibleVersePopupDialogState extends State<BibleVersePopupDialog> {
-  BiblePassageLookupResult? _lookup;
-  BibleNwtCatalog? _catalog;
+  List<BibleNwtCatalog> _translations = const [];
+  List<String> _selectedIds = const [];
+  List<BibleTranslationPassage> _passages = const [];
   bool _loading = true;
-  bool _importing = false;
   double _fontSize = 16;
-  String? _statusMessage;
   final JwHighlightFloatingController _hlFloating =
       JwHighlightFloatingController();
-  final GlobalKey _verseAnchorKey = GlobalKey();
+  final Map<String, GlobalKey> _anchorKeys = {};
 
   @override
   void initState() {
@@ -73,81 +80,45 @@ class _BibleVersePopupDialogState extends State<BibleVersePopupDialog> {
     super.dispose();
   }
 
+  GlobalKey _anchorKeyFor(String translationId) =>
+      _anchorKeys.putIfAbsent(translationId, () => GlobalKey());
+
   Future<void> _loadData() async {
     setState(() => _loading = true);
-    final catalog = await NwtBibleService.loadCatalog(widget.db);
-    final res = await NwtBibleService.lookupPassage(
+    final translations = await NwtBibleService.listTranslations(widget.db);
+    var selectedIds = await NwtBibleService.loadSelectedComparisonIds(
       widget.db,
+    );
+    final validIds = {for (final t in translations) t.id};
+    selectedIds = selectedIds.where(validIds.contains).toList();
+    if (selectedIds.isEmpty && translations.isNotEmpty) {
+      final primary =
+          translations.where((t) => t.isPrimary).firstOrNull ??
+          translations.first;
+      selectedIds = [primary.id];
+    }
+
+    final passages = await NwtBibleService.lookupComparisonPassages(
+      widget.db,
+      translationIds: selectedIds,
       bookNumber: widget.bookNumber,
       chapter: widget.chapter,
       verseSpec: widget.verseSpec,
     );
+
     if (!mounted) return;
     setState(() {
-      _catalog = catalog;
-      _lookup = res;
+      _translations = translations;
+      _selectedIds = selectedIds;
+      _passages = passages;
       _loading = false;
     });
   }
 
-  Future<void> _importLocalFile() async {
-    setState(() {
-      _importing = true;
-      _statusMessage = null;
-    });
-    try {
-      final files = await FilePicker.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: const ['epub', 'json', 'jwpub'],
-      );
-      if (files.isEmpty) {
-        if (mounted) setState(() => _importing = false);
-        return;
-      }
-      final file = files.first;
-      Uint8List bytes;
-      try {
-        bytes = await file.readAsBytes();
-      } catch (e) {
-        if (mounted) {
-          setState(() {
-            _importing = false;
-            _statusMessage =
-                'Não foi possível ler os bytes do arquivo "${file.name}": $e';
-          });
-        }
-        return;
-      }
-      if (bytes.isEmpty) {
-        if (mounted) {
-          setState(() {
-            _importing = false;
-            _statusMessage = 'O arquivo "${file.name}" está vazio.';
-          });
-        }
-        return;
-      }
-      final imported = await NwtBibleService.importFromBytes(
-        widget.db,
-        bytes: bytes,
-        fileName: file.name,
-      );
-      await _loadData();
-      if (mounted) {
-        setState(() {
-          _importing = false;
-          _statusMessage =
-              'TNM importada com sucesso: ${imported.catalog.bookCount} livro(s), ${imported.catalog.verseCount} versículos.';
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _importing = false;
-          _statusMessage = e.toString();
-        });
-      }
-    }
+  Future<void> _applyTranslationSelection(List<String> nextIds) async {
+    _hlFloating.hide();
+    await NwtBibleService.saveSelectedComparisonIds(widget.db, nextIds);
+    await _loadData();
   }
 
   Future<void> _showManualVerseModal() async {
@@ -156,7 +127,10 @@ class _BibleVersePopupDialogState extends State<BibleVersePopupDialog> {
     final verseNumCtrl = TextEditingController(text: '$defaultVerse');
     final textCtrl = TextEditingController();
 
-    final existingMatch = _lookup?.verses
+    final firstWithVerses = _passages
+        .where((p) => p.lookup.hasFoundVerses)
+        .firstOrNull;
+    final existingMatch = firstWithVerses?.lookup.verses
         .where((v) => v.number == defaultVerse)
         .firstOrNull;
     if (existingMatch != null) {
@@ -186,7 +160,7 @@ class _BibleVersePopupDialogState extends State<BibleVersePopupDialog> {
                 maxLines: 5,
                 autofocus: true,
                 decoration: const InputDecoration(
-                  labelText: 'Texto do versículo (TNM)',
+                  labelText: 'Texto do versículo (Offline)',
                   hintText:
                       'Cole ou digite o texto bíblico para uso offline...',
                   border: OutlineInputBorder(),
@@ -223,27 +197,148 @@ class _BibleVersePopupDialogState extends State<BibleVersePopupDialog> {
     textCtrl.dispose();
   }
 
-  List<
-    ({
-      int number,
-      String rawMarkup,
-      MappedRichTextResult mapped,
-      int docStart,
-      int docEnd,
-    })
-  >
-  _buildVerseSlices(bool isDark) {
-    final verses = _lookup?.verses ?? const [];
-    final slices =
-        <
-          ({
-            int number,
-            String rawMarkup,
-            MappedRichTextResult mapped,
-            int docStart,
-            int docEnd,
-          })
-        >[];
+  Future<void> _showCompareVersionsModal() async {
+    if (_translations.isEmpty) return;
+    final selectedSet = _selectedIds.toSet();
+    final result = await showDialog<List<String>>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (modalCtx, setModalState) {
+            return AlertDialog(
+              title: const Text('Comparar versões'),
+              content: SizedBox(
+                width: 420,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const Text(
+                        'Selecione 1 tradução para leitura simples ou marque várias para comparar lado a lado no estilo JW Library.',
+                        style: TextStyle(fontSize: 12.5, color: Colors.grey),
+                      ),
+                      const SizedBox(height: 12),
+                      for (final tr in _translations)
+                        CheckboxListTile(
+                          key: Key('chk_compare_bible_${tr.id}'),
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          value: selectedSet.contains(tr.id),
+                          title: Text(
+                            tr.title,
+                            style: const TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          subtitle: Text(
+                            '${tr.languageDisplay}${tr.isPrimary ? ' • Principal' : ''}',
+                            style: const TextStyle(fontSize: 11.5),
+                          ),
+                          secondary: _buildCoverWidget(
+                            tr.coverBase64,
+                            size: 36,
+                          ),
+                          onChanged: (checked) {
+                            setModalState(() {
+                              if (checked == true) {
+                                selectedSet.add(tr.id);
+                              } else if (selectedSet.length > 1) {
+                                selectedSet.remove(tr.id);
+                              }
+                            });
+                          },
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                if (_translations.length > 1)
+                  TextButton(
+                    onPressed: () {
+                      setModalState(() {
+                        selectedSet
+                          ..clear()
+                          ..addAll(_translations.map((t) => t.id));
+                      });
+                    },
+                    child: const Text('Marcar todas'),
+                  ),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Cancelar'),
+                ),
+                FilledButton(
+                  key: const Key('btn_apply_compare_versions'),
+                  onPressed: selectedSet.isEmpty
+                      ? null
+                      : () {
+                          final ordered = _translations
+                              .map((t) => t.id)
+                              .where(selectedSet.contains)
+                              .toList();
+                          Navigator.pop(ctx, ordered);
+                        },
+                  child: const Text('Aplicar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    if (result != null && result.isNotEmpty) {
+      await _applyTranslationSelection(result);
+    }
+  }
+
+  Widget _buildCoverWidget(String? coverBase64, {double size = 40}) {
+    if (coverBase64 != null && coverBase64.isNotEmpty) {
+      try {
+        final raw = coverBase64.contains(',')
+            ? coverBase64.split(',').last
+            : coverBase64;
+        final bytes = base64Decode(raw);
+        if (bytes.isNotEmpty) {
+          return ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: Image.memory(
+              bytes,
+              width: size,
+              height: size,
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) => _defaultBibleThumb(size),
+            ),
+          );
+        }
+      } catch (_) {}
+    }
+    return _defaultBibleThumb(size);
+  }
+
+  Widget _defaultBibleThumb(double size) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: const Color(0xFF334155),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Icon(
+        Icons.menu_book_rounded,
+        color: Colors.white70,
+        size: size * 0.56,
+      ),
+    );
+  }
+
+  List<_BibleSlice> _buildVerseSlices(
+    List<BibleVerseEntry> verses,
+    bool isDark,
+  ) {
+    final slices = <_BibleSlice>[];
     var cursor = 0;
     final verseStyle = TextStyle(
       fontSize: _fontSize,
@@ -269,22 +364,14 @@ class _BibleVersePopupDialogState extends State<BibleVersePopupDialog> {
         docStart: docStart,
         docEnd: docEnd,
       ));
-      cursor = docEnd + 1; // +1 espaço separador entre versículos
+      cursor = docEnd + 1;
     }
     return slices;
   }
 
   Future<void> _applyHighlightToSelection(
-    List<
-      ({
-        int number,
-        String rawMarkup,
-        MappedRichTextResult mapped,
-        int docStart,
-        int docEnd,
-      })
-    >
-    slices,
+    String translationId,
+    List<_BibleSlice> slices,
     int selStart,
     int selEnd,
     String? colorHex,
@@ -314,22 +401,14 @@ class _BibleVersePopupDialogState extends State<BibleVersePopupDialog> {
           chapter: widget.chapter,
           verse: slice.number,
           markedText: updatedMarkup,
+          translationId: translationId,
         );
         changed = true;
       }
     }
     if (changed) {
-      final updatedLookup = await NwtBibleService.lookupPassage(
-        widget.db,
-        bookNumber: widget.bookNumber,
-        chapter: widget.chapter,
-        verseSpec: widget.verseSpec,
-      );
-      if (!mounted) return;
       _hlFloating.hide();
-      setState(() {
-        _lookup = updatedLookup;
-      });
+      await _loadData();
     }
   }
 
@@ -346,6 +425,184 @@ class _BibleVersePopupDialogState extends State<BibleVersePopupDialog> {
     }
   }
 
+  Widget _buildSelectableVerses({
+    required BuildContext context,
+    required BibleTranslationPassage passage,
+    required bool isDark,
+    required String keyPrefix,
+  }) {
+    final slices = _buildVerseSlices(passage.lookup.verses, isDark);
+    return Listener(
+      key: _anchorKeyFor(passage.translationId),
+      onPointerDown: (e) => _hlFloating.recordPointerDown(e.position),
+      onPointerUp: (e) => _hlFloating.recordPointerUp(e.position),
+      child: SelectableText.rich(
+        TextSpan(
+          children: [
+            for (final slice in slices) ...[
+              TextSpan(
+                text: '${slice.number} ',
+                style: TextStyle(
+                  fontSize: _fontSize * 0.8,
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFF4338CA),
+                ),
+              ),
+              ...slice.mapped.spans,
+              const TextSpan(text: ' '),
+            ],
+          ],
+        ),
+        onSelectionChanged: (sel, _) {
+          if (!mounted) return;
+          if (sel.isValid && !sel.isCollapsed && sel.end > sel.start) {
+            _hlFloating.show(
+              context: context,
+              keyPrefix: keyPrefix,
+              anchorKey: _anchorKeyFor(passage.translationId),
+              onPickColor: (hex) => _applyHighlightToSelection(
+                passage.translationId,
+                slices,
+                sel.start,
+                sel.end,
+                hex,
+              ),
+            );
+          } else {
+            _hlFloating.hide();
+          }
+        },
+        contextMenuBuilder: (menuCtx, editableState) {
+          final sel = editableState.textEditingValue.selection;
+          final canHl = sel.isValid && !sel.isCollapsed;
+          final items = <ContextMenuButtonItem>[
+            ...editableState.contextMenuButtonItems,
+            if (canHl) ...[
+              for (final c in HighlightTextHelper.colors)
+                ContextMenuButtonItem(
+                  label: 'Marcar (${c.label})',
+                  onPressed: () {
+                    ContextMenuController.removeAny();
+                    _hlFloating.hide();
+                    _applyHighlightToSelection(
+                      passage.translationId,
+                      slices,
+                      sel.start,
+                      sel.end,
+                      c.hex,
+                    );
+                  },
+                ),
+              ContextMenuButtonItem(
+                label: 'Remover marcação',
+                onPressed: () {
+                  ContextMenuController.removeAny();
+                  _hlFloating.hide();
+                  _applyHighlightToSelection(
+                    passage.translationId,
+                    slices,
+                    sel.start,
+                    sel.end,
+                    null,
+                  );
+                },
+              ),
+            ],
+          ];
+          return AdaptiveTextSelectionToolbar.buttonItems(
+            anchors: editableState.contextMenuAnchors,
+            buttonItems: items,
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildComparisonCard(
+    BuildContext context,
+    BibleTranslationPassage passage,
+    bool isDark,
+  ) {
+    final headerBg = isDark ? const Color(0xFF1F242D) : const Color(0xFFE2E8F0);
+    final bodyBg = isDark ? const Color(0xFF121417) : const Color(0xFFF8FAFC);
+
+    return Container(
+      key: Key('bible_compare_card_${passage.translationId}'),
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: bodyBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: isDark ? Colors.white12 : Colors.black12),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          InkWell(
+            onTap: _translations.length > 1 ? _showCompareVersionsModal : null,
+            child: Container(
+              color: headerBg,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+              child: Row(
+                children: [
+                  _buildCoverWidget(passage.coverBase64, size: 38),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          passage.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        Text(
+                          passage.languageDisplay,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: isDark
+                                ? const Color(0xFF94A3B8)
+                                : const Color(0xFF475569),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (_translations.length > 1)
+                    const Icon(Icons.chevron_right, size: 20),
+                ],
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+            child: passage.lookup.hasFoundVerses
+                ? _buildSelectableVerses(
+                    context: context,
+                    passage: passage,
+                    isDark: isDark,
+                    keyPrefix: 'bible_${passage.translationId}',
+                  )
+                : Text(
+                    'Passagem não localizada nesta tradução.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontStyle: FontStyle.italic,
+                      color: isDark ? Colors.white54 : Colors.black54,
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -354,13 +611,22 @@ class _BibleVersePopupDialogState extends State<BibleVersePopupDialog> {
       chapter: widget.chapter,
       verseSpec: widget.verseSpec,
     );
+    final isComparing = _passages.length > 1;
+    final singlePassage = _passages.length == 1 ? _passages.first : null;
+    final anyFoundVerses = _passages.any((p) => p.lookup.hasFoundVerses);
+
+    final subtitleText = isComparing
+        ? 'Comparar versões • ${_passages.length} traduções'
+        : singlePassage != null
+        ? '${singlePassage.title} (${singlePassage.languageDisplay})'
+        : 'Biblioteca Bíblica (Offline / Local)';
 
     return Dialog(
       backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 620, maxHeight: 620),
+        constraints: const BoxConstraints(maxWidth: 640, maxHeight: 650),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -377,18 +643,22 @@ class _BibleVersePopupDialogState extends State<BibleVersePopupDialog> {
               ),
               child: Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF4338CA).withValues(alpha: 0.16),
-                      borderRadius: BorderRadius.circular(10),
+                  if (singlePassage != null &&
+                      singlePassage.coverBase64 != null)
+                    _buildCoverWidget(singlePassage.coverBase64, size: 38)
+                  else
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF4338CA).withValues(alpha: 0.16),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.menu_book_rounded,
+                        color: Color(0xFF4338CA),
+                        size: 22,
+                      ),
                     ),
-                    child: const Icon(
-                      Icons.menu_book_rounded,
-                      color: Color(0xFF4338CA),
-                      size: 22,
-                    ),
-                  ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -402,9 +672,7 @@ class _BibleVersePopupDialogState extends State<BibleVersePopupDialog> {
                           ),
                         ),
                         Text(
-                          _catalog != null
-                              ? '${_catalog!.title} • Offline'
-                              : 'Tradução do Novo Mundo (Offline / Local)',
+                          subtitleText,
                           style: TextStyle(
                             fontSize: 11.5,
                             color: isDark
@@ -417,6 +685,13 @@ class _BibleVersePopupDialogState extends State<BibleVersePopupDialog> {
                       ],
                     ),
                   ),
+                  if (_translations.isNotEmpty)
+                    IconButton(
+                      key: const Key('btn_bible_compare_versions'),
+                      tooltip: 'Comparar versões',
+                      icon: const Icon(Icons.translate_rounded, size: 19),
+                      onPressed: _showCompareVersionsModal,
+                    ),
                   IconButton(
                     tooltip: 'Diminuir fonte',
                     icon: const Icon(Icons.text_decrease, size: 18),
@@ -439,123 +714,37 @@ class _BibleVersePopupDialogState extends State<BibleVersePopupDialog> {
                 ],
               ),
             ),
-            if (_statusMessage != null)
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                color: AppTheme.primaryBlue.withValues(alpha: 0.1),
-                child: Text(
-                  _statusMessage!,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
             Expanded(
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
-                  : _lookup != null && _lookup!.hasFoundVerses
+                  : anyFoundVerses
                   ? Builder(
                       builder: (ctx) {
-                        final slices = _buildVerseSlices(isDark);
                         return NotificationListener<ScrollNotification>(
                           onNotification: (_) {
                             _hlFloating.hide();
                             return false;
                           },
                           child: SingleChildScrollView(
-                            padding: const EdgeInsets.all(20),
-                            child: Listener(
-                              key: _verseAnchorKey,
-                              onPointerDown: (e) =>
-                                  _hlFloating.recordPointerDown(e.position),
-                              onPointerUp: (e) =>
-                                  _hlFloating.recordPointerUp(e.position),
-                              child: SelectableText.rich(
-                                TextSpan(
-                                  children: [
-                                    for (final slice in slices) ...[
-                                      TextSpan(
-                                        text: '${slice.number} ',
-                                        style: TextStyle(
-                                          fontSize: _fontSize * 0.78,
-                                          fontWeight: FontWeight.bold,
-                                          color: const Color(0xFF4338CA),
-                                        ),
-                                      ),
-                                      ...slice.mapped.spans,
-                                      const TextSpan(text: ' '),
+                            padding: const EdgeInsets.all(16),
+                            child: isComparing
+                                ? Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      for (final p in _passages)
+                                        _buildComparisonCard(ctx, p, isDark),
                                     ],
-                                  ],
-                                ),
-                                onSelectionChanged: (sel, _) {
-                                  if (!mounted) return;
-                                  if (sel.isValid &&
-                                      !sel.isCollapsed &&
-                                      sel.end > sel.start) {
-                                    _hlFloating.show(
+                                  )
+                                : Padding(
+                                    padding: const EdgeInsets.all(4),
+                                    child: _buildSelectableVerses(
                                       context: ctx,
+                                      passage: _passages.first,
+                                      isDark: isDark,
                                       keyPrefix: 'bible',
-                                      anchorKey: _verseAnchorKey,
-                                      onPickColor: (hex) =>
-                                          _applyHighlightToSelection(
-                                            slices,
-                                            sel.start,
-                                            sel.end,
-                                            hex,
-                                          ),
-                                    );
-                                  } else {
-                                    _hlFloating.hide();
-                                  }
-                                },
-                                contextMenuBuilder: (menuCtx, editableState) {
-                                  final sel =
-                                      editableState.textEditingValue.selection;
-                                  final canHl = sel.isValid && !sel.isCollapsed;
-                                  final items = <ContextMenuButtonItem>[
-                                    ...editableState.contextMenuButtonItems,
-                                    if (canHl) ...[
-                                      for (final c
-                                          in HighlightTextHelper.colors)
-                                        ContextMenuButtonItem(
-                                          label: 'Marcar (${c.label})',
-                                          onPressed: () {
-                                            ContextMenuController.removeAny();
-                                            _hlFloating.hide();
-                                            _applyHighlightToSelection(
-                                              slices,
-                                              sel.start,
-                                              sel.end,
-                                              c.hex,
-                                            );
-                                          },
-                                        ),
-                                      ContextMenuButtonItem(
-                                        label: 'Remover marcação',
-                                        onPressed: () {
-                                          ContextMenuController.removeAny();
-                                          _hlFloating.hide();
-                                          _applyHighlightToSelection(
-                                            slices,
-                                            sel.start,
-                                            sel.end,
-                                            null,
-                                          );
-                                        },
-                                      ),
-                                    ],
-                                  ];
-                                  return AdaptiveTextSelectionToolbar.buttonItems(
-                                    anchors: editableState.contextMenuAnchors,
-                                    buttonItems: items,
-                                  );
-                                },
-                              ),
-                            ),
+                                    ),
+                                  ),
                           ),
                         );
                       },
@@ -572,9 +761,9 @@ class _BibleVersePopupDialogState extends State<BibleVersePopupDialog> {
                           ),
                           const SizedBox(height: 12),
                           Text(
-                            _lookup?.hasImportedBible == true
-                                ? 'Passagem "$refTitle" não localizada no arquivo TNM importado.'
-                                : 'Nenhuma cópia local da Bíblia Tradução do Novo Mundo importada ainda.',
+                            _translations.isNotEmpty
+                                ? 'Passagem "$refTitle" não localizada nas Bíblias importadas.'
+                                : 'Nenhuma Bíblia local importada ainda.',
                             textAlign: TextAlign.center,
                             style: const TextStyle(
                               fontWeight: FontWeight.bold,
@@ -583,9 +772,8 @@ class _BibleVersePopupDialogState extends State<BibleVersePopupDialog> {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'Para ler 100% offline dentro deste popup sem ferir direitos autorais, '
-                            'importe o arquivo .epub oficial baixado no jw.org (ou um .json próprio) '
-                            'ou cadastre manualmente este versículo abaixo.',
+                            'Importe traduções em múltiplos idiomas (.epub ou .json) '
+                            'em Configurações > Biblioteca Offline, ou cadastre este versículo manualmente abaixo.',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: 13,
@@ -595,25 +783,6 @@ class _BibleVersePopupDialogState extends State<BibleVersePopupDialog> {
                             ),
                           ),
                           const SizedBox(height: 18),
-                          FilledButton.icon(
-                            onPressed: _importing ? null : _importLocalFile,
-                            icon: _importing
-                                ? const SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white,
-                                    ),
-                                  )
-                                : const Icon(Icons.upload_file),
-                            label: Text(
-                              _importing
-                                  ? 'Importando Bíblia...'
-                                  : 'Importar TNM (.epub / .json)',
-                            ),
-                          ),
-                          const SizedBox(height: 10),
                           OutlinedButton.icon(
                             onPressed: _showManualVerseModal,
                             icon: const Icon(Icons.edit_note),
@@ -643,16 +812,24 @@ class _BibleVersePopupDialogState extends State<BibleVersePopupDialog> {
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      if (_lookup != null && _lookup!.hasFoundVerses) ...[
+                      if (anyFoundVerses) ...[
                         TextButton.icon(
                           icon: const Icon(Icons.copy, size: 16),
                           label: const Text('Copiar'),
                           onPressed: () {
-                            final joined = _lookup!.verses
-                                .map((v) => '${v.number} ${v.text}')
-                                .join(' ');
+                            final sections = _passages
+                                .where((p) => p.lookup.hasFoundVerses)
+                                .map((p) {
+                                  final joined = p.lookup.verses
+                                      .map((v) => '${v.number} ${v.text}')
+                                      .join(' ');
+                                  return _passages.length > 1
+                                      ? '${p.title} (${p.languageDisplay})\n$joined'
+                                      : joined;
+                                })
+                                .join('\n\n');
                             Clipboard.setData(
-                              ClipboardData(text: '$refTitle (TNM)\n$joined'),
+                              ClipboardData(text: '$refTitle\n$sections'),
                             );
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
@@ -672,11 +849,20 @@ class _BibleVersePopupDialogState extends State<BibleVersePopupDialog> {
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      TextButton.icon(
-                        icon: const Icon(Icons.upload_file_outlined, size: 16),
-                        label: const Text('Importar TNM'),
-                        onPressed: _importing ? null : _importLocalFile,
-                      ),
+                      if (_translations.length > 1)
+                        TextButton.icon(
+                          key: const Key('btn_bible_footer_compare'),
+                          icon: const Icon(
+                            Icons.view_agenda_outlined,
+                            size: 16,
+                          ),
+                          label: Text(
+                            isComparing
+                                ? 'Comparando (${_passages.length})'
+                                : 'Comparar (${_translations.length})',
+                          ),
+                          onPressed: _showCompareVersionsModal,
+                        ),
                       const SizedBox(width: 4),
                       FilledButton.tonalIcon(
                         icon: const Icon(Icons.open_in_new, size: 16),

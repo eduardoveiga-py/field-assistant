@@ -53,7 +53,10 @@ import 'customize_features_screen.dart';
 import 'connected_calendars_screen.dart';
 import 'appointments_screen.dart';
 import '../widgets/settings/backup_and_pin_dialogs.dart';
+import '../widgets/settings/offline_library_dialog.dart';
 import '../widgets/settings/sync_queue_management_sheet.dart';
+import '../../bible/nwt_bible_service.dart';
+import '../../publications/imported_publications_service.dart';
 
 export '../widgets/settings/sync_queue_management_sheet.dart'
     show SyncQueueManagementSheet;
@@ -97,6 +100,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   late Future<DateTime?> _lastSilentBackupFuture;
   Future<bool>? _e2eeFuture;
   String? _lastEffectiveUserId;
+  int _importedBiblesCount = 0;
+  int _importedPublicationsCount = 0;
 
   Future<bool> _getE2eeFuture(String effectiveUserId) {
     if (_e2eeFuture == null || _lastEffectiveUserId != effectiveUserId) {
@@ -123,7 +128,30 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       await _loadGoogleStatus();
       await _loadJwEmailConfig();
       await _loadPinStatus();
+      await _loadOfflineLibraryCounts();
     });
+  }
+
+  Future<void> _loadOfflineLibraryCounts() async {
+    try {
+      final db = ref.read(databaseProvider);
+      final bibles = await NwtBibleService.listTranslations(db);
+      final pubs = await ImportedPublicationsService.listPublications(db);
+      if (mounted) {
+        setState(() {
+          _importedBiblesCount = bibles.length;
+          _importedPublicationsCount = pubs.length;
+        });
+      }
+    } catch (e, st) {
+      AppLogger.warning('Falha ao consultar biblioteca offline', e, st);
+    }
+  }
+
+  Future<void> _openOfflineLibrary() async {
+    final db = ref.read(databaseProvider);
+    await showOfflineLibraryDialog(context, db: db);
+    await _loadOfflineLibraryCounts();
   }
 
   Future<void> _loadPinStatus() async {
@@ -1296,6 +1324,38 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   },
                 ),
               ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Seção: Biblioteca Offline (Bíblias e Publicações EPUB)
+          const Text(
+            'Biblioteca Offline',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          Card(
+            child: ListTile(
+              key: const Key('btn_open_offline_library'),
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryBlue.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.library_books_outlined,
+                  color: AppTheme.primaryBlue,
+                ),
+              ),
+              title: const Text('Bíblias e Publicações (.epub / .json)'),
+              subtitle: Text(
+                '$_importedBiblesCount Bíblia(s) • $_importedPublicationsCount publicação(ões) importada(s)\n'
+                'Importe traduções em múltiplos idiomas para comparação e publicações para a lista de referências.',
+              ),
+              isThreeLine: true,
+              trailing: const Icon(Icons.chevron_right),
+              onTap: _openOfflineLibrary,
             ),
           ),
           const SizedBox(height: 20),

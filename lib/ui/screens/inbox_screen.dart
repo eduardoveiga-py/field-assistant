@@ -2258,6 +2258,44 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
               ),
               const SizedBox(height: 16),
               ListTile(
+                key: const Key('btn_export_inbox_pdf'),
+                leading: const CircleAvatar(
+                  backgroundColor: Color(0xFFFEE2E2),
+                  child: Icon(
+                    Icons.picture_as_pdf_outlined,
+                    color: Color(0xFFDC2626),
+                  ),
+                ),
+                title: const Text('Documento PDF (.pdf)'),
+                subtitle: const Text(
+                  'Gera documento formatado offline pronto para impressão',
+                ),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  try {
+                    await ref
+                        .read(jwEmailServiceProvider)
+                        .exportInboxEntry(entry, format: 'pdf');
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('PDF da anotação gerado com sucesso!'),
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Falha ao gerar PDF: $e'),
+                          backgroundColor: Colors.redAccent,
+                        ),
+                      );
+                    }
+                  }
+                },
+              ),
+              ListTile(
                 leading: const CircleAvatar(
                   backgroundColor: Color(0xFFEFF6FF),
                   child: Icon(Icons.code, color: Color(0xFF3B82F6)),
@@ -2339,6 +2377,44 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                 style: TextStyle(fontSize: 13, color: Colors.grey),
               ),
               const SizedBox(height: 16),
+              ListTile(
+                key: const Key('btn_export_email_pdf'),
+                leading: const CircleAvatar(
+                  backgroundColor: Color(0xFFFEE2E2),
+                  child: Icon(
+                    Icons.picture_as_pdf_outlined,
+                    color: Color(0xFFDC2626),
+                  ),
+                ),
+                title: const Text('Documento PDF (.pdf)'),
+                subtitle: const Text(
+                  'Exporta remetente, data e corpo formatado em PDF offline',
+                ),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  try {
+                    await ref
+                        .read(jwEmailServiceProvider)
+                        .exportEmail(msg, format: 'pdf');
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('PDF do e-mail gerado com sucesso!'),
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Falha ao gerar PDF do e-mail: $e'),
+                          backgroundColor: Colors.redAccent,
+                        ),
+                      );
+                    }
+                  }
+                },
+              ),
               ListTile(
                 leading: const CircleAvatar(
                   backgroundColor: Color(0xFFEFF6FF),
@@ -3755,7 +3831,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                   color: Colors.blueAccent,
                                 ),
                                 SizedBox(width: 8),
-                                Text('Exportar (.md / .eml)'),
+                                Text('Exportar (.pdf / .md / .eml)'),
                               ],
                             ),
                           ),

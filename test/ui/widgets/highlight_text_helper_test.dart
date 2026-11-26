@@ -148,5 +148,27 @@ void main() {
         d.dispose();
       }
     });
+
+    test('aplica alto contraste para links no tema escuro mantendo offsets intactos', () {
+      const raw =
+          'Veja [📖 Mateus 7:12 (TNM)](app://ref/bible/40/7/12) e [📝 Nota](app://ref/note/n1)';
+      final dark = HighlightTextHelper.buildMappedSpans(
+        raw,
+        const TextStyle(fontSize: 14),
+        isDark: true,
+      );
+      final bibleSpan = dark.spans.whereType<TextSpan>().firstWhere(
+        (s) => s.text == '📖 Mateus 7:12 (TNM)',
+      );
+      final noteSpan = dark.spans.whereType<TextSpan>().firstWhere(
+        (s) => s.text == '📝 Nota',
+      );
+      expect(bibleSpan.style?.color, equals(const Color(0xFFA5B4FC)));
+      expect(noteSpan.style?.color, equals(const Color(0xFF5EEAD4)));
+      expect(
+        dark.plainDisplayText,
+        equals('Veja 📖 Mateus 7:12 (TNM) e 📝 Nota'),
+      );
+    });
   });
 }

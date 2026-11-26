@@ -19,6 +19,7 @@ import '../providers.dart';
 import '../screens/picture_bank_screen.dart';
 import 'bible_verse_popup_dialog.dart';
 import 'knowledge_item_reader_dialog.dart';
+import 'publication_reader_dialog.dart';
 
 /// Despachante universal de referências cruzadas (`app://ref/...`) e links web (`https?://`).
 /// Abre o leitor/visualizador popup correspondente por cima da tela atual e oferece
@@ -120,6 +121,15 @@ class AppReferenceViewer {
           bookNumber: parsed.bookNumber ?? 1,
           chapter: parsed.chapter ?? 1,
           verseSpec: parsed.verseSpec,
+        );
+        return;
+
+      case AppRefCategory.publication:
+        await showPublicationReaderDialog(
+          context,
+          db: db,
+          publicationId: parsed.itemId,
+          initialChapterIndex: parsed.publicationChapterIndex,
         );
         return;
 

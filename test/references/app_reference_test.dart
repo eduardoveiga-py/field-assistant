@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
+import 'package:archive/archive.dart';
 import 'package:drift/drift.dart' as drift;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -10,6 +12,7 @@ import 'package:ministerio_pessoal/inbox/inbox_manager.dart';
 import 'package:ministerio_pessoal/knowledge/knowledge_manager.dart';
 import 'package:ministerio_pessoal/picture_bank/picture_entry_model.dart';
 import 'package:ministerio_pessoal/projects/project_manager.dart';
+import 'package:ministerio_pessoal/publications/imported_publications_service.dart';
 import 'package:ministerio_pessoal/references/app_reference.dart';
 import 'package:ministerio_pessoal/research/research_manager.dart';
 import 'package:ministerio_pessoal/tasks/task_manager.dart';
@@ -290,6 +293,71 @@ void main() {
         '**Sistema incrível!** <u style="color:#10B981">Paz</u> e <mark style="background:#FFEB3B">alegria</mark>.',
       );
       expect(stripped, equals('Sistema incrível! Paz e alegria.'));
+    });
+
+    test('Categoria publication lista publicacoes importadas e interpreta URI com capitulo', () async {
+      final epubArchive = Archive();
+      void addText(String path, String text) {
+        final raw = utf8.encode(text);
+        epubArchive.addFile(ArchiveFile(path, raw.length, raw));
+      }
+
+      addText('META-INF/container.xml', '''<?xml version="1.0"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles>
+</container>''');
+      addText('OEBPS/content.opf', '''<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="2.0">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:title>Escute a Deus (Sintético)</dc:title>
+    <dc:language>pt</dc:language>
+  </metadata>
+  <manifest>
+    <item id="c0" href="c0.xhtml" media-type="application/xhtml+xml"/>
+    <item id="c1" href="c1.xhtml" media-type="application/xhtml+xml"/>
+  </manifest>
+  <spine>
+    <itemref idref="c0"/>
+    <itemref idref="c1"/>
+  </spine>
+</package>''');
+      addText(
+        'OEBPS/c0.xhtml',
+        '<html><head><title>Introdução</title></head><body><p>Primeiro texto.</p></body></html>',
+      );
+      addText(
+        'OEBPS/c1.xhtml',
+        '<html><head><title>Capítulo 1</title></head><body><p>Segundo texto.</p></body></html>',
+      );
+
+      final summary =
+          await ImportedPublicationsService.importPublicationFromBytes(
+            db,
+            bytes: Uint8List.fromList(ZipEncoder().encode(epubArchive)),
+            fileName: 'ld_sintetico.epub',
+          );
+
+      final candidates = await AppReferenceHelper.loadCandidates(
+        db,
+        AppRefCategory.publication,
+      );
+      expect(candidates.length, equals(1));
+      expect(candidates.single.id, equals(summary.id));
+      expect(candidates.single.title, equals('Escute a Deus (Sintético)'));
+
+      final link = AppReferenceHelper.buildPublicationMarkdownLink(
+        publicationId: summary.id,
+        title: summary.title,
+        chapterIndex: 1,
+        chapterTitle: 'Capítulo 1',
+      );
+      final uriMatch = RegExp(r'\((app://ref/[^\)]+)\)').firstMatch(link);
+      expect(uriMatch, isNotNull);
+      final parsed = AppReferenceHelper.parseUri(uriMatch!.group(1)!);
+      expect(parsed, isNotNull);
+      expect(parsed!.category, equals(AppRefCategory.publication));
+      expect(parsed.itemId, equals(summary.id));
+      expect(parsed.publicationChapterIndex, equals(1));
     });
   });
 }

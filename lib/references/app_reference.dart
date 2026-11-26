@@ -8,6 +8,7 @@ import '../core/feature_registry.dart';
 import '../database/app_database.dart';
 import '../inbox/email_html_sanitizer.dart';
 import '../picture_bank/picture_entry_model.dart';
+import '../publications/imported_publications_service.dart';
 
 /// Categorias suportadas pelas referências cruzadas em todo o aplicativo.
 enum AppRefCategory {
@@ -16,6 +17,13 @@ enum AppRefCategory {
     label: 'Bíblia (Tradução do Novo Mundo)',
     shortLabel: 'TNM',
     emoji: '📖',
+    targetFeature: AppFeature.knowledge,
+  ),
+  publication(
+    typeId: 'publication',
+    label: 'Biblioteca — Publicações Importadas',
+    shortLabel: 'Publicação',
+    emoji: '📚',
     targetFeature: AppFeature.knowledge,
   ),
   note(
@@ -150,6 +158,7 @@ class ParsedAppReference {
   final int? bookNumber;
   final int? chapter;
   final String? verseSpec;
+  final int? publicationChapterIndex;
 
   const ParsedAppReference({
     required this.category,
@@ -157,6 +166,7 @@ class ParsedAppReference {
     this.bookNumber,
     this.chapter,
     this.verseSpec,
+    this.publicationChapterIndex,
   });
 }
 
@@ -206,6 +216,30 @@ class AppReferenceHelper {
       return '${schemePrefix}bible/$bookNumber/$chapter';
     }
     return '${schemePrefix}bible/$bookNumber/$chapter/${Uri.encodeComponent(cleanSpec)}';
+  }
+
+  static String buildPublicationUri(String publicationId, {int? chapterIndex}) {
+    final encodedId = Uri.encodeComponent(publicationId);
+    if (chapterIndex == null) {
+      return '${schemePrefix}publication/$encodedId';
+    }
+    return '${schemePrefix}publication/$encodedId/$chapterIndex';
+  }
+
+  static String buildPublicationMarkdownLink({
+    required String publicationId,
+    required String title,
+    int? chapterIndex,
+    String? chapterTitle,
+  }) {
+    final rawLabel = (chapterTitle != null && chapterTitle.trim().isNotEmpty)
+        ? '$title — ${chapterTitle.trim()}'
+        : title;
+    final safeTitle = sanitizeLabel(
+      rawLabel.isEmpty ? AppRefCategory.publication.shortLabel : rawLabel,
+    );
+    final uri = buildPublicationUri(publicationId, chapterIndex: chapterIndex);
+    return '[${AppRefCategory.publication.emoji} $safeTitle]($uri)';
   }
 
   /// Escapa colchetes, marcações HTML/Markdown e quebras de linha no rótulo
@@ -278,6 +312,19 @@ class AppReferenceHelper {
       );
     }
 
+    if (cat == AppRefCategory.publication) {
+      if (parts.length < 2 || parts[1].isEmpty) return null;
+      final pubId = Uri.decodeComponent(parts[1]);
+      final chapterIdx = parts.length >= 3 && parts[2].isNotEmpty
+          ? int.tryParse(parts[2])
+          : null;
+      return ParsedAppReference(
+        category: cat,
+        itemId: pubId,
+        publicationChapterIndex: chapterIdx,
+      );
+    }
+
     if (parts.length < 2 || parts[1].isEmpty) return null;
     final id = Uri.decodeComponent(parts.sublist(1).join('/'));
     return ParsedAppReference(category: cat, itemId: id);
@@ -291,6 +338,23 @@ class AppReferenceHelper {
     switch (category) {
       case AppRefCategory.bible:
         return const [];
+      case AppRefCategory.publication:
+        final pubs = await ImportedPublicationsService.listPublications(db);
+        return pubs
+            .map(
+              (p) => AppReferenceCandidate(
+                category: category,
+                id: p.id,
+                title: p.title,
+                subtitle:
+                    '${NwtBibleBooks.languageDisplayName(p.language)} • ${p.chapterCount} seção(ões)',
+                previewImageData:
+                    (p.coverBase64 != null && p.coverBase64!.isNotEmpty)
+                    ? 'data:image/jpeg;base64,${p.coverBase64}'
+                    : null,
+              ),
+            )
+            .toList();
       case AppRefCategory.note:
         final rows =
             await (db.select(db.knowledgeNotes)
