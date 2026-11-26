@@ -1659,7 +1659,9 @@ class _TasksScreenState extends ConsumerState<TasksScreen>
 
   void _showCreateProjectModal() {
     String category = 'ministry';
+    String? areaId;
     DateTime? targetDate;
+    final km = ref.read(knowledgeManagerProvider);
 
     showAdaptiveMinistrySheet(
       context: context,
@@ -1738,6 +1740,45 @@ class _TasksScreenState extends ConsumerState<TasksScreen>
                           setModalState(() => category = v ?? 'ministry'),
                     ),
                     const SizedBox(height: 12),
+                    StreamBuilder<List<KnowledgeAreaEntry>>(
+                      stream: km.watchAreas(),
+                      builder: (context, areaSnap) {
+                        final areas =
+                            areaSnap.data ?? const <KnowledgeAreaEntry>[];
+                        if (areas.isEmpty) return const SizedBox.shrink();
+                        final validArea = areas.any((a) => a.id == areaId)
+                            ? areaId
+                            : null;
+                        return Column(
+                          children: [
+                            DropdownButtonFormField<String?>(
+                              initialValue: validArea,
+                              decoration: const InputDecoration(
+                                labelText: 'Área P.A.R.A. (Segundo Cérebro)',
+                                prefixIcon: Icon(
+                                  Icons.layers_outlined,
+                                  size: 18,
+                                ),
+                                border: OutlineInputBorder(),
+                              ),
+                              items: [
+                                const DropdownMenuItem<String?>(
+                                  value: null,
+                                  child: Text('Sem área vinculada'),
+                                ),
+                                for (final a in areas)
+                                  DropdownMenuItem<String?>(
+                                    value: a.id,
+                                    child: Text(a.name),
+                                  ),
+                              ],
+                              onChanged: (v) => setModalState(() => areaId = v),
+                            ),
+                            const SizedBox(height: 12),
+                          ],
+                        );
+                      },
+                    ),
                     ListTile(
                       title: Text(
                         targetDate == null
@@ -1790,6 +1831,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen>
                           name: name,
                           objective: objText.isNotEmpty ? objText : null,
                           category: category,
+                          areaId: areaId,
                           targetDate: targetDate,
                           tags: tags,
                         );
@@ -1813,7 +1855,9 @@ class _TasksScreenState extends ConsumerState<TasksScreen>
   void _showEditProjectModal(ProjectEntry project) {
     final initialTags = _extractTags(project.metadata);
     String category = project.category;
+    String? areaId = project.areaId;
     DateTime? targetDate = project.targetDate;
+    final km = ref.read(knowledgeManagerProvider);
 
     showAdaptiveMinistrySheet(
       context: context,
@@ -1897,6 +1941,45 @@ class _TasksScreenState extends ConsumerState<TasksScreen>
                           setModalState(() => category = v ?? 'ministry'),
                     ),
                     const SizedBox(height: 12),
+                    StreamBuilder<List<KnowledgeAreaEntry>>(
+                      stream: km.watchAreas(),
+                      builder: (context, areaSnap) {
+                        final areas =
+                            areaSnap.data ?? const <KnowledgeAreaEntry>[];
+                        if (areas.isEmpty) return const SizedBox.shrink();
+                        final validArea = areas.any((a) => a.id == areaId)
+                            ? areaId
+                            : null;
+                        return Column(
+                          children: [
+                            DropdownButtonFormField<String?>(
+                              initialValue: validArea,
+                              decoration: const InputDecoration(
+                                labelText: 'Área P.A.R.A. (Segundo Cérebro)',
+                                prefixIcon: Icon(
+                                  Icons.layers_outlined,
+                                  size: 18,
+                                ),
+                                border: OutlineInputBorder(),
+                              ),
+                              items: [
+                                const DropdownMenuItem<String?>(
+                                  value: null,
+                                  child: Text('Sem área vinculada'),
+                                ),
+                                for (final a in areas)
+                                  DropdownMenuItem<String?>(
+                                    value: a.id,
+                                    child: Text(a.name),
+                                  ),
+                              ],
+                              onChanged: (v) => setModalState(() => areaId = v),
+                            ),
+                            const SizedBox(height: 12),
+                          ],
+                        );
+                      },
+                    ),
                     ListTile(
                       title: Text(
                         targetDate == null
@@ -1950,6 +2033,8 @@ class _TasksScreenState extends ConsumerState<TasksScreen>
                           name: name,
                           objective: objText.isNotEmpty ? objText : null,
                           category: category,
+                          areaId: areaId,
+                          clearAreaId: areaId == null,
                           targetDate: targetDate,
                           tags: tags,
                         );

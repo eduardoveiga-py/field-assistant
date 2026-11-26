@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -14,6 +15,9 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/app_logger.dart';
 import '../../core/app_theme.dart';
 import '../../core/feature_registry.dart';
+import '../../knowledge/knowledge_backlink_indexer.dart';
+import '../../knowledge/knowledge_manager.dart';
+import '../../knowledge/second_brain_review_service.dart';
 import '../../official_docs/official_doc_manager.dart';
 import '../../official_docs/official_doc_models.dart';
 import '../../official_docs/official_doc_pdf_generator.dart';
@@ -29,12 +33,17 @@ import '../widgets/adaptive_ministry_sheet.dart';
 import '../widgets/app_inline_image_view.dart';
 import '../widgets/app_reference_viewer.dart';
 import '../widgets/knowledge/knowledge_ui_components.dart';
+import '../widgets/knowledge/second_brain_database_views.dart';
+import '../widgets/knowledge/second_brain_dialogs.dart';
+import '../widgets/knowledge/second_brain_rich_editor.dart';
 import '../widgets/knowledge_item_reader_dialog.dart';
 import '../widgets/managed_text_controllers.dart';
 import '../widgets/markdown_preview_text.dart';
 import '../widgets/rich_formatted_editing_controller.dart';
 import '../widgets/rich_markdown_toolbar.dart';
 import '../widgets/universal_attachment_viewer.dart';
+import 'inbox_screen.dart';
+import 'project_detail_screen.dart';
 import 'research_screen.dart';
 
 /// Tela do Módulo C — Base de Conhecimento do Field Assistant.
@@ -62,6 +71,8 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
   );
   final TextEditingController _searchCtrl = TextEditingController();
   String _searchQuery = '';
+  String? _selectedAreaId;
+  NotesDatabaseViewMode _notesViewMode = NotesDatabaseViewMode.list;
   String? _selectedNoteTag;
   String? _selectedNoteId;
   String? _selectedQuestionStatus = 'all'; // 'all', 'answered', 'unanswered'
@@ -83,6 +94,14 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
     );
     _tabController.addListener(() {
       if (mounted) setState(() {});
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(
+        KnowledgeBacklinkIndexer.ensureInitialBackfill(
+          ref.read(databaseProvider),
+        ),
+      );
     });
   }
 
@@ -157,13 +176,13 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.auto_stories_outlined),
-            tooltip: 'Pesquisas e Apresentações do Ministério',
-            onPressed: () {
-              Navigator.of(
-                context,
-              ).push(MaterialPageRoute(builder: (_) => const ResearchScreen()));
-            },
+            key: const Key('btn_kb_weekly_review'),
+            icon: const Icon(
+              Icons.psychology_alt_outlined,
+              color: Color(0xFF10B981),
+            ),
+            tooltip: 'Revisão Semanal & Espaçada',
+            onPressed: _openWeeklyReviewModal,
           ),
           IconButton(
             key: const Key('btn_kb_export_tab_pdf'),
@@ -186,6 +205,49 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
             icon: Icon(Icons.add_circle_outline, color: themePrimary),
             tooltip: 'Adicionar à Base',
             onPressed: _handleTabAwareAdd,
+          ),
+          PopupMenuButton<String>(
+            key: const Key('btn_kb_more_menu'),
+            tooltip: 'Segundo Cérebro & Importações',
+            icon: const Icon(Icons.more_vert),
+            onSelected: (val) {
+              if (val == 'areas') _openManageAreasModal();
+              if (val == 'notion') _openNotionImportModal();
+              if (val == 'research') {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ResearchScreen()),
+                );
+              }
+            },
+            itemBuilder: (_) => const [
+              PopupMenuItem(
+                value: 'areas',
+                child: ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.layers_outlined, size: 19),
+                  title: Text('Gerenciar Áreas P.A.R.A.'),
+                ),
+              ),
+              PopupMenuItem(
+                value: 'notion',
+                child: ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.auto_awesome_mosaic_outlined, size: 19),
+                  title: Text('Importar do Notion (.zip/.md/.csv)'),
+                ),
+              ),
+              PopupMenuItem(
+                value: 'research',
+                child: ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.auto_stories_outlined, size: 19),
+                  title: Text('Pesquisas e Apresentações'),
+                ),
+              ),
+            ],
           ),
         ],
         bottom: PreferredSize(
@@ -298,6 +360,8 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
               ),
             ),
           ),
+          if (_tabController.index < 4)
+            _buildAreasFilterBar(isDark, themePrimary),
           const Divider(height: 1),
 
           // Abas da Base
@@ -376,338 +440,528 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
   Widget _buildNotesTab(bool isDark) {
     final km = ref.watch(knowledgeManagerProvider);
 
-    return StreamBuilder<List<KnowledgeNoteEntry>>(
-      stream: km.watchNotes(
-        query: _searchQuery.isNotEmpty ? _searchQuery : null,
-      ),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
+    return StreamBuilder<List<KnowledgeAreaEntry>>(
+      stream: km.watchAreas(),
+      builder: (context, areasSnap) {
+        final areas = areasSnap.data ?? const <KnowledgeAreaEntry>[];
+        final areasById = {for (final a in areas) a.id: a};
 
-        final allNotes = (snapshot.data ?? [])
-            .where((n) => !OfficialDocManager.isReservedCategory(n.category))
-            .toList();
-        if (allNotes.isEmpty) {
-          return _buildEmptyState(
-            icon: Icons.note_outlined,
-            title: 'Nenhuma nota registrada',
-            subtitle: 'Guarde anotações temáticas, ideias de pregações ou notas pastorais.',
-            isDark: isDark,
-            actionLabel: 'Nova Nota',
-            onAction: _showCreateNoteModal,
-          );
-        }
-
-        // Extrai todas as tags únicas
-        final allTags = <String>{};
-        for (final n in allNotes) {
-          try {
-            final list = jsonDecode(n.tags) as List;
-            for (final item in list) {
-              final t = item.toString().trim();
-              if (t.isNotEmpty && !t.startsWith('research:')) {
-                allTags.add(t);
-              }
+        return StreamBuilder<List<KnowledgeNoteEntry>>(
+          stream: km.watchNotes(
+            areaId: _selectedAreaId,
+            query: _searchQuery.isNotEmpty ? _searchQuery : null,
+          ),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting &&
+                !snapshot.hasData) {
+              return const Center(child: CircularProgressIndicator());
             }
-          } catch (e, st) {
-            AppLogger.debug('Falha ao ler tags JSON da nota (${n.id}): $e', st);
-          }
-        }
 
-        final notes = allNotes.where((n) {
-          if (_selectedNoteTag == null) return true;
-          try {
-            final list = (jsonDecode(n.tags) as List)
-                .map((e) => e.toString())
+            final allNotes = (snapshot.data ?? [])
+                .where(
+                  (n) => !OfficialDocManager.isReservedCategory(n.category),
+                )
                 .toList();
-            return list.contains(_selectedNoteTag);
-          } catch (e, st) {
-            AppLogger.debug('Falha ao filtrar tags da nota (${n.id}): $e', st);
-            return false;
-          }
-        }).toList();
+            if (allNotes.isEmpty) {
+              return _buildEmptyState(
+                icon: Icons.note_outlined,
+                title: 'Nenhuma nota registrada',
+                subtitle: _selectedAreaId != null
+                    ? 'Nenhuma nota nesta Área P.A.R.A. ainda.'
+                    : 'Guarde anotações temáticas, ideias de pregações ou notas pastorais.',
+                isDark: isDark,
+                actionLabel: 'Nova Nota',
+                onAction: _showCreateNoteModal,
+              );
+            }
 
-        return LayoutBuilder(
-          builder: (context, constraints) {
-            final isWide = constraints.maxWidth >= 900;
-            KnowledgeNoteEntry? selectedNote;
-            if (_selectedNoteId != null) {
-              for (final n in notes) {
-                if (n.id == _selectedNoteId) {
-                  selectedNote = n;
-                  break;
+            final allTags = <String>{};
+            for (final n in allNotes) {
+              try {
+                final list = jsonDecode(n.tags) as List;
+                for (final item in list) {
+                  final t = item.toString().trim();
+                  if (t.isNotEmpty && !t.startsWith('research:')) {
+                    allTags.add(t);
+                  }
                 }
+              } catch (e, st) {
+                AppLogger.debug(
+                  'Falha ao ler tags JSON da nota (${n.id}): $e',
+                  st,
+                );
               }
             }
 
-            final listPane = Column(
-              children: [
-                // Filtros de Tags
-                if (allTags.isNotEmpty)
-                  Container(
-                    height: 50,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 6,
-                    ),
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      children: [
-                        FilterChip(
-                          label: const Text('Todas as Tags'),
-                          selected: _selectedNoteTag == null,
-                          onSelected: (val) =>
-                              setState(() => _selectedNoteTag = null),
-                          backgroundColor: isDark
-                              ? const Color(0xFF151E32)
-                              : const Color(0xFFF1F5F9),
+            final notes = allNotes.where((n) {
+              if (_selectedNoteTag == null) return true;
+              try {
+                final list = (jsonDecode(n.tags) as List)
+                    .map((e) => e.toString())
+                    .toList();
+                return list.contains(_selectedNoteTag);
+              } catch (e, st) {
+                AppLogger.debug(
+                  'Falha ao filtrar tags da nota (${n.id}): $e',
+                  st,
+                );
+                return false;
+              }
+            }).toList();
+
+            final viewSwitcherBar = Container(
+              height: 46,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                children: [
+                  for (final mode in NotesDatabaseViewMode.values)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: ChoiceChip(
+                        key: Key('view_mode_chip_${mode.name}'),
+                        avatar: Icon(mode.icon, size: 15),
+                        label: Text(
+                          mode.label,
+                          style: const TextStyle(fontSize: 12),
                         ),
-                        const SizedBox(width: 8),
-                        ...allTags.map((tag) {
-                          final isSelected = _selectedNoteTag == tag;
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: FilterChip(
-                              avatar: Icon(
-                                Icons.tag,
-                                size: 14,
-                                color: isSelected
-                                    ? Colors.white
-                                    : AppTheme.primaryBlue,
-                              ),
-                              label: Text(tag),
-                              selected: isSelected,
-                              onSelected: (val) => setState(
-                                () => _selectedNoteTag = val ? tag : null,
-                              ),
-                            ),
-                          );
-                        }),
-                      ],
-                    ),
-                  ),
-
-                Expanded(
-                  child: ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 92),
-                    itemCount: notes.length,
-                    separatorBuilder: (ctx, i) => const SizedBox(height: 10),
-                    itemBuilder: (ctx, i) {
-                      final note = notes[i];
-                      List<String> noteTags = [];
-                      try {
-                        noteTags = (jsonDecode(note.tags) as List)
-                            .map((e) => e.toString())
-                            .where((t) => !t.startsWith('research:'))
-                            .toList();
-                      } catch (e, st) {
-                        AppLogger.debug(
-                          'Falha ao exibir tags da nota (${note.id}): $e',
-                          st,
-                        );
-                      }
-
-                      final isSelectedInSplit =
-                          isWide && _selectedNoteId == note.id;
-                      return KnowledgeNoteListCard(
-                        note: note,
-                        tags: noteTags,
-                        formattedDate: _formatDate(note.updatedAt),
-                        isSelected: isSelectedInSplit,
-                        isDark: isDark,
-                        onTap: () {
-                          if (isWide) {
-                            setState(() => _selectedNoteId = note.id);
-                            return;
+                        selected: _notesViewMode == mode,
+                        visualDensity: VisualDensity.compact,
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        onSelected: (selected) {
+                          if (selected) {
+                            setState(() => _notesViewMode = mode);
                           }
-                          showKnowledgeItemReader(
-                            context,
-                            title: note.title,
-                            content: note.content,
-                            category: note.category,
-                            itemType: 'Nota',
-                            updatedAt: note.updatedAt,
-                            tags: noteTags,
-                            allowHighlights: true,
-                            onContentUpdated: (updated) async {
-                              await km.updateNote(note.id, content: updated);
-                            },
-                            onEdit: () => _showEditNoteModal(note),
-                            onDelete: () => km.softDeleteNote(note.id),
-                            onExport: () => _exportNote(note),
-                            onExportPdf: () => _exportNotePdf(note),
-                          );
                         },
-                        trailingMenu: PopupMenuButton<String>(
-                          icon: const Icon(Icons.more_vert, size: 20),
-                          onSelected: (val) {
-                            if (val == 'pin') km.togglePinNote(note.id);
-                            if (val == 'edit') _showEditNoteModal(note);
-                            if (val == 'research') {
-                              _transformNoteToResearch(note);
-                            }
-                            if (val == 'export_pdf') _exportNotePdf(note);
-                            if (val == 'export') _exportNote(note);
-                            if (val == 'delete') km.softDeleteNote(note.id);
-                          },
-                          itemBuilder: (ctx) => [
-                            PopupMenuItem(
-                              value: 'pin',
-                              child: Text(
-                                note.isPinned ? 'Desafixar' : 'Fixar no Topo',
-                              ),
-                            ),
-                            const PopupMenuItem(
-                              value: 'edit',
-                              child: Text('Editar Nota'),
-                            ),
-                            const PopupMenuItem(
-                              value: 'research',
-                              child: Text('Transformar em Pesquisa'),
-                            ),
-                            const PopupMenuItem(
-                              value: 'export_pdf',
-                              child: Text('Baixar PDF (.pdf)'),
-                            ),
-                            const PopupMenuItem(
-                              value: 'export',
-                              child: Text('Exportar Nota'),
-                            ),
-                            const PopupMenuItem(
-                              value: 'delete',
-                              child: Text(
-                                'Excluir Nota',
-                                style: TextStyle(color: Colors.redAccent),
-                              ),
-                            ),
-                          ],
+                      ),
+                    ),
+                  if (allTags.isNotEmpty) ...[
+                    const VerticalDivider(width: 16),
+                    FilterChip(
+                      label: const Text('Todas as Tags'),
+                      selected: _selectedNoteTag == null,
+                      visualDensity: VisualDensity.compact,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      onSelected: (_) =>
+                          setState(() => _selectedNoteTag = null),
+                    ),
+                    const SizedBox(width: 6),
+                    for (final tag in allTags)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: FilterChip(
+                          avatar: const Icon(Icons.tag, size: 13),
+                          label: Text(tag),
+                          selected: _selectedNoteTag == tag,
+                          visualDensity: VisualDensity.compact,
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                          onSelected: (val) => setState(
+                            () => _selectedNoteTag = val ? tag : null,
+                          ),
                         ),
-                      );
-                    },
-                  ),
-                ),
-              ],
+                      ),
+                  ],
+                ],
+              ),
             );
 
-            if (!isWide) {
-              return listPane;
-            }
-
-            List<String> selectedNoteTags = [];
-            if (selectedNote != null) {
+            void openSingleNote(KnowledgeNoteEntry note) {
+              List<String> noteTags = [];
               try {
-                selectedNoteTags = (jsonDecode(selectedNote.tags) as List)
+                noteTags = (jsonDecode(note.tags) as List)
                     .map((e) => e.toString())
                     .where((t) => !t.startsWith('research:'))
                     .toList();
               } catch (_) {}
+              showKnowledgeItemReader(
+                context,
+                title: note.title,
+                content: note.content,
+                category: note.category,
+                itemType: 'Nota',
+                updatedAt: note.updatedAt,
+                tags: noteTags,
+                allowHighlights: true,
+                backlinkTargetType: 'note',
+                backlinkTargetId: note.id,
+                onContentUpdated: (updated) async {
+                  await km.updateNote(note.id, content: updated);
+                },
+                onEdit: () => _showEditNoteModal(note),
+                onDelete: () => km.softDeleteNote(note.id),
+                onExport: () => _exportNote(note),
+                onExportPdf: () => _exportNotePdf(note),
+              );
             }
 
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                SizedBox(width: 400, child: listPane),
-                const VerticalDivider(width: 1),
-                Expanded(
-                  child: selectedNote == null
-                      ? Container(
-                          color: isDark
-                              ? const Color(0xFF090D16)
-                              : const Color(0xFFF1F5F9),
-                          child: Center(
-                            child: Semantics(
-                              label: 'Selecione uma nota para leitura completa',
-                              child: Container(
-                                constraints: const BoxConstraints(
-                                  maxWidth: 360,
-                                ),
-                                padding: const EdgeInsets.all(28),
-                                decoration: BoxDecoration(
-                                  color: isDark
-                                      ? const Color(0xFF111827)
-                                      : Colors.white,
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(
-                                    color: isDark
-                                        ? Colors.white.withValues(alpha: 0.08)
-                                        : const Color(0xFFE2E8F0),
+            if (_notesViewMode == NotesDatabaseViewMode.table) {
+              return Column(
+                children: [
+                  viewSwitcherBar,
+                  Expanded(
+                    child: NotesTableView(
+                      notes: notes,
+                      areasById: areasById,
+                      isDark: isDark,
+                      formatDate: _formatDate,
+                      onOpenNote: openSingleNote,
+                    ),
+                  ),
+                ],
+              );
+            }
+
+            if (_notesViewMode == NotesDatabaseViewMode.kanban) {
+              return Column(
+                children: [
+                  viewSwitcherBar,
+                  Expanded(
+                    child: NotesKanbanView(
+                      notes: notes,
+                      areasById: areasById,
+                      isDark: isDark,
+                      onOpenNote: openSingleNote,
+                      onChangeStatus: (note, newStatus) async {
+                        final props = KnowledgeManager.decodeProperties(
+                          note.propertiesJson,
+                        );
+                        props['status'] = newStatus;
+                        await km.updateNote(note.id, properties: props);
+                      },
+                      onCreateInStatus: (status) =>
+                          _showCreateNoteModal(initialStatus: status),
+                    ),
+                  ),
+                ],
+              );
+            }
+
+            if (_notesViewMode == NotesDatabaseViewMode.gallery) {
+              return Column(
+                children: [
+                  viewSwitcherBar,
+                  Expanded(
+                    child: NotesGalleryView(
+                      notes: notes,
+                      areasById: areasById,
+                      isDark: isDark,
+                      formatDate: _formatDate,
+                      onOpenNote: openSingleNote,
+                    ),
+                  ),
+                ],
+              );
+            }
+
+            return LayoutBuilder(
+              builder: (context, constraints) {
+                final isWide = constraints.maxWidth >= 900;
+                KnowledgeNoteEntry? selectedNote;
+                if (_selectedNoteId != null) {
+                  for (final n in notes) {
+                    if (n.id == _selectedNoteId) {
+                      selectedNote = n;
+                      break;
+                    }
+                  }
+                }
+
+                final listPane = Column(
+                  children: [
+                    viewSwitcherBar,
+                    Expanded(
+                      child: ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 92),
+                        itemCount: notes.length,
+                        separatorBuilder: (ctx, i) =>
+                            const SizedBox(height: 10),
+                        itemBuilder: (ctx, i) {
+                          final note = notes[i];
+                          List<String> noteTags = [];
+                          try {
+                            noteTags = (jsonDecode(note.tags) as List)
+                                .map((e) => e.toString())
+                                .where((t) => !t.startsWith('research:'))
+                                .toList();
+                          } catch (e, st) {
+                            AppLogger.debug(
+                              'Falha ao exibir tags da nota (${note.id}): $e',
+                              st,
+                            );
+                          }
+
+                          final isSelectedInSplit =
+                              isWide && _selectedNoteId == note.id;
+                          return KnowledgeNoteListCard(
+                            note: note,
+                            tags: noteTags,
+                            formattedDate: _formatDate(note.updatedAt),
+                            isSelected: isSelectedInSplit,
+                            isDark: isDark,
+                            onTap: () {
+                              if (isWide) {
+                                setState(() => _selectedNoteId = note.id);
+                                return;
+                              }
+                              openSingleNote(note);
+                            },
+                            trailingMenu: PopupMenuButton<String>(
+                              icon: const Icon(Icons.more_vert, size: 20),
+                              onSelected: (val) {
+                                if (val == 'pin') km.togglePinNote(note.id);
+                                if (val == 'edit') _showEditNoteModal(note);
+                                if (val == 'research') {
+                                  _transformNoteToResearch(note);
+                                }
+                                if (val == 'export_pdf') _exportNotePdf(note);
+                                if (val == 'export') _exportNote(note);
+                                if (val == 'delete') km.softDeleteNote(note.id);
+                              },
+                              itemBuilder: (ctx) => [
+                                PopupMenuItem(
+                                  value: 'pin',
+                                  child: Text(
+                                    note.isPinned
+                                        ? 'Desafixar'
+                                        : 'Fixar no Topo',
                                   ),
                                 ),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.all(16),
-                                      decoration: BoxDecoration(
-                                        color: AppTheme.primaryBlue.withValues(
-                                          alpha: 0.14,
+                                const PopupMenuItem(
+                                  value: 'edit',
+                                  child: Text('Editar Nota'),
+                                ),
+                                const PopupMenuItem(
+                                  value: 'research',
+                                  child: Text('Transformar em Pesquisa'),
+                                ),
+                                const PopupMenuItem(
+                                  value: 'export_pdf',
+                                  child: Text('Baixar PDF (.pdf)'),
+                                ),
+                                const PopupMenuItem(
+                                  value: 'export',
+                                  child: Text('Exportar Nota'),
+                                ),
+                                const PopupMenuItem(
+                                  value: 'delete',
+                                  child: Text(
+                                    'Excluir Nota',
+                                    style: TextStyle(color: Colors.redAccent),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                );
+
+                if (!isWide) {
+                  return listPane;
+                }
+
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SizedBox(width: 400, child: listPane),
+                    const VerticalDivider(width: 1),
+                    Expanded(
+                      child: selectedNote == null
+                          ? Container(
+                              color: isDark
+                                  ? const Color(0xFF090D16)
+                                  : const Color(0xFFF1F5F9),
+                              child: Center(
+                                child: Semantics(
+                                  label: 'Selecione uma nota para leitura completa',
+                                  child: Container(
+                                    constraints: const BoxConstraints(
+                                      maxWidth: 360,
+                                    ),
+                                    padding: const EdgeInsets.all(28),
+                                    decoration: BoxDecoration(
+                                      color: isDark
+                                          ? const Color(0xFF111827)
+                                          : Colors.white,
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                        color: isDark
+                                            ? Colors.white.withValues(
+                                                alpha: 0.08,
+                                              )
+                                            : const Color(0xFFE2E8F0),
+                                      ),
+                                    ),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.all(16),
+                                          decoration: BoxDecoration(
+                                            color: AppTheme.primaryBlue
+                                                .withValues(alpha: 0.14),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(
+                                            Icons.menu_book_rounded,
+                                            size: 36,
+                                            color: AppTheme.primaryBlue,
+                                          ),
                                         ),
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: const Icon(
-                                        Icons.menu_book_rounded,
-                                        size: 36,
-                                        color: AppTheme.primaryBlue,
-                                      ),
+                                        const SizedBox(height: 16),
+                                        Text(
+                                          'Selecione uma nota para leitura completa',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            color: isDark
+                                                ? const Color(0xFFE2E8F0)
+                                                : AppTheme.textDark,
+                                            fontSize: 15.5,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          'Toque em um cartão à esquerda para ler referências bíblicas, blocos estilo Notion, backlinks e subpáginas.',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            color: isDark
+                                                ? const Color(0xFF94A3B8)
+                                                : AppTheme.textMuted,
+                                            fontSize: 12.5,
+                                            height: 1.45,
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                    const SizedBox(height: 16),
-                                    Text(
-                                      'Selecione uma nota para leitura completa',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        color: isDark
-                                            ? const Color(0xFFE2E8F0)
-                                            : AppTheme.textDark,
-                                        fontSize: 15.5,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 6),
-                                    Text(
-                                      'Toque em um cartão à esquerda para ler referências bíblicas, destacar trechos e exportar em PDF.',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        color: isDark
-                                            ? const Color(0xFF94A3B8)
-                                            : AppTheme.textMuted,
-                                        fontSize: 12.5,
-                                        height: 1.45,
-                                      ),
-                                    ),
-                                  ],
+                                  ),
                                 ),
                               ),
+                            )
+                          : _buildNoteDetailSidePane(
+                              context,
+                              km,
+                              selectedNote,
+                              areasById,
+                              isDark,
                             ),
-                          ),
-                        )
-                      : KnowledgeNoteDetailPane(
-                          note: selectedNote,
-                          tags: selectedNoteTags,
-                          formattedDate: _formatDate(selectedNote.updatedAt),
-                          isDark: isDark,
-                          onEdit: () => _showEditNoteModal(selectedNote!),
-                          onExportPdf: () => _exportNotePdf(selectedNote!),
-                          onShare: () => _exportNote(selectedNote!),
-                          onTogglePin: () => km.togglePinNote(selectedNote!.id),
-                          onTransformResearch: () =>
-                              _transformNoteToResearch(selectedNote!),
-                          onContentUpdated: (updated) async {
-                            await km.updateNote(
-                              selectedNote!.id,
-                              content: updated,
-                            );
-                          },
-                          onOpenLink: (url) async {
-                            if (AppReferenceHelper.isAppReferenceUrl(url)) {
-                              await AppReferenceViewer.openUrl(context, url);
-                            } else {
-                              await _openUrl(url);
-                            }
-                          },
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildNoteDetailSidePane(
+    BuildContext context,
+    KnowledgeManager km,
+    KnowledgeNoteEntry selectedNote,
+    Map<String, KnowledgeAreaEntry> areasById,
+    bool isDark,
+  ) {
+    final db = ref.read(databaseProvider);
+    List<String> selectedNoteTags = [];
+    try {
+      selectedNoteTags = (jsonDecode(selectedNote.tags) as List)
+          .map((e) => e.toString())
+          .where((t) => !t.startsWith('research:'))
+          .toList();
+    } catch (_) {}
+
+    final area = selectedNote.areaId != null
+        ? areasById[selectedNote.areaId!]
+        : null;
+
+    return FutureBuilder<List<KnowledgeNoteEntry>>(
+      future: km.getNoteAncestors(selectedNote.id),
+      builder: (ctx, ancSnap) {
+        final ancestors = ancSnap.data ?? const <KnowledgeNoteEntry>[];
+        return StreamBuilder<List<KnowledgeNoteEntry>>(
+          stream: km.watchSubpages(selectedNote.id),
+          builder: (ctx, subSnap) {
+            final subpages = subSnap.data ?? const <KnowledgeNoteEntry>[];
+            return StreamBuilder<List<ResolvedBacklink>>(
+              stream: KnowledgeBacklinkIndexer.watchBacklinksFor(
+                db,
+                targetType: 'note',
+                targetId: selectedNote.id,
+              ),
+              builder: (ctx, blSnap) {
+                final backlinks = blSnap.data ?? const <ResolvedBacklink>[];
+                return KnowledgeNoteDetailPane(
+                  note: selectedNote,
+                  tags: selectedNoteTags,
+                  formattedDate: _formatDate(selectedNote.updatedAt),
+                  isDark: isDark,
+                  areaName: area?.name,
+                  areaColorHex: area?.colorHex,
+                  breadcrumbAncestors: ancestors,
+                  subpages: subpages,
+                  backlinks: backlinks,
+                  onSelectNote: (target) {
+                    setState(() => _selectedNoteId = target.id);
+                  },
+                  onCreateSubpage: () => _showCreateNoteModal(
+                    initialParentNoteId: selectedNote.id,
+                    initialAreaId: selectedNote.areaId,
+                  ),
+                  onToggleSpacedReview: () async {
+                    final enable = selectedNote.nextReviewAt == null;
+                    await SecondBrainReviewService.setSpacedReviewEnabled(
+                      db,
+                      entityType: 'note',
+                      entityId: selectedNote.id,
+                      enabled: enable,
+                    );
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          enable
+                              ? 'Revisão espaçada (SM-2) ativada para "${selectedNote.title}".'
+                              : 'Revisão espaçada pausada.',
                         ),
-                ),
-              ],
+                      ),
+                    );
+                  },
+                  onOpenBacklink: (link) async {
+                    if (link.sourceType == 'note') {
+                      setState(() => _selectedNoteId = link.sourceId);
+                      return;
+                    }
+                    final cat = AppRefCategory.fromTypeId(link.sourceType);
+                    if (cat != null) {
+                      await AppReferenceViewer.openUrl(
+                        context,
+                        AppReferenceHelper.buildUri(cat, link.sourceId),
+                      );
+                    }
+                  },
+                  onEdit: () => _showEditNoteModal(selectedNote),
+                  onExportPdf: () => _exportNotePdf(selectedNote),
+                  onShare: () => _exportNote(selectedNote),
+                  onTogglePin: () => km.togglePinNote(selectedNote.id),
+                  onTransformResearch: () =>
+                      _transformNoteToResearch(selectedNote),
+                  onContentUpdated: (updated) async {
+                    await km.updateNote(selectedNote.id, content: updated);
+                  },
+                  onOpenLink: (url) async {
+                    if (AppReferenceHelper.isAppReferenceUrl(url)) {
+                      await AppReferenceViewer.openUrl(context, url);
+                    } else {
+                      await _openUrl(url);
+                    }
+                  },
+                );
+              },
             );
           },
         );
@@ -728,10 +982,12 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
             ? null
             : _selectedQuestionStatus,
         category: _selectedQuestionCategory,
+        areaId: _selectedAreaId,
         query: _searchQuery.isNotEmpty ? _searchQuery : null,
       ),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
 
@@ -831,6 +1087,8 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                                 updatedAt: q.updatedAt,
                                 subtitle: readerSubtitle,
                                 allowHighlights: true,
+                                backlinkTargetType: 'question',
+                                backlinkTargetId: q.id,
                                 onContentUpdated: (updated) async {
                                   if (hasAnswer) {
                                     await km.updateQuestion(
@@ -917,10 +1175,12 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
     return StreamBuilder<List<KnowledgeDocumentEntry>>(
       stream: km.watchDocuments(
         category: _selectedDocCategory,
+        areaId: _selectedAreaId,
         query: _searchQuery.isNotEmpty ? _searchQuery : null,
       ),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
 
@@ -1127,6 +1387,8 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                             tags: docTags,
                             updatedAt: doc.updatedAt,
                             allowHighlights: true,
+                            backlinkTargetType: 'document',
+                            backlinkTargetId: doc.id,
                             onContentUpdated: (updated) async {
                               await km.updateDocument(
                                 doc.id,
@@ -1212,10 +1474,12 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
     return StreamBuilder<List<KnowledgeResourceEntry>>(
       stream: km.watchResources(
         category: _selectedResourceCategory,
+        areaId: _selectedAreaId,
         query: _searchQuery.isNotEmpty ? _searchQuery : null,
       ),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
 
@@ -1382,6 +1646,8 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                               tags: resTags,
                               updatedAt: r.updatedAt,
                               allowHighlights: hasDesc,
+                              backlinkTargetType: 'resource',
+                              backlinkTargetId: r.id,
                               onContentUpdated: hasDesc
                                   ? (updated) async {
                                       await km.updateResource(
@@ -1551,12 +1817,248 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
     );
   }
 
-  void _showCreateNoteModal() {
+  Widget _buildAreasFilterBar(bool isDark, Color themePrimary) {
+    final km = ref.watch(knowledgeManagerProvider);
+    return StreamBuilder<List<KnowledgeAreaEntry>>(
+      stream: km.watchAreas(),
+      builder: (context, snapshot) {
+        final areas = snapshot.data ?? const <KnowledgeAreaEntry>[];
+        return Container(
+          height: 46,
+          color: isDark ? const Color(0xFF0E1422) : Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            children: [
+              ChoiceChip(
+                key: const Key('area_chip_all'),
+                avatar: Icon(
+                  Icons.layers_outlined,
+                  size: 15,
+                  color: themePrimary,
+                ),
+                label: const Text(
+                  'Todas as Áreas',
+                  style: TextStyle(fontSize: 12),
+                ),
+                selected: _selectedAreaId == null,
+                visualDensity: VisualDensity.compact,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                onSelected: (_) => setState(() => _selectedAreaId = null),
+              ),
+              const SizedBox(width: 6),
+              for (final area in areas)
+                Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: ChoiceChip(
+                    key: Key('area_chip_${area.id}'),
+                    avatar: Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Color(
+                          int.tryParse(
+                                'FF${(area.colorHex ?? '#6366F1').replaceFirst('#', '')}',
+                                radix: 16,
+                              ) ??
+                              0xFF6366F1,
+                        ),
+                      ),
+                    ),
+                    label: Text(
+                      area.name,
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    selected: _selectedAreaId == area.id,
+                    visualDensity: VisualDensity.compact,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    onSelected: (selected) => setState(
+                      () => _selectedAreaId = selected ? area.id : null,
+                    ),
+                  ),
+                ),
+              ActionChip(
+                key: const Key('btn_manage_areas_chip'),
+                avatar: const Icon(Icons.add_circle_outline, size: 15),
+                label: const Text('Áreas', style: TextStyle(fontSize: 12)),
+                visualDensity: VisualDensity.compact,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                onPressed: _openManageAreasModal,
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _openManageAreasModal() {
+    final km = ref.read(knowledgeManagerProvider);
+    unawaited(
+      showManageAreasDialog(
+        context,
+        km: km,
+        currentAreaId: _selectedAreaId,
+        onAreaSelected: (areaId) {
+          if (mounted) setState(() => _selectedAreaId = areaId);
+        },
+      ),
+    );
+  }
+
+  void _openWeeklyReviewModal() {
+    final db = ref.read(databaseProvider);
+    final km = ref.read(knowledgeManagerProvider);
+    unawaited(
+      showWeeklyReviewDialog(
+        context,
+        db: db,
+        km: km,
+        onAnswerQuestion: _showAnswerQuestionModal,
+        onOpenProject: (projectId) {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => ProjectDetailScreen(projectId: projectId),
+            ),
+          );
+        },
+        onOpenInbox: () {
+          Navigator.of(context)
+              .push(MaterialPageRoute(builder: (_) => const InboxScreen()));
+        },
+      ),
+    );
+  }
+
+  void _openNotionImportModal() {
+    final db = ref.read(databaseProvider);
+    unawaited(
+      showNotionImportDialog(context, db: db, fallbackAreaId: _selectedAreaId),
+    );
+  }
+
+  Future<AppReferenceCandidate?> _createInlineNoteFromEditor(
+    String title,
+    String? areaId,
+  ) async {
+    final km = ref.read(knowledgeManagerProvider);
+    final created = await km.createNote(
+      title: title,
+      content: '',
+      areaId: areaId,
+    );
+    return AppReferenceCandidate(
+      category: AppRefCategory.note,
+      id: created.id,
+      title: created.title,
+      subtitle: 'Nota vinculada',
+    );
+  }
+
+  Widget _buildAreaDropdown({
+    required KnowledgeManager km,
+    required String? selectedAreaId,
+    required ValueChanged<String?> onChanged,
+  }) {
+    return StreamBuilder<List<KnowledgeAreaEntry>>(
+      stream: km.watchAreas(),
+      builder: (context, snap) {
+        final areas = snap.data ?? const <KnowledgeAreaEntry>[];
+        if (areas.isEmpty) return const SizedBox.shrink();
+        final effective = areas.any((a) => a.id == selectedAreaId)
+            ? selectedAreaId
+            : null;
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: DropdownButtonFormField<String?>(
+            initialValue: effective,
+            decoration: const InputDecoration(
+              labelText: 'Área P.A.R.A. (Opcional)',
+              prefixIcon: Icon(Icons.layers_outlined, size: 18),
+              border: OutlineInputBorder(),
+            ),
+            items: [
+              const DropdownMenuItem<String?>(
+                value: null,
+                child: Text('Sem área vinculada'),
+              ),
+              for (final area in areas)
+                DropdownMenuItem<String?>(
+                  value: area.id,
+                  child: Text(area.name),
+                ),
+            ],
+            onChanged: onChanged,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildParentNoteDropdown({
+    required KnowledgeManager km,
+    required String? excludeNoteId,
+    required String? selectedParentId,
+    required ValueChanged<String?> onChanged,
+  }) {
+    return StreamBuilder<List<KnowledgeNoteEntry>>(
+      stream: km.watchNotes(),
+      builder: (context, snap) {
+        final notes = (snap.data ?? const <KnowledgeNoteEntry>[])
+            .where((n) => n.id != excludeNoteId)
+            .toList();
+        if (notes.isEmpty) return const SizedBox.shrink();
+        final effective = notes.any((n) => n.id == selectedParentId)
+            ? selectedParentId
+            : null;
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: DropdownButtonFormField<String?>(
+            initialValue: effective,
+            decoration: const InputDecoration(
+              labelText: 'Subpágina de (Nota Pai)',
+              prefixIcon: Icon(Icons.account_tree_outlined, size: 18),
+              border: OutlineInputBorder(),
+            ),
+            items: [
+              const DropdownMenuItem<String?>(
+                value: null,
+                child: Text('Nota de nível principal'),
+              ),
+              for (final n in notes)
+                DropdownMenuItem<String?>(
+                  value: n.id,
+                  child: Text(
+                    n.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+            ],
+            onChanged: onChanged,
+          ),
+        );
+      },
+    );
+  }
+
+  void _showCreateNoteModal({
+    String? initialParentNoteId,
+    String? initialAreaId,
+    String? initialStatus,
+  }) {
     String category = 'general';
+    String? areaId = initialAreaId ?? _selectedAreaId;
+    String? parentNoteId = initialParentNoteId;
+    String statusProp = initialStatus ?? 'rascunho';
+    String priorityProp = 'normal';
+    bool spacedReviewEnabled = false;
+    final km = ref.read(knowledgeManagerProvider);
 
     showAdaptiveMinistrySheet(
       context: context,
-      title: 'Nova Nota',
+      title: parentNoteId != null ? 'Nova Subpágina' : 'Nova Nota',
       titleLeading: const Icon(Icons.note_add, color: Color(0xFF8B5CF6)),
       builder: (ctx, scroll) => ManagedTextControllers(
         initialTexts: const ['', '', ''],
@@ -1589,34 +2091,82 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                       ),
                     ),
                     const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      initialValue: category,
-                      decoration: const InputDecoration(
-                        labelText: 'Categoria',
-                        border: OutlineInputBorder(),
-                      ),
-                      items: const [
-                        DropdownMenuItem(
-                          value: 'general',
-                          child: Text('Geral'),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            initialValue: category,
+                            decoration: const InputDecoration(
+                              labelText: 'Categoria',
+                              border: OutlineInputBorder(),
+                            ),
+                            items: const [
+                              DropdownMenuItem(
+                                value: 'general',
+                                child: Text('Geral'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'ministry',
+                                child: Text('Ministério'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'research',
+                                child: Text('Pesquisa'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'pastoral',
+                                child: Text('Pastoral'),
+                              ),
+                            ],
+                            onChanged: (v) =>
+                                setSheetState(() => category = v ?? 'general'),
+                          ),
                         ),
-                        DropdownMenuItem(
-                          value: 'ministry',
-                          child: Text('Ministério'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'research',
-                          child: Text('Pesquisa'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'pastoral',
-                          child: Text('Pastoral'),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            initialValue: statusProp,
+                            decoration: const InputDecoration(
+                              labelText: 'Status (Kanban)',
+                              border: OutlineInputBorder(),
+                            ),
+                            items: const [
+                              DropdownMenuItem(
+                                value: 'rascunho',
+                                child: Text('Rascunho'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'em_estudo',
+                                child: Text('Em Estudo'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'revisar',
+                                child: Text('Revisar'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'concluido',
+                                child: Text('Concluído'),
+                              ),
+                            ],
+                            onChanged: (v) => setSheetState(
+                              () => statusProp = v ?? 'rascunho',
+                            ),
+                          ),
                         ),
                       ],
-                      onChanged: (v) =>
-                          setSheetState(() => category = v ?? 'general'),
                     ),
                     const SizedBox(height: 12),
+                    _buildAreaDropdown(
+                      km: km,
+                      selectedAreaId: areaId,
+                      onChanged: (v) => setSheetState(() => areaId = v),
+                    ),
+                    _buildParentNoteDropdown(
+                      km: km,
+                      excludeNoteId: null,
+                      selectedParentId: parentNoteId,
+                      onChanged: (v) => setSheetState(() => parentNoteId = v),
+                    ),
                     TextField(
                       controller: tagsCtrl,
                       decoration: const InputDecoration(
@@ -1627,15 +2177,41 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                       ),
                     ),
                     const SizedBox(height: 12),
-                    RichMarkdownToolbar(controller: contentCtrl),
-                    const SizedBox(height: 6),
-                    TextField(
-                      controller: contentCtrl,
-                      maxLines: 6,
+                    DropdownButtonFormField<String>(
+                      initialValue: priorityProp,
                       decoration: const InputDecoration(
-                        labelText: 'Conteúdo da Nota',
+                        labelText: 'Prioridade',
                         border: OutlineInputBorder(),
                       ),
+                      items: const [
+                        DropdownMenuItem(value: 'baixa', child: Text('Baixa')),
+                        DropdownMenuItem(
+                          value: 'normal',
+                          child: Text('Normal'),
+                        ),
+                        DropdownMenuItem(value: 'alta', child: Text('Alta')),
+                      ],
+                      onChanged: (v) =>
+                          setSheetState(() => priorityProp = v ?? 'normal'),
+                    ),
+                    SwitchListTile.adaptive(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text(
+                        'Incluir na Revisão Espaçada (SM-2)',
+                        style: TextStyle(fontSize: 13.5),
+                      ),
+                      value: spacedReviewEnabled,
+                      onChanged: (val) =>
+                          setSheetState(() => spacedReviewEnabled = val),
+                    ),
+                    const SizedBox(height: 6),
+                    SecondBrainRichEditor(
+                      controller: contentCtrl,
+                      labelText: 'Conteúdo da Nota',
+                      minLines: 6,
+                      maxLines: 12,
+                      onCreateInlineNote: (title) =>
+                          _createInlineNoteFromEditor(title, areaId),
                     ),
                     const SizedBox(height: 16),
                     Row(
@@ -1661,11 +2237,19 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                                   .map((t) => t.trim())
                                   .where((t) => t.isNotEmpty)
                                   .toList();
-                              final km = ref.read(knowledgeManagerProvider);
                               final note = await km.createNote(
                                 title: title,
                                 content: content,
                                 category: category,
+                                areaId: areaId,
+                                parentNoteId: parentNoteId,
+                                properties: {
+                                  'status': statusProp,
+                                  'priority': priorityProp,
+                                },
+                                nextReviewAt: spacedReviewEnabled
+                                    ? DateTime.now().toUtc()
+                                    : null,
                                 tags: rawTags,
                               );
                               if (ctx.mounted) Navigator.of(ctx).pop();
@@ -1693,11 +2277,19 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                                   .map((t) => t.trim())
                                   .where((t) => t.isNotEmpty)
                                   .toList();
-                              final km = ref.read(knowledgeManagerProvider);
                               await km.createNote(
                                 title: title,
                                 content: content,
                                 category: category,
+                                areaId: areaId,
+                                parentNoteId: parentNoteId,
+                                properties: {
+                                  'status': statusProp,
+                                  'priority': priorityProp,
+                                },
+                                nextReviewAt: spacedReviewEnabled
+                                    ? DateTime.now().toUtc()
+                                    : null,
                                 tags: rawTags,
                               );
                               if (ctx.mounted) Navigator.of(ctx).pop();
@@ -1734,6 +2326,17 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
       );
     }
     String category = note.category;
+    String? areaId = note.areaId;
+    String? parentNoteId = note.parentNoteId;
+    final propMap = KnowledgeManager.decodeProperties(note.propertiesJson);
+    final propMeta = NotePropertyMeta.fromJson(note.propertiesJson);
+    String statusProp = propMeta.status;
+    String priorityProp =
+        ['baixa', 'normal', 'alta'].contains(propMeta.priority.toLowerCase())
+        ? propMeta.priority.toLowerCase()
+        : 'normal';
+    bool spacedReviewEnabled = note.nextReviewAt != null;
+    final km = ref.read(knowledgeManagerProvider);
 
     showAdaptiveMinistrySheet(
       context: context,
@@ -1769,42 +2372,90 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                       ),
                     ),
                     const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      initialValue:
-                          [
-                            'general',
-                            'ministry',
-                            'research',
-                            'pastoral',
-                          ].contains(category)
-                          ? category
-                          : 'general',
-                      decoration: const InputDecoration(
-                        labelText: 'Categoria',
-                        border: OutlineInputBorder(),
-                      ),
-                      items: const [
-                        DropdownMenuItem(
-                          value: 'general',
-                          child: Text('Geral'),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            initialValue:
+                                [
+                                  'general',
+                                  'ministry',
+                                  'research',
+                                  'pastoral',
+                                ].contains(category)
+                                ? category
+                                : 'general',
+                            decoration: const InputDecoration(
+                              labelText: 'Categoria',
+                              border: OutlineInputBorder(),
+                            ),
+                            items: const [
+                              DropdownMenuItem(
+                                value: 'general',
+                                child: Text('Geral'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'ministry',
+                                child: Text('Ministério'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'research',
+                                child: Text('Pesquisa'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'pastoral',
+                                child: Text('Pastoral'),
+                              ),
+                            ],
+                            onChanged: (v) =>
+                                setSheetState(() => category = v ?? 'general'),
+                          ),
                         ),
-                        DropdownMenuItem(
-                          value: 'ministry',
-                          child: Text('Ministério'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'research',
-                          child: Text('Pesquisa'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'pastoral',
-                          child: Text('Pastoral'),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            initialValue: statusProp,
+                            decoration: const InputDecoration(
+                              labelText: 'Status (Kanban)',
+                              border: OutlineInputBorder(),
+                            ),
+                            items: const [
+                              DropdownMenuItem(
+                                value: 'rascunho',
+                                child: Text('Rascunho'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'em_estudo',
+                                child: Text('Em Estudo'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'revisar',
+                                child: Text('Revisar'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'concluido',
+                                child: Text('Concluído'),
+                              ),
+                            ],
+                            onChanged: (v) => setSheetState(
+                              () => statusProp = v ?? 'rascunho',
+                            ),
+                          ),
                         ),
                       ],
-                      onChanged: (v) =>
-                          setSheetState(() => category = v ?? 'general'),
                     ),
                     const SizedBox(height: 12),
+                    _buildAreaDropdown(
+                      km: km,
+                      selectedAreaId: areaId,
+                      onChanged: (v) => setSheetState(() => areaId = v),
+                    ),
+                    _buildParentNoteDropdown(
+                      km: km,
+                      excludeNoteId: note.id,
+                      selectedParentId: parentNoteId,
+                      onChanged: (v) => setSheetState(() => parentNoteId = v),
+                    ),
                     TextField(
                       controller: tagsCtrl,
                       decoration: const InputDecoration(
@@ -1815,15 +2466,41 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                       ),
                     ),
                     const SizedBox(height: 12),
-                    RichMarkdownToolbar(controller: contentCtrl),
-                    const SizedBox(height: 6),
-                    TextField(
-                      controller: contentCtrl,
-                      maxLines: 6,
+                    DropdownButtonFormField<String>(
+                      initialValue: priorityProp,
                       decoration: const InputDecoration(
-                        labelText: 'Conteúdo da Nota',
+                        labelText: 'Prioridade',
                         border: OutlineInputBorder(),
                       ),
+                      items: const [
+                        DropdownMenuItem(value: 'baixa', child: Text('Baixa')),
+                        DropdownMenuItem(
+                          value: 'normal',
+                          child: Text('Normal'),
+                        ),
+                        DropdownMenuItem(value: 'alta', child: Text('Alta')),
+                      ],
+                      onChanged: (v) =>
+                          setSheetState(() => priorityProp = v ?? 'normal'),
+                    ),
+                    SwitchListTile.adaptive(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text(
+                        'Incluir na Revisão Espaçada (SM-2)',
+                        style: TextStyle(fontSize: 13.5),
+                      ),
+                      value: spacedReviewEnabled,
+                      onChanged: (val) =>
+                          setSheetState(() => spacedReviewEnabled = val),
+                    ),
+                    const SizedBox(height: 6),
+                    SecondBrainRichEditor(
+                      controller: contentCtrl,
+                      labelText: 'Conteúdo da Nota',
+                      minLines: 6,
+                      maxLines: 12,
+                      onCreateInlineNote: (title) =>
+                          _createInlineNoteFromEditor(title, areaId),
                     ),
                     const SizedBox(height: 16),
                     Row(
@@ -1849,7 +2526,6 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                                   .map((t) => t.trim())
                                   .where((t) => t.isNotEmpty)
                                   .toList();
-                              // Preserva eventuais tags internas como research:
                               try {
                                 final internal = (jsonDecode(note.tags) as List)
                                     .map((e) => e.toString())
@@ -1863,18 +2539,44 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                                 );
                               }
 
-                              final km = ref.read(knowledgeManagerProvider);
-                              await km.updateNote(
-                                note.id,
-                                title: title,
-                                content: content,
-                                category: category,
-                                tags: rawTags,
-                              );
-                              final updatedNote = await km.getNoteById(note.id);
-                              if (ctx.mounted) Navigator.of(ctx).pop();
-                              if (updatedNote != null) {
-                                await _transformNoteToResearch(updatedNote);
+                              final mergedProps =
+                                  Map<String, dynamic>.from(propMap)
+                                    ..['status'] = statusProp
+                                    ..['priority'] = priorityProp;
+                              try {
+                                await km.updateNote(
+                                  note.id,
+                                  title: title,
+                                  content: content,
+                                  category: category,
+                                  areaId: areaId,
+                                  clearAreaId: areaId == null,
+                                  parentNoteId: parentNoteId,
+                                  clearParentNoteId: parentNoteId == null,
+                                  properties: mergedProps,
+                                  nextReviewAt: spacedReviewEnabled
+                                      ? (note.nextReviewAt ??
+                                            DateTime.now().toUtc())
+                                      : null,
+                                  clearNextReviewAt: !spacedReviewEnabled,
+                                  tags: rawTags,
+                                );
+                                final updatedNote = await km.getNoteById(
+                                  note.id,
+                                );
+                                if (ctx.mounted) Navigator.of(ctx).pop();
+                                if (updatedNote != null) {
+                                  await _transformNoteToResearch(updatedNote);
+                                }
+                              } on ArgumentError catch (e) {
+                                if (ctx.mounted) {
+                                  ScaffoldMessenger.of(ctx).showSnackBar(
+                                    SnackBar(
+                                      content: Text(e.message.toString()),
+                                      backgroundColor: Colors.redAccent,
+                                    ),
+                                  );
+                                }
                               }
                             },
                           ),
@@ -1912,15 +2614,39 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                                 );
                               }
 
-                              final km = ref.read(knowledgeManagerProvider);
-                              await km.updateNote(
-                                note.id,
-                                title: title,
-                                content: content,
-                                category: category,
-                                tags: rawTags,
-                              );
-                              if (ctx.mounted) Navigator.of(ctx).pop();
+                              final mergedProps =
+                                  Map<String, dynamic>.from(propMap)
+                                    ..['status'] = statusProp
+                                    ..['priority'] = priorityProp;
+                              try {
+                                await km.updateNote(
+                                  note.id,
+                                  title: title,
+                                  content: content,
+                                  category: category,
+                                  areaId: areaId,
+                                  clearAreaId: areaId == null,
+                                  parentNoteId: parentNoteId,
+                                  clearParentNoteId: parentNoteId == null,
+                                  properties: mergedProps,
+                                  nextReviewAt: spacedReviewEnabled
+                                      ? (note.nextReviewAt ??
+                                            DateTime.now().toUtc())
+                                      : null,
+                                  clearNextReviewAt: !spacedReviewEnabled,
+                                  tags: rawTags,
+                                );
+                                if (ctx.mounted) Navigator.of(ctx).pop();
+                              } on ArgumentError catch (e) {
+                                if (ctx.mounted) {
+                                  ScaffoldMessenger.of(ctx).showSnackBar(
+                                    SnackBar(
+                                      content: Text(e.message.toString()),
+                                      backgroundColor: Colors.redAccent,
+                                    ),
+                                  );
+                                }
+                              }
                             },
                             child: const Text(
                               'Salvar Alterações',
@@ -1941,6 +2667,10 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
   }
 
   void _showEditQuestionModal(KnowledgeQuestionEntry q) {
+    final km = ref.read(knowledgeManagerProvider);
+    String? areaId = q.areaId;
+    bool spacedReviewEnabled = q.nextReviewAt != null;
+
     showAdaptiveMinistrySheet(
       context: context,
       title: 'Editar Dúvida',
@@ -1957,75 +2687,94 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
           final ctxCtrl = ctrls[1];
           final ansCtrl = ctrls[2];
 
-          return SingleChildScrollView(
-            controller: scroll,
-            physics: const ClampingScrollPhysics(),
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                TextField(
-                  controller: qCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Pergunta do Morador ou Pesquisa',
-                    border: OutlineInputBorder(),
+          return StatefulBuilder(
+            builder: (ctx, setSheetState) => SingleChildScrollView(
+              controller: scroll,
+              physics: const ClampingScrollPhysics(),
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextField(
+                    controller: qCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Pergunta do Morador ou Pesquisa',
+                      border: OutlineInputBorder(),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                RichMarkdownToolbar(controller: ctxCtrl),
-                const SizedBox(height: 6),
-                TextField(
-                  controller: ctxCtrl,
-                  maxLines: 2,
-                  decoration: const InputDecoration(
+                  const SizedBox(height: 12),
+                  _buildAreaDropdown(
+                    km: km,
+                    selectedAreaId: areaId,
+                    onChanged: (v) => setSheetState(() => areaId = v),
+                  ),
+                  SecondBrainRichEditor(
+                    controller: ctxCtrl,
                     labelText: 'Contexto ou Objeção',
-                    border: OutlineInputBorder(),
+                    minLines: 2,
+                    maxLines: 5,
+                    enableImagePicker: false,
+                    onCreateInlineNote: (t) =>
+                        _createInlineNoteFromEditor(t, areaId),
                   ),
-                ),
-                const SizedBox(height: 12),
-                RichMarkdownToolbar(controller: ansCtrl),
-                const SizedBox(height: 6),
-                TextField(
-                  controller: ansCtrl,
-                  maxLines: 4,
-                  decoration: const InputDecoration(
+                  const SizedBox(height: 12),
+                  SecondBrainRichEditor(
+                    controller: ansCtrl,
                     labelText: 'Resposta Bíblica',
-                    border: OutlineInputBorder(),
+                    minLines: 4,
+                    maxLines: 10,
+                    onCreateInlineNote: (t) =>
+                        _createInlineNoteFromEditor(t, areaId),
                   ),
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFF59E0B),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  SwitchListTile.adaptive(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text(
+                      'Incluir na Revisão Espaçada (SM-2)',
+                      style: TextStyle(fontSize: 13.5),
+                    ),
+                    value: spacedReviewEnabled,
+                    onChanged: (val) =>
+                        setSheetState(() => spacedReviewEnabled = val),
                   ),
-                  onPressed: () async {
-                    final question = qCtrl.text.trim();
-                    if (question.isEmpty) return;
-                    final ctxText = RichFormattedEditingController.readMarkup(
-                      ctxCtrl,
-                    ).trim();
-                    final ansText = RichFormattedEditingController.readMarkup(
-                      ansCtrl,
-                    ).trim();
-                    final km = ref.read(knowledgeManagerProvider);
-                    await km.updateQuestion(
-                      q.id,
-                      question: question,
-                      context: ctxText.isNotEmpty ? ctxText : null,
-                      answer: ansText.isNotEmpty ? ansText : null,
-                      status: ansText.isNotEmpty ? 'answered' : 'open',
-                    );
-                    if (ctx.mounted) Navigator.of(ctx).pop();
-                  },
-                  child: const Text(
-                    'Salvar Alterações',
-                    style: TextStyle(fontWeight: FontWeight.bold),
+                  const SizedBox(height: 12),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFF59E0B),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    onPressed: () async {
+                      final question = qCtrl.text.trim();
+                      if (question.isEmpty) return;
+                      final ctxText = RichFormattedEditingController.readMarkup(
+                        ctxCtrl,
+                      ).trim();
+                      final ansText = RichFormattedEditingController.readMarkup(
+                        ansCtrl,
+                      ).trim();
+                      await km.updateQuestion(
+                        q.id,
+                        question: question,
+                        context: ctxText.isNotEmpty ? ctxText : null,
+                        answer: ansText.isNotEmpty ? ansText : null,
+                        areaId: areaId,
+                        clearAreaId: areaId == null,
+                        nextReviewAt: spacedReviewEnabled
+                            ? (q.nextReviewAt ?? DateTime.now().toUtc())
+                            : null,
+                        clearNextReviewAt: !spacedReviewEnabled,
+                        status: ansText.isNotEmpty ? 'answered' : 'unanswered',
+                      );
+                      if (ctx.mounted) Navigator.of(ctx).pop();
+                    },
+                    child: const Text(
+                      'Salvar Alterações',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           );
         },
@@ -2034,6 +2783,7 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
   }
 
   void _showEditDocumentModal(KnowledgeDocumentEntry doc) {
+    final km = ref.read(knowledgeManagerProvider);
     List<String> existingTags = [];
     try {
       existingTags = (jsonDecode(doc.tags) as List)
@@ -2046,6 +2796,7 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
       );
     }
     String category = doc.category;
+    String? areaId = doc.areaId;
 
     showAdaptiveMinistrySheet(
       context: context,
@@ -2115,6 +2866,11 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                           setSheetState(() => category = v ?? 'manual'),
                     ),
                     const SizedBox(height: 12),
+                    _buildAreaDropdown(
+                      km: km,
+                      selectedAreaId: areaId,
+                      onChanged: (v) => setSheetState(() => areaId = v),
+                    ),
                     TextField(
                       controller: tagsCtrl,
                       decoration: const InputDecoration(
@@ -2153,12 +2909,13 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                             .map((t) => t.trim())
                             .where((t) => t.isNotEmpty)
                             .toList();
-                        final km = ref.read(knowledgeManagerProvider);
                         await km.updateDocument(
                           doc.id,
                           title: title,
                           description: desc.isNotEmpty ? desc : '',
                           category: category,
+                          areaId: areaId,
+                          clearAreaId: areaId == null,
                           tags: rawTags,
                         );
                         if (ctx.mounted) Navigator.of(ctx).pop();
@@ -2179,6 +2936,7 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
   }
 
   void _showEditResourceModal(KnowledgeResourceEntry resource) {
+    final km = ref.read(knowledgeManagerProvider);
     List<String> existingTags = [];
     try {
       existingTags = (jsonDecode(resource.tags) as List)
@@ -2192,6 +2950,7 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
     }
     String resourceType = resource.resourceType;
     String category = resource.category;
+    String? areaId = resource.areaId;
 
     showAdaptiveMinistrySheet(
       context: context,
@@ -2242,6 +3001,11 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                       ),
                     ),
                     const SizedBox(height: 12),
+                    _buildAreaDropdown(
+                      km: km,
+                      selectedAreaId: areaId,
+                      onChanged: (v) => setSheetState(() => areaId = v),
+                    ),
                     TextField(
                       controller: tagsCtrl,
                       decoration: const InputDecoration(
@@ -2319,7 +3083,6 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                             .map((t) => t.trim())
                             .where((t) => t.isNotEmpty)
                             .toList();
-                        final km = ref.read(knowledgeManagerProvider);
                         await km.updateResource(
                           resource.id,
                           title: title,
@@ -2327,6 +3090,8 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                           description: descText.isNotEmpty ? descText : null,
                           resourceType: resourceType,
                           category: category,
+                          areaId: areaId,
+                          clearAreaId: areaId == null,
                           tags: rawTags,
                         );
                         if (ctx.mounted) Navigator.of(ctx).pop();
@@ -2683,6 +3448,10 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
   }
 
   void _showCreateQuestionModal() {
+    final km = ref.read(knowledgeManagerProvider);
+    String? areaId = _selectedAreaId;
+    bool spacedReviewEnabled = false;
+
     showAdaptiveMinistrySheet(
       context: context,
       title: 'Nova Dúvida Teocrática',
@@ -2697,59 +3466,77 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
           final qCtrl = ctrls[0];
           final ctxCtrl = ctrls[1];
 
-          return SingleChildScrollView(
-            controller: scroll,
-            physics: const ClampingScrollPhysics(),
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                TextField(
-                  controller: qCtrl,
-                  autofocus: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Pergunta do Morador ou Pesquisa',
-                    border: OutlineInputBorder(),
+          return StatefulBuilder(
+            builder: (ctx, setSheetState) => SingleChildScrollView(
+              controller: scroll,
+              physics: const ClampingScrollPhysics(),
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextField(
+                    controller: qCtrl,
+                    autofocus: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Pergunta do Morador ou Pesquisa',
+                      border: OutlineInputBorder(),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                RichMarkdownToolbar(controller: ctxCtrl),
-                const SizedBox(height: 6),
-                TextField(
-                  controller: ctxCtrl,
-                  maxLines: 4,
-                  decoration: const InputDecoration(
+                  const SizedBox(height: 12),
+                  _buildAreaDropdown(
+                    km: km,
+                    selectedAreaId: areaId,
+                    onChanged: (v) => setSheetState(() => areaId = v),
+                  ),
+                  SecondBrainRichEditor(
+                    controller: ctxCtrl,
                     labelText: 'Contexto ou Objeção (opcional)',
-                    border: OutlineInputBorder(),
+                    minLines: 3,
+                    maxLines: 6,
+                    onCreateInlineNote: (t) =>
+                        _createInlineNoteFromEditor(t, areaId),
                   ),
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFF59E0B),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  SwitchListTile.adaptive(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text(
+                      'Incluir na Revisão Espaçada (SM-2)',
+                      style: TextStyle(fontSize: 13.5),
+                    ),
+                    value: spacedReviewEnabled,
+                    onChanged: (val) =>
+                        setSheetState(() => spacedReviewEnabled = val),
                   ),
-                  onPressed: () async {
-                    final q = qCtrl.text.trim();
-                    if (q.isEmpty) return;
-                    final ctxText = RichFormattedEditingController.readMarkup(
-                      ctxCtrl,
-                    ).trim();
-                    final km = ref.read(knowledgeManagerProvider);
-                    await km.createQuestion(
-                      question: q,
-                      context: ctxText.isNotEmpty ? ctxText : null,
-                    );
-                    if (ctx.mounted) Navigator.of(ctx).pop();
-                  },
-                  child: const Text(
-                    'Salvar Dúvida',
-                    style: TextStyle(fontWeight: FontWeight.bold),
+                  const SizedBox(height: 12),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFF59E0B),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    onPressed: () async {
+                      final q = qCtrl.text.trim();
+                      if (q.isEmpty) return;
+                      final ctxText = RichFormattedEditingController.readMarkup(
+                        ctxCtrl,
+                      ).trim();
+                      await km.createQuestion(
+                        question: q,
+                        context: ctxText.isNotEmpty ? ctxText : null,
+                        areaId: areaId,
+                        nextReviewAt: spacedReviewEnabled
+                            ? DateTime.now().toUtc()
+                            : null,
+                      );
+                      if (ctx.mounted) Navigator.of(ctx).pop();
+                    },
+                    child: const Text(
+                      'Salvar Dúvida',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           );
         },
@@ -2786,16 +3573,13 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                   ),
                 ),
                 const SizedBox(height: 12),
-                RichMarkdownToolbar(controller: ansCtrl),
-                const SizedBox(height: 6),
-                TextField(
+                SecondBrainRichEditor(
                   controller: ansCtrl,
-                  autofocus: true,
-                  maxLines: 6,
-                  decoration: const InputDecoration(
-                    labelText: 'Resposta Bíblica e Textos de Apoio...',
-                    border: OutlineInputBorder(),
-                  ),
+                  labelText: 'Resposta Bíblica e Textos de Apoio...',
+                  minLines: 5,
+                  maxLines: 10,
+                  onCreateInlineNote: (t) =>
+                      _createInlineNoteFromEditor(t, question.areaId),
                 ),
                 const SizedBox(height: 16),
                 ElevatedButton(
@@ -3003,6 +3787,8 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
           fileSize: fileSize,
           fileType: fileExt,
           category: 'manual',
+          areaId: _selectedAreaId,
+          documentBytes: fileBytes,
         );
 
         if (fileBytes != null && fileBytes.isNotEmpty) {
@@ -3043,6 +3829,9 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
   }
 
   void _showCreateResourceModal() {
+    final km = ref.read(knowledgeManagerProvider);
+    String? areaId = _selectedAreaId;
+
     showAdaptiveMinistrySheet(
       context: context,
       title: 'Novo Recurso / Link',
@@ -3061,86 +3850,93 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
           final descCtrl = ctrls[2];
           final tagsCtrl = ctrls[3];
 
-          return SingleChildScrollView(
-            controller: scroll,
-            physics: const ClampingScrollPhysics(),
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                TextField(
-                  controller: titleCtrl,
-                  autofocus: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Título do Recurso',
-                    border: OutlineInputBorder(),
+          return StatefulBuilder(
+            builder: (ctx, setSheetState) => SingleChildScrollView(
+              controller: scroll,
+              physics: const ClampingScrollPhysics(),
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextField(
+                    controller: titleCtrl,
+                    autofocus: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Título do Recurso',
+                      border: OutlineInputBorder(),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: urlCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'URL (ex: https://www.jw.org/...)',
-                    border: OutlineInputBorder(),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: urlCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'URL (ex: https://www.jw.org/...)',
+                      border: OutlineInputBorder(),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: tagsCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Tags (separadas por vírgula)',
-                    hintText: 'Ex: jw, vídeos, pregação',
-                    prefixIcon: Icon(Icons.tag, size: 18),
-                    border: OutlineInputBorder(),
+                  const SizedBox(height: 12),
+                  _buildAreaDropdown(
+                    km: km,
+                    selectedAreaId: areaId,
+                    onChanged: (v) => setSheetState(() => areaId = v),
                   ),
-                ),
-                const SizedBox(height: 12),
-                RichMarkdownToolbar(controller: descCtrl),
-                const SizedBox(height: 6),
-                TextField(
-                  controller: descCtrl,
-                  maxLines: 4,
-                  decoration: const InputDecoration(
-                    labelText: 'Descrição / Para qual ocasião serve?',
-                    border: OutlineInputBorder(),
+                  TextField(
+                    controller: tagsCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Tags (separadas por vírgula)',
+                      hintText: 'Ex: jw, vídeos, pregação',
+                      prefixIcon: Icon(Icons.tag, size: 18),
+                      border: OutlineInputBorder(),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.teal,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  const SizedBox(height: 12),
+                  RichMarkdownToolbar(controller: descCtrl),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: descCtrl,
+                    maxLines: 4,
+                    decoration: const InputDecoration(
+                      labelText: 'Descrição / Para qual ocasião serve?',
+                      border: OutlineInputBorder(),
+                    ),
                   ),
-                  onPressed: () async {
-                    final title = titleCtrl.text.trim();
-                    if (title.isEmpty) return;
-                    final urlText = urlCtrl.text.trim();
-                    final descText = RichFormattedEditingController.readMarkup(
-                      descCtrl,
-                    ).trim();
-                    final rawTags = tagsCtrl.text
-                        .split(',')
-                        .map((t) => t.trim())
-                        .where((t) => t.isNotEmpty)
-                        .toList();
-                    final km = ref.read(knowledgeManagerProvider);
-                    await km.createResource(
-                      title: title,
-                      resourceType: 'link',
-                      url: urlText.isNotEmpty ? urlText : null,
-                      description: descText.isNotEmpty ? descText : null,
-                      tags: rawTags,
-                    );
-                    if (ctx.mounted) Navigator.of(ctx).pop();
-                  },
-                  child: const Text(
-                    'Salvar Recurso',
-                    style: TextStyle(fontWeight: FontWeight.bold),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.teal,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    onPressed: () async {
+                      final title = titleCtrl.text.trim();
+                      if (title.isEmpty) return;
+                      final urlText = urlCtrl.text.trim();
+                      final descText =
+                          RichFormattedEditingController.readMarkup(descCtrl)
+                              .trim();
+                      final rawTags = tagsCtrl.text
+                          .split(',')
+                          .map((t) => t.trim())
+                          .where((t) => t.isNotEmpty)
+                          .toList();
+                      await km.createResource(
+                        title: title,
+                        resourceType: 'link',
+                        url: urlText.isNotEmpty ? urlText : null,
+                        description: descText.isNotEmpty ? descText : null,
+                        areaId: areaId,
+                        tags: rawTags,
+                      );
+                      if (ctx.mounted) Navigator.of(ctx).pop();
+                    },
+                    child: const Text(
+                      'Salvar Recurso',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           );
         },

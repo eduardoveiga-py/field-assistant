@@ -222,7 +222,12 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
       );
       await coordinator.syncAll(interactive: false);
       if (mounted) setState(() {});
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.debug(
+        'Sincronização silenciosa de e-mail encerrada com aviso: $e',
+        st,
+      );
+    }
   }
 
   @override
@@ -389,6 +394,190 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
     return EmailSyncCoordinator.friendlyErrorMessage(e, acc);
   }
 
+  Future<List<EmailAccount>> _findMissingLocalCredentialAccounts(
+    AppDatabase db,
+    List<EmailAccount> accounts,
+  ) async {
+    final missing = <EmailAccount>[];
+    for (final acc in accounts) {
+      if (!acc.isActive || acc.isOAuth) continue;
+      if (!await EmailAccountsManager.hasLocalCredentials(acc, db)) {
+        missing.add(acc);
+      }
+    }
+    return missing;
+  }
+
+  Future<void> _promptLocalEmailPassword(EmailAccount acc) async {
+    final ctrl = TextEditingController();
+    var obscure = true;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlgState) => AlertDialog(
+          title: const Text('Senha Local do Aparelho'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'A conta "${acc.name}" (${acc.email}) foi recebida via E2EE sem senha. '
+                'Salve a senha localmente apenas neste aparelho:',
+                style: const TextStyle(fontSize: 13),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: ctrl,
+                obscureText: obscure,
+                decoration: InputDecoration(
+                  labelText: 'Senha / App Password',
+                  border: const OutlineInputBorder(),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      obscure ? Icons.visibility : Icons.visibility_off,
+                    ),
+                    onPressed: () => setDlgState(() => obscure = !obscure),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                final clean = ctrl.text.trim();
+                if (clean.isEmpty) return;
+                await EmailAccountsManager.setLocalAccountPassword(
+                  acc.id,
+                  clean,
+                );
+                if (ctx.mounted) Navigator.pop(ctx);
+                if (mounted) {
+                  setState(() {
+                    _accountsFuture = null;
+                  });
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Credencial local salva para ${acc.email}.',
+                      ),
+                      backgroundColor: AppTheme.successGreen,
+                    ),
+                  );
+                }
+              },
+              child: const Text('Salvar neste Aparelho'),
+            ),
+          ],
+        ),
+      ),
+    );
+    ctrl.dispose();
+  }
+
+  Widget _buildSyncedAccountsBanner(bool isDark) {
+    final db = ref.read(repositoryProvider).db;
+    return StreamBuilder<List<EmailAccount>>(
+      stream: EmailAccountsManager.watchAccounts(db),
+      builder: (context, snapshot) {
+        final accounts = snapshot.data ?? const <EmailAccount>[];
+        if (accounts.isEmpty) return const SizedBox.shrink();
+
+        if (kIsWeb) {
+          final hasNativeOnly = accounts.any(
+            (a) => a.isActive && !a.supportsDirectBrowserSync,
+          );
+          if (!hasNativeOnly) return const SizedBox.shrink();
+          return Container(
+            width: double.infinity,
+            margin: const EdgeInsets.fromLTRB(16, 4, 16, 2),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.teal.withValues(alpha: isDark ? 0.16 : 0.08),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.teal.withValues(alpha: 0.35)),
+            ),
+            child: const Row(
+              children: [
+                Icon(
+                  Icons.verified_user_outlined,
+                  size: 15,
+                  color: Colors.teal,
+                ),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Contas Exchange/IMAP sincronizadas via E2EE: leitura e pesquisa no navegador (senhas permanecem apenas nos aparelhos configurados).',
+                    style: TextStyle(fontSize: 11, color: Colors.teal),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return FutureBuilder<List<EmailAccount>>(
+          future: _findMissingLocalCredentialAccounts(db, accounts),
+          builder: (context, missingSnap) {
+            final missing = missingSnap.data ?? const <EmailAccount>[];
+            if (missing.isEmpty) return const SizedBox.shrink();
+            final target = missing.first;
+            return Container(
+              width: double.infinity,
+              margin: const EdgeInsets.fromLTRB(16, 4, 16, 2),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.amber.withValues(alpha: isDark ? 0.16 : 0.10),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: Colors.amber.shade700.withValues(alpha: 0.4),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.vpn_key_outlined,
+                    size: 15,
+                    color: Colors.amber.shade700,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      missing.length == 1
+                          ? '${target.email}: leitura E2EE ativa (sem senha local neste aparelho).'
+                          : '${missing.length} contas E2EE sem senha local neste aparelho.',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isDark
+                            ? Colors.amber.shade200
+                            : Colors.amber.shade900,
+                      ),
+                    ),
+                  ),
+                  TextButton(
+                    style: TextButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                    ),
+                    onPressed: () => _promptLocalEmailPassword(target),
+                    child: const Text(
+                      'Definir Senha',
+                      style: TextStyle(fontSize: 11),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   Future<void> _syncEmails() async {
     if (_isSyncingEmails) return;
     setState(() => _isSyncingEmails = true);
@@ -403,7 +592,12 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
       unawaited(() async {
         try {
           await ref.read(supabaseSyncServiceProvider).sync();
-        } catch (_) {}
+        } catch (e, st) {
+          AppLogger.debug(
+            'Push/Pull Supabase pós-sync de e-mail adiado: $e',
+            st,
+          );
+        }
       }());
 
       if (mounted) {
@@ -2683,6 +2877,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
           ),
         ),
         const Divider(height: 1),
+
+        // Aviso contextual de contas E2EE em dispositivos secundários / Web
+        _buildSyncedAccountsBanner(isDark),
 
         // Lista Reativa de E-mails
         Expanded(
@@ -6642,7 +6839,8 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                                 isSending = false;
                                                 needsConfig = true;
                                                 inlineError =
-                                                    'Senha não configurada para a conta ${selectedAccount!.name}. Acesse Configurações para validar seu acesso.';
+                                                    'Senha não configurada neste dispositivo para a conta ${selectedAccount!.name}. '
+                                                    'Por segurança, senhas nunca são copiadas via nuvem; informe a senha neste aparelho em Ajustes > Contas de E-mail.';
                                               });
                                             }
                                             return;

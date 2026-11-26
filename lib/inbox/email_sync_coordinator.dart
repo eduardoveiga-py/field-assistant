@@ -648,8 +648,8 @@ class EmailSyncCoordinator {
             failed.addAll(folderWarnings.map((w) => '${acc.name}: $w'));
           }
         } else if (kIsWeb) {
-          failed.add(
-            '${acc.name}: Conexão direta IMAP/Exchange indisponível na Web; sincronize via app nativo.',
+          AppLogger.debug(
+            'Sincronização direta ${acc.incomingProtocol} (${acc.email}) ignorada no navegador; mensagens sincronizadas via E2EE de dispositivo nativo.',
           );
         } else {
           final pass = await EmailAccountsManager.getAccountPassword(

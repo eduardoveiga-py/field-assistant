@@ -400,6 +400,7 @@ class _MarkdownPreviewTextState extends State<MarkdownPreviewText> {
         child: SelectableText.rich(
           TextSpan(children: mapped.spans),
           textAlign: widget.textAlign,
+          minLines: widget.maxLines != null && widget.maxLines! > 1 ? 1 : null,
           maxLines: widget.maxLines,
           onSelectionChanged: canHighlightInline
               ? (sel, _) {

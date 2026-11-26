@@ -8,6 +8,7 @@ import '../../core/app_theme.dart';
 import '../../core/feature_registry.dart';
 import '../../database/app_database.dart';
 import '../../database/repository.dart';
+import '../../knowledge/knowledge_search_index.dart';
 import '../providers.dart';
 import 'person_detail_screen.dart';
 import 'phone_contacts_screen.dart';
@@ -574,29 +575,40 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
       }
     }
 
-    // 9. Base de Conhecimento (Notas — governada por knowledge — FA-FUNC-01)
+    // 9. Base de Conhecimento FTS5 / Índice Completo (Notas, Dúvidas, PDFs e Recursos — FA-FUNC-01)
     if (isKnowledgeEnabled) {
       try {
-        final notes =
-            await (db.select(db.knowledgeNotes)..where(
-                  (t) =>
-                      (t.title.like('%$query%') | t.content.like('%$query%')) &
-                      t.deletedAt.isNull(),
-                ))
-                .get();
-        for (final n in notes) {
+        final kbResults = await KnowledgeSearchIndex.search(
+          db,
+          query,
+          limit: 25,
+        );
+        for (final hit in kbResults) {
+          final typeLabel = switch (hit.entityType) {
+            'question' => 'Dúvida',
+            'document' => 'Documento / PDF',
+            'resource' => 'Recurso',
+            _ => 'Nota',
+          };
+          final tabIndex = switch (hit.entityType) {
+            'question' => 1,
+            'document' => 2,
+            'resource' => 3,
+            _ => 0,
+          };
           results.add(
             GlobalSearchResultItem(
-              id: n.id,
-              title: n.title,
-              subtitle: 'Nota • Categoria: ${n.category}',
-              snippet: n.content,
+              id: hit.id,
+              title: hit.title,
+              subtitle: '$typeLabel • Categoria: ${hit.category}',
+              snippet: hit.snippet,
               type: GlobalSearchResultType.knowledge,
               onTap: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => const KnowledgeBaseScreen(),
+                    builder: (_) =>
+                        KnowledgeBaseScreen(initialTabIndex: tabIndex),
                   ),
                 );
               },

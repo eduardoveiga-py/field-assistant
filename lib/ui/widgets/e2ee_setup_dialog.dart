@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,6 +7,7 @@ import '../../core/app_logger.dart';
 import '../../core/biometric_auth_service.dart';
 import '../../sync/crypto/recovery_crypto.dart';
 import '../../sync/crypto/recovery_vault_verifier.dart';
+import '../../sync/crypto/web_key_persistence.dart';
 import '../../sync/supabase_sync_service.dart';
 
 /// Diálogo completo para configuração e restauração do cofre E2EE.
@@ -45,6 +47,12 @@ class _E2eeSetupDialogState extends ConsumerState<E2eeSetupDialog>
       TextEditingController();
   int _wordCount = 0;
 
+  // Opções de persistência no navegador (Web PWA)
+  bool _webRequirePinOnReload = false;
+  final TextEditingController _webPinController = TextEditingController();
+  final TextEditingController _webPinConfirmController =
+      TextEditingController();
+
   @override
   void initState() {
     super.initState();
@@ -57,7 +65,24 @@ class _E2eeSetupDialogState extends ConsumerState<E2eeSetupDialog>
   void dispose() {
     _tabController.dispose();
     _restorePhraseController.dispose();
+    _webPinController.dispose();
+    _webPinConfirmController.dispose();
     super.dispose();
+  }
+
+  String? _resolveValidatedWebPin() {
+    if (!kIsWeb || !_webRequirePinOnReload) return null;
+    final pin = _webPinController.text.trim();
+    final confirm = _webPinConfirmController.text.trim();
+    if (pin.length < WebPinKeyWrapper.minPinLength) {
+      throw FormatException(
+        'O PIN de bloqueio rápido na Web precisa ter ao menos ${WebPinKeyWrapper.minPinLength} caracteres.',
+      );
+    }
+    if (pin != confirm) {
+      throw const FormatException('A confirmação do PIN na Web não confere.');
+    }
+    return pin;
   }
 
   void _updateWordCount() {
@@ -87,12 +112,14 @@ class _E2eeSetupDialogState extends ConsumerState<E2eeSetupDialog>
     });
 
     try {
+      final webPin = _resolveValidatedWebPin();
       final e2ee = ref.read(e2eeServiceProvider);
       // Salva e confirma no servidor Supabase
       await e2ee.keyStore.install(
         owner: widget.userId,
         phrase: _generatedPhrase!,
         confirmation: _generatedPhrase!,
+        webUnlockPin: webPin,
       );
       if (widget.userId != 'local_user') {
         await e2ee.keyStore.copyOwnerKey(
@@ -163,8 +190,9 @@ class _E2eeSetupDialogState extends ConsumerState<E2eeSetupDialog>
     });
 
     try {
+      final webPin = _resolveValidatedWebPin();
       final e2ee = ref.read(e2eeServiceProvider);
-      await e2ee.restoreVault(widget.userId, phrase);
+      await e2ee.restoreVault(widget.userId, phrase, webUnlockPin: webPin);
       if (widget.userId != 'local_user') {
         await e2ee.keyStore.copyOwnerKey(
           fromOwner: widget.userId,
@@ -300,6 +328,10 @@ class _E2eeSetupDialogState extends ConsumerState<E2eeSetupDialog>
                   ],
                 ),
               ),
+              if (kIsWeb) ...[
+                const SizedBox(height: 12),
+                _buildWebPersistenceSelector(theme, isDark),
+              ],
             ],
           ),
         ),
@@ -310,6 +342,99 @@ class _E2eeSetupDialogState extends ConsumerState<E2eeSetupDialog>
           child: const Text('Cancelar / Manter Local'),
         ),
       ],
+    );
+  }
+
+  Widget _buildWebPersistenceSelector(ThemeData theme, bool isDark) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: isDark
+            ? Colors.blueGrey.withValues(alpha: 0.16)
+            : Colors.blue.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: theme.colorScheme.primary.withValues(alpha: 0.35),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.web_rounded,
+                size: 18,
+                color: theme.colorScheme.primary,
+              ),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Persistência neste Navegador (PWA)',
+                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'As 24 palavras nunca são salvas no navegador. A chave derivada é protegida no IndexedDB via WebCrypto (menos isolada que o Keychain nativo em celulares/PCs compartilhados).',
+            style: TextStyle(
+              fontSize: 11,
+              color: isDark ? Colors.grey.shade300 : Colors.grey.shade700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          SwitchListTile.adaptive(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            title: const Text(
+              'Proteger navegador com PIN rápido ao recarregar',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+            ),
+            subtitle: Text(
+              _webRequirePinOnReload
+                  ? 'Ideal para computadores compartilhados: exige PIN curto após recarregar a página.'
+                  : 'Desbloqueio persistente automático (ideal para celular, tablet ou PC pessoal).',
+              style: const TextStyle(fontSize: 11),
+            ),
+            value: _webRequirePinOnReload,
+            onChanged: _isLoading
+                ? null
+                : (v) => setState(() => _webRequirePinOnReload = v),
+          ),
+          if (_webRequirePinOnReload) ...[
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _webPinController,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      labelText: 'PIN (mín. 6)',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: _webPinConfirmController,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      labelText: 'Confirmar PIN',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
     );
   }
 
@@ -669,6 +794,148 @@ class E2eeViewPhraseDialog extends StatelessWidget {
         ElevatedButton(
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Fechar'),
+        ),
+      ],
+    );
+  }
+}
+
+/// Diálogo leve para desbloquear um cofre E2EE protegido por PIN rápido no navegador.
+class WebPinUnlockDialog extends ConsumerStatefulWidget {
+  final String userId;
+
+  const WebPinUnlockDialog({super.key, required this.userId});
+
+  static Future<bool?> show(BuildContext context, {required String userId}) {
+    final effectiveId = userId.trim().isNotEmpty ? userId.trim() : 'local_user';
+    return showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => WebPinUnlockDialog(userId: effectiveId),
+    );
+  }
+
+  @override
+  ConsumerState<WebPinUnlockDialog> createState() => _WebPinUnlockDialogState();
+}
+
+class _WebPinUnlockDialogState extends ConsumerState<WebPinUnlockDialog> {
+  final TextEditingController _pinController = TextEditingController();
+  bool _isLoading = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _pinController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _unlock() async {
+    final pin = _pinController.text.trim();
+    if (pin.isEmpty) {
+      setState(() => _error = 'Informe seu PIN de desbloqueio rápido.');
+      return;
+    }
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      await ref
+          .read(e2eeServiceProvider)
+          .unlockWithWebPin(ownerId: widget.userId, pin: pin);
+      if (mounted) {
+        ref.read(supabaseSyncServiceProvider).sync();
+        Navigator.of(context).pop(true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Cofre E2EE desbloqueado! Sincronização iniciada.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e, st) {
+      AppLogger.warning('Falha ao desbloquear cofre E2EE Web com PIN', e, st);
+      if (mounted) {
+        setState(() {
+          _error = e is FormatException
+              ? e.message
+              : 'Não foi possível desbloquear com esse PIN.';
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Row(
+        children: [
+          Icon(Icons.lock_open_rounded, color: Colors.blue),
+          SizedBox(width: 8),
+          Expanded(child: Text('Desbloquear Sincronização E2EE')),
+        ],
+      ),
+      content: SizedBox(
+        width: 400,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Este navegador possui seu cofre E2EE salvo e protegido por PIN rápido.',
+              style: TextStyle(fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _pinController,
+              obscureText: true,
+              autofocus: true,
+              onSubmitted: (_) => _isLoading ? null : _unlock(),
+              decoration: const InputDecoration(
+                labelText: 'PIN de desbloqueio rápido',
+                prefixIcon: Icon(Icons.pin_outlined),
+                border: OutlineInputBorder(),
+              ),
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 10),
+              Text(
+                _error!,
+                style: const TextStyle(color: Colors.red, fontSize: 12),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isLoading
+              ? null
+              : () async {
+                  Navigator.of(context).pop(false);
+                  await E2eeSetupDialog.show(context, userId: widget.userId);
+                },
+          child: const Text('Usar 24 Palavras'),
+        ),
+        TextButton(
+          onPressed: _isLoading ? null : () => Navigator.of(context).pop(false),
+          child: const Text('Agora Não'),
+        ),
+        FilledButton.icon(
+          onPressed: _isLoading ? null : _unlock,
+          icon: _isLoading
+              ? const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.lock_open, size: 16),
+          label: const Text('Desbloquear'),
         ),
       ],
     );

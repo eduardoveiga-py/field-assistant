@@ -18012,6 +18012,15 @@ class $ProjectsTable extends Projects
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _areaIdMeta = const VerificationMeta('areaId');
+  @override
+  late final GeneratedColumn<String> areaId = GeneratedColumn<String>(
+    'area_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _metadataMeta = const VerificationMeta(
     'metadata',
   );
@@ -18083,6 +18092,7 @@ class $ProjectsTable extends Projects
     targetDate,
     completedAt,
     originInboxId,
+    areaId,
     metadata,
     createdAt,
     updatedAt,
@@ -18183,6 +18193,12 @@ class $ProjectsTable extends Projects
         ),
       );
     }
+    if (data.containsKey('area_id')) {
+      context.handle(
+        _areaIdMeta,
+        areaId.isAcceptableOrUnknown(data['area_id']!, _areaIdMeta),
+      );
+    }
     if (data.containsKey('metadata')) {
       context.handle(
         _metadataMeta,
@@ -18274,6 +18290,10 @@ class $ProjectsTable extends Projects
         DriftSqlType.string,
         data['${effectivePrefix}origin_inbox_id'],
       ),
+      areaId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}area_id'],
+      ),
       metadata: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}metadata'],
@@ -18316,6 +18336,7 @@ class ProjectEntry extends DataClass implements Insertable<ProjectEntry> {
   final DateTime? targetDate;
   final DateTime? completedAt;
   final String? originInboxId;
+  final String? areaId;
   final String metadata;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -18334,6 +18355,7 @@ class ProjectEntry extends DataClass implements Insertable<ProjectEntry> {
     this.targetDate,
     this.completedAt,
     this.originInboxId,
+    this.areaId,
     required this.metadata,
     required this.createdAt,
     required this.updatedAt,
@@ -18370,6 +18392,9 @@ class ProjectEntry extends DataClass implements Insertable<ProjectEntry> {
     }
     if (!nullToAbsent || originInboxId != null) {
       map['origin_inbox_id'] = Variable<String>(originInboxId);
+    }
+    if (!nullToAbsent || areaId != null) {
+      map['area_id'] = Variable<String>(areaId);
     }
     map['metadata'] = Variable<String>(metadata);
     map['created_at'] = Variable<DateTime>(createdAt);
@@ -18411,6 +18436,9 @@ class ProjectEntry extends DataClass implements Insertable<ProjectEntry> {
       originInboxId: originInboxId == null && nullToAbsent
           ? const Value.absent()
           : Value(originInboxId),
+      areaId: areaId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(areaId),
       metadata: Value(metadata),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
@@ -18439,6 +18467,7 @@ class ProjectEntry extends DataClass implements Insertable<ProjectEntry> {
       targetDate: serializer.fromJson<DateTime?>(json['targetDate']),
       completedAt: serializer.fromJson<DateTime?>(json['completedAt']),
       originInboxId: serializer.fromJson<String?>(json['originInboxId']),
+      areaId: serializer.fromJson<String?>(json['areaId']),
       metadata: serializer.fromJson<String>(json['metadata']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
@@ -18462,6 +18491,7 @@ class ProjectEntry extends DataClass implements Insertable<ProjectEntry> {
       'targetDate': serializer.toJson<DateTime?>(targetDate),
       'completedAt': serializer.toJson<DateTime?>(completedAt),
       'originInboxId': serializer.toJson<String?>(originInboxId),
+      'areaId': serializer.toJson<String?>(areaId),
       'metadata': serializer.toJson<String>(metadata),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
@@ -18483,6 +18513,7 @@ class ProjectEntry extends DataClass implements Insertable<ProjectEntry> {
     Value<DateTime?> targetDate = const Value.absent(),
     Value<DateTime?> completedAt = const Value.absent(),
     Value<String?> originInboxId = const Value.absent(),
+    Value<String?> areaId = const Value.absent(),
     String? metadata,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -18503,6 +18534,7 @@ class ProjectEntry extends DataClass implements Insertable<ProjectEntry> {
     originInboxId: originInboxId.present
         ? originInboxId.value
         : this.originInboxId,
+    areaId: areaId.present ? areaId.value : this.areaId,
     metadata: metadata ?? this.metadata,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
@@ -18531,6 +18563,7 @@ class ProjectEntry extends DataClass implements Insertable<ProjectEntry> {
       originInboxId: data.originInboxId.present
           ? data.originInboxId.value
           : this.originInboxId,
+      areaId: data.areaId.present ? data.areaId.value : this.areaId,
       metadata: data.metadata.present ? data.metadata.value : this.metadata,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
@@ -18554,6 +18587,7 @@ class ProjectEntry extends DataClass implements Insertable<ProjectEntry> {
           ..write('targetDate: $targetDate, ')
           ..write('completedAt: $completedAt, ')
           ..write('originInboxId: $originInboxId, ')
+          ..write('areaId: $areaId, ')
           ..write('metadata: $metadata, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
@@ -18577,6 +18611,7 @@ class ProjectEntry extends DataClass implements Insertable<ProjectEntry> {
     targetDate,
     completedAt,
     originInboxId,
+    areaId,
     metadata,
     createdAt,
     updatedAt,
@@ -18599,6 +18634,7 @@ class ProjectEntry extends DataClass implements Insertable<ProjectEntry> {
           other.targetDate == this.targetDate &&
           other.completedAt == this.completedAt &&
           other.originInboxId == this.originInboxId &&
+          other.areaId == this.areaId &&
           other.metadata == this.metadata &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
@@ -18619,6 +18655,7 @@ class ProjectsCompanion extends UpdateCompanion<ProjectEntry> {
   final Value<DateTime?> targetDate;
   final Value<DateTime?> completedAt;
   final Value<String?> originInboxId;
+  final Value<String?> areaId;
   final Value<String> metadata;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
@@ -18638,6 +18675,7 @@ class ProjectsCompanion extends UpdateCompanion<ProjectEntry> {
     this.targetDate = const Value.absent(),
     this.completedAt = const Value.absent(),
     this.originInboxId = const Value.absent(),
+    this.areaId = const Value.absent(),
     this.metadata = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -18658,6 +18696,7 @@ class ProjectsCompanion extends UpdateCompanion<ProjectEntry> {
     this.targetDate = const Value.absent(),
     this.completedAt = const Value.absent(),
     this.originInboxId = const Value.absent(),
+    this.areaId = const Value.absent(),
     this.metadata = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
@@ -18681,6 +18720,7 @@ class ProjectsCompanion extends UpdateCompanion<ProjectEntry> {
     Expression<DateTime>? targetDate,
     Expression<DateTime>? completedAt,
     Expression<String>? originInboxId,
+    Expression<String>? areaId,
     Expression<String>? metadata,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
@@ -18701,6 +18741,7 @@ class ProjectsCompanion extends UpdateCompanion<ProjectEntry> {
       if (targetDate != null) 'target_date': targetDate,
       if (completedAt != null) 'completed_at': completedAt,
       if (originInboxId != null) 'origin_inbox_id': originInboxId,
+      if (areaId != null) 'area_id': areaId,
       if (metadata != null) 'metadata': metadata,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -18723,6 +18764,7 @@ class ProjectsCompanion extends UpdateCompanion<ProjectEntry> {
     Value<DateTime?>? targetDate,
     Value<DateTime?>? completedAt,
     Value<String?>? originInboxId,
+    Value<String?>? areaId,
     Value<String>? metadata,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
@@ -18743,6 +18785,7 @@ class ProjectsCompanion extends UpdateCompanion<ProjectEntry> {
       targetDate: targetDate ?? this.targetDate,
       completedAt: completedAt ?? this.completedAt,
       originInboxId: originInboxId ?? this.originInboxId,
+      areaId: areaId ?? this.areaId,
       metadata: metadata ?? this.metadata,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -18791,6 +18834,9 @@ class ProjectsCompanion extends UpdateCompanion<ProjectEntry> {
     if (originInboxId.present) {
       map['origin_inbox_id'] = Variable<String>(originInboxId.value);
     }
+    if (areaId.present) {
+      map['area_id'] = Variable<String>(areaId.value);
+    }
     if (metadata.present) {
       map['metadata'] = Variable<String>(metadata.value);
     }
@@ -18827,6 +18873,7 @@ class ProjectsCompanion extends UpdateCompanion<ProjectEntry> {
           ..write('targetDate: $targetDate, ')
           ..write('completedAt: $completedAt, ')
           ..write('originInboxId: $originInboxId, ')
+          ..write('areaId: $areaId, ')
           ..write('metadata: $metadata, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
@@ -20412,6 +20459,73 @@ class $KnowledgeNotesTable extends KnowledgeNotes
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _areaIdMeta = const VerificationMeta('areaId');
+  @override
+  late final GeneratedColumn<String> areaId = GeneratedColumn<String>(
+    'area_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _parentNoteIdMeta = const VerificationMeta(
+    'parentNoteId',
+  );
+  @override
+  late final GeneratedColumn<String> parentNoteId = GeneratedColumn<String>(
+    'parent_note_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _propertiesJsonMeta = const VerificationMeta(
+    'propertiesJson',
+  );
+  @override
+  late final GeneratedColumn<String> propertiesJson = GeneratedColumn<String>(
+    'properties_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('{}'),
+  );
+  static const VerificationMeta _reviewLevelMeta = const VerificationMeta(
+    'reviewLevel',
+  );
+  @override
+  late final GeneratedColumn<int> reviewLevel = GeneratedColumn<int>(
+    'review_level',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _nextReviewAtMeta = const VerificationMeta(
+    'nextReviewAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> nextReviewAt = GeneratedColumn<DateTime>(
+    'next_review_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _lastReviewedAtMeta = const VerificationMeta(
+    'lastReviewedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> lastReviewedAt =
+      GeneratedColumn<DateTime>(
+        'last_reviewed_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -20471,6 +20585,12 @@ class $KnowledgeNotesTable extends KnowledgeNotes
     attachments,
     sources,
     isPinned,
+    areaId,
+    parentNoteId,
+    propertiesJson,
+    reviewLevel,
+    nextReviewAt,
+    lastReviewedAt,
     createdAt,
     updatedAt,
     deletedAt,
@@ -20569,6 +20689,57 @@ class $KnowledgeNotesTable extends KnowledgeNotes
         isPinned.isAcceptableOrUnknown(data['is_pinned']!, _isPinnedMeta),
       );
     }
+    if (data.containsKey('area_id')) {
+      context.handle(
+        _areaIdMeta,
+        areaId.isAcceptableOrUnknown(data['area_id']!, _areaIdMeta),
+      );
+    }
+    if (data.containsKey('parent_note_id')) {
+      context.handle(
+        _parentNoteIdMeta,
+        parentNoteId.isAcceptableOrUnknown(
+          data['parent_note_id']!,
+          _parentNoteIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('properties_json')) {
+      context.handle(
+        _propertiesJsonMeta,
+        propertiesJson.isAcceptableOrUnknown(
+          data['properties_json']!,
+          _propertiesJsonMeta,
+        ),
+      );
+    }
+    if (data.containsKey('review_level')) {
+      context.handle(
+        _reviewLevelMeta,
+        reviewLevel.isAcceptableOrUnknown(
+          data['review_level']!,
+          _reviewLevelMeta,
+        ),
+      );
+    }
+    if (data.containsKey('next_review_at')) {
+      context.handle(
+        _nextReviewAtMeta,
+        nextReviewAt.isAcceptableOrUnknown(
+          data['next_review_at']!,
+          _nextReviewAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('last_reviewed_at')) {
+      context.handle(
+        _lastReviewedAtMeta,
+        lastReviewedAt.isAcceptableOrUnknown(
+          data['last_reviewed_at']!,
+          _lastReviewedAtMeta,
+        ),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -20654,6 +20825,30 @@ class $KnowledgeNotesTable extends KnowledgeNotes
         DriftSqlType.bool,
         data['${effectivePrefix}is_pinned'],
       )!,
+      areaId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}area_id'],
+      ),
+      parentNoteId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}parent_note_id'],
+      ),
+      propertiesJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}properties_json'],
+      )!,
+      reviewLevel: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}review_level'],
+      )!,
+      nextReviewAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}next_review_at'],
+      ),
+      lastReviewedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_reviewed_at'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -20693,6 +20888,12 @@ class KnowledgeNoteEntry extends DataClass
   final String attachments;
   final String sources;
   final bool isPinned;
+  final String? areaId;
+  final String? parentNoteId;
+  final String propertiesJson;
+  final int reviewLevel;
+  final DateTime? nextReviewAt;
+  final DateTime? lastReviewedAt;
   final DateTime createdAt;
   final DateTime updatedAt;
   final DateTime? deletedAt;
@@ -20710,6 +20911,12 @@ class KnowledgeNoteEntry extends DataClass
     required this.attachments,
     required this.sources,
     required this.isPinned,
+    this.areaId,
+    this.parentNoteId,
+    required this.propertiesJson,
+    required this.reviewLevel,
+    this.nextReviewAt,
+    this.lastReviewedAt,
     required this.createdAt,
     required this.updatedAt,
     this.deletedAt,
@@ -20738,6 +20945,20 @@ class KnowledgeNoteEntry extends DataClass
     map['attachments'] = Variable<String>(attachments);
     map['sources'] = Variable<String>(sources);
     map['is_pinned'] = Variable<bool>(isPinned);
+    if (!nullToAbsent || areaId != null) {
+      map['area_id'] = Variable<String>(areaId);
+    }
+    if (!nullToAbsent || parentNoteId != null) {
+      map['parent_note_id'] = Variable<String>(parentNoteId);
+    }
+    map['properties_json'] = Variable<String>(propertiesJson);
+    map['review_level'] = Variable<int>(reviewLevel);
+    if (!nullToAbsent || nextReviewAt != null) {
+      map['next_review_at'] = Variable<DateTime>(nextReviewAt);
+    }
+    if (!nullToAbsent || lastReviewedAt != null) {
+      map['last_reviewed_at'] = Variable<DateTime>(lastReviewedAt);
+    }
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     if (!nullToAbsent || deletedAt != null) {
@@ -20769,6 +20990,20 @@ class KnowledgeNoteEntry extends DataClass
       attachments: Value(attachments),
       sources: Value(sources),
       isPinned: Value(isPinned),
+      areaId: areaId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(areaId),
+      parentNoteId: parentNoteId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(parentNoteId),
+      propertiesJson: Value(propertiesJson),
+      reviewLevel: Value(reviewLevel),
+      nextReviewAt: nextReviewAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(nextReviewAt),
+      lastReviewedAt: lastReviewedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastReviewedAt),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
       deletedAt: deletedAt == null && nullToAbsent
@@ -20796,6 +21031,12 @@ class KnowledgeNoteEntry extends DataClass
       attachments: serializer.fromJson<String>(json['attachments']),
       sources: serializer.fromJson<String>(json['sources']),
       isPinned: serializer.fromJson<bool>(json['isPinned']),
+      areaId: serializer.fromJson<String?>(json['areaId']),
+      parentNoteId: serializer.fromJson<String?>(json['parentNoteId']),
+      propertiesJson: serializer.fromJson<String>(json['propertiesJson']),
+      reviewLevel: serializer.fromJson<int>(json['reviewLevel']),
+      nextReviewAt: serializer.fromJson<DateTime?>(json['nextReviewAt']),
+      lastReviewedAt: serializer.fromJson<DateTime?>(json['lastReviewedAt']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
@@ -20818,6 +21059,12 @@ class KnowledgeNoteEntry extends DataClass
       'attachments': serializer.toJson<String>(attachments),
       'sources': serializer.toJson<String>(sources),
       'isPinned': serializer.toJson<bool>(isPinned),
+      'areaId': serializer.toJson<String?>(areaId),
+      'parentNoteId': serializer.toJson<String?>(parentNoteId),
+      'propertiesJson': serializer.toJson<String>(propertiesJson),
+      'reviewLevel': serializer.toJson<int>(reviewLevel),
+      'nextReviewAt': serializer.toJson<DateTime?>(nextReviewAt),
+      'lastReviewedAt': serializer.toJson<DateTime?>(lastReviewedAt),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'deletedAt': serializer.toJson<DateTime?>(deletedAt),
@@ -20838,6 +21085,12 @@ class KnowledgeNoteEntry extends DataClass
     String? attachments,
     String? sources,
     bool? isPinned,
+    Value<String?> areaId = const Value.absent(),
+    Value<String?> parentNoteId = const Value.absent(),
+    String? propertiesJson,
+    int? reviewLevel,
+    Value<DateTime?> nextReviewAt = const Value.absent(),
+    Value<DateTime?> lastReviewedAt = const Value.absent(),
     DateTime? createdAt,
     DateTime? updatedAt,
     Value<DateTime?> deletedAt = const Value.absent(),
@@ -20857,6 +21110,14 @@ class KnowledgeNoteEntry extends DataClass
     attachments: attachments ?? this.attachments,
     sources: sources ?? this.sources,
     isPinned: isPinned ?? this.isPinned,
+    areaId: areaId.present ? areaId.value : this.areaId,
+    parentNoteId: parentNoteId.present ? parentNoteId.value : this.parentNoteId,
+    propertiesJson: propertiesJson ?? this.propertiesJson,
+    reviewLevel: reviewLevel ?? this.reviewLevel,
+    nextReviewAt: nextReviewAt.present ? nextReviewAt.value : this.nextReviewAt,
+    lastReviewedAt: lastReviewedAt.present
+        ? lastReviewedAt.value
+        : this.lastReviewedAt,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
     deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
@@ -20880,6 +21141,22 @@ class KnowledgeNoteEntry extends DataClass
           : this.attachments,
       sources: data.sources.present ? data.sources.value : this.sources,
       isPinned: data.isPinned.present ? data.isPinned.value : this.isPinned,
+      areaId: data.areaId.present ? data.areaId.value : this.areaId,
+      parentNoteId: data.parentNoteId.present
+          ? data.parentNoteId.value
+          : this.parentNoteId,
+      propertiesJson: data.propertiesJson.present
+          ? data.propertiesJson.value
+          : this.propertiesJson,
+      reviewLevel: data.reviewLevel.present
+          ? data.reviewLevel.value
+          : this.reviewLevel,
+      nextReviewAt: data.nextReviewAt.present
+          ? data.nextReviewAt.value
+          : this.nextReviewAt,
+      lastReviewedAt: data.lastReviewedAt.present
+          ? data.lastReviewedAt.value
+          : this.lastReviewedAt,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
@@ -20902,6 +21179,12 @@ class KnowledgeNoteEntry extends DataClass
           ..write('attachments: $attachments, ')
           ..write('sources: $sources, ')
           ..write('isPinned: $isPinned, ')
+          ..write('areaId: $areaId, ')
+          ..write('parentNoteId: $parentNoteId, ')
+          ..write('propertiesJson: $propertiesJson, ')
+          ..write('reviewLevel: $reviewLevel, ')
+          ..write('nextReviewAt: $nextReviewAt, ')
+          ..write('lastReviewedAt: $lastReviewedAt, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
@@ -20911,7 +21194,7 @@ class KnowledgeNoteEntry extends DataClass
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     id,
     projectId,
     personId,
@@ -20924,11 +21207,17 @@ class KnowledgeNoteEntry extends DataClass
     attachments,
     sources,
     isPinned,
+    areaId,
+    parentNoteId,
+    propertiesJson,
+    reviewLevel,
+    nextReviewAt,
+    lastReviewedAt,
     createdAt,
     updatedAt,
     deletedAt,
     revision,
-  );
+  ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -20945,6 +21234,12 @@ class KnowledgeNoteEntry extends DataClass
           other.attachments == this.attachments &&
           other.sources == this.sources &&
           other.isPinned == this.isPinned &&
+          other.areaId == this.areaId &&
+          other.parentNoteId == this.parentNoteId &&
+          other.propertiesJson == this.propertiesJson &&
+          other.reviewLevel == this.reviewLevel &&
+          other.nextReviewAt == this.nextReviewAt &&
+          other.lastReviewedAt == this.lastReviewedAt &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
           other.deletedAt == this.deletedAt &&
@@ -20964,6 +21259,12 @@ class KnowledgeNotesCompanion extends UpdateCompanion<KnowledgeNoteEntry> {
   final Value<String> attachments;
   final Value<String> sources;
   final Value<bool> isPinned;
+  final Value<String?> areaId;
+  final Value<String?> parentNoteId;
+  final Value<String> propertiesJson;
+  final Value<int> reviewLevel;
+  final Value<DateTime?> nextReviewAt;
+  final Value<DateTime?> lastReviewedAt;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   final Value<DateTime?> deletedAt;
@@ -20982,6 +21283,12 @@ class KnowledgeNotesCompanion extends UpdateCompanion<KnowledgeNoteEntry> {
     this.attachments = const Value.absent(),
     this.sources = const Value.absent(),
     this.isPinned = const Value.absent(),
+    this.areaId = const Value.absent(),
+    this.parentNoteId = const Value.absent(),
+    this.propertiesJson = const Value.absent(),
+    this.reviewLevel = const Value.absent(),
+    this.nextReviewAt = const Value.absent(),
+    this.lastReviewedAt = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.deletedAt = const Value.absent(),
@@ -21001,6 +21308,12 @@ class KnowledgeNotesCompanion extends UpdateCompanion<KnowledgeNoteEntry> {
     this.attachments = const Value.absent(),
     this.sources = const Value.absent(),
     this.isPinned = const Value.absent(),
+    this.areaId = const Value.absent(),
+    this.parentNoteId = const Value.absent(),
+    this.propertiesJson = const Value.absent(),
+    this.reviewLevel = const Value.absent(),
+    this.nextReviewAt = const Value.absent(),
+    this.lastReviewedAt = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
     this.deletedAt = const Value.absent(),
@@ -21024,6 +21337,12 @@ class KnowledgeNotesCompanion extends UpdateCompanion<KnowledgeNoteEntry> {
     Expression<String>? attachments,
     Expression<String>? sources,
     Expression<bool>? isPinned,
+    Expression<String>? areaId,
+    Expression<String>? parentNoteId,
+    Expression<String>? propertiesJson,
+    Expression<int>? reviewLevel,
+    Expression<DateTime>? nextReviewAt,
+    Expression<DateTime>? lastReviewedAt,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
     Expression<DateTime>? deletedAt,
@@ -21043,6 +21362,12 @@ class KnowledgeNotesCompanion extends UpdateCompanion<KnowledgeNoteEntry> {
       if (attachments != null) 'attachments': attachments,
       if (sources != null) 'sources': sources,
       if (isPinned != null) 'is_pinned': isPinned,
+      if (areaId != null) 'area_id': areaId,
+      if (parentNoteId != null) 'parent_note_id': parentNoteId,
+      if (propertiesJson != null) 'properties_json': propertiesJson,
+      if (reviewLevel != null) 'review_level': reviewLevel,
+      if (nextReviewAt != null) 'next_review_at': nextReviewAt,
+      if (lastReviewedAt != null) 'last_reviewed_at': lastReviewedAt,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (deletedAt != null) 'deleted_at': deletedAt,
@@ -21064,6 +21389,12 @@ class KnowledgeNotesCompanion extends UpdateCompanion<KnowledgeNoteEntry> {
     Value<String>? attachments,
     Value<String>? sources,
     Value<bool>? isPinned,
+    Value<String?>? areaId,
+    Value<String?>? parentNoteId,
+    Value<String>? propertiesJson,
+    Value<int>? reviewLevel,
+    Value<DateTime?>? nextReviewAt,
+    Value<DateTime?>? lastReviewedAt,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
     Value<DateTime?>? deletedAt,
@@ -21083,6 +21414,12 @@ class KnowledgeNotesCompanion extends UpdateCompanion<KnowledgeNoteEntry> {
       attachments: attachments ?? this.attachments,
       sources: sources ?? this.sources,
       isPinned: isPinned ?? this.isPinned,
+      areaId: areaId ?? this.areaId,
+      parentNoteId: parentNoteId ?? this.parentNoteId,
+      propertiesJson: propertiesJson ?? this.propertiesJson,
+      reviewLevel: reviewLevel ?? this.reviewLevel,
+      nextReviewAt: nextReviewAt ?? this.nextReviewAt,
+      lastReviewedAt: lastReviewedAt ?? this.lastReviewedAt,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,
@@ -21130,6 +21467,24 @@ class KnowledgeNotesCompanion extends UpdateCompanion<KnowledgeNoteEntry> {
     if (isPinned.present) {
       map['is_pinned'] = Variable<bool>(isPinned.value);
     }
+    if (areaId.present) {
+      map['area_id'] = Variable<String>(areaId.value);
+    }
+    if (parentNoteId.present) {
+      map['parent_note_id'] = Variable<String>(parentNoteId.value);
+    }
+    if (propertiesJson.present) {
+      map['properties_json'] = Variable<String>(propertiesJson.value);
+    }
+    if (reviewLevel.present) {
+      map['review_level'] = Variable<int>(reviewLevel.value);
+    }
+    if (nextReviewAt.present) {
+      map['next_review_at'] = Variable<DateTime>(nextReviewAt.value);
+    }
+    if (lastReviewedAt.present) {
+      map['last_reviewed_at'] = Variable<DateTime>(lastReviewedAt.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -21163,6 +21518,12 @@ class KnowledgeNotesCompanion extends UpdateCompanion<KnowledgeNoteEntry> {
           ..write('attachments: $attachments, ')
           ..write('sources: $sources, ')
           ..write('isPinned: $isPinned, ')
+          ..write('areaId: $areaId, ')
+          ..write('parentNoteId: $parentNoteId, ')
+          ..write('propertiesJson: $propertiesJson, ')
+          ..write('reviewLevel: $reviewLevel, ')
+          ..write('nextReviewAt: $nextReviewAt, ')
+          ..write('lastReviewedAt: $lastReviewedAt, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
@@ -21308,6 +21669,50 @@ class $KnowledgeQuestionsTable extends KnowledgeQuestions
     type: DriftSqlType.dateTime,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _areaIdMeta = const VerificationMeta('areaId');
+  @override
+  late final GeneratedColumn<String> areaId = GeneratedColumn<String>(
+    'area_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _reviewLevelMeta = const VerificationMeta(
+    'reviewLevel',
+  );
+  @override
+  late final GeneratedColumn<int> reviewLevel = GeneratedColumn<int>(
+    'review_level',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _nextReviewAtMeta = const VerificationMeta(
+    'nextReviewAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> nextReviewAt = GeneratedColumn<DateTime>(
+    'next_review_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _lastReviewedAtMeta = const VerificationMeta(
+    'lastReviewedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> lastReviewedAt =
+      GeneratedColumn<DateTime>(
+        'last_reviewed_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -21367,6 +21772,10 @@ class $KnowledgeQuestionsTable extends KnowledgeQuestions
     status,
     answer,
     answeredAt,
+    areaId,
+    reviewLevel,
+    nextReviewAt,
+    lastReviewedAt,
     createdAt,
     updatedAt,
     deletedAt,
@@ -21463,6 +21872,39 @@ class $KnowledgeQuestionsTable extends KnowledgeQuestions
         answeredAt.isAcceptableOrUnknown(data['answered_at']!, _answeredAtMeta),
       );
     }
+    if (data.containsKey('area_id')) {
+      context.handle(
+        _areaIdMeta,
+        areaId.isAcceptableOrUnknown(data['area_id']!, _areaIdMeta),
+      );
+    }
+    if (data.containsKey('review_level')) {
+      context.handle(
+        _reviewLevelMeta,
+        reviewLevel.isAcceptableOrUnknown(
+          data['review_level']!,
+          _reviewLevelMeta,
+        ),
+      );
+    }
+    if (data.containsKey('next_review_at')) {
+      context.handle(
+        _nextReviewAtMeta,
+        nextReviewAt.isAcceptableOrUnknown(
+          data['next_review_at']!,
+          _nextReviewAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('last_reviewed_at')) {
+      context.handle(
+        _lastReviewedAtMeta,
+        lastReviewedAt.isAcceptableOrUnknown(
+          data['last_reviewed_at']!,
+          _lastReviewedAtMeta,
+        ),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -21548,6 +21990,22 @@ class $KnowledgeQuestionsTable extends KnowledgeQuestions
         DriftSqlType.dateTime,
         data['${effectivePrefix}answered_at'],
       ),
+      areaId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}area_id'],
+      ),
+      reviewLevel: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}review_level'],
+      )!,
+      nextReviewAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}next_review_at'],
+      ),
+      lastReviewedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_reviewed_at'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -21587,6 +22045,10 @@ class KnowledgeQuestionEntry extends DataClass
   final String status;
   final String? answer;
   final DateTime? answeredAt;
+  final String? areaId;
+  final int reviewLevel;
+  final DateTime? nextReviewAt;
+  final DateTime? lastReviewedAt;
   final DateTime createdAt;
   final DateTime updatedAt;
   final DateTime? deletedAt;
@@ -21604,6 +22066,10 @@ class KnowledgeQuestionEntry extends DataClass
     required this.status,
     this.answer,
     this.answeredAt,
+    this.areaId,
+    required this.reviewLevel,
+    this.nextReviewAt,
+    this.lastReviewedAt,
     required this.createdAt,
     required this.updatedAt,
     this.deletedAt,
@@ -21639,6 +22105,16 @@ class KnowledgeQuestionEntry extends DataClass
     }
     if (!nullToAbsent || answeredAt != null) {
       map['answered_at'] = Variable<DateTime>(answeredAt);
+    }
+    if (!nullToAbsent || areaId != null) {
+      map['area_id'] = Variable<String>(areaId);
+    }
+    map['review_level'] = Variable<int>(reviewLevel);
+    if (!nullToAbsent || nextReviewAt != null) {
+      map['next_review_at'] = Variable<DateTime>(nextReviewAt);
+    }
+    if (!nullToAbsent || lastReviewedAt != null) {
+      map['last_reviewed_at'] = Variable<DateTime>(lastReviewedAt);
     }
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
@@ -21679,6 +22155,16 @@ class KnowledgeQuestionEntry extends DataClass
       answeredAt: answeredAt == null && nullToAbsent
           ? const Value.absent()
           : Value(answeredAt),
+      areaId: areaId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(areaId),
+      reviewLevel: Value(reviewLevel),
+      nextReviewAt: nextReviewAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(nextReviewAt),
+      lastReviewedAt: lastReviewedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastReviewedAt),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
       deletedAt: deletedAt == null && nullToAbsent
@@ -21708,6 +22194,10 @@ class KnowledgeQuestionEntry extends DataClass
       status: serializer.fromJson<String>(json['status']),
       answer: serializer.fromJson<String?>(json['answer']),
       answeredAt: serializer.fromJson<DateTime?>(json['answeredAt']),
+      areaId: serializer.fromJson<String?>(json['areaId']),
+      reviewLevel: serializer.fromJson<int>(json['reviewLevel']),
+      nextReviewAt: serializer.fromJson<DateTime?>(json['nextReviewAt']),
+      lastReviewedAt: serializer.fromJson<DateTime?>(json['lastReviewedAt']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
@@ -21730,6 +22220,10 @@ class KnowledgeQuestionEntry extends DataClass
       'status': serializer.toJson<String>(status),
       'answer': serializer.toJson<String?>(answer),
       'answeredAt': serializer.toJson<DateTime?>(answeredAt),
+      'areaId': serializer.toJson<String?>(areaId),
+      'reviewLevel': serializer.toJson<int>(reviewLevel),
+      'nextReviewAt': serializer.toJson<DateTime?>(nextReviewAt),
+      'lastReviewedAt': serializer.toJson<DateTime?>(lastReviewedAt),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'deletedAt': serializer.toJson<DateTime?>(deletedAt),
@@ -21750,6 +22244,10 @@ class KnowledgeQuestionEntry extends DataClass
     String? status,
     Value<String?> answer = const Value.absent(),
     Value<DateTime?> answeredAt = const Value.absent(),
+    Value<String?> areaId = const Value.absent(),
+    int? reviewLevel,
+    Value<DateTime?> nextReviewAt = const Value.absent(),
+    Value<DateTime?> lastReviewedAt = const Value.absent(),
     DateTime? createdAt,
     DateTime? updatedAt,
     Value<DateTime?> deletedAt = const Value.absent(),
@@ -21771,6 +22269,12 @@ class KnowledgeQuestionEntry extends DataClass
     status: status ?? this.status,
     answer: answer.present ? answer.value : this.answer,
     answeredAt: answeredAt.present ? answeredAt.value : this.answeredAt,
+    areaId: areaId.present ? areaId.value : this.areaId,
+    reviewLevel: reviewLevel ?? this.reviewLevel,
+    nextReviewAt: nextReviewAt.present ? nextReviewAt.value : this.nextReviewAt,
+    lastReviewedAt: lastReviewedAt.present
+        ? lastReviewedAt.value
+        : this.lastReviewedAt,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
     deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
@@ -21796,6 +22300,16 @@ class KnowledgeQuestionEntry extends DataClass
       answeredAt: data.answeredAt.present
           ? data.answeredAt.value
           : this.answeredAt,
+      areaId: data.areaId.present ? data.areaId.value : this.areaId,
+      reviewLevel: data.reviewLevel.present
+          ? data.reviewLevel.value
+          : this.reviewLevel,
+      nextReviewAt: data.nextReviewAt.present
+          ? data.nextReviewAt.value
+          : this.nextReviewAt,
+      lastReviewedAt: data.lastReviewedAt.present
+          ? data.lastReviewedAt.value
+          : this.lastReviewedAt,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
@@ -21818,6 +22332,10 @@ class KnowledgeQuestionEntry extends DataClass
           ..write('status: $status, ')
           ..write('answer: $answer, ')
           ..write('answeredAt: $answeredAt, ')
+          ..write('areaId: $areaId, ')
+          ..write('reviewLevel: $reviewLevel, ')
+          ..write('nextReviewAt: $nextReviewAt, ')
+          ..write('lastReviewedAt: $lastReviewedAt, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
@@ -21840,6 +22358,10 @@ class KnowledgeQuestionEntry extends DataClass
     status,
     answer,
     answeredAt,
+    areaId,
+    reviewLevel,
+    nextReviewAt,
+    lastReviewedAt,
     createdAt,
     updatedAt,
     deletedAt,
@@ -21861,6 +22383,10 @@ class KnowledgeQuestionEntry extends DataClass
           other.status == this.status &&
           other.answer == this.answer &&
           other.answeredAt == this.answeredAt &&
+          other.areaId == this.areaId &&
+          other.reviewLevel == this.reviewLevel &&
+          other.nextReviewAt == this.nextReviewAt &&
+          other.lastReviewedAt == this.lastReviewedAt &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
           other.deletedAt == this.deletedAt &&
@@ -21881,6 +22407,10 @@ class KnowledgeQuestionsCompanion
   final Value<String> status;
   final Value<String?> answer;
   final Value<DateTime?> answeredAt;
+  final Value<String?> areaId;
+  final Value<int> reviewLevel;
+  final Value<DateTime?> nextReviewAt;
+  final Value<DateTime?> lastReviewedAt;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   final Value<DateTime?> deletedAt;
@@ -21899,6 +22429,10 @@ class KnowledgeQuestionsCompanion
     this.status = const Value.absent(),
     this.answer = const Value.absent(),
     this.answeredAt = const Value.absent(),
+    this.areaId = const Value.absent(),
+    this.reviewLevel = const Value.absent(),
+    this.nextReviewAt = const Value.absent(),
+    this.lastReviewedAt = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.deletedAt = const Value.absent(),
@@ -21918,6 +22452,10 @@ class KnowledgeQuestionsCompanion
     this.status = const Value.absent(),
     this.answer = const Value.absent(),
     this.answeredAt = const Value.absent(),
+    this.areaId = const Value.absent(),
+    this.reviewLevel = const Value.absent(),
+    this.nextReviewAt = const Value.absent(),
+    this.lastReviewedAt = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
     this.deletedAt = const Value.absent(),
@@ -21940,6 +22478,10 @@ class KnowledgeQuestionsCompanion
     Expression<String>? status,
     Expression<String>? answer,
     Expression<DateTime>? answeredAt,
+    Expression<String>? areaId,
+    Expression<int>? reviewLevel,
+    Expression<DateTime>? nextReviewAt,
+    Expression<DateTime>? lastReviewedAt,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
     Expression<DateTime>? deletedAt,
@@ -21959,6 +22501,10 @@ class KnowledgeQuestionsCompanion
       if (status != null) 'status': status,
       if (answer != null) 'answer': answer,
       if (answeredAt != null) 'answered_at': answeredAt,
+      if (areaId != null) 'area_id': areaId,
+      if (reviewLevel != null) 'review_level': reviewLevel,
+      if (nextReviewAt != null) 'next_review_at': nextReviewAt,
+      if (lastReviewedAt != null) 'last_reviewed_at': lastReviewedAt,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (deletedAt != null) 'deleted_at': deletedAt,
@@ -21980,6 +22526,10 @@ class KnowledgeQuestionsCompanion
     Value<String>? status,
     Value<String?>? answer,
     Value<DateTime?>? answeredAt,
+    Value<String?>? areaId,
+    Value<int>? reviewLevel,
+    Value<DateTime?>? nextReviewAt,
+    Value<DateTime?>? lastReviewedAt,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
     Value<DateTime?>? deletedAt,
@@ -21999,6 +22549,10 @@ class KnowledgeQuestionsCompanion
       status: status ?? this.status,
       answer: answer ?? this.answer,
       answeredAt: answeredAt ?? this.answeredAt,
+      areaId: areaId ?? this.areaId,
+      reviewLevel: reviewLevel ?? this.reviewLevel,
+      nextReviewAt: nextReviewAt ?? this.nextReviewAt,
+      lastReviewedAt: lastReviewedAt ?? this.lastReviewedAt,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,
@@ -22046,6 +22600,18 @@ class KnowledgeQuestionsCompanion
     if (answeredAt.present) {
       map['answered_at'] = Variable<DateTime>(answeredAt.value);
     }
+    if (areaId.present) {
+      map['area_id'] = Variable<String>(areaId.value);
+    }
+    if (reviewLevel.present) {
+      map['review_level'] = Variable<int>(reviewLevel.value);
+    }
+    if (nextReviewAt.present) {
+      map['next_review_at'] = Variable<DateTime>(nextReviewAt.value);
+    }
+    if (lastReviewedAt.present) {
+      map['last_reviewed_at'] = Variable<DateTime>(lastReviewedAt.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -22079,6 +22645,10 @@ class KnowledgeQuestionsCompanion
           ..write('status: $status, ')
           ..write('answer: $answer, ')
           ..write('answeredAt: $answeredAt, ')
+          ..write('areaId: $areaId, ')
+          ..write('reviewLevel: $reviewLevel, ')
+          ..write('nextReviewAt: $nextReviewAt, ')
+          ..write('lastReviewedAt: $lastReviewedAt, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
@@ -22269,6 +22839,26 @@ class $KnowledgeDocumentsTable extends KnowledgeDocuments
     requiredDuringInsert: false,
     defaultValue: const Constant('general'),
   );
+  static const VerificationMeta _areaIdMeta = const VerificationMeta('areaId');
+  @override
+  late final GeneratedColumn<String> areaId = GeneratedColumn<String>(
+    'area_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _extractedTextMeta = const VerificationMeta(
+    'extractedText',
+  );
+  @override
+  late final GeneratedColumn<String> extractedText = GeneratedColumn<String>(
+    'extracted_text',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -22332,6 +22922,8 @@ class $KnowledgeDocumentsTable extends KnowledgeDocuments
     description,
     tags,
     category,
+    areaId,
+    extractedText,
     createdAt,
     updatedAt,
     deletedAt,
@@ -22469,6 +23061,21 @@ class $KnowledgeDocumentsTable extends KnowledgeDocuments
         category.isAcceptableOrUnknown(data['category']!, _categoryMeta),
       );
     }
+    if (data.containsKey('area_id')) {
+      context.handle(
+        _areaIdMeta,
+        areaId.isAcceptableOrUnknown(data['area_id']!, _areaIdMeta),
+      );
+    }
+    if (data.containsKey('extracted_text')) {
+      context.handle(
+        _extractedTextMeta,
+        extractedText.isAcceptableOrUnknown(
+          data['extracted_text']!,
+          _extractedTextMeta,
+        ),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -22570,6 +23177,14 @@ class $KnowledgeDocumentsTable extends KnowledgeDocuments
         DriftSqlType.string,
         data['${effectivePrefix}category'],
       )!,
+      areaId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}area_id'],
+      ),
+      extractedText: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}extracted_text'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -22613,6 +23228,8 @@ class KnowledgeDocumentEntry extends DataClass
   final String? description;
   final String tags;
   final String category;
+  final String? areaId;
+  final String? extractedText;
   final DateTime createdAt;
   final DateTime updatedAt;
   final DateTime? deletedAt;
@@ -22634,6 +23251,8 @@ class KnowledgeDocumentEntry extends DataClass
     this.description,
     required this.tags,
     required this.category,
+    this.areaId,
+    this.extractedText,
     required this.createdAt,
     required this.updatedAt,
     this.deletedAt,
@@ -22674,6 +23293,12 @@ class KnowledgeDocumentEntry extends DataClass
     }
     map['tags'] = Variable<String>(tags);
     map['category'] = Variable<String>(category);
+    if (!nullToAbsent || areaId != null) {
+      map['area_id'] = Variable<String>(areaId);
+    }
+    if (!nullToAbsent || extractedText != null) {
+      map['extracted_text'] = Variable<String>(extractedText);
+    }
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     if (!nullToAbsent || deletedAt != null) {
@@ -22717,6 +23342,12 @@ class KnowledgeDocumentEntry extends DataClass
           : Value(description),
       tags: Value(tags),
       category: Value(category),
+      areaId: areaId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(areaId),
+      extractedText: extractedText == null && nullToAbsent
+          ? const Value.absent()
+          : Value(extractedText),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
       deletedAt: deletedAt == null && nullToAbsent
@@ -22752,6 +23383,8 @@ class KnowledgeDocumentEntry extends DataClass
       description: serializer.fromJson<String?>(json['description']),
       tags: serializer.fromJson<String>(json['tags']),
       category: serializer.fromJson<String>(json['category']),
+      areaId: serializer.fromJson<String?>(json['areaId']),
+      extractedText: serializer.fromJson<String?>(json['extractedText']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
@@ -22778,6 +23411,8 @@ class KnowledgeDocumentEntry extends DataClass
       'description': serializer.toJson<String?>(description),
       'tags': serializer.toJson<String>(tags),
       'category': serializer.toJson<String>(category),
+      'areaId': serializer.toJson<String?>(areaId),
+      'extractedText': serializer.toJson<String?>(extractedText),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'deletedAt': serializer.toJson<DateTime?>(deletedAt),
@@ -22802,6 +23437,8 @@ class KnowledgeDocumentEntry extends DataClass
     Value<String?> description = const Value.absent(),
     String? tags,
     String? category,
+    Value<String?> areaId = const Value.absent(),
+    Value<String?> extractedText = const Value.absent(),
     DateTime? createdAt,
     DateTime? updatedAt,
     Value<DateTime?> deletedAt = const Value.absent(),
@@ -22831,6 +23468,10 @@ class KnowledgeDocumentEntry extends DataClass
     description: description.present ? description.value : this.description,
     tags: tags ?? this.tags,
     category: category ?? this.category,
+    areaId: areaId.present ? areaId.value : this.areaId,
+    extractedText: extractedText.present
+        ? extractedText.value
+        : this.extractedText,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
     deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
@@ -22864,6 +23505,10 @@ class KnowledgeDocumentEntry extends DataClass
           : this.description,
       tags: data.tags.present ? data.tags.value : this.tags,
       category: data.category.present ? data.category.value : this.category,
+      areaId: data.areaId.present ? data.areaId.value : this.areaId,
+      extractedText: data.extractedText.present
+          ? data.extractedText.value
+          : this.extractedText,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
@@ -22890,6 +23535,8 @@ class KnowledgeDocumentEntry extends DataClass
           ..write('description: $description, ')
           ..write('tags: $tags, ')
           ..write('category: $category, ')
+          ..write('areaId: $areaId, ')
+          ..write('extractedText: $extractedText, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
@@ -22899,7 +23546,7 @@ class KnowledgeDocumentEntry extends DataClass
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     id,
     projectId,
     researchArticleId,
@@ -22916,11 +23563,13 @@ class KnowledgeDocumentEntry extends DataClass
     description,
     tags,
     category,
+    areaId,
+    extractedText,
     createdAt,
     updatedAt,
     deletedAt,
     revision,
-  );
+  ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -22941,6 +23590,8 @@ class KnowledgeDocumentEntry extends DataClass
           other.description == this.description &&
           other.tags == this.tags &&
           other.category == this.category &&
+          other.areaId == this.areaId &&
+          other.extractedText == this.extractedText &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
           other.deletedAt == this.deletedAt &&
@@ -22965,6 +23616,8 @@ class KnowledgeDocumentsCompanion
   final Value<String?> description;
   final Value<String> tags;
   final Value<String> category;
+  final Value<String?> areaId;
+  final Value<String?> extractedText;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   final Value<DateTime?> deletedAt;
@@ -22987,6 +23640,8 @@ class KnowledgeDocumentsCompanion
     this.description = const Value.absent(),
     this.tags = const Value.absent(),
     this.category = const Value.absent(),
+    this.areaId = const Value.absent(),
+    this.extractedText = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.deletedAt = const Value.absent(),
@@ -23010,6 +23665,8 @@ class KnowledgeDocumentsCompanion
     this.description = const Value.absent(),
     this.tags = const Value.absent(),
     this.category = const Value.absent(),
+    this.areaId = const Value.absent(),
+    this.extractedText = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
     this.deletedAt = const Value.absent(),
@@ -23040,6 +23697,8 @@ class KnowledgeDocumentsCompanion
     Expression<String>? description,
     Expression<String>? tags,
     Expression<String>? category,
+    Expression<String>? areaId,
+    Expression<String>? extractedText,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
     Expression<DateTime>? deletedAt,
@@ -23063,6 +23722,8 @@ class KnowledgeDocumentsCompanion
       if (description != null) 'description': description,
       if (tags != null) 'tags': tags,
       if (category != null) 'category': category,
+      if (areaId != null) 'area_id': areaId,
+      if (extractedText != null) 'extracted_text': extractedText,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (deletedAt != null) 'deleted_at': deletedAt,
@@ -23088,6 +23749,8 @@ class KnowledgeDocumentsCompanion
     Value<String?>? description,
     Value<String>? tags,
     Value<String>? category,
+    Value<String?>? areaId,
+    Value<String?>? extractedText,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
     Value<DateTime?>? deletedAt,
@@ -23111,6 +23774,8 @@ class KnowledgeDocumentsCompanion
       description: description ?? this.description,
       tags: tags ?? this.tags,
       category: category ?? this.category,
+      areaId: areaId ?? this.areaId,
+      extractedText: extractedText ?? this.extractedText,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,
@@ -23170,6 +23835,12 @@ class KnowledgeDocumentsCompanion
     if (category.present) {
       map['category'] = Variable<String>(category.value);
     }
+    if (areaId.present) {
+      map['area_id'] = Variable<String>(areaId.value);
+    }
+    if (extractedText.present) {
+      map['extracted_text'] = Variable<String>(extractedText.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -23207,6 +23878,8 @@ class KnowledgeDocumentsCompanion
           ..write('description: $description, ')
           ..write('tags: $tags, ')
           ..write('category: $category, ')
+          ..write('areaId: $areaId, ')
+          ..write('extractedText: $extractedText, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
@@ -23350,6 +24023,15 @@ class $KnowledgeResourcesTable extends KnowledgeResources
     requiredDuringInsert: false,
     defaultValue: const Constant('general'),
   );
+  static const VerificationMeta _areaIdMeta = const VerificationMeta('areaId');
+  @override
+  late final GeneratedColumn<String> areaId = GeneratedColumn<String>(
+    'area_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -23409,6 +24091,7 @@ class $KnowledgeResourcesTable extends KnowledgeResources
     localAssetPath,
     tags,
     category,
+    areaId,
     createdAt,
     updatedAt,
     deletedAt,
@@ -23516,6 +24199,12 @@ class $KnowledgeResourcesTable extends KnowledgeResources
         category.isAcceptableOrUnknown(data['category']!, _categoryMeta),
       );
     }
+    if (data.containsKey('area_id')) {
+      context.handle(
+        _areaIdMeta,
+        areaId.isAcceptableOrUnknown(data['area_id']!, _areaIdMeta),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -23601,6 +24290,10 @@ class $KnowledgeResourcesTable extends KnowledgeResources
         DriftSqlType.string,
         data['${effectivePrefix}category'],
       )!,
+      areaId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}area_id'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -23640,6 +24333,7 @@ class KnowledgeResourceEntry extends DataClass
   final String? localAssetPath;
   final String tags;
   final String category;
+  final String? areaId;
   final DateTime createdAt;
   final DateTime updatedAt;
   final DateTime? deletedAt;
@@ -23657,6 +24351,7 @@ class KnowledgeResourceEntry extends DataClass
     this.localAssetPath,
     required this.tags,
     required this.category,
+    this.areaId,
     required this.createdAt,
     required this.updatedAt,
     this.deletedAt,
@@ -23691,6 +24386,9 @@ class KnowledgeResourceEntry extends DataClass
     }
     map['tags'] = Variable<String>(tags);
     map['category'] = Variable<String>(category);
+    if (!nullToAbsent || areaId != null) {
+      map['area_id'] = Variable<String>(areaId);
+    }
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     if (!nullToAbsent || deletedAt != null) {
@@ -23726,6 +24424,9 @@ class KnowledgeResourceEntry extends DataClass
           : Value(localAssetPath),
       tags: Value(tags),
       category: Value(category),
+      areaId: areaId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(areaId),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
       deletedAt: deletedAt == null && nullToAbsent
@@ -23755,6 +24456,7 @@ class KnowledgeResourceEntry extends DataClass
       localAssetPath: serializer.fromJson<String?>(json['localAssetPath']),
       tags: serializer.fromJson<String>(json['tags']),
       category: serializer.fromJson<String>(json['category']),
+      areaId: serializer.fromJson<String?>(json['areaId']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
@@ -23777,6 +24479,7 @@ class KnowledgeResourceEntry extends DataClass
       'localAssetPath': serializer.toJson<String?>(localAssetPath),
       'tags': serializer.toJson<String>(tags),
       'category': serializer.toJson<String>(category),
+      'areaId': serializer.toJson<String?>(areaId),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'deletedAt': serializer.toJson<DateTime?>(deletedAt),
@@ -23797,6 +24500,7 @@ class KnowledgeResourceEntry extends DataClass
     Value<String?> localAssetPath = const Value.absent(),
     String? tags,
     String? category,
+    Value<String?> areaId = const Value.absent(),
     DateTime? createdAt,
     DateTime? updatedAt,
     Value<DateTime?> deletedAt = const Value.absent(),
@@ -23820,6 +24524,7 @@ class KnowledgeResourceEntry extends DataClass
         : this.localAssetPath,
     tags: tags ?? this.tags,
     category: category ?? this.category,
+    areaId: areaId.present ? areaId.value : this.areaId,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
     deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
@@ -23849,6 +24554,7 @@ class KnowledgeResourceEntry extends DataClass
           : this.localAssetPath,
       tags: data.tags.present ? data.tags.value : this.tags,
       category: data.category.present ? data.category.value : this.category,
+      areaId: data.areaId.present ? data.areaId.value : this.areaId,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
@@ -23871,6 +24577,7 @@ class KnowledgeResourceEntry extends DataClass
           ..write('localAssetPath: $localAssetPath, ')
           ..write('tags: $tags, ')
           ..write('category: $category, ')
+          ..write('areaId: $areaId, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
@@ -23893,6 +24600,7 @@ class KnowledgeResourceEntry extends DataClass
     localAssetPath,
     tags,
     category,
+    areaId,
     createdAt,
     updatedAt,
     deletedAt,
@@ -23914,6 +24622,7 @@ class KnowledgeResourceEntry extends DataClass
           other.localAssetPath == this.localAssetPath &&
           other.tags == this.tags &&
           other.category == this.category &&
+          other.areaId == this.areaId &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
           other.deletedAt == this.deletedAt &&
@@ -23934,6 +24643,7 @@ class KnowledgeResourcesCompanion
   final Value<String?> localAssetPath;
   final Value<String> tags;
   final Value<String> category;
+  final Value<String?> areaId;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   final Value<DateTime?> deletedAt;
@@ -23952,6 +24662,7 @@ class KnowledgeResourcesCompanion
     this.localAssetPath = const Value.absent(),
     this.tags = const Value.absent(),
     this.category = const Value.absent(),
+    this.areaId = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.deletedAt = const Value.absent(),
@@ -23971,6 +24682,7 @@ class KnowledgeResourcesCompanion
     this.localAssetPath = const Value.absent(),
     this.tags = const Value.absent(),
     this.category = const Value.absent(),
+    this.areaId = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
     this.deletedAt = const Value.absent(),
@@ -23994,6 +24706,7 @@ class KnowledgeResourcesCompanion
     Expression<String>? localAssetPath,
     Expression<String>? tags,
     Expression<String>? category,
+    Expression<String>? areaId,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
     Expression<DateTime>? deletedAt,
@@ -24013,6 +24726,7 @@ class KnowledgeResourcesCompanion
       if (localAssetPath != null) 'local_asset_path': localAssetPath,
       if (tags != null) 'tags': tags,
       if (category != null) 'category': category,
+      if (areaId != null) 'area_id': areaId,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (deletedAt != null) 'deleted_at': deletedAt,
@@ -24034,6 +24748,7 @@ class KnowledgeResourcesCompanion
     Value<String?>? localAssetPath,
     Value<String>? tags,
     Value<String>? category,
+    Value<String?>? areaId,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
     Value<DateTime?>? deletedAt,
@@ -24053,6 +24768,7 @@ class KnowledgeResourcesCompanion
       localAssetPath: localAssetPath ?? this.localAssetPath,
       tags: tags ?? this.tags,
       category: category ?? this.category,
+      areaId: areaId ?? this.areaId,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,
@@ -24100,6 +24816,9 @@ class KnowledgeResourcesCompanion
     if (category.present) {
       map['category'] = Variable<String>(category.value);
     }
+    if (areaId.present) {
+      map['area_id'] = Variable<String>(areaId.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -24133,6 +24852,7 @@ class KnowledgeResourcesCompanion
           ..write('localAssetPath: $localAssetPath, ')
           ..write('tags: $tags, ')
           ..write('category: $category, ')
+          ..write('areaId: $areaId, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
@@ -26219,6 +26939,2345 @@ class TicunaTagsCompanion extends UpdateCompanion<TicunaTagDbEntry> {
   }
 }
 
+class $EmailAccountsTable extends EmailAccounts
+    with TableInfo<$EmailAccountsTable, EmailAccountDbEntry> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $EmailAccountsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _emailMeta = const VerificationMeta('email');
+  @override
+  late final GeneratedColumn<String> email = GeneratedColumn<String>(
+    'email',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _providerTypeMeta = const VerificationMeta(
+    'providerType',
+  );
+  @override
+  late final GeneratedColumn<String> providerType = GeneratedColumn<String>(
+    'provider_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _incomingHostMeta = const VerificationMeta(
+    'incomingHost',
+  );
+  @override
+  late final GeneratedColumn<String> incomingHost = GeneratedColumn<String>(
+    'incoming_host',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _incomingPortMeta = const VerificationMeta(
+    'incomingPort',
+  );
+  @override
+  late final GeneratedColumn<int> incomingPort = GeneratedColumn<int>(
+    'incoming_port',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(993),
+  );
+  static const VerificationMeta _incomingProtocolMeta = const VerificationMeta(
+    'incomingProtocol',
+  );
+  @override
+  late final GeneratedColumn<String> incomingProtocol = GeneratedColumn<String>(
+    'incoming_protocol',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('imap'),
+  );
+  static const VerificationMeta _outgoingHostMeta = const VerificationMeta(
+    'outgoingHost',
+  );
+  @override
+  late final GeneratedColumn<String> outgoingHost = GeneratedColumn<String>(
+    'outgoing_host',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _outgoingPortMeta = const VerificationMeta(
+    'outgoingPort',
+  );
+  @override
+  late final GeneratedColumn<int> outgoingPort = GeneratedColumn<int>(
+    'outgoing_port',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(587),
+  );
+  static const VerificationMeta _outgoingSecurityMeta = const VerificationMeta(
+    'outgoingSecurity',
+  );
+  @override
+  late final GeneratedColumn<String> outgoingSecurity = GeneratedColumn<String>(
+    'outgoing_security',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('starttls'),
+  );
+  static const VerificationMeta _outgoingProtocolMeta = const VerificationMeta(
+    'outgoingProtocol',
+  );
+  @override
+  late final GeneratedColumn<String> outgoingProtocol = GeneratedColumn<String>(
+    'outgoing_protocol',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('smtp'),
+  );
+  static const VerificationMeta _usernameMeta = const VerificationMeta(
+    'username',
+  );
+  @override
+  late final GeneratedColumn<String> username = GeneratedColumn<String>(
+    'username',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _isActiveMeta = const VerificationMeta(
+    'isActive',
+  );
+  @override
+  late final GeneratedColumn<bool> isActive = GeneratedColumn<bool>(
+    'is_active',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_active" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  static const VerificationMeta _signatureHtmlMeta = const VerificationMeta(
+    'signatureHtml',
+  );
+  @override
+  late final GeneratedColumn<String> signatureHtml = GeneratedColumn<String>(
+    'signature_html',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _revisionMeta = const VerificationMeta(
+    'revision',
+  );
+  @override
+  late final GeneratedColumn<int> revision = GeneratedColumn<int>(
+    'revision',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    name,
+    email,
+    providerType,
+    incomingHost,
+    incomingPort,
+    incomingProtocol,
+    outgoingHost,
+    outgoingPort,
+    outgoingSecurity,
+    outgoingProtocol,
+    username,
+    isActive,
+    signatureHtml,
+    createdAt,
+    updatedAt,
+    deletedAt,
+    revision,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'email_accounts';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<EmailAccountDbEntry> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('email')) {
+      context.handle(
+        _emailMeta,
+        email.isAcceptableOrUnknown(data['email']!, _emailMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_emailMeta);
+    }
+    if (data.containsKey('provider_type')) {
+      context.handle(
+        _providerTypeMeta,
+        providerType.isAcceptableOrUnknown(
+          data['provider_type']!,
+          _providerTypeMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_providerTypeMeta);
+    }
+    if (data.containsKey('incoming_host')) {
+      context.handle(
+        _incomingHostMeta,
+        incomingHost.isAcceptableOrUnknown(
+          data['incoming_host']!,
+          _incomingHostMeta,
+        ),
+      );
+    }
+    if (data.containsKey('incoming_port')) {
+      context.handle(
+        _incomingPortMeta,
+        incomingPort.isAcceptableOrUnknown(
+          data['incoming_port']!,
+          _incomingPortMeta,
+        ),
+      );
+    }
+    if (data.containsKey('incoming_protocol')) {
+      context.handle(
+        _incomingProtocolMeta,
+        incomingProtocol.isAcceptableOrUnknown(
+          data['incoming_protocol']!,
+          _incomingProtocolMeta,
+        ),
+      );
+    }
+    if (data.containsKey('outgoing_host')) {
+      context.handle(
+        _outgoingHostMeta,
+        outgoingHost.isAcceptableOrUnknown(
+          data['outgoing_host']!,
+          _outgoingHostMeta,
+        ),
+      );
+    }
+    if (data.containsKey('outgoing_port')) {
+      context.handle(
+        _outgoingPortMeta,
+        outgoingPort.isAcceptableOrUnknown(
+          data['outgoing_port']!,
+          _outgoingPortMeta,
+        ),
+      );
+    }
+    if (data.containsKey('outgoing_security')) {
+      context.handle(
+        _outgoingSecurityMeta,
+        outgoingSecurity.isAcceptableOrUnknown(
+          data['outgoing_security']!,
+          _outgoingSecurityMeta,
+        ),
+      );
+    }
+    if (data.containsKey('outgoing_protocol')) {
+      context.handle(
+        _outgoingProtocolMeta,
+        outgoingProtocol.isAcceptableOrUnknown(
+          data['outgoing_protocol']!,
+          _outgoingProtocolMeta,
+        ),
+      );
+    }
+    if (data.containsKey('username')) {
+      context.handle(
+        _usernameMeta,
+        username.isAcceptableOrUnknown(data['username']!, _usernameMeta),
+      );
+    }
+    if (data.containsKey('is_active')) {
+      context.handle(
+        _isActiveMeta,
+        isActive.isAcceptableOrUnknown(data['is_active']!, _isActiveMeta),
+      );
+    }
+    if (data.containsKey('signature_html')) {
+      context.handle(
+        _signatureHtmlMeta,
+        signatureHtml.isAcceptableOrUnknown(
+          data['signature_html']!,
+          _signatureHtmlMeta,
+        ),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
+    if (data.containsKey('revision')) {
+      context.handle(
+        _revisionMeta,
+        revision.isAcceptableOrUnknown(data['revision']!, _revisionMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  EmailAccountDbEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return EmailAccountDbEntry(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      email: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}email'],
+      )!,
+      providerType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}provider_type'],
+      )!,
+      incomingHost: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}incoming_host'],
+      )!,
+      incomingPort: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}incoming_port'],
+      )!,
+      incomingProtocol: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}incoming_protocol'],
+      )!,
+      outgoingHost: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}outgoing_host'],
+      )!,
+      outgoingPort: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}outgoing_port'],
+      )!,
+      outgoingSecurity: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}outgoing_security'],
+      )!,
+      outgoingProtocol: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}outgoing_protocol'],
+      )!,
+      username: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}username'],
+      )!,
+      isActive: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_active'],
+      )!,
+      signatureHtml: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}signature_html'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
+      revision: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}revision'],
+      )!,
+    );
+  }
+
+  @override
+  $EmailAccountsTable createAlias(String alias) {
+    return $EmailAccountsTable(attachedDatabase, alias);
+  }
+}
+
+class EmailAccountDbEntry extends DataClass
+    implements Insertable<EmailAccountDbEntry> {
+  final String id;
+  final String name;
+  final String email;
+  final String providerType;
+  final String incomingHost;
+  final int incomingPort;
+  final String incomingProtocol;
+  final String outgoingHost;
+  final int outgoingPort;
+  final String outgoingSecurity;
+  final String outgoingProtocol;
+  final String username;
+  final bool isActive;
+  final String signatureHtml;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final DateTime? deletedAt;
+  final int revision;
+  const EmailAccountDbEntry({
+    required this.id,
+    required this.name,
+    required this.email,
+    required this.providerType,
+    required this.incomingHost,
+    required this.incomingPort,
+    required this.incomingProtocol,
+    required this.outgoingHost,
+    required this.outgoingPort,
+    required this.outgoingSecurity,
+    required this.outgoingProtocol,
+    required this.username,
+    required this.isActive,
+    required this.signatureHtml,
+    required this.createdAt,
+    required this.updatedAt,
+    this.deletedAt,
+    required this.revision,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
+    map['email'] = Variable<String>(email);
+    map['provider_type'] = Variable<String>(providerType);
+    map['incoming_host'] = Variable<String>(incomingHost);
+    map['incoming_port'] = Variable<int>(incomingPort);
+    map['incoming_protocol'] = Variable<String>(incomingProtocol);
+    map['outgoing_host'] = Variable<String>(outgoingHost);
+    map['outgoing_port'] = Variable<int>(outgoingPort);
+    map['outgoing_security'] = Variable<String>(outgoingSecurity);
+    map['outgoing_protocol'] = Variable<String>(outgoingProtocol);
+    map['username'] = Variable<String>(username);
+    map['is_active'] = Variable<bool>(isActive);
+    map['signature_html'] = Variable<String>(signatureHtml);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    map['revision'] = Variable<int>(revision);
+    return map;
+  }
+
+  EmailAccountsCompanion toCompanion(bool nullToAbsent) {
+    return EmailAccountsCompanion(
+      id: Value(id),
+      name: Value(name),
+      email: Value(email),
+      providerType: Value(providerType),
+      incomingHost: Value(incomingHost),
+      incomingPort: Value(incomingPort),
+      incomingProtocol: Value(incomingProtocol),
+      outgoingHost: Value(outgoingHost),
+      outgoingPort: Value(outgoingPort),
+      outgoingSecurity: Value(outgoingSecurity),
+      outgoingProtocol: Value(outgoingProtocol),
+      username: Value(username),
+      isActive: Value(isActive),
+      signatureHtml: Value(signatureHtml),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+      revision: Value(revision),
+    );
+  }
+
+  factory EmailAccountDbEntry.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return EmailAccountDbEntry(
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      email: serializer.fromJson<String>(json['email']),
+      providerType: serializer.fromJson<String>(json['providerType']),
+      incomingHost: serializer.fromJson<String>(json['incomingHost']),
+      incomingPort: serializer.fromJson<int>(json['incomingPort']),
+      incomingProtocol: serializer.fromJson<String>(json['incomingProtocol']),
+      outgoingHost: serializer.fromJson<String>(json['outgoingHost']),
+      outgoingPort: serializer.fromJson<int>(json['outgoingPort']),
+      outgoingSecurity: serializer.fromJson<String>(json['outgoingSecurity']),
+      outgoingProtocol: serializer.fromJson<String>(json['outgoingProtocol']),
+      username: serializer.fromJson<String>(json['username']),
+      isActive: serializer.fromJson<bool>(json['isActive']),
+      signatureHtml: serializer.fromJson<String>(json['signatureHtml']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+      revision: serializer.fromJson<int>(json['revision']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
+      'email': serializer.toJson<String>(email),
+      'providerType': serializer.toJson<String>(providerType),
+      'incomingHost': serializer.toJson<String>(incomingHost),
+      'incomingPort': serializer.toJson<int>(incomingPort),
+      'incomingProtocol': serializer.toJson<String>(incomingProtocol),
+      'outgoingHost': serializer.toJson<String>(outgoingHost),
+      'outgoingPort': serializer.toJson<int>(outgoingPort),
+      'outgoingSecurity': serializer.toJson<String>(outgoingSecurity),
+      'outgoingProtocol': serializer.toJson<String>(outgoingProtocol),
+      'username': serializer.toJson<String>(username),
+      'isActive': serializer.toJson<bool>(isActive),
+      'signatureHtml': serializer.toJson<String>(signatureHtml),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+      'revision': serializer.toJson<int>(revision),
+    };
+  }
+
+  EmailAccountDbEntry copyWith({
+    String? id,
+    String? name,
+    String? email,
+    String? providerType,
+    String? incomingHost,
+    int? incomingPort,
+    String? incomingProtocol,
+    String? outgoingHost,
+    int? outgoingPort,
+    String? outgoingSecurity,
+    String? outgoingProtocol,
+    String? username,
+    bool? isActive,
+    String? signatureHtml,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    Value<DateTime?> deletedAt = const Value.absent(),
+    int? revision,
+  }) => EmailAccountDbEntry(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    email: email ?? this.email,
+    providerType: providerType ?? this.providerType,
+    incomingHost: incomingHost ?? this.incomingHost,
+    incomingPort: incomingPort ?? this.incomingPort,
+    incomingProtocol: incomingProtocol ?? this.incomingProtocol,
+    outgoingHost: outgoingHost ?? this.outgoingHost,
+    outgoingPort: outgoingPort ?? this.outgoingPort,
+    outgoingSecurity: outgoingSecurity ?? this.outgoingSecurity,
+    outgoingProtocol: outgoingProtocol ?? this.outgoingProtocol,
+    username: username ?? this.username,
+    isActive: isActive ?? this.isActive,
+    signatureHtml: signatureHtml ?? this.signatureHtml,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+    revision: revision ?? this.revision,
+  );
+  EmailAccountDbEntry copyWithCompanion(EmailAccountsCompanion data) {
+    return EmailAccountDbEntry(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      email: data.email.present ? data.email.value : this.email,
+      providerType: data.providerType.present
+          ? data.providerType.value
+          : this.providerType,
+      incomingHost: data.incomingHost.present
+          ? data.incomingHost.value
+          : this.incomingHost,
+      incomingPort: data.incomingPort.present
+          ? data.incomingPort.value
+          : this.incomingPort,
+      incomingProtocol: data.incomingProtocol.present
+          ? data.incomingProtocol.value
+          : this.incomingProtocol,
+      outgoingHost: data.outgoingHost.present
+          ? data.outgoingHost.value
+          : this.outgoingHost,
+      outgoingPort: data.outgoingPort.present
+          ? data.outgoingPort.value
+          : this.outgoingPort,
+      outgoingSecurity: data.outgoingSecurity.present
+          ? data.outgoingSecurity.value
+          : this.outgoingSecurity,
+      outgoingProtocol: data.outgoingProtocol.present
+          ? data.outgoingProtocol.value
+          : this.outgoingProtocol,
+      username: data.username.present ? data.username.value : this.username,
+      isActive: data.isActive.present ? data.isActive.value : this.isActive,
+      signatureHtml: data.signatureHtml.present
+          ? data.signatureHtml.value
+          : this.signatureHtml,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      revision: data.revision.present ? data.revision.value : this.revision,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('EmailAccountDbEntry(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('email: $email, ')
+          ..write('providerType: $providerType, ')
+          ..write('incomingHost: $incomingHost, ')
+          ..write('incomingPort: $incomingPort, ')
+          ..write('incomingProtocol: $incomingProtocol, ')
+          ..write('outgoingHost: $outgoingHost, ')
+          ..write('outgoingPort: $outgoingPort, ')
+          ..write('outgoingSecurity: $outgoingSecurity, ')
+          ..write('outgoingProtocol: $outgoingProtocol, ')
+          ..write('username: $username, ')
+          ..write('isActive: $isActive, ')
+          ..write('signatureHtml: $signatureHtml, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('revision: $revision')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    name,
+    email,
+    providerType,
+    incomingHost,
+    incomingPort,
+    incomingProtocol,
+    outgoingHost,
+    outgoingPort,
+    outgoingSecurity,
+    outgoingProtocol,
+    username,
+    isActive,
+    signatureHtml,
+    createdAt,
+    updatedAt,
+    deletedAt,
+    revision,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is EmailAccountDbEntry &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.email == this.email &&
+          other.providerType == this.providerType &&
+          other.incomingHost == this.incomingHost &&
+          other.incomingPort == this.incomingPort &&
+          other.incomingProtocol == this.incomingProtocol &&
+          other.outgoingHost == this.outgoingHost &&
+          other.outgoingPort == this.outgoingPort &&
+          other.outgoingSecurity == this.outgoingSecurity &&
+          other.outgoingProtocol == this.outgoingProtocol &&
+          other.username == this.username &&
+          other.isActive == this.isActive &&
+          other.signatureHtml == this.signatureHtml &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.deletedAt == this.deletedAt &&
+          other.revision == this.revision);
+}
+
+class EmailAccountsCompanion extends UpdateCompanion<EmailAccountDbEntry> {
+  final Value<String> id;
+  final Value<String> name;
+  final Value<String> email;
+  final Value<String> providerType;
+  final Value<String> incomingHost;
+  final Value<int> incomingPort;
+  final Value<String> incomingProtocol;
+  final Value<String> outgoingHost;
+  final Value<int> outgoingPort;
+  final Value<String> outgoingSecurity;
+  final Value<String> outgoingProtocol;
+  final Value<String> username;
+  final Value<bool> isActive;
+  final Value<String> signatureHtml;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<DateTime?> deletedAt;
+  final Value<int> revision;
+  final Value<int> rowid;
+  const EmailAccountsCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.email = const Value.absent(),
+    this.providerType = const Value.absent(),
+    this.incomingHost = const Value.absent(),
+    this.incomingPort = const Value.absent(),
+    this.incomingProtocol = const Value.absent(),
+    this.outgoingHost = const Value.absent(),
+    this.outgoingPort = const Value.absent(),
+    this.outgoingSecurity = const Value.absent(),
+    this.outgoingProtocol = const Value.absent(),
+    this.username = const Value.absent(),
+    this.isActive = const Value.absent(),
+    this.signatureHtml = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  EmailAccountsCompanion.insert({
+    required String id,
+    required String name,
+    required String email,
+    required String providerType,
+    this.incomingHost = const Value.absent(),
+    this.incomingPort = const Value.absent(),
+    this.incomingProtocol = const Value.absent(),
+    this.outgoingHost = const Value.absent(),
+    this.outgoingPort = const Value.absent(),
+    this.outgoingSecurity = const Value.absent(),
+    this.outgoingProtocol = const Value.absent(),
+    this.username = const Value.absent(),
+    this.isActive = const Value.absent(),
+    this.signatureHtml = const Value.absent(),
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    this.deletedAt = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       name = Value(name),
+       email = Value(email),
+       providerType = Value(providerType),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<EmailAccountDbEntry> custom({
+    Expression<String>? id,
+    Expression<String>? name,
+    Expression<String>? email,
+    Expression<String>? providerType,
+    Expression<String>? incomingHost,
+    Expression<int>? incomingPort,
+    Expression<String>? incomingProtocol,
+    Expression<String>? outgoingHost,
+    Expression<int>? outgoingPort,
+    Expression<String>? outgoingSecurity,
+    Expression<String>? outgoingProtocol,
+    Expression<String>? username,
+    Expression<bool>? isActive,
+    Expression<String>? signatureHtml,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? deletedAt,
+    Expression<int>? revision,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (email != null) 'email': email,
+      if (providerType != null) 'provider_type': providerType,
+      if (incomingHost != null) 'incoming_host': incomingHost,
+      if (incomingPort != null) 'incoming_port': incomingPort,
+      if (incomingProtocol != null) 'incoming_protocol': incomingProtocol,
+      if (outgoingHost != null) 'outgoing_host': outgoingHost,
+      if (outgoingPort != null) 'outgoing_port': outgoingPort,
+      if (outgoingSecurity != null) 'outgoing_security': outgoingSecurity,
+      if (outgoingProtocol != null) 'outgoing_protocol': outgoingProtocol,
+      if (username != null) 'username': username,
+      if (isActive != null) 'is_active': isActive,
+      if (signatureHtml != null) 'signature_html': signatureHtml,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (revision != null) 'revision': revision,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  EmailAccountsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? name,
+    Value<String>? email,
+    Value<String>? providerType,
+    Value<String>? incomingHost,
+    Value<int>? incomingPort,
+    Value<String>? incomingProtocol,
+    Value<String>? outgoingHost,
+    Value<int>? outgoingPort,
+    Value<String>? outgoingSecurity,
+    Value<String>? outgoingProtocol,
+    Value<String>? username,
+    Value<bool>? isActive,
+    Value<String>? signatureHtml,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<DateTime?>? deletedAt,
+    Value<int>? revision,
+    Value<int>? rowid,
+  }) {
+    return EmailAccountsCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      email: email ?? this.email,
+      providerType: providerType ?? this.providerType,
+      incomingHost: incomingHost ?? this.incomingHost,
+      incomingPort: incomingPort ?? this.incomingPort,
+      incomingProtocol: incomingProtocol ?? this.incomingProtocol,
+      outgoingHost: outgoingHost ?? this.outgoingHost,
+      outgoingPort: outgoingPort ?? this.outgoingPort,
+      outgoingSecurity: outgoingSecurity ?? this.outgoingSecurity,
+      outgoingProtocol: outgoingProtocol ?? this.outgoingProtocol,
+      username: username ?? this.username,
+      isActive: isActive ?? this.isActive,
+      signatureHtml: signatureHtml ?? this.signatureHtml,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+      revision: revision ?? this.revision,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (email.present) {
+      map['email'] = Variable<String>(email.value);
+    }
+    if (providerType.present) {
+      map['provider_type'] = Variable<String>(providerType.value);
+    }
+    if (incomingHost.present) {
+      map['incoming_host'] = Variable<String>(incomingHost.value);
+    }
+    if (incomingPort.present) {
+      map['incoming_port'] = Variable<int>(incomingPort.value);
+    }
+    if (incomingProtocol.present) {
+      map['incoming_protocol'] = Variable<String>(incomingProtocol.value);
+    }
+    if (outgoingHost.present) {
+      map['outgoing_host'] = Variable<String>(outgoingHost.value);
+    }
+    if (outgoingPort.present) {
+      map['outgoing_port'] = Variable<int>(outgoingPort.value);
+    }
+    if (outgoingSecurity.present) {
+      map['outgoing_security'] = Variable<String>(outgoingSecurity.value);
+    }
+    if (outgoingProtocol.present) {
+      map['outgoing_protocol'] = Variable<String>(outgoingProtocol.value);
+    }
+    if (username.present) {
+      map['username'] = Variable<String>(username.value);
+    }
+    if (isActive.present) {
+      map['is_active'] = Variable<bool>(isActive.value);
+    }
+    if (signatureHtml.present) {
+      map['signature_html'] = Variable<String>(signatureHtml.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (revision.present) {
+      map['revision'] = Variable<int>(revision.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('EmailAccountsCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('email: $email, ')
+          ..write('providerType: $providerType, ')
+          ..write('incomingHost: $incomingHost, ')
+          ..write('incomingPort: $incomingPort, ')
+          ..write('incomingProtocol: $incomingProtocol, ')
+          ..write('outgoingHost: $outgoingHost, ')
+          ..write('outgoingPort: $outgoingPort, ')
+          ..write('outgoingSecurity: $outgoingSecurity, ')
+          ..write('outgoingProtocol: $outgoingProtocol, ')
+          ..write('username: $username, ')
+          ..write('isActive: $isActive, ')
+          ..write('signatureHtml: $signatureHtml, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('revision: $revision, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $KnowledgeAreasTable extends KnowledgeAreas
+    with TableInfo<$KnowledgeAreasTable, KnowledgeAreaEntry> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $KnowledgeAreasTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _descriptionMeta = const VerificationMeta(
+    'description',
+  );
+  @override
+  late final GeneratedColumn<String> description = GeneratedColumn<String>(
+    'description',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _iconNameMeta = const VerificationMeta(
+    'iconName',
+  );
+  @override
+  late final GeneratedColumn<String> iconName = GeneratedColumn<String>(
+    'icon_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _colorHexMeta = const VerificationMeta(
+    'colorHex',
+  );
+  @override
+  late final GeneratedColumn<String> colorHex = GeneratedColumn<String>(
+    'color_hex',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _sortOrderMeta = const VerificationMeta(
+    'sortOrder',
+  );
+  @override
+  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+    'sort_order',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _isArchivedMeta = const VerificationMeta(
+    'isArchived',
+  );
+  @override
+  late final GeneratedColumn<bool> isArchived = GeneratedColumn<bool>(
+    'is_archived',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_archived" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _revisionMeta = const VerificationMeta(
+    'revision',
+  );
+  @override
+  late final GeneratedColumn<int> revision = GeneratedColumn<int>(
+    'revision',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    name,
+    description,
+    iconName,
+    colorHex,
+    sortOrder,
+    isArchived,
+    createdAt,
+    updatedAt,
+    deletedAt,
+    revision,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'knowledge_areas';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<KnowledgeAreaEntry> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('description')) {
+      context.handle(
+        _descriptionMeta,
+        description.isAcceptableOrUnknown(
+          data['description']!,
+          _descriptionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('icon_name')) {
+      context.handle(
+        _iconNameMeta,
+        iconName.isAcceptableOrUnknown(data['icon_name']!, _iconNameMeta),
+      );
+    }
+    if (data.containsKey('color_hex')) {
+      context.handle(
+        _colorHexMeta,
+        colorHex.isAcceptableOrUnknown(data['color_hex']!, _colorHexMeta),
+      );
+    }
+    if (data.containsKey('sort_order')) {
+      context.handle(
+        _sortOrderMeta,
+        sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
+      );
+    }
+    if (data.containsKey('is_archived')) {
+      context.handle(
+        _isArchivedMeta,
+        isArchived.isAcceptableOrUnknown(data['is_archived']!, _isArchivedMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
+    if (data.containsKey('revision')) {
+      context.handle(
+        _revisionMeta,
+        revision.isAcceptableOrUnknown(data['revision']!, _revisionMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  KnowledgeAreaEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return KnowledgeAreaEntry(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      description: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}description'],
+      ),
+      iconName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}icon_name'],
+      ),
+      colorHex: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}color_hex'],
+      ),
+      sortOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sort_order'],
+      )!,
+      isArchived: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_archived'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
+      revision: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}revision'],
+      )!,
+    );
+  }
+
+  @override
+  $KnowledgeAreasTable createAlias(String alias) {
+    return $KnowledgeAreasTable(attachedDatabase, alias);
+  }
+}
+
+class KnowledgeAreaEntry extends DataClass
+    implements Insertable<KnowledgeAreaEntry> {
+  final String id;
+  final String name;
+  final String? description;
+  final String? iconName;
+  final String? colorHex;
+  final int sortOrder;
+  final bool isArchived;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final DateTime? deletedAt;
+  final int revision;
+  const KnowledgeAreaEntry({
+    required this.id,
+    required this.name,
+    this.description,
+    this.iconName,
+    this.colorHex,
+    required this.sortOrder,
+    required this.isArchived,
+    required this.createdAt,
+    required this.updatedAt,
+    this.deletedAt,
+    required this.revision,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
+    if (!nullToAbsent || description != null) {
+      map['description'] = Variable<String>(description);
+    }
+    if (!nullToAbsent || iconName != null) {
+      map['icon_name'] = Variable<String>(iconName);
+    }
+    if (!nullToAbsent || colorHex != null) {
+      map['color_hex'] = Variable<String>(colorHex);
+    }
+    map['sort_order'] = Variable<int>(sortOrder);
+    map['is_archived'] = Variable<bool>(isArchived);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    map['revision'] = Variable<int>(revision);
+    return map;
+  }
+
+  KnowledgeAreasCompanion toCompanion(bool nullToAbsent) {
+    return KnowledgeAreasCompanion(
+      id: Value(id),
+      name: Value(name),
+      description: description == null && nullToAbsent
+          ? const Value.absent()
+          : Value(description),
+      iconName: iconName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(iconName),
+      colorHex: colorHex == null && nullToAbsent
+          ? const Value.absent()
+          : Value(colorHex),
+      sortOrder: Value(sortOrder),
+      isArchived: Value(isArchived),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+      revision: Value(revision),
+    );
+  }
+
+  factory KnowledgeAreaEntry.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return KnowledgeAreaEntry(
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      description: serializer.fromJson<String?>(json['description']),
+      iconName: serializer.fromJson<String?>(json['iconName']),
+      colorHex: serializer.fromJson<String?>(json['colorHex']),
+      sortOrder: serializer.fromJson<int>(json['sortOrder']),
+      isArchived: serializer.fromJson<bool>(json['isArchived']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+      revision: serializer.fromJson<int>(json['revision']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
+      'description': serializer.toJson<String?>(description),
+      'iconName': serializer.toJson<String?>(iconName),
+      'colorHex': serializer.toJson<String?>(colorHex),
+      'sortOrder': serializer.toJson<int>(sortOrder),
+      'isArchived': serializer.toJson<bool>(isArchived),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+      'revision': serializer.toJson<int>(revision),
+    };
+  }
+
+  KnowledgeAreaEntry copyWith({
+    String? id,
+    String? name,
+    Value<String?> description = const Value.absent(),
+    Value<String?> iconName = const Value.absent(),
+    Value<String?> colorHex = const Value.absent(),
+    int? sortOrder,
+    bool? isArchived,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    Value<DateTime?> deletedAt = const Value.absent(),
+    int? revision,
+  }) => KnowledgeAreaEntry(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    description: description.present ? description.value : this.description,
+    iconName: iconName.present ? iconName.value : this.iconName,
+    colorHex: colorHex.present ? colorHex.value : this.colorHex,
+    sortOrder: sortOrder ?? this.sortOrder,
+    isArchived: isArchived ?? this.isArchived,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+    revision: revision ?? this.revision,
+  );
+  KnowledgeAreaEntry copyWithCompanion(KnowledgeAreasCompanion data) {
+    return KnowledgeAreaEntry(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      description: data.description.present
+          ? data.description.value
+          : this.description,
+      iconName: data.iconName.present ? data.iconName.value : this.iconName,
+      colorHex: data.colorHex.present ? data.colorHex.value : this.colorHex,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+      isArchived: data.isArchived.present
+          ? data.isArchived.value
+          : this.isArchived,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      revision: data.revision.present ? data.revision.value : this.revision,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('KnowledgeAreaEntry(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('description: $description, ')
+          ..write('iconName: $iconName, ')
+          ..write('colorHex: $colorHex, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('isArchived: $isArchived, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('revision: $revision')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    name,
+    description,
+    iconName,
+    colorHex,
+    sortOrder,
+    isArchived,
+    createdAt,
+    updatedAt,
+    deletedAt,
+    revision,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is KnowledgeAreaEntry &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.description == this.description &&
+          other.iconName == this.iconName &&
+          other.colorHex == this.colorHex &&
+          other.sortOrder == this.sortOrder &&
+          other.isArchived == this.isArchived &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.deletedAt == this.deletedAt &&
+          other.revision == this.revision);
+}
+
+class KnowledgeAreasCompanion extends UpdateCompanion<KnowledgeAreaEntry> {
+  final Value<String> id;
+  final Value<String> name;
+  final Value<String?> description;
+  final Value<String?> iconName;
+  final Value<String?> colorHex;
+  final Value<int> sortOrder;
+  final Value<bool> isArchived;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<DateTime?> deletedAt;
+  final Value<int> revision;
+  final Value<int> rowid;
+  const KnowledgeAreasCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.description = const Value.absent(),
+    this.iconName = const Value.absent(),
+    this.colorHex = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.isArchived = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  KnowledgeAreasCompanion.insert({
+    required String id,
+    required String name,
+    this.description = const Value.absent(),
+    this.iconName = const Value.absent(),
+    this.colorHex = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.isArchived = const Value.absent(),
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    this.deletedAt = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       name = Value(name),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<KnowledgeAreaEntry> custom({
+    Expression<String>? id,
+    Expression<String>? name,
+    Expression<String>? description,
+    Expression<String>? iconName,
+    Expression<String>? colorHex,
+    Expression<int>? sortOrder,
+    Expression<bool>? isArchived,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? deletedAt,
+    Expression<int>? revision,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (description != null) 'description': description,
+      if (iconName != null) 'icon_name': iconName,
+      if (colorHex != null) 'color_hex': colorHex,
+      if (sortOrder != null) 'sort_order': sortOrder,
+      if (isArchived != null) 'is_archived': isArchived,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (revision != null) 'revision': revision,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  KnowledgeAreasCompanion copyWith({
+    Value<String>? id,
+    Value<String>? name,
+    Value<String?>? description,
+    Value<String?>? iconName,
+    Value<String?>? colorHex,
+    Value<int>? sortOrder,
+    Value<bool>? isArchived,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<DateTime?>? deletedAt,
+    Value<int>? revision,
+    Value<int>? rowid,
+  }) {
+    return KnowledgeAreasCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      description: description ?? this.description,
+      iconName: iconName ?? this.iconName,
+      colorHex: colorHex ?? this.colorHex,
+      sortOrder: sortOrder ?? this.sortOrder,
+      isArchived: isArchived ?? this.isArchived,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+      revision: revision ?? this.revision,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (description.present) {
+      map['description'] = Variable<String>(description.value);
+    }
+    if (iconName.present) {
+      map['icon_name'] = Variable<String>(iconName.value);
+    }
+    if (colorHex.present) {
+      map['color_hex'] = Variable<String>(colorHex.value);
+    }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
+    if (isArchived.present) {
+      map['is_archived'] = Variable<bool>(isArchived.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (revision.present) {
+      map['revision'] = Variable<int>(revision.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('KnowledgeAreasCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('description: $description, ')
+          ..write('iconName: $iconName, ')
+          ..write('colorHex: $colorHex, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('isArchived: $isArchived, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('revision: $revision, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $KnowledgeLinksTable extends KnowledgeLinks
+    with TableInfo<$KnowledgeLinksTable, KnowledgeLinkEntry> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $KnowledgeLinksTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sourceTypeMeta = const VerificationMeta(
+    'sourceType',
+  );
+  @override
+  late final GeneratedColumn<String> sourceType = GeneratedColumn<String>(
+    'source_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sourceIdMeta = const VerificationMeta(
+    'sourceId',
+  );
+  @override
+  late final GeneratedColumn<String> sourceId = GeneratedColumn<String>(
+    'source_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _targetTypeMeta = const VerificationMeta(
+    'targetType',
+  );
+  @override
+  late final GeneratedColumn<String> targetType = GeneratedColumn<String>(
+    'target_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _targetIdMeta = const VerificationMeta(
+    'targetId',
+  );
+  @override
+  late final GeneratedColumn<String> targetId = GeneratedColumn<String>(
+    'target_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _targetUriMeta = const VerificationMeta(
+    'targetUri',
+  );
+  @override
+  late final GeneratedColumn<String> targetUri = GeneratedColumn<String>(
+    'target_uri',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _anchorTextMeta = const VerificationMeta(
+    'anchorText',
+  );
+  @override
+  late final GeneratedColumn<String> anchorText = GeneratedColumn<String>(
+    'anchor_text',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _revisionMeta = const VerificationMeta(
+    'revision',
+  );
+  @override
+  late final GeneratedColumn<int> revision = GeneratedColumn<int>(
+    'revision',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    sourceType,
+    sourceId,
+    targetType,
+    targetId,
+    targetUri,
+    anchorText,
+    createdAt,
+    updatedAt,
+    deletedAt,
+    revision,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'knowledge_links';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<KnowledgeLinkEntry> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('source_type')) {
+      context.handle(
+        _sourceTypeMeta,
+        sourceType.isAcceptableOrUnknown(data['source_type']!, _sourceTypeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sourceTypeMeta);
+    }
+    if (data.containsKey('source_id')) {
+      context.handle(
+        _sourceIdMeta,
+        sourceId.isAcceptableOrUnknown(data['source_id']!, _sourceIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sourceIdMeta);
+    }
+    if (data.containsKey('target_type')) {
+      context.handle(
+        _targetTypeMeta,
+        targetType.isAcceptableOrUnknown(data['target_type']!, _targetTypeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_targetTypeMeta);
+    }
+    if (data.containsKey('target_id')) {
+      context.handle(
+        _targetIdMeta,
+        targetId.isAcceptableOrUnknown(data['target_id']!, _targetIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_targetIdMeta);
+    }
+    if (data.containsKey('target_uri')) {
+      context.handle(
+        _targetUriMeta,
+        targetUri.isAcceptableOrUnknown(data['target_uri']!, _targetUriMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_targetUriMeta);
+    }
+    if (data.containsKey('anchor_text')) {
+      context.handle(
+        _anchorTextMeta,
+        anchorText.isAcceptableOrUnknown(data['anchor_text']!, _anchorTextMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
+    if (data.containsKey('revision')) {
+      context.handle(
+        _revisionMeta,
+        revision.isAcceptableOrUnknown(data['revision']!, _revisionMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  KnowledgeLinkEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return KnowledgeLinkEntry(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      sourceType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_type'],
+      )!,
+      sourceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_id'],
+      )!,
+      targetType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}target_type'],
+      )!,
+      targetId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}target_id'],
+      )!,
+      targetUri: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}target_uri'],
+      )!,
+      anchorText: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}anchor_text'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
+      revision: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}revision'],
+      )!,
+    );
+  }
+
+  @override
+  $KnowledgeLinksTable createAlias(String alias) {
+    return $KnowledgeLinksTable(attachedDatabase, alias);
+  }
+}
+
+class KnowledgeLinkEntry extends DataClass
+    implements Insertable<KnowledgeLinkEntry> {
+  final String id;
+  final String sourceType;
+  final String sourceId;
+  final String targetType;
+  final String targetId;
+  final String targetUri;
+  final String anchorText;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final DateTime? deletedAt;
+  final int revision;
+  const KnowledgeLinkEntry({
+    required this.id,
+    required this.sourceType,
+    required this.sourceId,
+    required this.targetType,
+    required this.targetId,
+    required this.targetUri,
+    required this.anchorText,
+    required this.createdAt,
+    required this.updatedAt,
+    this.deletedAt,
+    required this.revision,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['source_type'] = Variable<String>(sourceType);
+    map['source_id'] = Variable<String>(sourceId);
+    map['target_type'] = Variable<String>(targetType);
+    map['target_id'] = Variable<String>(targetId);
+    map['target_uri'] = Variable<String>(targetUri);
+    map['anchor_text'] = Variable<String>(anchorText);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    map['revision'] = Variable<int>(revision);
+    return map;
+  }
+
+  KnowledgeLinksCompanion toCompanion(bool nullToAbsent) {
+    return KnowledgeLinksCompanion(
+      id: Value(id),
+      sourceType: Value(sourceType),
+      sourceId: Value(sourceId),
+      targetType: Value(targetType),
+      targetId: Value(targetId),
+      targetUri: Value(targetUri),
+      anchorText: Value(anchorText),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+      revision: Value(revision),
+    );
+  }
+
+  factory KnowledgeLinkEntry.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return KnowledgeLinkEntry(
+      id: serializer.fromJson<String>(json['id']),
+      sourceType: serializer.fromJson<String>(json['sourceType']),
+      sourceId: serializer.fromJson<String>(json['sourceId']),
+      targetType: serializer.fromJson<String>(json['targetType']),
+      targetId: serializer.fromJson<String>(json['targetId']),
+      targetUri: serializer.fromJson<String>(json['targetUri']),
+      anchorText: serializer.fromJson<String>(json['anchorText']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+      revision: serializer.fromJson<int>(json['revision']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'sourceType': serializer.toJson<String>(sourceType),
+      'sourceId': serializer.toJson<String>(sourceId),
+      'targetType': serializer.toJson<String>(targetType),
+      'targetId': serializer.toJson<String>(targetId),
+      'targetUri': serializer.toJson<String>(targetUri),
+      'anchorText': serializer.toJson<String>(anchorText),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+      'revision': serializer.toJson<int>(revision),
+    };
+  }
+
+  KnowledgeLinkEntry copyWith({
+    String? id,
+    String? sourceType,
+    String? sourceId,
+    String? targetType,
+    String? targetId,
+    String? targetUri,
+    String? anchorText,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    Value<DateTime?> deletedAt = const Value.absent(),
+    int? revision,
+  }) => KnowledgeLinkEntry(
+    id: id ?? this.id,
+    sourceType: sourceType ?? this.sourceType,
+    sourceId: sourceId ?? this.sourceId,
+    targetType: targetType ?? this.targetType,
+    targetId: targetId ?? this.targetId,
+    targetUri: targetUri ?? this.targetUri,
+    anchorText: anchorText ?? this.anchorText,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+    revision: revision ?? this.revision,
+  );
+  KnowledgeLinkEntry copyWithCompanion(KnowledgeLinksCompanion data) {
+    return KnowledgeLinkEntry(
+      id: data.id.present ? data.id.value : this.id,
+      sourceType: data.sourceType.present
+          ? data.sourceType.value
+          : this.sourceType,
+      sourceId: data.sourceId.present ? data.sourceId.value : this.sourceId,
+      targetType: data.targetType.present
+          ? data.targetType.value
+          : this.targetType,
+      targetId: data.targetId.present ? data.targetId.value : this.targetId,
+      targetUri: data.targetUri.present ? data.targetUri.value : this.targetUri,
+      anchorText: data.anchorText.present
+          ? data.anchorText.value
+          : this.anchorText,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      revision: data.revision.present ? data.revision.value : this.revision,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('KnowledgeLinkEntry(')
+          ..write('id: $id, ')
+          ..write('sourceType: $sourceType, ')
+          ..write('sourceId: $sourceId, ')
+          ..write('targetType: $targetType, ')
+          ..write('targetId: $targetId, ')
+          ..write('targetUri: $targetUri, ')
+          ..write('anchorText: $anchorText, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('revision: $revision')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    sourceType,
+    sourceId,
+    targetType,
+    targetId,
+    targetUri,
+    anchorText,
+    createdAt,
+    updatedAt,
+    deletedAt,
+    revision,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is KnowledgeLinkEntry &&
+          other.id == this.id &&
+          other.sourceType == this.sourceType &&
+          other.sourceId == this.sourceId &&
+          other.targetType == this.targetType &&
+          other.targetId == this.targetId &&
+          other.targetUri == this.targetUri &&
+          other.anchorText == this.anchorText &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.deletedAt == this.deletedAt &&
+          other.revision == this.revision);
+}
+
+class KnowledgeLinksCompanion extends UpdateCompanion<KnowledgeLinkEntry> {
+  final Value<String> id;
+  final Value<String> sourceType;
+  final Value<String> sourceId;
+  final Value<String> targetType;
+  final Value<String> targetId;
+  final Value<String> targetUri;
+  final Value<String> anchorText;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<DateTime?> deletedAt;
+  final Value<int> revision;
+  final Value<int> rowid;
+  const KnowledgeLinksCompanion({
+    this.id = const Value.absent(),
+    this.sourceType = const Value.absent(),
+    this.sourceId = const Value.absent(),
+    this.targetType = const Value.absent(),
+    this.targetId = const Value.absent(),
+    this.targetUri = const Value.absent(),
+    this.anchorText = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  KnowledgeLinksCompanion.insert({
+    required String id,
+    required String sourceType,
+    required String sourceId,
+    required String targetType,
+    required String targetId,
+    required String targetUri,
+    this.anchorText = const Value.absent(),
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    this.deletedAt = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       sourceType = Value(sourceType),
+       sourceId = Value(sourceId),
+       targetType = Value(targetType),
+       targetId = Value(targetId),
+       targetUri = Value(targetUri),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<KnowledgeLinkEntry> custom({
+    Expression<String>? id,
+    Expression<String>? sourceType,
+    Expression<String>? sourceId,
+    Expression<String>? targetType,
+    Expression<String>? targetId,
+    Expression<String>? targetUri,
+    Expression<String>? anchorText,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? deletedAt,
+    Expression<int>? revision,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (sourceType != null) 'source_type': sourceType,
+      if (sourceId != null) 'source_id': sourceId,
+      if (targetType != null) 'target_type': targetType,
+      if (targetId != null) 'target_id': targetId,
+      if (targetUri != null) 'target_uri': targetUri,
+      if (anchorText != null) 'anchor_text': anchorText,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (revision != null) 'revision': revision,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  KnowledgeLinksCompanion copyWith({
+    Value<String>? id,
+    Value<String>? sourceType,
+    Value<String>? sourceId,
+    Value<String>? targetType,
+    Value<String>? targetId,
+    Value<String>? targetUri,
+    Value<String>? anchorText,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<DateTime?>? deletedAt,
+    Value<int>? revision,
+    Value<int>? rowid,
+  }) {
+    return KnowledgeLinksCompanion(
+      id: id ?? this.id,
+      sourceType: sourceType ?? this.sourceType,
+      sourceId: sourceId ?? this.sourceId,
+      targetType: targetType ?? this.targetType,
+      targetId: targetId ?? this.targetId,
+      targetUri: targetUri ?? this.targetUri,
+      anchorText: anchorText ?? this.anchorText,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+      revision: revision ?? this.revision,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (sourceType.present) {
+      map['source_type'] = Variable<String>(sourceType.value);
+    }
+    if (sourceId.present) {
+      map['source_id'] = Variable<String>(sourceId.value);
+    }
+    if (targetType.present) {
+      map['target_type'] = Variable<String>(targetType.value);
+    }
+    if (targetId.present) {
+      map['target_id'] = Variable<String>(targetId.value);
+    }
+    if (targetUri.present) {
+      map['target_uri'] = Variable<String>(targetUri.value);
+    }
+    if (anchorText.present) {
+      map['anchor_text'] = Variable<String>(anchorText.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (revision.present) {
+      map['revision'] = Variable<int>(revision.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('KnowledgeLinksCompanion(')
+          ..write('id: $id, ')
+          ..write('sourceType: $sourceType, ')
+          ..write('sourceId: $sourceId, ')
+          ..write('targetType: $targetType, ')
+          ..write('targetId: $targetId, ')
+          ..write('targetUri: $targetUri, ')
+          ..write('anchorText: $anchorText, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('revision: $revision, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -26271,6 +29330,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $TicunaWordsTable ticunaWords = $TicunaWordsTable(this);
   late final $TicunaPhrasesTable ticunaPhrases = $TicunaPhrasesTable(this);
   late final $TicunaTagsTable ticunaTags = $TicunaTagsTable(this);
+  late final $EmailAccountsTable emailAccounts = $EmailAccountsTable(this);
+  late final $KnowledgeAreasTable knowledgeAreas = $KnowledgeAreasTable(this);
+  late final $KnowledgeLinksTable knowledgeLinks = $KnowledgeLinksTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -26309,6 +29371,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     ticunaWords,
     ticunaPhrases,
     ticunaTags,
+    emailAccounts,
+    knowledgeAreas,
+    knowledgeLinks,
   ];
 }
 
@@ -36923,6 +39988,7 @@ typedef $$ProjectsTableCreateCompanionBuilder = ProjectsCompanion Function({
   Value<DateTime?> targetDate,
   Value<DateTime?> completedAt,
   Value<String?> originInboxId,
+  Value<String?> areaId,
   Value<String> metadata,
   required DateTime createdAt,
   required DateTime updatedAt,
@@ -36943,6 +40009,7 @@ typedef $$ProjectsTableUpdateCompanionBuilder = ProjectsCompanion Function({
   Value<DateTime?> targetDate,
   Value<DateTime?> completedAt,
   Value<String?> originInboxId,
+  Value<String?> areaId,
   Value<String> metadata,
   Value<DateTime> createdAt,
   Value<DateTime> updatedAt,
@@ -37017,6 +40084,11 @@ class $$ProjectsTableFilterComposer
 
   ColumnFilters<String> get originInboxId => $composableBuilder(
     column: $table.originInboxId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get areaId => $composableBuilder(
+    column: $table.areaId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -37115,6 +40187,11 @@ class $$ProjectsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get areaId => $composableBuilder(
+    column: $table.areaId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get metadata => $composableBuilder(
     column: $table.metadata,
     builder: (column) => ColumnOrderings(column),
@@ -37194,6 +40271,9 @@ class $$ProjectsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get areaId =>
+      $composableBuilder(column: $table.areaId, builder: (column) => column);
+
   GeneratedColumn<String> get metadata =>
       $composableBuilder(column: $table.metadata, builder: (column) => column);
 
@@ -37253,6 +40333,7 @@ class $$ProjectsTableTableManager
                 Value<DateTime?> targetDate = const Value.absent(),
                 Value<DateTime?> completedAt = const Value.absent(),
                 Value<String?> originInboxId = const Value.absent(),
+                Value<String?> areaId = const Value.absent(),
                 Value<String> metadata = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
@@ -37272,6 +40353,7 @@ class $$ProjectsTableTableManager
                 targetDate: targetDate,
                 completedAt: completedAt,
                 originInboxId: originInboxId,
+                areaId: areaId,
                 metadata: metadata,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
@@ -37293,6 +40375,7 @@ class $$ProjectsTableTableManager
                 Value<DateTime?> targetDate = const Value.absent(),
                 Value<DateTime?> completedAt = const Value.absent(),
                 Value<String?> originInboxId = const Value.absent(),
+                Value<String?> areaId = const Value.absent(),
                 Value<String> metadata = const Value.absent(),
                 required DateTime createdAt,
                 required DateTime updatedAt,
@@ -37312,6 +40395,7 @@ class $$ProjectsTableTableManager
                 targetDate: targetDate,
                 completedAt: completedAt,
                 originInboxId: originInboxId,
+                areaId: areaId,
                 metadata: metadata,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
@@ -37986,6 +41070,12 @@ typedef $$KnowledgeNotesTableCreateCompanionBuilder =
       Value<String> attachments,
       Value<String> sources,
       Value<bool> isPinned,
+      Value<String?> areaId,
+      Value<String?> parentNoteId,
+      Value<String> propertiesJson,
+      Value<int> reviewLevel,
+      Value<DateTime?> nextReviewAt,
+      Value<DateTime?> lastReviewedAt,
       required DateTime createdAt,
       required DateTime updatedAt,
       Value<DateTime?> deletedAt,
@@ -38006,6 +41096,12 @@ typedef $$KnowledgeNotesTableUpdateCompanionBuilder =
       Value<String> attachments,
       Value<String> sources,
       Value<bool> isPinned,
+      Value<String?> areaId,
+      Value<String?> parentNoteId,
+      Value<String> propertiesJson,
+      Value<int> reviewLevel,
+      Value<DateTime?> nextReviewAt,
+      Value<DateTime?> lastReviewedAt,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
       Value<DateTime?> deletedAt,
@@ -38079,6 +41175,36 @@ class $$KnowledgeNotesTableFilterComposer
 
   ColumnFilters<bool> get isPinned => $composableBuilder(
     column: $table.isPinned,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get areaId => $composableBuilder(
+    column: $table.areaId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get parentNoteId => $composableBuilder(
+    column: $table.parentNoteId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get propertiesJson => $composableBuilder(
+    column: $table.propertiesJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get reviewLevel => $composableBuilder(
+    column: $table.reviewLevel,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get nextReviewAt => $composableBuilder(
+    column: $table.nextReviewAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastReviewedAt => $composableBuilder(
+    column: $table.lastReviewedAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -38172,6 +41298,36 @@ class $$KnowledgeNotesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get areaId => $composableBuilder(
+    column: $table.areaId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get parentNoteId => $composableBuilder(
+    column: $table.parentNoteId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get propertiesJson => $composableBuilder(
+    column: $table.propertiesJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get reviewLevel => $composableBuilder(
+    column: $table.reviewLevel,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get nextReviewAt => $composableBuilder(
+    column: $table.nextReviewAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get lastReviewedAt => $composableBuilder(
+    column: $table.lastReviewedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -38242,6 +41398,34 @@ class $$KnowledgeNotesTableAnnotationComposer
   GeneratedColumn<bool> get isPinned =>
       $composableBuilder(column: $table.isPinned, builder: (column) => column);
 
+  GeneratedColumn<String> get areaId =>
+      $composableBuilder(column: $table.areaId, builder: (column) => column);
+
+  GeneratedColumn<String> get parentNoteId => $composableBuilder(
+    column: $table.parentNoteId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get propertiesJson => $composableBuilder(
+    column: $table.propertiesJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get reviewLevel => $composableBuilder(
+    column: $table.reviewLevel,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get nextReviewAt => $composableBuilder(
+    column: $table.nextReviewAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get lastReviewedAt => $composableBuilder(
+    column: $table.lastReviewedAt,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
 
@@ -38304,6 +41488,12 @@ class $$KnowledgeNotesTableTableManager
                 Value<String> attachments = const Value.absent(),
                 Value<String> sources = const Value.absent(),
                 Value<bool> isPinned = const Value.absent(),
+                Value<String?> areaId = const Value.absent(),
+                Value<String?> parentNoteId = const Value.absent(),
+                Value<String> propertiesJson = const Value.absent(),
+                Value<int> reviewLevel = const Value.absent(),
+                Value<DateTime?> nextReviewAt = const Value.absent(),
+                Value<DateTime?> lastReviewedAt = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<DateTime?> deletedAt = const Value.absent(),
@@ -38322,6 +41512,12 @@ class $$KnowledgeNotesTableTableManager
                 attachments: attachments,
                 sources: sources,
                 isPinned: isPinned,
+                areaId: areaId,
+                parentNoteId: parentNoteId,
+                propertiesJson: propertiesJson,
+                reviewLevel: reviewLevel,
+                nextReviewAt: nextReviewAt,
+                lastReviewedAt: lastReviewedAt,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
@@ -38342,6 +41538,12 @@ class $$KnowledgeNotesTableTableManager
                 Value<String> attachments = const Value.absent(),
                 Value<String> sources = const Value.absent(),
                 Value<bool> isPinned = const Value.absent(),
+                Value<String?> areaId = const Value.absent(),
+                Value<String?> parentNoteId = const Value.absent(),
+                Value<String> propertiesJson = const Value.absent(),
+                Value<int> reviewLevel = const Value.absent(),
+                Value<DateTime?> nextReviewAt = const Value.absent(),
+                Value<DateTime?> lastReviewedAt = const Value.absent(),
                 required DateTime createdAt,
                 required DateTime updatedAt,
                 Value<DateTime?> deletedAt = const Value.absent(),
@@ -38360,6 +41562,12 @@ class $$KnowledgeNotesTableTableManager
                 attachments: attachments,
                 sources: sources,
                 isPinned: isPinned,
+                areaId: areaId,
+                parentNoteId: parentNoteId,
+                propertiesJson: propertiesJson,
+                reviewLevel: reviewLevel,
+                nextReviewAt: nextReviewAt,
+                lastReviewedAt: lastReviewedAt,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
@@ -38414,6 +41622,10 @@ typedef $$KnowledgeQuestionsTableCreateCompanionBuilder =
       Value<String> status,
       Value<String?> answer,
       Value<DateTime?> answeredAt,
+      Value<String?> areaId,
+      Value<int> reviewLevel,
+      Value<DateTime?> nextReviewAt,
+      Value<DateTime?> lastReviewedAt,
       required DateTime createdAt,
       required DateTime updatedAt,
       Value<DateTime?> deletedAt,
@@ -38434,6 +41646,10 @@ typedef $$KnowledgeQuestionsTableUpdateCompanionBuilder =
       Value<String> status,
       Value<String?> answer,
       Value<DateTime?> answeredAt,
+      Value<String?> areaId,
+      Value<int> reviewLevel,
+      Value<DateTime?> nextReviewAt,
+      Value<DateTime?> lastReviewedAt,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
       Value<DateTime?> deletedAt,
@@ -38507,6 +41723,26 @@ class $$KnowledgeQuestionsTableFilterComposer
 
   ColumnFilters<DateTime> get answeredAt => $composableBuilder(
     column: $table.answeredAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get areaId => $composableBuilder(
+    column: $table.areaId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get reviewLevel => $composableBuilder(
+    column: $table.reviewLevel,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get nextReviewAt => $composableBuilder(
+    column: $table.nextReviewAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastReviewedAt => $composableBuilder(
+    column: $table.lastReviewedAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -38600,6 +41836,26 @@ class $$KnowledgeQuestionsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get areaId => $composableBuilder(
+    column: $table.areaId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get reviewLevel => $composableBuilder(
+    column: $table.reviewLevel,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get nextReviewAt => $composableBuilder(
+    column: $table.nextReviewAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get lastReviewedAt => $composableBuilder(
+    column: $table.lastReviewedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -38672,6 +41928,24 @@ class $$KnowledgeQuestionsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get areaId =>
+      $composableBuilder(column: $table.areaId, builder: (column) => column);
+
+  GeneratedColumn<int> get reviewLevel => $composableBuilder(
+    column: $table.reviewLevel,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get nextReviewAt => $composableBuilder(
+    column: $table.nextReviewAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get lastReviewedAt => $composableBuilder(
+    column: $table.lastReviewedAt,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
 
@@ -38737,6 +42011,10 @@ class $$KnowledgeQuestionsTableTableManager
                 Value<String> status = const Value.absent(),
                 Value<String?> answer = const Value.absent(),
                 Value<DateTime?> answeredAt = const Value.absent(),
+                Value<String?> areaId = const Value.absent(),
+                Value<int> reviewLevel = const Value.absent(),
+                Value<DateTime?> nextReviewAt = const Value.absent(),
+                Value<DateTime?> lastReviewedAt = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<DateTime?> deletedAt = const Value.absent(),
@@ -38755,6 +42033,10 @@ class $$KnowledgeQuestionsTableTableManager
                 status: status,
                 answer: answer,
                 answeredAt: answeredAt,
+                areaId: areaId,
+                reviewLevel: reviewLevel,
+                nextReviewAt: nextReviewAt,
+                lastReviewedAt: lastReviewedAt,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
@@ -38775,6 +42057,10 @@ class $$KnowledgeQuestionsTableTableManager
                 Value<String> status = const Value.absent(),
                 Value<String?> answer = const Value.absent(),
                 Value<DateTime?> answeredAt = const Value.absent(),
+                Value<String?> areaId = const Value.absent(),
+                Value<int> reviewLevel = const Value.absent(),
+                Value<DateTime?> nextReviewAt = const Value.absent(),
+                Value<DateTime?> lastReviewedAt = const Value.absent(),
                 required DateTime createdAt,
                 required DateTime updatedAt,
                 Value<DateTime?> deletedAt = const Value.absent(),
@@ -38793,6 +42079,10 @@ class $$KnowledgeQuestionsTableTableManager
                 status: status,
                 answer: answer,
                 answeredAt: answeredAt,
+                areaId: areaId,
+                reviewLevel: reviewLevel,
+                nextReviewAt: nextReviewAt,
+                lastReviewedAt: lastReviewedAt,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
@@ -38857,6 +42147,8 @@ typedef $$KnowledgeDocumentsTableCreateCompanionBuilder =
       Value<String?> description,
       Value<String> tags,
       Value<String> category,
+      Value<String?> areaId,
+      Value<String?> extractedText,
       required DateTime createdAt,
       required DateTime updatedAt,
       Value<DateTime?> deletedAt,
@@ -38881,6 +42173,8 @@ typedef $$KnowledgeDocumentsTableUpdateCompanionBuilder =
       Value<String?> description,
       Value<String> tags,
       Value<String> category,
+      Value<String?> areaId,
+      Value<String?> extractedText,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
       Value<DateTime?> deletedAt,
@@ -38974,6 +42268,16 @@ class $$KnowledgeDocumentsTableFilterComposer
 
   ColumnFilters<String> get category => $composableBuilder(
     column: $table.category,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get areaId => $composableBuilder(
+    column: $table.areaId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get extractedText => $composableBuilder(
+    column: $table.extractedText,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -39087,6 +42391,16 @@ class $$KnowledgeDocumentsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get areaId => $composableBuilder(
+    column: $table.areaId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get extractedText => $composableBuilder(
+    column: $table.extractedText,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -39175,6 +42489,14 @@ class $$KnowledgeDocumentsTableAnnotationComposer
   GeneratedColumn<String> get category =>
       $composableBuilder(column: $table.category, builder: (column) => column);
 
+  GeneratedColumn<String> get areaId =>
+      $composableBuilder(column: $table.areaId, builder: (column) => column);
+
+  GeneratedColumn<String> get extractedText => $composableBuilder(
+    column: $table.extractedText,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
 
@@ -39244,6 +42566,8 @@ class $$KnowledgeDocumentsTableTableManager
                 Value<String?> description = const Value.absent(),
                 Value<String> tags = const Value.absent(),
                 Value<String> category = const Value.absent(),
+                Value<String?> areaId = const Value.absent(),
+                Value<String?> extractedText = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<DateTime?> deletedAt = const Value.absent(),
@@ -39266,6 +42590,8 @@ class $$KnowledgeDocumentsTableTableManager
                 description: description,
                 tags: tags,
                 category: category,
+                areaId: areaId,
+                extractedText: extractedText,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
@@ -39290,6 +42616,8 @@ class $$KnowledgeDocumentsTableTableManager
                 Value<String?> description = const Value.absent(),
                 Value<String> tags = const Value.absent(),
                 Value<String> category = const Value.absent(),
+                Value<String?> areaId = const Value.absent(),
+                Value<String?> extractedText = const Value.absent(),
                 required DateTime createdAt,
                 required DateTime updatedAt,
                 Value<DateTime?> deletedAt = const Value.absent(),
@@ -39312,6 +42640,8 @@ class $$KnowledgeDocumentsTableTableManager
                 description: description,
                 tags: tags,
                 category: category,
+                areaId: areaId,
+                extractedText: extractedText,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
@@ -39372,6 +42702,7 @@ typedef $$KnowledgeResourcesTableCreateCompanionBuilder =
       Value<String?> localAssetPath,
       Value<String> tags,
       Value<String> category,
+      Value<String?> areaId,
       required DateTime createdAt,
       required DateTime updatedAt,
       Value<DateTime?> deletedAt,
@@ -39392,6 +42723,7 @@ typedef $$KnowledgeResourcesTableUpdateCompanionBuilder =
       Value<String?> localAssetPath,
       Value<String> tags,
       Value<String> category,
+      Value<String?> areaId,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
       Value<DateTime?> deletedAt,
@@ -39465,6 +42797,11 @@ class $$KnowledgeResourcesTableFilterComposer
 
   ColumnFilters<String> get category => $composableBuilder(
     column: $table.category,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get areaId => $composableBuilder(
+    column: $table.areaId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -39558,6 +42895,11 @@ class $$KnowledgeResourcesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get areaId => $composableBuilder(
+    column: $table.areaId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -39634,6 +42976,9 @@ class $$KnowledgeResourcesTableAnnotationComposer
   GeneratedColumn<String> get category =>
       $composableBuilder(column: $table.category, builder: (column) => column);
 
+  GeneratedColumn<String> get areaId =>
+      $composableBuilder(column: $table.areaId, builder: (column) => column);
+
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
 
@@ -39699,6 +43044,7 @@ class $$KnowledgeResourcesTableTableManager
                 Value<String?> localAssetPath = const Value.absent(),
                 Value<String> tags = const Value.absent(),
                 Value<String> category = const Value.absent(),
+                Value<String?> areaId = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<DateTime?> deletedAt = const Value.absent(),
@@ -39717,6 +43063,7 @@ class $$KnowledgeResourcesTableTableManager
                 localAssetPath: localAssetPath,
                 tags: tags,
                 category: category,
+                areaId: areaId,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
@@ -39737,6 +43084,7 @@ class $$KnowledgeResourcesTableTableManager
                 Value<String?> localAssetPath = const Value.absent(),
                 Value<String> tags = const Value.absent(),
                 Value<String> category = const Value.absent(),
+                Value<String?> areaId = const Value.absent(),
                 required DateTime createdAt,
                 required DateTime updatedAt,
                 Value<DateTime?> deletedAt = const Value.absent(),
@@ -39755,6 +43103,7 @@ class $$KnowledgeResourcesTableTableManager
                 localAssetPath: localAssetPath,
                 tags: tags,
                 category: category,
+                areaId: areaId,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
@@ -40819,6 +44168,1152 @@ typedef $$TicunaTagsTableProcessedTableManager =
       TicunaTagDbEntry,
       PrefetchHooks Function()
     >;
+typedef $$EmailAccountsTableCreateCompanionBuilder =
+    EmailAccountsCompanion Function({
+      required String id,
+      required String name,
+      required String email,
+      required String providerType,
+      Value<String> incomingHost,
+      Value<int> incomingPort,
+      Value<String> incomingProtocol,
+      Value<String> outgoingHost,
+      Value<int> outgoingPort,
+      Value<String> outgoingSecurity,
+      Value<String> outgoingProtocol,
+      Value<String> username,
+      Value<bool> isActive,
+      Value<String> signatureHtml,
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> revision,
+      Value<int> rowid,
+    });
+typedef $$EmailAccountsTableUpdateCompanionBuilder =
+    EmailAccountsCompanion Function({
+      Value<String> id,
+      Value<String> name,
+      Value<String> email,
+      Value<String> providerType,
+      Value<String> incomingHost,
+      Value<int> incomingPort,
+      Value<String> incomingProtocol,
+      Value<String> outgoingHost,
+      Value<int> outgoingPort,
+      Value<String> outgoingSecurity,
+      Value<String> outgoingProtocol,
+      Value<String> username,
+      Value<bool> isActive,
+      Value<String> signatureHtml,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> revision,
+      Value<int> rowid,
+    });
+
+class $$EmailAccountsTableFilterComposer
+    extends Composer<_$AppDatabase, $EmailAccountsTable> {
+  $$EmailAccountsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get email => $composableBuilder(
+    column: $table.email,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get providerType => $composableBuilder(
+    column: $table.providerType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get incomingHost => $composableBuilder(
+    column: $table.incomingHost,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get incomingPort => $composableBuilder(
+    column: $table.incomingPort,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get incomingProtocol => $composableBuilder(
+    column: $table.incomingProtocol,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get outgoingHost => $composableBuilder(
+    column: $table.outgoingHost,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get outgoingPort => $composableBuilder(
+    column: $table.outgoingPort,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get outgoingSecurity => $composableBuilder(
+    column: $table.outgoingSecurity,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get outgoingProtocol => $composableBuilder(
+    column: $table.outgoingProtocol,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get username => $composableBuilder(
+    column: $table.username,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get signatureHtml => $composableBuilder(
+    column: $table.signatureHtml,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$EmailAccountsTableOrderingComposer
+    extends Composer<_$AppDatabase, $EmailAccountsTable> {
+  $$EmailAccountsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get email => $composableBuilder(
+    column: $table.email,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get providerType => $composableBuilder(
+    column: $table.providerType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get incomingHost => $composableBuilder(
+    column: $table.incomingHost,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get incomingPort => $composableBuilder(
+    column: $table.incomingPort,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get incomingProtocol => $composableBuilder(
+    column: $table.incomingProtocol,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get outgoingHost => $composableBuilder(
+    column: $table.outgoingHost,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get outgoingPort => $composableBuilder(
+    column: $table.outgoingPort,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get outgoingSecurity => $composableBuilder(
+    column: $table.outgoingSecurity,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get outgoingProtocol => $composableBuilder(
+    column: $table.outgoingProtocol,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get username => $composableBuilder(
+    column: $table.username,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get signatureHtml => $composableBuilder(
+    column: $table.signatureHtml,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$EmailAccountsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $EmailAccountsTable> {
+  $$EmailAccountsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get email =>
+      $composableBuilder(column: $table.email, builder: (column) => column);
+
+  GeneratedColumn<String> get providerType => $composableBuilder(
+    column: $table.providerType,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get incomingHost => $composableBuilder(
+    column: $table.incomingHost,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get incomingPort => $composableBuilder(
+    column: $table.incomingPort,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get incomingProtocol => $composableBuilder(
+    column: $table.incomingProtocol,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get outgoingHost => $composableBuilder(
+    column: $table.outgoingHost,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get outgoingPort => $composableBuilder(
+    column: $table.outgoingPort,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get outgoingSecurity => $composableBuilder(
+    column: $table.outgoingSecurity,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get outgoingProtocol => $composableBuilder(
+    column: $table.outgoingProtocol,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get username =>
+      $composableBuilder(column: $table.username, builder: (column) => column);
+
+  GeneratedColumn<bool> get isActive =>
+      $composableBuilder(column: $table.isActive, builder: (column) => column);
+
+  GeneratedColumn<String> get signatureHtml => $composableBuilder(
+    column: $table.signatureHtml,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<int> get revision =>
+      $composableBuilder(column: $table.revision, builder: (column) => column);
+}
+
+class $$EmailAccountsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $EmailAccountsTable,
+          EmailAccountDbEntry,
+          $$EmailAccountsTableFilterComposer,
+          $$EmailAccountsTableOrderingComposer,
+          $$EmailAccountsTableAnnotationComposer,
+          $$EmailAccountsTableCreateCompanionBuilder,
+          $$EmailAccountsTableUpdateCompanionBuilder,
+          (
+            EmailAccountDbEntry,
+            BaseReferences<
+              _$AppDatabase,
+              $EmailAccountsTable,
+              EmailAccountDbEntry
+            >,
+          ),
+          EmailAccountDbEntry,
+          PrefetchHooks Function()
+        > {
+  $$EmailAccountsTableTableManager(_$AppDatabase db, $EmailAccountsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$EmailAccountsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$EmailAccountsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$EmailAccountsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<String> email = const Value.absent(),
+                Value<String> providerType = const Value.absent(),
+                Value<String> incomingHost = const Value.absent(),
+                Value<int> incomingPort = const Value.absent(),
+                Value<String> incomingProtocol = const Value.absent(),
+                Value<String> outgoingHost = const Value.absent(),
+                Value<int> outgoingPort = const Value.absent(),
+                Value<String> outgoingSecurity = const Value.absent(),
+                Value<String> outgoingProtocol = const Value.absent(),
+                Value<String> username = const Value.absent(),
+                Value<bool> isActive = const Value.absent(),
+                Value<String> signatureHtml = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> revision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => EmailAccountsCompanion(
+                id: id,
+                name: name,
+                email: email,
+                providerType: providerType,
+                incomingHost: incomingHost,
+                incomingPort: incomingPort,
+                incomingProtocol: incomingProtocol,
+                outgoingHost: outgoingHost,
+                outgoingPort: outgoingPort,
+                outgoingSecurity: outgoingSecurity,
+                outgoingProtocol: outgoingProtocol,
+                username: username,
+                isActive: isActive,
+                signatureHtml: signatureHtml,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                revision: revision,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String name,
+                required String email,
+                required String providerType,
+                Value<String> incomingHost = const Value.absent(),
+                Value<int> incomingPort = const Value.absent(),
+                Value<String> incomingProtocol = const Value.absent(),
+                Value<String> outgoingHost = const Value.absent(),
+                Value<int> outgoingPort = const Value.absent(),
+                Value<String> outgoingSecurity = const Value.absent(),
+                Value<String> outgoingProtocol = const Value.absent(),
+                Value<String> username = const Value.absent(),
+                Value<bool> isActive = const Value.absent(),
+                Value<String> signatureHtml = const Value.absent(),
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> revision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => EmailAccountsCompanion.insert(
+                id: id,
+                name: name,
+                email: email,
+                providerType: providerType,
+                incomingHost: incomingHost,
+                incomingPort: incomingPort,
+                incomingProtocol: incomingProtocol,
+                outgoingHost: outgoingHost,
+                outgoingPort: outgoingPort,
+                outgoingSecurity: outgoingSecurity,
+                outgoingProtocol: outgoingProtocol,
+                username: username,
+                isActive: isActive,
+                signatureHtml: signatureHtml,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                revision: revision,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$EmailAccountsTable, EmailAccountDbEntry>(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $EmailAccountsTable,
+                    EmailAccountDbEntry
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$EmailAccountsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $EmailAccountsTable,
+      EmailAccountDbEntry,
+      $$EmailAccountsTableFilterComposer,
+      $$EmailAccountsTableOrderingComposer,
+      $$EmailAccountsTableAnnotationComposer,
+      $$EmailAccountsTableCreateCompanionBuilder,
+      $$EmailAccountsTableUpdateCompanionBuilder,
+      (
+        EmailAccountDbEntry,
+        BaseReferences<_$AppDatabase, $EmailAccountsTable, EmailAccountDbEntry>,
+      ),
+      EmailAccountDbEntry,
+      PrefetchHooks Function()
+    >;
+typedef $$KnowledgeAreasTableCreateCompanionBuilder =
+    KnowledgeAreasCompanion Function({
+      required String id,
+      required String name,
+      Value<String?> description,
+      Value<String?> iconName,
+      Value<String?> colorHex,
+      Value<int> sortOrder,
+      Value<bool> isArchived,
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> revision,
+      Value<int> rowid,
+    });
+typedef $$KnowledgeAreasTableUpdateCompanionBuilder =
+    KnowledgeAreasCompanion Function({
+      Value<String> id,
+      Value<String> name,
+      Value<String?> description,
+      Value<String?> iconName,
+      Value<String?> colorHex,
+      Value<int> sortOrder,
+      Value<bool> isArchived,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> revision,
+      Value<int> rowid,
+    });
+
+class $$KnowledgeAreasTableFilterComposer
+    extends Composer<_$AppDatabase, $KnowledgeAreasTable> {
+  $$KnowledgeAreasTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get iconName => $composableBuilder(
+    column: $table.iconName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get colorHex => $composableBuilder(
+    column: $table.colorHex,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isArchived => $composableBuilder(
+    column: $table.isArchived,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$KnowledgeAreasTableOrderingComposer
+    extends Composer<_$AppDatabase, $KnowledgeAreasTable> {
+  $$KnowledgeAreasTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get iconName => $composableBuilder(
+    column: $table.iconName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get colorHex => $composableBuilder(
+    column: $table.colorHex,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isArchived => $composableBuilder(
+    column: $table.isArchived,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$KnowledgeAreasTableAnnotationComposer
+    extends Composer<_$AppDatabase, $KnowledgeAreasTable> {
+  $$KnowledgeAreasTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get iconName =>
+      $composableBuilder(column: $table.iconName, builder: (column) => column);
+
+  GeneratedColumn<String> get colorHex =>
+      $composableBuilder(column: $table.colorHex, builder: (column) => column);
+
+  GeneratedColumn<int> get sortOrder =>
+      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
+
+  GeneratedColumn<bool> get isArchived => $composableBuilder(
+    column: $table.isArchived,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<int> get revision =>
+      $composableBuilder(column: $table.revision, builder: (column) => column);
+}
+
+class $$KnowledgeAreasTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $KnowledgeAreasTable,
+          KnowledgeAreaEntry,
+          $$KnowledgeAreasTableFilterComposer,
+          $$KnowledgeAreasTableOrderingComposer,
+          $$KnowledgeAreasTableAnnotationComposer,
+          $$KnowledgeAreasTableCreateCompanionBuilder,
+          $$KnowledgeAreasTableUpdateCompanionBuilder,
+          (
+            KnowledgeAreaEntry,
+            BaseReferences<
+              _$AppDatabase,
+              $KnowledgeAreasTable,
+              KnowledgeAreaEntry
+            >,
+          ),
+          KnowledgeAreaEntry,
+          PrefetchHooks Function()
+        > {
+  $$KnowledgeAreasTableTableManager(
+    _$AppDatabase db,
+    $KnowledgeAreasTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$KnowledgeAreasTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$KnowledgeAreasTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$KnowledgeAreasTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<String?> description = const Value.absent(),
+                Value<String?> iconName = const Value.absent(),
+                Value<String?> colorHex = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<bool> isArchived = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> revision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => KnowledgeAreasCompanion(
+                id: id,
+                name: name,
+                description: description,
+                iconName: iconName,
+                colorHex: colorHex,
+                sortOrder: sortOrder,
+                isArchived: isArchived,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                revision: revision,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String name,
+                Value<String?> description = const Value.absent(),
+                Value<String?> iconName = const Value.absent(),
+                Value<String?> colorHex = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<bool> isArchived = const Value.absent(),
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> revision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => KnowledgeAreasCompanion.insert(
+                id: id,
+                name: name,
+                description: description,
+                iconName: iconName,
+                colorHex: colorHex,
+                sortOrder: sortOrder,
+                isArchived: isArchived,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                revision: revision,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$KnowledgeAreasTable, KnowledgeAreaEntry>(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $KnowledgeAreasTable,
+                    KnowledgeAreaEntry
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$KnowledgeAreasTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $KnowledgeAreasTable,
+      KnowledgeAreaEntry,
+      $$KnowledgeAreasTableFilterComposer,
+      $$KnowledgeAreasTableOrderingComposer,
+      $$KnowledgeAreasTableAnnotationComposer,
+      $$KnowledgeAreasTableCreateCompanionBuilder,
+      $$KnowledgeAreasTableUpdateCompanionBuilder,
+      (
+        KnowledgeAreaEntry,
+        BaseReferences<_$AppDatabase, $KnowledgeAreasTable, KnowledgeAreaEntry>,
+      ),
+      KnowledgeAreaEntry,
+      PrefetchHooks Function()
+    >;
+typedef $$KnowledgeLinksTableCreateCompanionBuilder =
+    KnowledgeLinksCompanion Function({
+      required String id,
+      required String sourceType,
+      required String sourceId,
+      required String targetType,
+      required String targetId,
+      required String targetUri,
+      Value<String> anchorText,
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> revision,
+      Value<int> rowid,
+    });
+typedef $$KnowledgeLinksTableUpdateCompanionBuilder =
+    KnowledgeLinksCompanion Function({
+      Value<String> id,
+      Value<String> sourceType,
+      Value<String> sourceId,
+      Value<String> targetType,
+      Value<String> targetId,
+      Value<String> targetUri,
+      Value<String> anchorText,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> revision,
+      Value<int> rowid,
+    });
+
+class $$KnowledgeLinksTableFilterComposer
+    extends Composer<_$AppDatabase, $KnowledgeLinksTable> {
+  $$KnowledgeLinksTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sourceType => $composableBuilder(
+    column: $table.sourceType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sourceId => $composableBuilder(
+    column: $table.sourceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get targetType => $composableBuilder(
+    column: $table.targetType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get targetId => $composableBuilder(
+    column: $table.targetId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get targetUri => $composableBuilder(
+    column: $table.targetUri,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get anchorText => $composableBuilder(
+    column: $table.anchorText,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$KnowledgeLinksTableOrderingComposer
+    extends Composer<_$AppDatabase, $KnowledgeLinksTable> {
+  $$KnowledgeLinksTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sourceType => $composableBuilder(
+    column: $table.sourceType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sourceId => $composableBuilder(
+    column: $table.sourceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get targetType => $composableBuilder(
+    column: $table.targetType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get targetId => $composableBuilder(
+    column: $table.targetId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get targetUri => $composableBuilder(
+    column: $table.targetUri,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get anchorText => $composableBuilder(
+    column: $table.anchorText,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$KnowledgeLinksTableAnnotationComposer
+    extends Composer<_$AppDatabase, $KnowledgeLinksTable> {
+  $$KnowledgeLinksTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get sourceType => $composableBuilder(
+    column: $table.sourceType,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get sourceId =>
+      $composableBuilder(column: $table.sourceId, builder: (column) => column);
+
+  GeneratedColumn<String> get targetType => $composableBuilder(
+    column: $table.targetType,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get targetId =>
+      $composableBuilder(column: $table.targetId, builder: (column) => column);
+
+  GeneratedColumn<String> get targetUri =>
+      $composableBuilder(column: $table.targetUri, builder: (column) => column);
+
+  GeneratedColumn<String> get anchorText => $composableBuilder(
+    column: $table.anchorText,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<int> get revision =>
+      $composableBuilder(column: $table.revision, builder: (column) => column);
+}
+
+class $$KnowledgeLinksTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $KnowledgeLinksTable,
+          KnowledgeLinkEntry,
+          $$KnowledgeLinksTableFilterComposer,
+          $$KnowledgeLinksTableOrderingComposer,
+          $$KnowledgeLinksTableAnnotationComposer,
+          $$KnowledgeLinksTableCreateCompanionBuilder,
+          $$KnowledgeLinksTableUpdateCompanionBuilder,
+          (
+            KnowledgeLinkEntry,
+            BaseReferences<
+              _$AppDatabase,
+              $KnowledgeLinksTable,
+              KnowledgeLinkEntry
+            >,
+          ),
+          KnowledgeLinkEntry,
+          PrefetchHooks Function()
+        > {
+  $$KnowledgeLinksTableTableManager(
+    _$AppDatabase db,
+    $KnowledgeLinksTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$KnowledgeLinksTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$KnowledgeLinksTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$KnowledgeLinksTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> sourceType = const Value.absent(),
+                Value<String> sourceId = const Value.absent(),
+                Value<String> targetType = const Value.absent(),
+                Value<String> targetId = const Value.absent(),
+                Value<String> targetUri = const Value.absent(),
+                Value<String> anchorText = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> revision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => KnowledgeLinksCompanion(
+                id: id,
+                sourceType: sourceType,
+                sourceId: sourceId,
+                targetType: targetType,
+                targetId: targetId,
+                targetUri: targetUri,
+                anchorText: anchorText,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                revision: revision,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String sourceType,
+                required String sourceId,
+                required String targetType,
+                required String targetId,
+                required String targetUri,
+                Value<String> anchorText = const Value.absent(),
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> revision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => KnowledgeLinksCompanion.insert(
+                id: id,
+                sourceType: sourceType,
+                sourceId: sourceId,
+                targetType: targetType,
+                targetId: targetId,
+                targetUri: targetUri,
+                anchorText: anchorText,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                revision: revision,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$KnowledgeLinksTable, KnowledgeLinkEntry>(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $KnowledgeLinksTable,
+                    KnowledgeLinkEntry
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$KnowledgeLinksTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $KnowledgeLinksTable,
+      KnowledgeLinkEntry,
+      $$KnowledgeLinksTableFilterComposer,
+      $$KnowledgeLinksTableOrderingComposer,
+      $$KnowledgeLinksTableAnnotationComposer,
+      $$KnowledgeLinksTableCreateCompanionBuilder,
+      $$KnowledgeLinksTableUpdateCompanionBuilder,
+      (
+        KnowledgeLinkEntry,
+        BaseReferences<_$AppDatabase, $KnowledgeLinksTable, KnowledgeLinkEntry>,
+      ),
+      KnowledgeLinkEntry,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -40892,4 +45387,10 @@ class $AppDatabaseManager {
       $$TicunaPhrasesTableTableManager(_db, _db.ticunaPhrases);
   $$TicunaTagsTableTableManager get ticunaTags =>
       $$TicunaTagsTableTableManager(_db, _db.ticunaTags);
+  $$EmailAccountsTableTableManager get emailAccounts =>
+      $$EmailAccountsTableTableManager(_db, _db.emailAccounts);
+  $$KnowledgeAreasTableTableManager get knowledgeAreas =>
+      $$KnowledgeAreasTableTableManager(_db, _db.knowledgeAreas);
+  $$KnowledgeLinksTableTableManager get knowledgeLinks =>
+      $$KnowledgeLinksTableTableManager(_db, _db.knowledgeLinks);
 }

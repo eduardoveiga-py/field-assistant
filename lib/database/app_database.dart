@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart';
 
 import '../core/app_logger.dart';
@@ -42,6 +44,9 @@ part 'app_database.g.dart';
     TicunaWords,
     TicunaPhrases,
     TicunaTags,
+    EmailAccounts,
+    KnowledgeAreas,
+    KnowledgeLinks,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -50,7 +55,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -135,6 +140,18 @@ class AppDatabase extends _$AppDatabase {
         await _normalizeLegacyTextTimestamps();
         await _ensurePerformanceIndexes();
       }
+      if (from < 9) {
+        // Migração incremental da versão 8 para a versão 9:
+        // - Adiciona EmailAccounts (metadados multi-contas sem senhas para sync E2EE)
+        // - Adiciona KnowledgeAreas (P.A.R.A.) e KnowledgeLinks (Backlinks bidirecionais)
+        // - Adiciona colunas de área, subpáginas, propriedades, revisão espaçada e texto PDF
+        await _createTableIfNotExists(m, emailAccounts);
+        await _createTableIfNotExists(m, knowledgeAreas);
+        await _createTableIfNotExists(m, knowledgeLinks);
+        await _migrateV9Columns(m);
+        await _migrateLegacyEmailAccountsToTable();
+        await _ensurePerformanceIndexes();
+      }
     },
     beforeOpen: (details) async {
       await _ensureAppKvStoreUpdatedAt();
@@ -143,9 +160,241 @@ class AppDatabase extends _$AppDatabase {
     },
   );
 
+  Future<void> _migrateV9Columns(Migrator m) async {
+    Future<void> addCols(
+      String tableName,
+      Future<void> Function(Set<String> cols) apply,
+    ) async {
+      final exists = await customSelect(
+        "SELECT count(*) as count FROM sqlite_master WHERE type='table' AND name=?",
+        variables: [Variable.withString(tableName)],
+      ).getSingle();
+      if (exists.read<int>('count') == 0) return;
+      final columns = await customSelect('PRAGMA table_info($tableName)').get();
+      final colNames = columns.map((c) => c.read<String>('name')).toSet();
+      await apply(colNames);
+    }
+
+    await addCols('projects', (cols) async {
+      if (!cols.contains('area_id')) {
+        await m.addColumn(projects, projects.areaId);
+      }
+    });
+
+    await addCols('knowledge_notes', (cols) async {
+      if (!cols.contains('area_id')) {
+        await m.addColumn(knowledgeNotes, knowledgeNotes.areaId);
+      }
+      if (!cols.contains('parent_note_id')) {
+        await m.addColumn(knowledgeNotes, knowledgeNotes.parentNoteId);
+      }
+      if (!cols.contains('properties_json')) {
+        await m.addColumn(knowledgeNotes, knowledgeNotes.propertiesJson);
+      }
+      if (!cols.contains('review_level')) {
+        await m.addColumn(knowledgeNotes, knowledgeNotes.reviewLevel);
+      }
+      if (!cols.contains('next_review_at')) {
+        await m.addColumn(knowledgeNotes, knowledgeNotes.nextReviewAt);
+      }
+      if (!cols.contains('last_reviewed_at')) {
+        await m.addColumn(knowledgeNotes, knowledgeNotes.lastReviewedAt);
+      }
+    });
+
+    await addCols('knowledge_questions', (cols) async {
+      if (!cols.contains('area_id')) {
+        await m.addColumn(knowledgeQuestions, knowledgeQuestions.areaId);
+      }
+      if (!cols.contains('review_level')) {
+        await m.addColumn(knowledgeQuestions, knowledgeQuestions.reviewLevel);
+      }
+      if (!cols.contains('next_review_at')) {
+        await m.addColumn(knowledgeQuestions, knowledgeQuestions.nextReviewAt);
+      }
+      if (!cols.contains('last_reviewed_at')) {
+        await m.addColumn(
+          knowledgeQuestions,
+          knowledgeQuestions.lastReviewedAt,
+        );
+      }
+    });
+
+    await addCols('knowledge_documents', (cols) async {
+      if (!cols.contains('area_id')) {
+        await m.addColumn(knowledgeDocuments, knowledgeDocuments.areaId);
+      }
+      if (!cols.contains('extracted_text')) {
+        await m.addColumn(knowledgeDocuments, knowledgeDocuments.extractedText);
+      }
+    });
+
+    await addCols('knowledge_resources', (cols) async {
+      if (!cols.contains('area_id')) {
+        await m.addColumn(knowledgeResources, knowledgeResources.areaId);
+      }
+    });
+  }
+
+  Future<void> _migrateLegacyEmailAccountsToTable() async {
+    try {
+      final hasKv = await customSelect(
+        "SELECT count(*) as count FROM sqlite_master WHERE type='table' AND name='app_kv_store'",
+      ).getSingle();
+      if (hasKv.read<int>('count') == 0) return;
+
+      final existingCountRow = await customSelect(
+        'SELECT count(*) as count FROM email_accounts',
+      ).getSingle();
+      if (existingCountRow.read<int>('count') > 0) return;
+
+      final hasSyncQueueRow = await customSelect(
+        "SELECT count(*) as count FROM sqlite_master WHERE type='table' AND name='sync_queue'",
+      ).getSingle();
+      final hasSyncQueue = hasSyncQueueRow.read<int>('count') > 0;
+
+      final row =
+          await (select(appKvStore)
+                ..where((t) => t.key.equals('multi_email_accounts_registry')))
+              .getSingleOrNull();
+      final items = <Map<String, dynamic>>[];
+      if (row != null && row.value.trim().isNotEmpty) {
+        final decoded = jsonDecode(row.value);
+        if (decoded is List) {
+          for (final e in decoded) {
+            if (e is Map) {
+              items.add(Map<String, dynamic>.from(e));
+            }
+          }
+        }
+      }
+
+      if (items.isEmpty) {
+        final legacyImapEmail = await (select(
+          appKvStore,
+        )..where((t) => t.key.equals('jw_imap_email'))).getSingleOrNull();
+        final legacyEasEmail = await (select(
+          appKvStore,
+        )..where((t) => t.key.equals('jw_eas_email'))).getSingleOrNull();
+        final protocol = await (select(
+          appKvStore,
+        )..where((t) => t.key.equals('jw_mail_protocol'))).getSingleOrNull();
+
+        if (protocol?.value == 'exchange' &&
+            legacyEasEmail?.value.isNotEmpty == true) {
+          final host = await (select(
+            appKvStore,
+          )..where((t) => t.key.equals('jw_eas_host'))).getSingleOrNull();
+          items.add({
+            'id': 'legacy_eas_account',
+            'name': 'Exchange Principal',
+            'email': legacyEasEmail!.value,
+            'providerType': 'exchange',
+            'incomingHost': host?.value.isNotEmpty == true
+                ? host!.value
+                : 'outlook.office365.com',
+            'incomingPort': 443,
+            'incomingProtocol': 'exchange',
+            'outgoingHost': host?.value.isNotEmpty == true
+                ? host!.value
+                : 'outlook.office365.com',
+            'outgoingPort': 443,
+            'outgoingSecurity': 'ssl',
+            'outgoingProtocol': 'exchange',
+            'username': legacyEasEmail.value,
+            'isActive': true,
+          });
+        } else if (legacyImapEmail?.value.isNotEmpty == true) {
+          final host = await (select(
+            appKvStore,
+          )..where((t) => t.key.equals('jw_imap_host'))).getSingleOrNull();
+          items.add({
+            'id': 'legacy_imap_account',
+            'name': 'JWPUB Principal',
+            'email': legacyImapEmail!.value,
+            'providerType': 'jwpub',
+            'incomingHost': host?.value.isNotEmpty == true
+                ? host!.value
+                : 'mail.jw.org',
+            'incomingPort': 993,
+            'incomingProtocol': 'imap',
+            'outgoingHost': host?.value.isNotEmpty == true
+                ? host!.value
+                : 'mail.jw.org',
+            'outgoingPort': 587,
+            'outgoingSecurity': 'starttls',
+            'outgoingProtocol': 'smtp',
+            'username': legacyImapEmail.value,
+            'isActive': true,
+          });
+        }
+      }
+
+      final now = DateTime.now();
+      for (final raw in items) {
+        final email = (raw['email']?.toString() ?? '').trim();
+        final id = (raw['id']?.toString() ?? '').trim();
+        if (email.isEmpty || id.isEmpty) continue;
+        final createdAt = raw['createdAt'] != null
+            ? (DateTime.tryParse(raw['createdAt'].toString()) ?? now)
+            : now;
+        final incProto = raw['incomingProtocol']?.toString() ?? 'imap';
+        final companion = EmailAccountsCompanion.insert(
+          id: id,
+          name: (raw['name']?.toString().trim().isNotEmpty == true)
+              ? raw['name'].toString().trim()
+              : email,
+          email: email,
+          providerType: raw['providerType']?.toString() ?? 'custom',
+          incomingHost: Value(raw['incomingHost']?.toString() ?? ''),
+          incomingPort: Value((raw['incomingPort'] as num?)?.toInt() ?? 993),
+          incomingProtocol: Value(incProto),
+          outgoingHost: Value(raw['outgoingHost']?.toString() ?? ''),
+          outgoingPort: Value((raw['outgoingPort'] as num?)?.toInt() ?? 587),
+          outgoingSecurity: Value(
+            raw['outgoingSecurity']?.toString() ?? 'starttls',
+          ),
+          outgoingProtocol: Value(
+            raw['outgoingProtocol']?.toString() ??
+                (incProto == 'exchange' ? 'exchange' : 'smtp'),
+          ),
+          username: Value(raw['username']?.toString() ?? email),
+          isActive: Value(raw['isActive'] as bool? ?? true),
+          signatureHtml: Value(raw['signatureHtml']?.toString() ?? ''),
+          createdAt: createdAt,
+          updatedAt: now,
+        );
+        await into(emailAccounts).insertOnConflictUpdate(companion);
+        if (hasSyncQueue) {
+          final inserted = await (select(
+            emailAccounts,
+          )..where((t) => t.id.equals(id))).getSingle();
+          await into(syncQueue).insertOnConflictUpdate(
+            SyncQueueCompanion.insert(
+              id: 'mig_email_$id',
+              entityType: 'email_accounts',
+              entityId: id,
+              operation: 'INSERT',
+              payload: jsonEncode(
+                SyncTimestamp.normalizeMapDates(inserted.toJson()),
+              ),
+              createdAt: now,
+            ),
+          );
+        }
+      }
+    } catch (e, st) {
+      AppLogger.warning(
+        'Falha ao migrar contas de e-mail legadas para tabela tipada email_accounts',
+        e,
+        st,
+      );
+    }
+  }
+
   Future<void> _ensurePerformanceIndexes() async {
     final rows = await customSelect(
-      "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('people', 'sync_queue', 'appointments', 'visits')",
+      "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('people', 'sync_queue', 'appointments', 'visits', 'projects', 'knowledge_notes', 'knowledge_links', 'email_accounts')",
     ).get();
     final existing = rows.map((r) => r.read<String>('name')).toSet();
     if (existing.contains('people')) {
@@ -190,6 +439,48 @@ class AppDatabase extends _$AppDatabase {
           'CREATE INDEX IF NOT EXISTS idx_visits_person_id ON visits(person_id);',
         );
       }
+    }
+    if (existing.contains('projects')) {
+      final cols = await customSelect('PRAGMA table_info(projects)').get();
+      final colNames = cols.map((c) => c.read<String>('name')).toSet();
+      if (colNames.contains('area_id')) {
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_projects_area ON projects(area_id);',
+        );
+      }
+    }
+    if (existing.contains('knowledge_notes')) {
+      final cols = await customSelect('PRAGMA table_info(knowledge_notes)')
+          .get();
+      final colNames = cols.map((c) => c.read<String>('name')).toSet();
+      if (colNames.contains('parent_note_id')) {
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_knowledge_notes_parent ON knowledge_notes(parent_note_id);',
+        );
+      }
+      if (colNames.contains('area_id')) {
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_knowledge_notes_area ON knowledge_notes(area_id);',
+        );
+      }
+      if (colNames.contains('next_review_at')) {
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_knowledge_notes_next_review ON knowledge_notes(next_review_at);',
+        );
+      }
+    }
+    if (existing.contains('knowledge_links')) {
+      await customStatement(
+        'CREATE INDEX IF NOT EXISTS idx_knowledge_links_target ON knowledge_links(target_type, target_id, deleted_at);',
+      );
+      await customStatement(
+        'CREATE INDEX IF NOT EXISTS idx_knowledge_links_source ON knowledge_links(source_type, source_id, deleted_at);',
+      );
+    }
+    if (existing.contains('email_accounts')) {
+      await customStatement(
+        'CREATE INDEX IF NOT EXISTS idx_email_accounts_email ON email_accounts(email COLLATE NOCASE);',
+      );
     }
   }
 

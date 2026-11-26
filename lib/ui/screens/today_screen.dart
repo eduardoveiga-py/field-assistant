@@ -7,6 +7,8 @@ import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
 import '../../contacts/person_hand_off_helper.dart';
 import '../../sync/supabase_sync_service.dart';
+import '../../sync/sync_privacy_policy.dart';
+import '../widgets/e2ee_setup_dialog.dart';
 import '../../territory/geocoding_service.dart';
 import '../../territory/sector_manager.dart';
 import '../providers.dart';
@@ -92,8 +94,36 @@ class TodayScreen extends ConsumerWidget {
     final repo = ref.read(repositoryProvider);
     final pendingOps = await repo.getPendingSyncOperations();
     final currentUser = _getCurrentSupabaseUser();
+    final e2ee = ref.read(e2eeServiceProvider);
+    final ownerId = currentUser?.id ?? 'local_user';
+    final isE2eeReady = currentUser != null
+        ? await e2ee.isKeyInstalled(ownerId)
+        : false;
+    final isWebPinLocked = currentUser != null && !isE2eeReady
+        ? await e2ee.isWebPinLocked(ownerId)
+        : false;
+    final cloudSyncEnabled = SyncPrivacyPolicy.canRunRemoteSync();
 
     if (!context.mounted) return;
+
+    final statusTitle = currentUser == null
+        ? 'Modo Offline-First ativo. Seus dados estão preservados localmente.'
+        : (!cloudSyncEnabled
+              ? 'Conectado (${currentUser.email ?? "Usuário"}) — Sincronização em nuvem pausada nesta compilação.'
+              : (isE2eeReady
+                    ? 'Conectado ao Supabase: ${currentUser.email ?? "Usuário autenticado"}'
+                    : (isWebPinLocked
+                          ? 'Cofre E2EE bloqueado por PIN neste navegador (${currentUser.email ?? "Usuário"})'
+                          : 'Chave E2EE pendente neste aparelho (${currentUser.email ?? "Usuário"})')));
+    final statusSubtitle = currentUser == null
+        ? 'Modo offline-first. Conecte sua conta e configure a chave E2EE para sincronizar na nuvem.'
+        : (isE2eeReady
+              ? 'Conta conectada com Criptografia de Ponta a Ponta (E2EE) desbloqueada neste dispositivo.'
+              : (isWebPinLocked
+                    ? 'Digite seu PIN de desbloqueio rápido para liberar a sincronização multi-dispositivos.'
+                    : 'Restaure sua frase de 24 palavras para sincronizar notas, e-mails e registros entre dispositivos.'));
+    final isFullyActive =
+        currentUser != null && cloudSyncEnabled && isE2eeReady;
 
     showModalBottomSheet(
       context: context,
@@ -111,10 +141,16 @@ class TodayScreen extends ConsumerWidget {
               Row(
                 children: [
                   Icon(
-                    Icons.cloud_off,
-                    color: currentUser != null
+                    isFullyActive
+                        ? Icons.verified_user_rounded
+                        : (isWebPinLocked
+                              ? Icons.lock_clock_outlined
+                              : Icons.cloud_off),
+                    color: isFullyActive
                         ? AppTheme.successGreen
-                        : AppTheme.primaryBlue,
+                        : (currentUser != null
+                              ? Colors.orange.shade700
+                              : AppTheme.primaryBlue),
                     size: 28,
                   ),
                   const SizedBox(width: 10),
@@ -137,25 +173,33 @@ class TodayScreen extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: currentUser != null
+                  color: isFullyActive
                       ? AppTheme.successGreen.withValues(alpha: 0.12)
-                      : const Color(0xFFEFF6FF),
+                      : (currentUser != null
+                            ? Colors.amber.withValues(alpha: 0.12)
+                            : const Color(0xFFEFF6FF)),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: currentUser != null
+                    color: isFullyActive
                         ? AppTheme.successGreen.withValues(alpha: 0.35)
-                        : AppTheme.primaryBlue.withValues(alpha: 0.25),
+                        : (currentUser != null
+                              ? Colors.amber.withValues(alpha: 0.45)
+                              : AppTheme.primaryBlue.withValues(alpha: 0.25)),
                   ),
                 ),
                 child: Row(
                   children: [
                     Icon(
-                      currentUser != null
+                      isFullyActive
                           ? Icons.verified_user_rounded
-                          : Icons.check_circle,
-                      color: currentUser != null
+                          : (currentUser != null
+                                ? Icons.shield_outlined
+                                : Icons.check_circle),
+                      color: isFullyActive
                           ? AppTheme.successGreen
-                          : AppTheme.primaryBlue,
+                          : (currentUser != null
+                                ? Colors.amber.shade900
+                                : AppTheme.primaryBlue),
                       size: 22,
                     ),
                     const SizedBox(width: 10),
@@ -164,22 +208,20 @@ class TodayScreen extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            currentUser != null
-                                ? 'Conectado ao Supabase: ${currentUser.email ?? "Usuário autenticado"}'
-                                : 'Modo Offline-First ativo. Seus dados estão preservados localmente.',
+                            statusTitle,
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.bold,
-                              color: currentUser != null
+                              color: isFullyActive
                                   ? AppTheme.successGreen
-                                  : Colors.blue.shade900,
+                                  : (currentUser != null
+                                        ? Colors.amber.shade900
+                                        : Colors.blue.shade900),
                             ),
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            currentUser != null
-                                ? 'Conta conectada com Criptografia de Ponta a Ponta (E2EE). Sincronização segura ativa.'
-                                : 'Modo offline-first. Conecte sua conta e configure a chave E2EE para sincronizar na nuvem.',
+                            statusSubtitle,
                             style: const TextStyle(fontSize: 11.5),
                           ),
                         ],
@@ -197,6 +239,30 @@ class TodayScreen extends ConsumerWidget {
                 '• Última checagem: ${AppDateUtils.formatDateTime(DateTime.now())}',
               ),
               const SizedBox(height: 18),
+              if (currentUser != null && !isE2eeReady) ...[
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    icon: Icon(
+                      isWebPinLocked ? Icons.lock_open : Icons.key_rounded,
+                    ),
+                    label: Text(
+                      isWebPinLocked
+                          ? 'Desbloquear Cofre E2EE (PIN)'
+                          : 'Configurar / Restaurar Chave E2EE',
+                    ),
+                    onPressed: () async {
+                      Navigator.pop(ctx);
+                      if (isWebPinLocked) {
+                        await WebPinUnlockDialog.show(context, userId: ownerId);
+                      } else {
+                        await E2eeSetupDialog.show(context, userId: ownerId);
+                      }
+                    },
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(

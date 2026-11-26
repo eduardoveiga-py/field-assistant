@@ -11,9 +11,9 @@ void main() {
   group(
     'FA-SYNC-01: Reconciliação Drift vs Supabase (mapEntityToRemoteTable)',
     () {
-      test('mapeia todas as 26 tabelas em snake_case, camelCase, PascalCase, singular e plural', () {
+      test('mapeia todas as 29 tabelas em snake_case, camelCase, PascalCase, singular e plural', () {
         final expectedTables = SupabaseSyncService.syncTables;
-        expect(expectedTables.length, equals(26));
+        expect(expectedTables.length, equals(29));
 
         // 1. people
         expect(SupabaseSyncService.mapEntityToRemoteTable('people'), 'people');
@@ -378,6 +378,20 @@ void main() {
         expect(
           SupabaseSyncService.mapEntityToRemoteTable('TicunaPhrase'),
           'ticuna_phrases',
+        );
+
+        // 27-29. email_accounts, knowledge_areas, knowledge_links
+        expect(
+          SupabaseSyncService.mapEntityToRemoteTable('EmailAccount'),
+          'email_accounts',
+        );
+        expect(
+          SupabaseSyncService.mapEntityToRemoteTable('KnowledgeArea'),
+          'knowledge_areas',
+        );
+        expect(
+          SupabaseSyncService.mapEntityToRemoteTable('KnowledgeLink'),
+          'knowledge_links',
         );
 
         // Valida que toda tabela do syncTables é mapeada para si mesma quando fornecida em snake_case

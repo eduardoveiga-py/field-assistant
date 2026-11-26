@@ -248,12 +248,15 @@ void main() {
           'ticunaPhrases',
           'ticunaTags',
           'appKvStore',
+          'emailAccounts',
+          'knowledgeAreas',
+          'knowledgeLinks',
         ];
 
         expect(
           preview.inventoryTables.length,
-          equals(33),
-          reason: 'O backup deve exportar exatamente 33 tabelas',
+          equals(36),
+          reason: 'O backup deve exportar exatamente 36 tabelas',
         );
         for (final tbl in expected22Tables) {
           expect(

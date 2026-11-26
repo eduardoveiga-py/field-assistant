@@ -9,6 +9,7 @@ import 'recovery_crypto.dart';
 import 'recovery_key_store.dart';
 import 'recovery_vault_transport.dart';
 import 'recovery_vault_verifier.dart';
+import 'web_key_persistence.dart';
 
 /// Serviço central de gerenciamento da Criptografia de Ponta a Ponta (E2EE).
 /// Coordena o cofre BIP-39, chaves criptográficas locais estritamente isoladas
@@ -75,6 +76,52 @@ class E2eeService {
       );
       return null;
     }
+  }
+
+  /// Verifica se o cofre local na Web está salvo porém bloqueado por PIN rápido.
+  Future<bool> isWebPinLocked(String ownerId) async {
+    final effectiveId = _normalizeOwner(ownerId);
+    try {
+      return await keyStore.isWebPinLocked(effectiveId);
+    } catch (e, st) {
+      AppLogger.warning(
+        'Falha ao consultar estado de bloqueio PIN na Web para $effectiveId',
+        e,
+        st,
+      );
+      return false;
+    }
+  }
+
+  /// Retorna o estado detalhado de persistência da chave E2EE para [ownerId].
+  Future<WebKeyUnlockMode> getWebUnlockMode(String ownerId) async {
+    final effectiveId = _normalizeOwner(ownerId);
+    try {
+      return await keyStore.getWebUnlockState(effectiveId);
+    } catch (e, st) {
+      AppLogger.warning(
+        'Falha ao consultar modo de desbloqueio E2EE para $effectiveId',
+        e,
+        st,
+      );
+      return WebKeyUnlockMode.none;
+    }
+  }
+
+  /// Desbloqueia o cofre protegido por PIN PBKDF2-SHA256 no navegador.
+  Future<bool> unlockWithWebPin({
+    required String ownerId,
+    required String pin,
+  }) async {
+    final effectiveId = _normalizeOwner(ownerId);
+    await keyStore.unlockWithPin(owner: effectiveId, pin: pin);
+    return true;
+  }
+
+  /// Bloqueia apenas a sessão em RAM na Web preservando o envelope protegido no IndexedDB.
+  Future<void> lockWebSession(String ownerId) async {
+    final effectiveId = _normalizeOwner(ownerId);
+    await keyStore.lockWebSession(effectiveId);
   }
 
   /// Remove a chave E2EE local de uma conta específica.
@@ -162,7 +209,7 @@ class E2eeService {
 
   /// Inicializa um novo cofre E2EE com frase mnemônica de 24 palavras BIP-39,
   /// grava no cofre remoto e instala EXCLUSIVAMENTE sob [ownerId].
-  Future<String> setupNewVault(String ownerId) async {
+  Future<String> setupNewVault(String ownerId, {String? webUnlockPin}) async {
     final effectiveId = _normalizeOwner(ownerId);
     final phrase = RecoveryCrypto.createPhrase();
     final key = await RecoveryCrypto.keyFromPhrase(phrase);
@@ -194,6 +241,7 @@ class E2eeService {
       owner: effectiveId,
       phrase: phrase,
       confirmation: phrase,
+      webUnlockPin: webUnlockPin,
     );
     AppLogger.info('Novo cofre E2EE configurado com sucesso para $effectiveId');
     return phrase;
@@ -201,12 +249,18 @@ class E2eeService {
 
   /// Restaura o acesso ao cofre a partir da frase de 24 palavras digitada pelo usuário.
   /// Falha fechada se o cofre remoto não existir (nunca cria silenciosamente um novo cofre).
-  Future<bool> restoreVault(String ownerId, String phrase) async {
+  Future<bool> restoreVault(
+    String ownerId,
+    String phrase, {
+    String? webUnlockPin,
+  }) async {
     final effectiveId = _normalizeOwner(ownerId);
     final key = await RecoveryCrypto.keyFromPhrase(phrase);
     final transport = getVaultTransport(effectiveId);
+    String? expectedVaultId;
+    Map<String, dynamic>? remoteMarker;
     if (transport != null) {
-      final remoteMarker = await transport.fetch();
+      remoteMarker = await transport.fetch();
       if (remoteMarker == null) {
         throw StateError(
           'Nenhum cofre de criptografia encontrado no servidor para esta conta. '
@@ -214,7 +268,7 @@ class E2eeService {
         );
       }
       try {
-        await RecoveryVaultVerifier.verify(
+        expectedVaultId = await RecoveryVaultVerifier.verify(
           root: key,
           owner: effectiveId,
           marker: remoteMarker,
@@ -230,11 +284,23 @@ class E2eeService {
         );
       }
     }
-    await keyStore.install(
-      owner: effectiveId,
-      phrase: phrase,
-      confirmation: phrase,
-    );
+    if (remoteMarker != null && expectedVaultId != null) {
+      await keyStore.restoreVerified(
+        owner: effectiveId,
+        phrase: phrase,
+        confirmation: phrase,
+        marker: remoteMarker,
+        expectedVaultId: expectedVaultId,
+        webUnlockPin: webUnlockPin,
+      );
+    } else {
+      await keyStore.install(
+        owner: effectiveId,
+        phrase: phrase,
+        confirmation: phrase,
+        webUnlockPin: webUnlockPin,
+      );
+    }
     AppLogger.info('Cofre E2EE restaurado com sucesso para $effectiveId');
     return true;
   }

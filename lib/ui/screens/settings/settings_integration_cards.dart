@@ -366,10 +366,14 @@ extension _SettingsIntegrationCards on _SettingsScreenState {
             const SizedBox(height: 10),
             () {
               final effectiveUserId = currentUser?.id ?? 'local_user';
-              return FutureBuilder<bool>(
+              return FutureBuilder<
+                ({bool installed, WebKeyUnlockMode webMode})
+              >(
                 future: _getE2eeFuture(effectiveUserId),
                 builder: (ctx, snapshot) {
-                  final isE2eeConfigured = snapshot.data ?? false;
+                  final e2eeState = snapshot.data;
+                  final isE2eeConfigured = e2eeState?.installed ?? false;
+                  final webMode = e2eeState?.webMode ?? WebKeyUnlockMode.none;
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const SizedBox(height: 2);
                   }
@@ -417,9 +421,13 @@ extension _SettingsIntegrationCards on _SettingsScreenState {
                             ],
                           ),
                           const SizedBox(height: 4),
-                          const Text(
-                            'Seus registros e mídias são cifrados no aparelho com chave BIP-39 e AES-256-GCM antes de trafegar na nuvem.',
-                            style: TextStyle(fontSize: 11),
+                          Text(
+                            kIsWeb
+                                ? (webMode == WebKeyUnlockMode.unlockedFromPin
+                                      ? 'Chave E2EE ativa na sessão e protegida por PIN PBKDF2-SHA256 no IndexedDB.'
+                                      : 'Chave E2EE persistida no navegador via WebCrypto não-extraível no IndexedDB (sem gravar suas 24 palavras).')
+                                : 'Seus registros e mídias são cifrados no aparelho com chave BIP-39 e AES-256-GCM antes de trafegar na nuvem.',
+                            style: const TextStyle(fontSize: 11),
                           ),
                           const SizedBox(height: 8),
                           Wrap(
@@ -471,6 +479,145 @@ extension _SettingsIntegrationCards on _SettingsScreenState {
                                 },
                                 icon: const Icon(Icons.verified_user, size: 16),
                                 label: const Text('Verificar Status do Cofre'),
+                              ),
+                              if (kIsWeb &&
+                                  webMode == WebKeyUnlockMode.unlockedFromPin)
+                                OutlinedButton.icon(
+                                  onPressed: () async {
+                                    await ref
+                                        .read(e2eeServiceProvider)
+                                        .lockWebSession(effectiveUserId);
+                                    if (mounted) {
+                                      _e2eeFuture = null;
+                                      _updateState(() {});
+                                    }
+                                  },
+                                  icon: const Icon(
+                                    Icons.lock_outline,
+                                    size: 16,
+                                  ),
+                                  label: const Text('Bloquear Sessão (PIN)'),
+                                ),
+                              if (kIsWeb)
+                                OutlinedButton.icon(
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: Colors.red.shade700,
+                                  ),
+                                  onPressed: () async {
+                                    final confirm = await showDialog<bool>(
+                                      context: context,
+                                      builder: (dCtx) => AlertDialog(
+                                        title: const Text(
+                                          'Esquecer chave deste navegador?',
+                                        ),
+                                        content: const Text(
+                                          'Isso remove a chave E2EE salva no IndexedDB deste navegador. Seus dados na nuvem não são apagados e você poderá restaurar usando sua frase de 24 palavras.',
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () =>
+                                                Navigator.pop(dCtx, false),
+                                            child: const Text('Cancelar'),
+                                          ),
+                                          FilledButton(
+                                            onPressed: () =>
+                                                Navigator.pop(dCtx, true),
+                                            child: const Text('Remover'),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                    if (confirm == true) {
+                                      await ref
+                                          .read(e2eeServiceProvider)
+                                          .clearKey(effectiveUserId);
+                                      if (mounted) {
+                                        _e2eeFuture = null;
+                                        _updateState(() {});
+                                      }
+                                    }
+                                  },
+                                  icon: const Icon(
+                                    Icons.delete_outline,
+                                    size: 16,
+                                  ),
+                                  label: const Text(
+                                    'Esquecer Chave deste Navegador',
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  } else if (webMode == WebKeyUnlockMode.pinLocked) {
+                    return Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withValues(alpha: 0.10),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.blue.shade400),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.lock_clock_outlined,
+                                color: Colors.blue.shade700,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              const Expanded(
+                                child: Text(
+                                  'Cofre E2EE Bloqueado por PIN neste Navegador',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            'Digite seu PIN de desbloqueio rápido para liberar a sincronização E2EE nesta sessão.',
+                            style: TextStyle(fontSize: 11),
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              FilledButton.icon(
+                                onPressed: () async {
+                                  final unlocked =
+                                      await WebPinUnlockDialog.show(
+                                        context,
+                                        userId: effectiveUserId,
+                                      );
+                                  if (unlocked == true && mounted) {
+                                    _e2eeFuture = null;
+                                    _updateState(() {});
+                                  }
+                                },
+                                icon: const Icon(Icons.lock_open, size: 16),
+                                label: const Text('Desbloquear com PIN'),
+                              ),
+                              OutlinedButton.icon(
+                                onPressed: () async {
+                                  final updated = await E2eeSetupDialog.show(
+                                    context,
+                                    userId: effectiveUserId,
+                                  );
+                                  if (updated == true && mounted) {
+                                    _e2eeFuture = null;
+                                    _updateState(() {});
+                                  }
+                                },
+                                icon: const Icon(Icons.key, size: 16),
+                                label: const Text('Restaurar com 24 Palavras'),
                               ),
                             ],
                           ),
@@ -950,6 +1097,24 @@ extension _SettingsIntegrationCards on _SettingsScreenState {
             updatedAt: now,
           ),
         );
+    final acc = EmailAccount(
+      id: EmailAccountsManager.legacyImapAccountId,
+      name: 'JWPUB / IMAP Principal',
+      email: email,
+      providerType: email.toLowerCase().contains('jwpub')
+          ? EmailProviderType.jwpub
+          : EmailProviderType.custom,
+      incomingHost: imapHost,
+      incomingPort: imapPort,
+      incomingProtocol: 'imap',
+      outgoingHost: smtpHost,
+      outgoingPort: smtpPort,
+      outgoingSecurity: smtpSecurity,
+      outgoingProtocol: 'smtp',
+      username: email,
+      createdAt: DateTime.now(),
+    );
+    await EmailAccountsManager.saveAccount(db, acc, password: pass);
   }
 
   Future<void> _testAndSaveJwEmail({bool includeImap = true}) async {
@@ -1097,6 +1262,15 @@ extension _SettingsIntegrationCards on _SettingsScreenState {
               );
         }
       });
+      final easAcc = EmailAccount.createPreset(
+        id: EmailAccountsManager.legacyEasAccountId,
+        providerType: EmailProviderType.exchange,
+        name: 'Exchange Principal',
+        email: email,
+        username: email,
+        customHost: host.toLowerCase(),
+      );
+      await EmailAccountsManager.saveAccount(db, easAcc, password: password);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -1150,8 +1324,8 @@ extension _SettingsIntegrationCards on _SettingsScreenState {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            child: FutureBuilder<List<EmailAccount>>(
-              future: EmailAccountsManager.loadAccounts(db),
+            child: StreamBuilder<List<EmailAccount>>(
+              stream: EmailAccountsManager.watchAccounts(db),
               builder: (ctx, snapshot) {
                 final accounts = snapshot.data ?? [];
                 return Column(
@@ -1258,6 +1432,60 @@ extension _SettingsIntegrationCards on _SettingsScreenState {
                                       ),
                                     );
                                   },
+                                )
+                              else
+                                FutureBuilder<bool>(
+                                  future:
+                                      EmailAccountsManager.hasLocalCredentials(
+                                        acc,
+                                        db,
+                                      ),
+                                  builder: (ctx, credSnap) {
+                                    if (credSnap.connectionState ==
+                                        ConnectionState.waiting) {
+                                      return const SizedBox.shrink();
+                                    }
+                                    final hasLocalCred = credSnap.data ?? false;
+                                    final badgeColor =
+                                        (kIsWeb &&
+                                            !acc.supportsDirectBrowserSync)
+                                        ? Colors.teal
+                                        : (hasLocalCred
+                                              ? Colors.green
+                                              : Colors.amber.shade800);
+                                    final badgeLabel =
+                                        (kIsWeb &&
+                                            !acc.supportsDirectBrowserSync)
+                                        ? 'Leitura via Cofre E2EE'
+                                        : (hasLocalCred
+                                              ? 'Credencial Ativa'
+                                              : 'Senha Local Pendente');
+                                    return Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: badgeColor.withValues(
+                                          alpha: 0.15,
+                                        ),
+                                        borderRadius: BorderRadius.circular(4),
+                                        border: Border.all(
+                                          color: badgeColor.withValues(
+                                            alpha: 0.5,
+                                          ),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        badgeLabel,
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: badgeColor,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    );
+                                  },
                                 ),
                             ],
                           ),
@@ -1268,6 +1496,17 @@ extension _SettingsIntegrationCards on _SettingsScreenState {
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
+                              if (!kIsWeb && !acc.isOAuth)
+                                IconButton(
+                                  tooltip: 'Definir / Atualizar Senha neste Aparelho',
+                                  icon: const Icon(
+                                    Icons.password_outlined,
+                                    color: Colors.amber,
+                                    size: 20,
+                                  ),
+                                  onPressed: () =>
+                                      _showSetLocalEmailPasswordDialog(acc),
+                                ),
                               IconButton(
                                 key: Key('btn_email_signature_${acc.id}'),
                                 tooltip: 'Assinatura do e-mail',
@@ -1470,6 +1709,75 @@ extension _SettingsIntegrationCards on _SettingsScreenState {
         ),
       ),
     );
+  }
+
+  Future<void> _showSetLocalEmailPasswordDialog(EmailAccount acc) async {
+    final passCtrl = TextEditingController();
+    bool obscure = true;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlgState) => AlertDialog(
+          title: const Text('Definir Senha Neste Aparelho'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'A conta "${acc.name}" (${acc.email}) foi sincronizada via E2EE sem senha na nuvem. '
+                'Informe a senha ou senha de aplicativo apenas para o cofre deste dispositivo:',
+                style: const TextStyle(fontSize: 13),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: passCtrl,
+                obscureText: obscure,
+                decoration: InputDecoration(
+                  labelText: 'Senha / App Password *',
+                  border: const OutlineInputBorder(),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      obscure ? Icons.visibility : Icons.visibility_off,
+                    ),
+                    onPressed: () => setDlgState(() => obscure = !obscure),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final pass = passCtrl.text.trim();
+                if (pass.isEmpty) return;
+                await EmailAccountsManager.setLocalAccountPassword(
+                  acc.id,
+                  pass,
+                );
+                if (ctx.mounted) Navigator.pop(ctx);
+                if (mounted) {
+                  _updateState(() {});
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Senha salva no cofre seguro deste aparelho para ${acc.email}.',
+                      ),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              },
+              child: const Text('Salvar neste Aparelho'),
+            ),
+          ],
+        ),
+      ),
+    );
+    passCtrl.dispose();
   }
 
   Future<void> _connectGmailOAuth(AppDatabase db) async {

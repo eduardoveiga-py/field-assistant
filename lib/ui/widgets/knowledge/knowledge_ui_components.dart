@@ -1,9 +1,13 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 import '../../../core/app_theme.dart';
 import '../../../database/app_database.dart';
+import '../../../knowledge/knowledge_backlink_indexer.dart';
 import '../../../references/app_reference.dart';
 import '../markdown_preview_text.dart';
+import 'rich_block_markdown_view.dart';
 
 /// Identidade visual (cor + ícone + rótulo amigável) para itens da Base de Conhecimento.
 class KnowledgeBadgeStyle {
@@ -403,6 +407,15 @@ class KnowledgeNoteDetailPane extends StatelessWidget {
   final VoidCallback onTransformResearch;
   final Future<void> Function(String updatedContent) onContentUpdated;
   final ValueChanged<String> onOpenLink;
+  final String? areaName;
+  final String? areaColorHex;
+  final List<KnowledgeNoteEntry> breadcrumbAncestors;
+  final List<KnowledgeNoteEntry> subpages;
+  final List<ResolvedBacklink> backlinks;
+  final void Function(KnowledgeNoteEntry note)? onSelectNote;
+  final VoidCallback? onCreateSubpage;
+  final void Function(ResolvedBacklink link)? onOpenBacklink;
+  final VoidCallback? onToggleSpacedReview;
 
   const KnowledgeNoteDetailPane({
     super.key,
@@ -417,12 +430,53 @@ class KnowledgeNoteDetailPane extends StatelessWidget {
     required this.onTransformResearch,
     required this.onContentUpdated,
     required this.onOpenLink,
+    this.areaName,
+    this.areaColorHex,
+    this.breadcrumbAncestors = const [],
+    this.subpages = const [],
+    this.backlinks = const [],
+    this.onSelectNote,
+    this.onCreateSubpage,
+    this.onOpenBacklink,
+    this.onToggleSpacedReview,
   });
+
+  static Map<String, dynamic> _decodeProperties(String raw) {
+    try {
+      final d = jsonDecode(raw);
+      if (d is Map) return Map<String, dynamic>.from(d);
+    } catch (_) {}
+    return const {};
+  }
+
+  static Color _parseHex(String? hex, Color fallback) {
+    if (hex == null || hex.trim().isEmpty) return fallback;
+    final clean = hex.trim().replaceFirst('#', '');
+    final v = int.tryParse(clean.length == 6 ? 'FF$clean' : clean, radix: 16);
+    return v != null ? Color(v) : fallback;
+  }
+
+  static String _statusLabel(String raw) {
+    switch (raw.trim().toLowerCase()) {
+      case 'em_estudo':
+        return 'Em Estudo';
+      case 'revisar':
+        return 'Para Revisar';
+      case 'concluido':
+      case 'concluído':
+        return 'Concluído';
+      case 'rascunho':
+      default:
+        return raw.trim().isEmpty ? 'Rascunho' : raw;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final style = resolveNoteCategoryStyle(note.category, note.tags);
     final extractedLinks = extractMarkdownLinks(note.content);
+    final props = _decodeProperties(note.propertiesJson);
+    final areaColor = _parseHex(areaColorHex, const Color(0xFF6366F1));
     final sheetBg = isDark ? const Color(0xFF111827) : Colors.white;
     final headerGradStart = style.accent.withValues(
       alpha: isDark ? 0.16 : 0.08,
@@ -479,6 +533,63 @@ class KnowledgeNoteDetailPane extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        if (breadcrumbAncestors.isNotEmpty) ...[
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.account_tree_outlined,
+                                  size: 14,
+                                  color: isDark
+                                      ? const Color(0xFF94A3B8)
+                                      : const Color(0xFF64748B),
+                                ),
+                                const SizedBox(width: 6),
+                                for (final anc in breadcrumbAncestors) ...[
+                                  InkWell(
+                                    onTap: onSelectNote != null
+                                        ? () => onSelectNote!(anc)
+                                        : null,
+                                    borderRadius: BorderRadius.circular(6),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 4,
+                                        vertical: 2,
+                                      ),
+                                      child: Text(
+                                        anc.title,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppTheme.primaryBlue,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const Text(
+                                    ' / ',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                ],
+                                Text(
+                                  note.title,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: isDark
+                                        ? const Color(0xFF94A3B8)
+                                        : const Color(0xFF64748B),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                        ],
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -533,6 +644,46 @@ class KnowledgeNoteDetailPane extends StatelessWidget {
                                           icon: Icons.push_pin_rounded,
                                           label: 'Fixada',
                                           color: const Color(0xFFF59E0B),
+                                          isDark: isDark,
+                                        ),
+                                      if (areaName != null &&
+                                          areaName!.trim().isNotEmpty)
+                                        KnowledgePillBadge(
+                                          icon: Icons.layers_outlined,
+                                          label: areaName!,
+                                          color: areaColor,
+                                          isDark: isDark,
+                                        ),
+                                      if (props['status'] != null &&
+                                          props['status']
+                                              .toString()
+                                              .trim()
+                                              .isNotEmpty)
+                                        KnowledgePillBadge(
+                                          icon: Icons.flag_outlined,
+                                          label: _statusLabel(
+                                            props['status'].toString(),
+                                          ),
+                                          color: const Color(0xFF0EA5E9),
+                                          isDark: isDark,
+                                        ),
+                                      if (props['priority'] != null &&
+                                          props['priority']
+                                              .toString()
+                                              .trim()
+                                              .isNotEmpty)
+                                        KnowledgePillBadge(
+                                          label:
+                                              'Prioridade: ${props['priority']}',
+                                          color: const Color(0xFFEC4899),
+                                          isDark: isDark,
+                                        ),
+                                      if (note.nextReviewAt != null)
+                                        KnowledgePillBadge(
+                                          icon: Icons.replay_rounded,
+                                          label:
+                                              'SM-2 Nível ${note.reviewLevel}',
+                                          color: const Color(0xFF10B981),
                                           isDark: isDark,
                                         ),
                                       for (final tag in tags)
@@ -626,6 +777,10 @@ class KnowledgeNoteDetailPane extends StatelessWidget {
                               icon: const Icon(Icons.more_horiz_rounded),
                               onSelected: (val) {
                                 if (val == 'pin') onTogglePin();
+                                if (val == 'subpage') onCreateSubpage?.call();
+                                if (val == 'spaced_review') {
+                                  onToggleSpacedReview?.call();
+                                }
                                 if (val == 'research') {
                                   onTransformResearch();
                                 }
@@ -639,6 +794,20 @@ class KnowledgeNoteDetailPane extends StatelessWidget {
                                         : 'Fixar no topo',
                                   ),
                                 ),
+                                if (onCreateSubpage != null)
+                                  const PopupMenuItem(
+                                    value: 'subpage',
+                                    child: Text('Nova Subpágina'),
+                                  ),
+                                if (onToggleSpacedReview != null)
+                                  PopupMenuItem(
+                                    value: 'spaced_review',
+                                    child: Text(
+                                      note.nextReviewAt != null
+                                          ? 'Pausar Revisão Espaçada'
+                                          : 'Ativar Revisão Espaçada (SM-2)',
+                                    ),
+                                  ),
                                 const PopupMenuItem(
                                   value: 'research',
                                   child: Text('Transformar em Pesquisa'),
@@ -651,16 +820,17 @@ class KnowledgeNoteDetailPane extends StatelessWidget {
                     ),
                   ),
 
-                  // Corpo da nota com tipografia editorial e sublinhado direto JW Library
+                  // Corpo da nota com tipografia editorial, blocos Notion e sublinhado JW Library
                   Padding(
                     padding: const EdgeInsets.fromLTRB(26, 22, 26, 22),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        MarkdownPreviewText(
+                        RichBlockMarkdownView(
                           text: note.content,
-                          selectable: true,
+                          isDark: isDark,
                           allowHighlights: true,
+                          onLinkTap: onOpenLink,
                           onContentUpdated: onContentUpdated,
                           style: TextStyle(
                             fontSize: 15.8,
@@ -670,6 +840,93 @@ class KnowledgeNoteDetailPane extends StatelessWidget {
                                 : const Color(0xFF1E293B),
                           ),
                         ),
+                        if (subpages.isNotEmpty || onCreateSubpage != null) ...[
+                          const SizedBox(height: 20),
+                          Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? const Color(0xFF151E32)
+                                  : const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: isDark
+                                    ? Colors.white.withValues(alpha: 0.08)
+                                    : const Color(0xFFE2E8F0),
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.subdirectory_arrow_right_rounded,
+                                      size: 16,
+                                      color: Color(0xFF6366F1),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        'SUBPÁGINAS (${subpages.length})',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w800,
+                                          letterSpacing: 0.7,
+                                          color: isDark
+                                              ? const Color(0xFF94A3B8)
+                                              : const Color(0xFF64748B),
+                                        ),
+                                      ),
+                                    ),
+                                    if (onCreateSubpage != null)
+                                      TextButton.icon(
+                                        style: TextButton.styleFrom(
+                                          visualDensity: VisualDensity.compact,
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                          ),
+                                        ),
+                                        onPressed: onCreateSubpage,
+                                        icon: const Icon(Icons.add, size: 15),
+                                        label: const Text(
+                                          'Nova Subpágina',
+                                          style: TextStyle(fontSize: 12),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                                if (subpages.isNotEmpty) ...[
+                                  const SizedBox(height: 8),
+                                  Wrap(
+                                    spacing: 8,
+                                    runSpacing: 8,
+                                    children: [
+                                      for (final sub in subpages)
+                                        ActionChip(
+                                          avatar: const Icon(
+                                            Icons.article_outlined,
+                                            size: 15,
+                                            color: Color(0xFF6366F1),
+                                          ),
+                                          label: Text(
+                                            sub.title,
+                                            style: const TextStyle(
+                                              fontSize: 12.5,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                          onPressed: onSelectNote != null
+                                              ? () => onSelectNote!(sub)
+                                              : null,
+                                        ),
+                                    ],
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 18),
                         Row(
                           children: [
@@ -698,8 +955,8 @@ class KnowledgeNoteDetailPane extends StatelessWidget {
                     ),
                   ),
 
-                  // Barra interativa de referências citadas (quando houver links na nota)
-                  if (extractedLinks.isNotEmpty)
+                  // Barra interativa de referências citadas e Backlinks bidirecionais
+                  if (extractedLinks.isNotEmpty || backlinks.isNotEmpty)
                     Container(
                       padding: const EdgeInsets.fromLTRB(24, 14, 24, 18),
                       decoration: BoxDecoration(
@@ -717,67 +974,116 @@ class KnowledgeNoteDetailPane extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'REFERÊNCIAS E LINKS CITADOS (${extractedLinks.length})',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.8,
-                              color: isDark
-                                  ? const Color(0xFF94A3B8)
-                                  : const Color(0xFF64748B),
+                          if (extractedLinks.isNotEmpty) ...[
+                            Text(
+                              'REFERÊNCIAS E LINKS CITADOS (${extractedLinks.length})',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.8,
+                                color: isDark
+                                    ? const Color(0xFF94A3B8)
+                                    : const Color(0xFF64748B),
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 10),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: [
-                              for (final link in extractedLinks)
-                                ActionChip(
-                                  avatar: Icon(
-                                    link.isBible
-                                        ? Icons.menu_book_rounded
-                                        : (link.isInternal
-                                              ? Icons.link_rounded
-                                              : Icons.open_in_new_rounded),
-                                    size: 16,
-                                    color: link.isBible
-                                        ? (isDark
-                                              ? const Color(0xFFA5B4FC)
-                                              : const Color(0xFF4338CA))
-                                        : AppTheme.accentTeal,
-                                  ),
-                                  backgroundColor: isDark
-                                      ? const Color(0xFF182238)
-                                      : Colors.white,
-                                  side: BorderSide(
-                                    color:
-                                        (link.isBible
-                                                ? const Color(0xFF6366F1)
-                                                : AppTheme.accentTeal)
-                                            .withValues(
-                                              alpha: isDark ? 0.35 : 0.28,
-                                            ),
-                                  ),
-                                  label: Text(
-                                    link.label,
-                                    style: TextStyle(
-                                      fontSize: 12.5,
-                                      fontWeight: FontWeight.w600,
+                            const SizedBox(height: 10),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                for (final link in extractedLinks)
+                                  ActionChip(
+                                    avatar: Icon(
+                                      link.isBible
+                                          ? Icons.menu_book_rounded
+                                          : (link.isInternal
+                                                ? Icons.link_rounded
+                                                : Icons.open_in_new_rounded),
+                                      size: 16,
                                       color: link.isBible
                                           ? (isDark
-                                                ? const Color(0xFFC7D2FE)
-                                                : const Color(0xFF3730A3))
-                                          : (isDark
-                                                ? const Color(0xFF99F6E4)
-                                                : const Color(0xFF0F766E)),
+                                                ? const Color(0xFFA5B4FC)
+                                                : const Color(0xFF4338CA))
+                                          : AppTheme.accentTeal,
                                     ),
+                                    backgroundColor: isDark
+                                        ? const Color(0xFF182238)
+                                        : Colors.white,
+                                    side: BorderSide(
+                                      color:
+                                          (link.isBible
+                                                  ? const Color(0xFF6366F1)
+                                                  : AppTheme.accentTeal)
+                                              .withValues(
+                                                alpha: isDark ? 0.35 : 0.28,
+                                              ),
+                                    ),
+                                    label: Text(
+                                      link.label,
+                                      style: TextStyle(
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.w600,
+                                        color: link.isBible
+                                            ? (isDark
+                                                  ? const Color(0xFFC7D2FE)
+                                                  : const Color(0xFF3730A3))
+                                            : (isDark
+                                                  ? const Color(0xFF99F6E4)
+                                                  : const Color(0xFF0F766E)),
+                                      ),
+                                    ),
+                                    onPressed: () => onOpenLink(link.url),
                                   ),
-                                  onPressed: () => onOpenLink(link.url),
-                                ),
-                            ],
-                          ),
+                              ],
+                            ),
+                          ],
+                          if (extractedLinks.isNotEmpty && backlinks.isNotEmpty)
+                            const SizedBox(height: 16),
+                          if (backlinks.isNotEmpty) ...[
+                            Text(
+                              'MENCIONADO EM (${backlinks.length})',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.8,
+                                color: isDark
+                                    ? const Color(0xFF94A3B8)
+                                    : const Color(0xFF64748B),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                for (final b in backlinks)
+                                  ActionChip(
+                                    avatar: const Icon(
+                                      Icons.call_received_rounded,
+                                      size: 15,
+                                      color: Color(0xFF10B981),
+                                    ),
+                                    backgroundColor: isDark
+                                        ? const Color(0xFF13222B)
+                                        : Colors.white,
+                                    side: BorderSide(
+                                      color: const Color(0xFF10B981)
+                                          .withValues(alpha: 0.38),
+                                    ),
+                                    label: Text(
+                                      '${b.sourceTitle} (${b.sourceSubtitle})',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    onPressed: onOpenBacklink != null
+                                        ? () => onOpenBacklink!(b)
+                                        : null,
+                                  ),
+                              ],
+                            ),
+                          ],
                         ],
                       ),
                     ),
