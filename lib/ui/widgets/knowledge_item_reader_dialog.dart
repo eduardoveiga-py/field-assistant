@@ -1,15 +1,19 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/app_theme.dart';
+import '../../knowledge/knowledge_backlink_indexer.dart';
 import '../../references/app_reference.dart';
 import '../../reports/knowledge_and_email_pdf_service.dart';
+import '../providers.dart';
 import 'app_inline_image_view.dart';
 import 'app_reference_viewer.dart';
 import 'highlight_text_helper.dart';
 import 'jw_highlight_floating_toolbar.dart';
+import 'knowledge/rich_block_markdown_view.dart';
 import 'universal_attachment_viewer.dart';
 
 /// Abre a janela dedicada para leitura completa e imersiva de itens do aplicativo,
@@ -33,6 +37,8 @@ Future<void> showKnowledgeItemReader(
   Future<void> Function(String updatedContent)? onContentUpdated,
   VoidCallback? onJumpToTab,
   String jumpToTabLabel = 'Ir para a aba',
+  String? backlinkTargetType,
+  String? backlinkTargetId,
 }) async {
   await showDialog(
     context: context,
@@ -55,6 +61,8 @@ Future<void> showKnowledgeItemReader(
       onContentUpdated: onContentUpdated,
       onJumpToTab: onJumpToTab,
       jumpToTabLabel: jumpToTabLabel,
+      backlinkTargetType: backlinkTargetType,
+      backlinkTargetId: backlinkTargetId,
     ),
   );
 }
@@ -104,6 +112,8 @@ class KnowledgeItemReaderDialog extends StatefulWidget {
   final Future<void> Function(String updatedContent)? onContentUpdated;
   final VoidCallback? onJumpToTab;
   final String jumpToTabLabel;
+  final String? backlinkTargetType;
+  final String? backlinkTargetId;
 
   const KnowledgeItemReaderDialog({
     super.key,
@@ -124,6 +134,8 @@ class KnowledgeItemReaderDialog extends StatefulWidget {
     this.onContentUpdated,
     this.onJumpToTab,
     this.jumpToTabLabel = 'Ir para a aba',
+    this.backlinkTargetType,
+    this.backlinkTargetId,
   });
 
   @override
@@ -717,6 +729,15 @@ class _KnowledgeItemReaderDialogState extends State<KnowledgeItemReaderDialog> {
                             }).toList(),
                           ),
                         ],
+                        if (widget.backlinkTargetType != null &&
+                            widget.backlinkTargetId != null)
+                          _ReaderBacklinksSection(
+                            targetType: widget.backlinkTargetType!,
+                            targetId: widget.backlinkTargetId!,
+                            isDark: isDark,
+                            onOpenUri: (uri) =>
+                                _openUrlOrReference(context, uri),
+                          ),
                       ],
                     ),
                   ),
@@ -749,6 +770,24 @@ class _KnowledgeItemReaderDialogState extends State<KnowledgeItemReaderDialog> {
       height: 1.65,
       color: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF1E293B),
     );
+
+    if (SecondBrainBlockParser.containsRichBlocks(rawText)) {
+      return RichBlockMarkdownView(
+        text: rawText,
+        style: baseStyle,
+        isDark: isDark,
+        allowHighlights: _canInteractiveHighlight,
+        onLinkTap: (url) => _openUrlOrReference(context, url),
+        onContentUpdated: widget.onContentUpdated != null
+            ? (updated) async {
+                if (mounted) {
+                  setState(() => _content = updated);
+                }
+                await widget.onContentUpdated!(updated);
+              }
+            : null,
+      );
+    }
 
     final segments = _splitSegments(rawText);
     final widgets = <Widget>[];
@@ -868,5 +907,96 @@ class _KnowledgeItemReaderDialogState extends State<KnowledgeItemReaderDialog> {
     bool isDark,
   ) {
     return AppInlineImageView(src: src, alt: alt, maxHeight: 280);
+  }
+}
+
+class _ReaderBacklinksSection extends ConsumerWidget {
+  final String targetType;
+  final String targetId;
+  final bool isDark;
+  final ValueChanged<String> onOpenUri;
+
+  const _ReaderBacklinksSection({
+    required this.targetType,
+    required this.targetId,
+    required this.isDark,
+    required this.onOpenUri,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final db = ref.watch(databaseProvider);
+    return StreamBuilder<List<ResolvedBacklink>>(
+      stream: KnowledgeBacklinkIndexer.watchBacklinksFor(
+        db,
+        targetType: targetType,
+        targetId: targetId,
+      ),
+      builder: (context, snap) {
+        final links = snap.data ?? const <ResolvedBacklink>[];
+        if (links.isEmpty) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.only(top: 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Divider(),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.call_received_rounded,
+                    size: 16,
+                    color: Color(0xFF10B981),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Mencionado em (${links.length}):',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13.5,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final link in links)
+                    Builder(
+                      builder: (_) {
+                        final cat = AppRefCategory.fromTypeId(link.sourceType);
+                        return ActionChip(
+                          avatar: Icon(
+                            Icons.link_rounded,
+                            size: 15,
+                            color: isDark
+                                ? const Color(0xFF6EE7B7)
+                                : const Color(0xFF047857),
+                          ),
+                          label: Text(
+                            '${link.sourceTitle} • ${link.sourceSubtitle}',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          onPressed: cat == null
+                              ? null
+                              : () => onOpenUri(
+                                  AppReferenceHelper.buildUri(
+                                    cat,
+                                    link.sourceId,
+                                  ),
+                                ),
+                        );
+                      },
+                    ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 }

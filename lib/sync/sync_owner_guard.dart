@@ -279,6 +279,9 @@ class SyncOwnerGuard {
       await db.delete(db.researchArticles).go();
       await db.delete(db.researchTags).go();
       await db.delete(db.inboxEntries).go();
+      await db.delete(db.emailAccounts).go();
+      await db.delete(db.knowledgeLinks).go();
+      await db.delete(db.knowledgeAreas).go();
       await db.delete(db.tasks).go();
       await db.delete(db.projects).go();
       await db.delete(db.knowledgeNotes).go();
@@ -313,6 +316,7 @@ class SyncOwnerGuard {
                 t.key.like('pending_ticuna_audio_download_%') |
                 t.key.like('pending_doc_download_%') |
                 t.key.like('pending_photo_download_%') |
+                t.key.like('pending_inbox_meta_download_%') |
                 t.key.like('doc_bytes_%') |
                 t.key.equals(demoModeKvKey) |
                 t.key.equals(offlineModeKvKey),

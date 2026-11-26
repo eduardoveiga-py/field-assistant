@@ -585,6 +585,7 @@ class Projects extends Table {
   DateTimeColumn get completedAt =>
       dateTime().nullable().named('completed_at')();
   TextColumn get originInboxId => text().nullable().named('origin_inbox_id')();
+  TextColumn get areaId => text().nullable().named('area_id')();
   TextColumn get metadata => text().withDefault(const Constant('{}'))(); // JSON
 
   DateTimeColumn get createdAt => dateTime().named('created_at')();
@@ -673,6 +674,16 @@ class KnowledgeNotes extends Table {
       text().withDefault(const Constant('[]'))(); // JSON array
   BoolColumn get isPinned =>
       boolean().named('is_pinned').withDefault(const Constant(false))();
+  TextColumn get areaId => text().nullable().named('area_id')();
+  TextColumn get parentNoteId => text().nullable().named('parent_note_id')();
+  TextColumn get propertiesJson =>
+      text().named('properties_json').withDefault(const Constant('{}'))();
+  IntColumn get reviewLevel =>
+      integer().named('review_level').withDefault(const Constant(0))();
+  DateTimeColumn get nextReviewAt =>
+      dateTime().nullable().named('next_review_at')();
+  DateTimeColumn get lastReviewedAt =>
+      dateTime().nullable().named('last_reviewed_at')();
 
   DateTimeColumn get createdAt => dateTime().named('created_at')();
   DateTimeColumn get updatedAt => dateTime().named('updated_at')();
@@ -703,6 +714,13 @@ class KnowledgeQuestions extends Table {
   )(); // unanswered, researching, answered, archived
   TextColumn get answer => text().nullable()();
   DateTimeColumn get answeredAt => dateTime().nullable().named('answered_at')();
+  TextColumn get areaId => text().nullable().named('area_id')();
+  IntColumn get reviewLevel =>
+      integer().named('review_level').withDefault(const Constant(0))();
+  DateTimeColumn get nextReviewAt =>
+      dateTime().nullable().named('next_review_at')();
+  DateTimeColumn get lastReviewedAt =>
+      dateTime().nullable().named('last_reviewed_at')();
 
   DateTimeColumn get createdAt => dateTime().named('created_at')();
   DateTimeColumn get updatedAt => dateTime().named('updated_at')();
@@ -736,6 +754,8 @@ class KnowledgeDocuments extends Table {
   TextColumn get description => text().nullable()();
   TextColumn get tags => text().withDefault(const Constant('[]'))();
   TextColumn get category => text().withDefault(const Constant('general'))();
+  TextColumn get areaId => text().nullable().named('area_id')();
+  TextColumn get extractedText => text().nullable().named('extracted_text')();
 
   DateTimeColumn get createdAt => dateTime().named('created_at')();
   DateTimeColumn get updatedAt => dateTime().named('updated_at')();
@@ -763,6 +783,84 @@ class KnowledgeResources extends Table {
       text().nullable().named('local_asset_path')();
   TextColumn get tags => text().withDefault(const Constant('[]'))();
   TextColumn get category => text().withDefault(const Constant('general'))();
+  TextColumn get areaId => text().nullable().named('area_id')();
+
+  DateTimeColumn get createdAt => dateTime().named('created_at')();
+  DateTimeColumn get updatedAt => dateTime().named('updated_at')();
+  DateTimeColumn get deletedAt => dateTime().nullable().named('deleted_at')();
+  IntColumn get revision => integer().withDefault(const Constant(1))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+@DataClassName('EmailAccountDbEntry')
+class EmailAccounts extends Table {
+  TextColumn get id => text()();
+  TextColumn get name => text()();
+  TextColumn get email => text()();
+  TextColumn get providerType => text().named('provider_type')();
+  TextColumn get incomingHost =>
+      text().named('incoming_host').withDefault(const Constant(''))();
+  IntColumn get incomingPort =>
+      integer().named('incoming_port').withDefault(const Constant(993))();
+  TextColumn get incomingProtocol =>
+      text().named('incoming_protocol').withDefault(const Constant('imap'))();
+  TextColumn get outgoingHost =>
+      text().named('outgoing_host').withDefault(const Constant(''))();
+  IntColumn get outgoingPort =>
+      integer().named('outgoing_port').withDefault(const Constant(587))();
+  TextColumn get outgoingSecurity => text()
+      .named('outgoing_security')
+      .withDefault(const Constant('starttls'))();
+  TextColumn get outgoingProtocol =>
+      text().named('outgoing_protocol').withDefault(const Constant('smtp'))();
+  TextColumn get username => text().withDefault(const Constant(''))();
+  BoolColumn get isActive =>
+      boolean().named('is_active').withDefault(const Constant(true))();
+  TextColumn get signatureHtml =>
+      text().named('signature_html').withDefault(const Constant(''))();
+
+  DateTimeColumn get createdAt => dateTime().named('created_at')();
+  DateTimeColumn get updatedAt => dateTime().named('updated_at')();
+  DateTimeColumn get deletedAt => dateTime().nullable().named('deleted_at')();
+  IntColumn get revision => integer().withDefault(const Constant(1))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+@DataClassName('KnowledgeAreaEntry')
+class KnowledgeAreas extends Table {
+  TextColumn get id => text()();
+  TextColumn get name => text()();
+  TextColumn get description => text().nullable()();
+  TextColumn get iconName => text().nullable().named('icon_name')();
+  TextColumn get colorHex => text().nullable().named('color_hex')();
+  IntColumn get sortOrder =>
+      integer().named('sort_order').withDefault(const Constant(0))();
+  BoolColumn get isArchived =>
+      boolean().named('is_archived').withDefault(const Constant(false))();
+
+  DateTimeColumn get createdAt => dateTime().named('created_at')();
+  DateTimeColumn get updatedAt => dateTime().named('updated_at')();
+  DateTimeColumn get deletedAt => dateTime().nullable().named('deleted_at')();
+  IntColumn get revision => integer().withDefault(const Constant(1))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+@DataClassName('KnowledgeLinkEntry')
+class KnowledgeLinks extends Table {
+  TextColumn get id => text()();
+  TextColumn get sourceType => text().named('source_type')();
+  TextColumn get sourceId => text().named('source_id')();
+  TextColumn get targetType => text().named('target_type')();
+  TextColumn get targetId => text().named('target_id')();
+  TextColumn get targetUri => text().named('target_uri')();
+  TextColumn get anchorText =>
+      text().named('anchor_text').withDefault(const Constant(''))();
 
   DateTimeColumn get createdAt => dateTime().named('created_at')();
   DateTimeColumn get updatedAt => dateTime().named('updated_at')();

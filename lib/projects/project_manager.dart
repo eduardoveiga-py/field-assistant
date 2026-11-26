@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 import '../core/app_logger.dart';
 import '../core/sync_timestamp.dart';
 import '../database/app_database.dart';
+import '../knowledge/knowledge_backlink_indexer.dart';
 
 /// Estatísticas de progresso e execução de um projeto
 class ProjectProgress {
@@ -48,6 +49,7 @@ class ProjectManager {
     String? colorHex,
     String? iconName,
     String? originInboxId,
+    String? areaId,
     DateTime? targetDate,
     List<String> tags = const [],
   }) async {
@@ -64,6 +66,7 @@ class ProjectManager {
       colorHex: drift.Value(colorHex ?? '#2563EB'),
       iconName: drift.Value(iconName ?? 'folder'),
       originInboxId: drift.Value(originInboxId),
+      areaId: drift.Value(areaId),
       targetDate: drift.Value(targetDate),
       metadata: drift.Value(jsonEncode({'tags': tags})),
       createdAt: now,
@@ -74,6 +77,12 @@ class ProjectManager {
       await db.into(db.projects).insert(companion);
       await _recordSyncQueue(id, 'INSERT');
     });
+    await KnowledgeBacklinkIndexer.reindexLinksForSource(
+      db,
+      sourceType: 'project',
+      sourceId: id,
+      textFields: [objective ?? '', description ?? ''],
+    );
 
     return (await (db.select(
       db.projects,
@@ -89,6 +98,8 @@ class ProjectManager {
     String? status,
     String? colorHex,
     String? iconName,
+    String? areaId,
+    bool clearAreaId = false,
     DateTime? targetDate,
     List<String>? tags,
   }) async {
@@ -118,6 +129,11 @@ class ProjectManager {
         iconName: iconName != null
             ? drift.Value(iconName)
             : const drift.Value.absent(),
+        areaId: clearAreaId
+            ? const drift.Value(null)
+            : (areaId != null
+                  ? drift.Value(areaId)
+                  : const drift.Value.absent()),
         targetDate: targetDate != null
             ? drift.Value(targetDate)
             : const drift.Value.absent(),
@@ -133,6 +149,15 @@ class ProjectManager {
       )..where((t) => t.id.equals(id))).write(companion);
       await _recordSyncQueue(id, 'UPDATE', baseData: existing.toJson());
     });
+    final updated = await getProjectById(id);
+    if (updated != null && updated.deletedAt == null) {
+      await KnowledgeBacklinkIndexer.reindexLinksForSource(
+        db,
+        sourceType: 'project',
+        sourceId: id,
+        textFields: [updated.objective ?? '', updated.description ?? ''],
+      );
+    }
   }
 
   Future<void> updateProjectStatus(String id, String status) async {
@@ -165,34 +190,43 @@ class ProjectManager {
       );
       await _recordSyncQueue(id, 'DELETE', baseData: existing.toJson());
     });
+    await KnowledgeBacklinkIndexer.softDeleteLinksForSource(
+      db,
+      sourceType: 'project',
+      sourceId: id,
+    );
   }
 
   // ==========================================
   // CONSULTAS REATIVAS (STREAMS)
   // ==========================================
 
-  Stream<List<ProjectEntry>> watchActiveProjects() {
-    return (db.select(db.projects)
-          ..where(
-            (t) => t.status.isIn(['planning', 'active']) & t.deletedAt.isNull(),
-          )
-          ..orderBy([
-            (t) => drift.OrderingTerm(
-              expression: t.targetDate,
-              mode: drift.OrderingMode.asc,
-              nulls: drift.NullsOrder.last,
-            ),
-            (t) => drift.OrderingTerm(
-              expression: t.createdAt,
-              mode: drift.OrderingMode.desc,
-            ),
-          ]))
-        .watch();
+  Stream<List<ProjectEntry>> watchActiveProjects({String? areaId}) {
+    final q = db.select(db.projects)
+      ..where(
+        (t) => t.status.isIn(['planning', 'active']) & t.deletedAt.isNull(),
+      );
+    if (areaId != null && areaId.isNotEmpty) {
+      q.where((t) => t.areaId.equals(areaId));
+    }
+    q.orderBy([
+      (t) => drift.OrderingTerm(
+        expression: t.targetDate,
+        mode: drift.OrderingMode.asc,
+        nulls: drift.NullsOrder.last,
+      ),
+      (t) => drift.OrderingTerm(
+        expression: t.createdAt,
+        mode: drift.OrderingMode.desc,
+      ),
+    ]);
+    return q.watch();
   }
 
   Stream<List<ProjectEntry>> watchAllProjects({
     String? category,
     String? status,
+    String? areaId,
   }) {
     final q = db.select(db.projects)..where((t) => t.deletedAt.isNull());
 
@@ -201,6 +235,9 @@ class ProjectManager {
     }
     if (status != null && status.isNotEmpty && status != 'all') {
       q.where((t) => t.status.equals(status));
+    }
+    if (areaId != null && areaId.isNotEmpty) {
+      q.where((t) => t.areaId.equals(areaId));
     }
 
     q.orderBy([

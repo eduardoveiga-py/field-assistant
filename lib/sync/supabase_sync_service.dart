@@ -242,13 +242,16 @@ class SupabaseSyncService {
     'research_articles',
     'research_tags',
     'territory_sectors',
+    'email_accounts',
     'inbox_entries',
+    'knowledge_areas',
     'projects',
     'tasks',
     'knowledge_notes',
     'knowledge_questions',
     'knowledge_documents',
     'knowledge_resources',
+    'knowledge_links',
     'ticuna_words',
     'ticuna_phrases',
   ];
@@ -363,6 +366,22 @@ class SupabaseSyncService {
     }
 
     if (!await e2eeService.isKeyInstalled(ownerDecision.activeUserId!)) {
+      if (await e2eeService.isWebPinLocked(ownerDecision.activeUserId!)) {
+        _setStatus(SyncStatus.savedLocally);
+        const pinLockedMsg =
+            'Sincronização E2EE bloqueada por PIN neste navegador. Digite seu PIN de desbloqueio rápido nas Configurações ou na barra superior.';
+        return (
+          ownerId: null,
+          blockedResult: const SyncProcessResult(
+            totalProcessed: 0,
+            successCount: 0,
+            failureCount: 0,
+            conflictCount: 0,
+            errors: [pinLockedMsg],
+            message: pinLockedMsg,
+          ),
+        );
+      }
       return (ownerId: null, blockedResult: _blockedUntilEncryption());
     }
 
@@ -432,6 +451,22 @@ class SupabaseSyncService {
       sanitized.remove('audio_file_path');
       sanitized.remove('audioFilePath');
     }
+    if (entityType == 'email_accounts' || entityType == 'emailAccounts') {
+      for (final secretKey in [
+        'password',
+        'pass',
+        'oauth_token',
+        'oauthToken',
+        'access_token',
+        'accessToken',
+        'refresh_token',
+        'refreshToken',
+        'id_token',
+        'idToken',
+      ]) {
+        sanitized.remove(secretKey);
+      }
+    }
     return sanitized;
   }
 
@@ -442,6 +477,7 @@ class SupabaseSyncService {
     'sources',
     'media_urls',
     'participant_ids',
+    'properties_json',
   };
 
   /// Converte payload com chaves camelCase para snake_case para envio PostgREST
@@ -616,6 +652,24 @@ class SupabaseSyncService {
       case 'inbox_entry':
       case 'inbox_entries':
         return 'inbox_entries';
+      case 'emailaccount':
+      case 'emailaccounts':
+      case 'emailaccountdbentry':
+      case 'email_account':
+      case 'email_accounts':
+        return 'email_accounts';
+      case 'knowledgearea':
+      case 'knowledgeareas':
+      case 'knowledgeareaentry':
+      case 'knowledge_area':
+      case 'knowledge_areas':
+        return 'knowledge_areas';
+      case 'knowledgelink':
+      case 'knowledgelinks':
+      case 'knowledgelinkentry':
+      case 'knowledge_link':
+      case 'knowledge_links':
+        return 'knowledge_links';
       case 'project':
       case 'projects':
         return 'projects';
@@ -885,12 +939,77 @@ class SupabaseSyncService {
           map['metadata'] = jsonEncode(map['metadata']);
         }
         map['metadata'] ??= '{}';
+        map['capturedAt'] =
+            _isoString(map['capturedAt']) ??
+            _isoString(map['captured_at']) ??
+            map['createdAt'];
+        map['processedAt'] =
+            _isoString(map['processedAt']) ?? _isoString(map['processed_at']);
+        break;
+      case 'email_accounts':
+        map['providerType'] =
+            map['providerType'] ?? map['provider_type'] ?? 'custom';
+        map['incomingHost'] = map['incomingHost'] ?? map['incoming_host'] ?? '';
+        map['incomingPort'] =
+            (map['incomingPort'] ?? map['incoming_port']) is int
+            ? (map['incomingPort'] ?? map['incoming_port'])
+            : int.tryParse(
+                    (map['incomingPort'] ?? map['incoming_port'] ?? '993')
+                        .toString(),
+                  ) ??
+                  993;
+        map['incomingProtocol'] =
+            map['incomingProtocol'] ?? map['incoming_protocol'] ?? 'imap';
+        map['outgoingHost'] = map['outgoingHost'] ?? map['outgoing_host'] ?? '';
+        map['outgoingPort'] =
+            (map['outgoingPort'] ?? map['outgoing_port']) is int
+            ? (map['outgoingPort'] ?? map['outgoing_port'])
+            : int.tryParse(
+                    (map['outgoingPort'] ?? map['outgoing_port'] ?? '587')
+                        .toString(),
+                  ) ??
+                  587;
+        map['outgoingSecurity'] =
+            map['outgoingSecurity'] ?? map['outgoing_security'] ?? 'starttls';
+        map['outgoingProtocol'] =
+            map['outgoingProtocol'] ?? map['outgoing_protocol'] ?? 'smtp';
+        map['username'] ??= map['email'] ?? '';
+        map['isActive'] =
+            map['isActive'] == true ||
+            map['is_active'] == true ||
+            map['isActive'] == 1 ||
+            map['is_active'] == 1 ||
+            (map['isActive'] == null && map['is_active'] == null);
+        map['signatureHtml'] =
+            map['signatureHtml'] ?? map['signature_html'] ?? '';
+        break;
+      case 'knowledge_areas':
+        map['sortOrder'] = (map['sortOrder'] ?? map['sort_order']) is int
+            ? (map['sortOrder'] ?? map['sort_order'])
+            : int.tryParse(
+                    (map['sortOrder'] ?? map['sort_order'] ?? '0').toString(),
+                  ) ??
+                  0;
+        map['isArchived'] =
+            map['isArchived'] == true ||
+            map['is_archived'] == true ||
+            map['isArchived'] == 1 ||
+            map['is_archived'] == 1;
+        break;
+      case 'knowledge_links':
+        map['sourceType'] = map['sourceType'] ?? map['source_type'] ?? 'note';
+        map['sourceId'] = map['sourceId'] ?? map['source_id'] ?? '';
+        map['targetType'] = map['targetType'] ?? map['target_type'] ?? 'note';
+        map['targetId'] = map['targetId'] ?? map['target_id'] ?? '';
+        map['targetUri'] = map['targetUri'] ?? map['target_uri'] ?? '';
+        map['anchorText'] = map['anchorText'] ?? map['anchor_text'] ?? '';
         break;
       case 'projects':
         if (map['metadata'] is Map) {
           map['metadata'] = jsonEncode(map['metadata']);
         }
         map['metadata'] ??= '{}';
+        map['areaId'] = map['areaId'] ?? map['area_id'];
         break;
       case 'tasks':
         if (map['attachments'] is List) {
@@ -911,16 +1030,53 @@ class SupabaseSyncService {
         map['attachments'] ??= '[]';
         if (map['sources'] is List) map['sources'] = jsonEncode(map['sources']);
         map['sources'] ??= '[]';
+        if (map['propertiesJson'] is Map) {
+          map['propertiesJson'] = jsonEncode(map['propertiesJson']);
+        }
+        map['propertiesJson'] =
+            map['propertiesJson'] ?? map['properties_json'] ?? '{}';
+        map['areaId'] = map['areaId'] ?? map['area_id'];
+        map['parentNoteId'] = map['parentNoteId'] ?? map['parent_note_id'];
+        map['reviewLevel'] = (map['reviewLevel'] ?? map['review_level']) is int
+            ? (map['reviewLevel'] ?? map['review_level'])
+            : int.tryParse(
+                    (map['reviewLevel'] ?? map['review_level'] ?? '0')
+                        .toString(),
+                  ) ??
+                  0;
+        map['nextReviewAt'] =
+            _isoString(map['nextReviewAt']) ??
+            _isoString(map['next_review_at']);
+        map['lastReviewedAt'] =
+            _isoString(map['lastReviewedAt']) ??
+            _isoString(map['last_reviewed_at']);
         break;
       case 'knowledge_questions':
+        map['areaId'] = map['areaId'] ?? map['area_id'];
+        map['reviewLevel'] = (map['reviewLevel'] ?? map['review_level']) is int
+            ? (map['reviewLevel'] ?? map['review_level'])
+            : int.tryParse(
+                    (map['reviewLevel'] ?? map['review_level'] ?? '0')
+                        .toString(),
+                  ) ??
+                  0;
+        map['nextReviewAt'] =
+            _isoString(map['nextReviewAt']) ??
+            _isoString(map['next_review_at']);
+        map['lastReviewedAt'] =
+            _isoString(map['lastReviewedAt']) ??
+            _isoString(map['last_reviewed_at']);
         break;
       case 'knowledge_documents':
         if (map['tags'] is List) map['tags'] = jsonEncode(map['tags']);
         map['tags'] ??= '[]';
+        map['areaId'] = map['areaId'] ?? map['area_id'];
+        map['extractedText'] = map['extractedText'] ?? map['extracted_text'];
         break;
       case 'knowledge_resources':
         if (map['tags'] is List) map['tags'] = jsonEncode(map['tags']);
         map['tags'] ??= '[]';
+        map['areaId'] = map['areaId'] ?? map['area_id'];
         break;
     }
     return map;
@@ -996,6 +1152,21 @@ class SupabaseSyncService {
         break;
       case 'inbox_entries':
         await db.into(db.inboxEntries).insert(InboxEntry.fromJson(map));
+        break;
+      case 'email_accounts':
+        await db
+            .into(db.emailAccounts)
+            .insert(EmailAccountDbEntry.fromJson(map));
+        break;
+      case 'knowledge_areas':
+        await db
+            .into(db.knowledgeAreas)
+            .insert(KnowledgeAreaEntry.fromJson(map));
+        break;
+      case 'knowledge_links':
+        await db
+            .into(db.knowledgeLinks)
+            .insert(KnowledgeLinkEntry.fromJson(map));
         break;
       case 'projects':
         await db.into(db.projects).insert(ProjectEntry.fromJson(map));
@@ -1233,6 +1404,21 @@ class SupabaseSyncService {
         break;
       case 'inbox_entries':
         await db.update(db.inboxEntries).replace(InboxEntry.fromJson(map));
+        break;
+      case 'email_accounts':
+        await db
+            .update(db.emailAccounts)
+            .replace(EmailAccountDbEntry.fromJson(map));
+        break;
+      case 'knowledge_areas':
+        await db
+            .update(db.knowledgeAreas)
+            .replace(KnowledgeAreaEntry.fromJson(map));
+        break;
+      case 'knowledge_links':
+        await db
+            .update(db.knowledgeLinks)
+            .replace(KnowledgeLinkEntry.fromJson(map));
         break;
       case 'projects':
         await db.update(db.projects).replace(ProjectEntry.fromJson(map));
@@ -1496,6 +1682,18 @@ class SupabaseSyncService {
           InboxEntriesCompanion(deletedAt: drift.Value(deletedAt)),
         );
         break;
+      case 'email_accounts':
+        await (db.update(db.emailAccounts)..where((t) => t.id.equals(id)))
+            .write(EmailAccountsCompanion(deletedAt: drift.Value(deletedAt)));
+        break;
+      case 'knowledge_areas':
+        await (db.update(db.knowledgeAreas)..where((t) => t.id.equals(id)))
+            .write(KnowledgeAreasCompanion(deletedAt: drift.Value(deletedAt)));
+        break;
+      case 'knowledge_links':
+        await (db.update(db.knowledgeLinks)..where((t) => t.id.equals(id)))
+            .write(KnowledgeLinksCompanion(deletedAt: drift.Value(deletedAt)));
+        break;
       case 'projects':
         await (db.update(db.projects)..where((t) => t.id.equals(id))).write(
           ProjectsCompanion(deletedAt: drift.Value(deletedAt)),
@@ -1639,6 +1837,21 @@ class SupabaseSyncService {
       case 'inbox_entries':
         final row = await (db.select(
           db.inboxEntries,
+        )..where((t) => t.id.equals(id))).getSingleOrNull();
+        return row?.toJson();
+      case 'email_accounts':
+        final row = await (db.select(
+          db.emailAccounts,
+        )..where((t) => t.id.equals(id))).getSingleOrNull();
+        return row?.toJson();
+      case 'knowledge_areas':
+        final row = await (db.select(
+          db.knowledgeAreas,
+        )..where((t) => t.id.equals(id))).getSingleOrNull();
+        return row?.toJson();
+      case 'knowledge_links':
+        final row = await (db.select(
+          db.knowledgeLinks,
         )..where((t) => t.id.equals(id))).getSingleOrNull();
         return row?.toJson();
       case 'projects':
@@ -2600,6 +2813,22 @@ class SupabaseSyncService {
             )
           : await _downloadPersonPhoto(id, client);
       if (ok) recovered++;
+    }
+
+    final pendingInboxMeta = await (db.select(
+      db.appKvStore,
+    )..where((t) => t.key.like('pending_inbox_meta_download_%'))).get();
+
+    for (final row in pendingInboxMeta) {
+      final id = row.key.replaceFirst('pending_inbox_meta_download_', '');
+      if (e2eeTransfer != null) {
+        final ok = await _downloadEncryptedMediaForTable(
+          tableName: 'inbox_entries',
+          entityId: id,
+          transfer: e2eeTransfer,
+        );
+        if (ok) recovered++;
+      }
     }
 
     return recovered;
@@ -4285,6 +4514,89 @@ class SupabaseSyncService {
         return EncryptedMediaUploadResult.none;
       }
 
+      if (tableName == 'inbox_entries') {
+        final serializedLen = utf8.encode(jsonEncode(cleanPayload)).length;
+        // Mantém ampla margem abaixo do teto de 1 MiB de encrypted_records (~700 KiB plaintext).
+        if (serializedLen > 700 * 1024) {
+          final rawMeta = cleanPayload['metadata'];
+          final rawAtts = cleanPayload['attachments'];
+          final offloadBytes = Uint8List.fromList(
+            utf8.encode(
+              jsonEncode({'metadata': rawMeta, 'attachments': rawAtts}),
+            ),
+          );
+          final mediaId = 'inbox_meta_$entityId';
+          final newVersionId = DateTime.now()
+              .toUtc()
+              .microsecondsSinceEpoch
+              .toString();
+          final prevVersionId =
+              cleanPayload['e2ee_media_version']?.toString() ??
+              await _getActiveMediaVersion(tableName, entityId);
+
+          await transfer.uploadEncrypted(
+            bucket: 'knowledge_vault',
+            mediaId: mediaId,
+            plaintextBytes: offloadBytes,
+            versionId: newVersionId,
+          );
+
+          // Preserva metadados essenciais leves para renderização e filtros imediatos offline.
+          try {
+            final decodedMeta = rawMeta is String
+                ? Map<String, dynamic>.from(jsonDecode(rawMeta) as Map)
+                : (rawMeta is Map
+                      ? Map<String, dynamic>.from(rawMeta)
+                      : <String, dynamic>{});
+            final emailRaw = decodedMeta['email'];
+            if (emailRaw is Map) {
+              final eMap = Map<String, dynamic>.from(emailRaw);
+              eMap.remove('rawEmlBase64');
+              final bodyHtml = eMap['bodyHtml']?.toString();
+              if (bodyHtml != null && bodyHtml.length > 16384) {
+                eMap.remove('bodyHtml');
+                decodedMeta['bodyHydratedFromVaultPending'] = true;
+              }
+              final bodyTxt = eMap['bodyText']?.toString();
+              if (bodyTxt != null && bodyTxt.length > 16384) {
+                eMap['bodyText'] = bodyTxt.substring(0, 16384);
+              }
+              if (eMap['attachments'] is List) {
+                eMap['attachments'] = (eMap['attachments'] as List).map((a) {
+                  if (a is Map) {
+                    final copy = Map<String, dynamic>.from(a);
+                    copy.remove('rawBytes');
+                    copy.remove('base64');
+                    return copy;
+                  }
+                  return a;
+                }).toList();
+              }
+              decodedMeta['email'] = eMap;
+            }
+            cleanPayload['metadata'] = jsonEncode(decodedMeta);
+          } catch (_) {}
+
+          final contentStr = cleanPayload['content']?.toString() ?? '';
+          if (contentStr.length > 16384) {
+            cleanPayload['content'] = contentStr.substring(0, 16384);
+          }
+          cleanPayload['attachments'] = '[]';
+          cleanPayload['e2ee_media_bucket'] = 'knowledge_vault';
+          cleanPayload['e2ee_media_id'] = mediaId;
+          cleanPayload['e2ee_media_version'] = newVersionId;
+
+          return EncryptedMediaUploadResult(
+            success: true,
+            bucket: 'knowledge_vault',
+            mediaId: mediaId,
+            newVersionId: newVersionId,
+            previousVersionId: prevVersionId,
+          );
+        }
+        return EncryptedMediaUploadResult.none;
+      }
+
       return EncryptedMediaUploadResult.none;
     } catch (e, st) {
       AppLogger.warning(
@@ -4308,10 +4620,41 @@ class SupabaseSyncService {
         return 'pending_doc_download_$entityId';
       case 'person_photos':
         return 'pending_photo_download_$entityId';
+      case 'inbox_entries':
+        return 'pending_inbox_meta_download_$entityId';
       default:
         return null;
     }
   }
+
+  /// Ponte exclusiva de teste automatizado para validar offload cifrado (>700 KiB)
+  /// de metadados extensos (`inbox_entries` / mídias) para `knowledge_vault`.
+  @visibleForTesting
+  Future<EncryptedMediaUploadResult> uploadEncryptedMediaForTesting({
+    required String tableName,
+    required String entityId,
+    required Map<String, dynamic> cleanPayload,
+    required EncryptedMediaTransfer transfer,
+    required List<String> errors,
+  }) => _uploadEncryptedMediaIfApplicable(
+    tableName: tableName,
+    entityId: entityId,
+    cleanPayload: cleanPayload,
+    transfer: transfer,
+    errors: errors,
+  );
+
+  /// Ponte exclusiva de teste automatizado para validar reidratação E2EE do payload extenso.
+  @visibleForTesting
+  Future<bool> downloadEncryptedMediaForTesting({
+    required String tableName,
+    required String entityId,
+    required EncryptedMediaTransfer transfer,
+  }) => _downloadEncryptedMediaForTable(
+    tableName: tableName,
+    entityId: entityId,
+    transfer: transfer,
+  );
 
   Future<void> _markPendingMediaDownload(
     String tableName,
@@ -4456,6 +4799,38 @@ class SupabaseSyncService {
         await _clearPendingMediaDownload(tableName, entityId);
         return true;
       }
+
+      if (tableName == 'inbox_entries') {
+        final mediaId = 'inbox_meta_$entityId';
+        final bytes = await transfer.downloadDecrypted(
+          bucket: 'knowledge_vault',
+          mediaId: mediaId,
+        );
+        final decoded = jsonDecode(utf8.decode(bytes));
+        if (decoded is Map) {
+          final metaVal = decoded['metadata'];
+          final attsVal = decoded['attachments'];
+          await (db.update(
+            db.inboxEntries,
+          )..where((t) => t.id.equals(entityId))).write(
+            InboxEntriesCompanion(
+              metadata: metaVal != null
+                  ? drift.Value(
+                      metaVal is String ? metaVal : jsonEncode(metaVal),
+                    )
+                  : const drift.Value.absent(),
+              attachments: attsVal != null
+                  ? drift.Value(
+                      attsVal is String ? attsVal : jsonEncode(attsVal),
+                    )
+                  : const drift.Value.absent(),
+            ),
+          );
+        }
+        await _clearPendingMediaDownload(tableName, entityId);
+        return true;
+      }
+
       return true;
     } catch (e, st) {
       AppLogger.warning(

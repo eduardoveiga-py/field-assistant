@@ -29,6 +29,7 @@ import '../../core/app_logger.dart';
 import '../../database/app_database.dart';
 import '../../inbox/jw_email_service.dart';
 import '../../sync/media_bytes.dart';
+import '../../sync/crypto/web_key_persistence.dart';
 import '../../sync/supabase_config.dart';
 import '../../sync/supabase_sync_service.dart';
 import '../../sync/sync_owner_guard.dart';
@@ -98,17 +99,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final _exchangePasswordCtrl = TextEditingController();
   final _exchangeHostCtrl = TextEditingController();
   late Future<DateTime?> _lastSilentBackupFuture;
-  Future<bool>? _e2eeFuture;
+  Future<({bool installed, WebKeyUnlockMode webMode})>? _e2eeFuture;
   String? _lastEffectiveUserId;
   int _importedBiblesCount = 0;
   int _importedPublicationsCount = 0;
 
-  Future<bool> _getE2eeFuture(String effectiveUserId) {
+  Future<({bool installed, WebKeyUnlockMode webMode})> _getE2eeFuture(
+    String effectiveUserId,
+  ) {
     if (_e2eeFuture == null || _lastEffectiveUserId != effectiveUserId) {
       _lastEffectiveUserId = effectiveUserId;
-      _e2eeFuture = ref
-          .read(e2eeServiceProvider)
-          .isKeyInstalled(effectiveUserId);
+      _e2eeFuture = () async {
+        final e2ee = ref.read(e2eeServiceProvider);
+        final installed = await e2ee.isKeyInstalled(effectiveUserId);
+        final webMode = await e2ee.getWebUnlockMode(effectiveUserId);
+        return (installed: installed, webMode: webMode);
+      }();
     }
     return _e2eeFuture!;
   }

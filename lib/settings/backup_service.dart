@@ -93,6 +93,9 @@ class RestorePreview {
   final int ticunaTagsToAdd;
   final int knowledgeNotesToAdd;
   final int knowledgeDocumentsToAdd;
+  final int emailAccountsToAdd;
+  final int knowledgeAreasToAdd;
+  final int knowledgeLinksToAdd;
   final List<String> inventoryTables;
   final List<String> corruptedAudioIds;
   final List<String> corruptedDocumentIds;
@@ -129,6 +132,9 @@ class RestorePreview {
     this.ticunaTagsToAdd = 0,
     this.knowledgeNotesToAdd = 0,
     this.knowledgeDocumentsToAdd = 0,
+    this.emailAccountsToAdd = 0,
+    this.knowledgeAreasToAdd = 0,
+    this.knowledgeLinksToAdd = 0,
     this.inventoryTables = const [],
     this.corruptedAudioIds = const [],
     this.corruptedDocumentIds = const [],
@@ -432,13 +438,16 @@ class BackupService {
     final manualOrders = await db.select(db.studentManualOrder).get();
     final calendarEvents = await db.select(db.externalCalendarEvents).get();
     final calendarLinks = await db.select(db.calendarEventLinks).get();
+    final emailAccounts = await db.select(db.emailAccounts).get();
     final inboxes = await db.select(db.inboxEntries).get();
+    final knowledgeAreas = await db.select(db.knowledgeAreas).get();
     final projects = await db.select(db.projects).get();
     final tasks = await db.select(db.tasks).get();
     final knowledgeNotes = await db.select(db.knowledgeNotes).get();
     final knowledgeQuestions = await db.select(db.knowledgeQuestions).get();
     final knowledgeDocuments = await db.select(db.knowledgeDocuments).get();
     final knowledgeResources = await db.select(db.knowledgeResources).get();
+    final knowledgeLinks = await db.select(db.knowledgeLinks).get();
     final appLanguages = await db.select(db.appLanguages).get();
     final ticunaWords = await _readRawTableRows('ticuna_words');
     final ticunaPhrases = await _readRawTableRows('ticuna_phrases');
@@ -608,13 +617,16 @@ class BackupService {
         'studentManualOrder',
         'externalCalendarEvents',
         'calendarEventLinks',
+        'emailAccounts',
         'inboxEntries',
+        'knowledgeAreas',
         'projects',
         'tasks',
         'knowledgeNotes',
         'knowledgeQuestions',
         'knowledgeDocuments',
         'knowledgeResources',
+        'knowledgeLinks',
         'appLanguages',
         'ticunaWords',
         'ticunaPhrases',
@@ -646,7 +658,9 @@ class BackupService {
       'studentManualOrder': manualOrders.map((m) => m.toJson()).toList(),
       'externalCalendarEvents': calendarEvents.map((c) => c.toJson()).toList(),
       'calendarEventLinks': calendarLinks.map((l) => l.toJson()).toList(),
+      'emailAccounts': emailAccounts.map((a) => a.toJson()).toList(),
       'inboxEntries': inboxes.map((i) => i.toJson()).toList(),
+      'knowledgeAreas': knowledgeAreas.map((a) => a.toJson()).toList(),
       'projects': projects.map((p) => p.toJson()).toList(),
       'tasks': tasks.map((t) => t.toJson()).toList(),
       'knowledgeNotes': knowledgeNotes.map((n) => n.toJson()).toList(),
@@ -655,6 +669,7 @@ class BackupService {
       'knowledgeDocumentFiles': knowledgeDocumentFiles,
       'knowledgeDocumentHashes': knowledgeDocumentHashes,
       'knowledgeResources': knowledgeResources.map((r) => r.toJson()).toList(),
+      'knowledgeLinks': knowledgeLinks.map((l) => l.toJson()).toList(),
       'appLanguages': appLanguages.map((l) => l.toJson()).toList(),
       'ticunaWords': ticunaWords,
       'ticunaPhrases': ticunaPhrases,
@@ -1041,6 +1056,31 @@ class BackupService {
       if (!existingKDocIds.contains(item['id'] as String)) kDocAdd++;
     }
 
+    final importedEmailAccounts =
+        (data['emailAccounts'] as List<dynamic>?) ?? [];
+    final existingEmailAccounts = await db.select(db.emailAccounts).get();
+    final existingEmailIds = {for (var a in existingEmailAccounts) a.id};
+    int emailAccAdd = 0;
+    for (final item in importedEmailAccounts) {
+      if (!existingEmailIds.contains(item['id'] as String)) emailAccAdd++;
+    }
+
+    final importedKAreas = (data['knowledgeAreas'] as List<dynamic>?) ?? [];
+    final existingKAreas = await db.select(db.knowledgeAreas).get();
+    final existingKAreaIds = {for (var a in existingKAreas) a.id};
+    int kAreaAdd = 0;
+    for (final item in importedKAreas) {
+      if (!existingKAreaIds.contains(item['id'] as String)) kAreaAdd++;
+    }
+
+    final importedKLinks = (data['knowledgeLinks'] as List<dynamic>?) ?? [];
+    final existingKLinks = await db.select(db.knowledgeLinks).get();
+    final existingKLinkIds = {for (var l in existingKLinks) l.id};
+    int kLinkAdd = 0;
+    for (final item in importedKLinks) {
+      if (!existingKLinkIds.contains(item['id'] as String)) kLinkAdd++;
+    }
+
     // Prévia: Sync Queue (22ª Tabela)
     final importedSyncQueue = (data['syncQueue'] as List<dynamic>?) ?? [];
     final existingSyncQueue = await db.select(db.syncQueue).get();
@@ -1160,6 +1200,9 @@ class BackupService {
       ticunaTagsToAdd: ttAdd,
       knowledgeNotesToAdd: kNoteAdd,
       knowledgeDocumentsToAdd: kDocAdd,
+      emailAccountsToAdd: emailAccAdd,
+      knowledgeAreasToAdd: kAreaAdd,
+      knowledgeLinksToAdd: kLinkAdd,
       inventoryTables: tableList,
       corruptedAudioIds: corruptedAudioIds,
       corruptedDocumentIds: corruptedDocumentIds,
@@ -1199,6 +1242,8 @@ class BackupService {
     'last_modified_external',
     'lastSyncedAt',
     'last_synced_at',
+    'nextReviewAt',
+    'next_review_at',
     'lastReviewedAt',
     'last_reviewed_at',
   };
@@ -2169,6 +2214,39 @@ class BackupService {
           }
         }
 
+        // 20b. Contas de E-mail (perfis sem segredos locais)
+        final emailAccRows = (data['emailAccounts'] as List<dynamic>?) ?? [];
+        for (final item in emailAccRows) {
+          final map = Map<String, dynamic>.from(item as Map)
+            ..remove('password')
+            ..remove('refreshToken')
+            ..remove('accessToken');
+          final entry = EmailAccountDbEntry.fromJson(map);
+          final existing = await (db.select(
+            db.emailAccounts,
+          )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
+          if (existing == null) {
+            await db.into(db.emailAccounts).insert(entry);
+            await _reconstituteSyncQueue(
+              'email_accounts',
+              entry.id,
+              'INSERT',
+              map,
+            );
+            totalRestoredCount++;
+          } else if (entry.updatedAt.isAfter(existing.updatedAt) ||
+              entry.revision > existing.revision) {
+            await db.update(db.emailAccounts).replace(entry);
+            await _reconstituteSyncQueue(
+              'email_accounts',
+              entry.id,
+              'UPDATE',
+              map,
+            );
+            totalRestoredCount++;
+          }
+        }
+
         // 21. Inbox Universal
         final inboxRows = (data['inboxEntries'] as List<dynamic>?) ?? [];
         for (final item in inboxRows) {
@@ -2191,6 +2269,36 @@ class BackupService {
             await db.update(db.inboxEntries).replace(entry);
             await _reconstituteSyncQueue(
               'inbox_entries',
+              entry.id,
+              'UPDATE',
+              map,
+            );
+            totalRestoredCount++;
+          }
+        }
+
+        // 21b. Áreas P.A.R.A. do Segundo Cérebro
+        final areaRows = (data['knowledgeAreas'] as List<dynamic>?) ?? [];
+        for (final item in areaRows) {
+          final map = item as Map<String, dynamic>;
+          final entry = KnowledgeAreaEntry.fromJson(map);
+          final existing = await (db.select(
+            db.knowledgeAreas,
+          )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
+          if (existing == null) {
+            await db.into(db.knowledgeAreas).insert(entry);
+            await _reconstituteSyncQueue(
+              'knowledge_areas',
+              entry.id,
+              'INSERT',
+              map,
+            );
+            totalRestoredCount++;
+          } else if (entry.updatedAt.isAfter(existing.updatedAt) ||
+              entry.revision > existing.revision) {
+            await db.update(db.knowledgeAreas).replace(entry);
+            await _reconstituteSyncQueue(
+              'knowledge_areas',
               entry.id,
               'UPDATE',
               map,
@@ -2363,6 +2471,36 @@ class BackupService {
             await db.update(db.knowledgeResources).replace(entry);
             await _reconstituteSyncQueue(
               'knowledge_resources',
+              entry.id,
+              'UPDATE',
+              map,
+            );
+            totalRestoredCount++;
+          }
+        }
+
+        // 27b. Vínculos Bidirecionais (Backlinks)
+        final linkRows = (data['knowledgeLinks'] as List<dynamic>?) ?? [];
+        for (final item in linkRows) {
+          final map = item as Map<String, dynamic>;
+          final entry = KnowledgeLinkEntry.fromJson(map);
+          final existing = await (db.select(
+            db.knowledgeLinks,
+          )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
+          if (existing == null) {
+            await db.into(db.knowledgeLinks).insert(entry);
+            await _reconstituteSyncQueue(
+              'knowledge_links',
+              entry.id,
+              'INSERT',
+              map,
+            );
+            totalRestoredCount++;
+          } else if (entry.updatedAt.isAfter(existing.updatedAt) ||
+              entry.revision > existing.revision) {
+            await db.update(db.knowledgeLinks).replace(entry);
+            await _reconstituteSyncQueue(
+              'knowledge_links',
               entry.id,
               'UPDATE',
               map,

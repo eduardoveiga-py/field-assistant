@@ -691,5 +691,172 @@ void main() {
 
       await appDb.close();
     });
+
+    test('TC-MIG-08: Migração incremental v8 para v9 com EmailAccounts (sem senha) e Segundo Cérebro', () async {
+      final sqliteDb = sql.sqlite3.openInMemory();
+      sqliteDb.execute('PRAGMA user_version = 8;');
+      sqliteDb.execute('''
+        CREATE TABLE app_kv_store (
+          key TEXT NOT NULL PRIMARY KEY,
+          value TEXT NOT NULL,
+          updated_at INTEGER
+        );
+      ''');
+      sqliteDb.execute('''
+        INSERT INTO app_kv_store (key, value) VALUES (
+          'multi_email_accounts_registry',
+          '[{"id":"acc-ex-1","name":"Exchange Campo","email":"irmao@jw.org","providerType":"exchange","incomingHost":"outlook.office365.com","incomingPort":443,"incomingProtocol":"exchange","outgoingHost":"outlook.office365.com","outgoingPort":443,"outgoingSecurity":"ssl","outgoingProtocol":"exchange","username":"irmao@jw.org","isActive":true}]'
+        );
+      ''');
+      sqliteDb.execute('''
+        CREATE TABLE projects (
+          id TEXT NOT NULL PRIMARY KEY,
+          name TEXT NOT NULL,
+          category TEXT NOT NULL DEFAULT 'ministry',
+          status TEXT NOT NULL DEFAULT 'active',
+          metadata TEXT NOT NULL DEFAULT '{}',
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL,
+          deleted_at INTEGER,
+          revision INTEGER NOT NULL DEFAULT 1
+        );
+      ''');
+      sqliteDb.execute('''
+        CREATE TABLE knowledge_notes (
+          id TEXT NOT NULL PRIMARY KEY,
+          title TEXT NOT NULL,
+          content TEXT NOT NULL,
+          category TEXT NOT NULL DEFAULT 'general',
+          tags TEXT NOT NULL DEFAULT '[]',
+          attachments TEXT NOT NULL DEFAULT '[]',
+          sources TEXT NOT NULL DEFAULT '[]',
+          is_pinned INTEGER NOT NULL DEFAULT 0,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL,
+          deleted_at INTEGER,
+          revision INTEGER NOT NULL DEFAULT 1
+        );
+      ''');
+      sqliteDb.execute(
+        "INSERT INTO knowledge_notes (id, title, content, created_at, updated_at) "
+        "VALUES ('n1', 'Nota Pré-v9', 'Texto preservado', 1700000000, 1700000000);",
+      );
+      sqliteDb.execute('''
+        CREATE TABLE knowledge_questions (
+          id TEXT NOT NULL PRIMARY KEY,
+          question TEXT NOT NULL,
+          category TEXT NOT NULL DEFAULT 'biblical',
+          status TEXT NOT NULL DEFAULT 'unanswered',
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL,
+          deleted_at INTEGER,
+          revision INTEGER NOT NULL DEFAULT 1
+        );
+      ''');
+      sqliteDb.execute('''
+        CREATE TABLE knowledge_documents (
+          id TEXT NOT NULL PRIMARY KEY,
+          title TEXT NOT NULL,
+          file_name TEXT NOT NULL,
+          file_type TEXT NOT NULL,
+          file_size INTEGER NOT NULL,
+          file_path TEXT NOT NULL,
+          tags TEXT NOT NULL DEFAULT '[]',
+          category TEXT NOT NULL DEFAULT 'general',
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL,
+          deleted_at INTEGER,
+          revision INTEGER NOT NULL DEFAULT 1
+        );
+      ''');
+      sqliteDb.execute('''
+        CREATE TABLE knowledge_resources (
+          id TEXT NOT NULL PRIMARY KEY,
+          title TEXT NOT NULL,
+          resource_type TEXT NOT NULL,
+          tags TEXT NOT NULL DEFAULT '[]',
+          category TEXT NOT NULL DEFAULT 'general',
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL,
+          deleted_at INTEGER,
+          revision INTEGER NOT NULL DEFAULT 1
+        );
+      ''');
+      sqliteDb.execute('''
+        CREATE TABLE sync_queue (
+          id TEXT NOT NULL PRIMARY KEY,
+          entity_type TEXT NOT NULL,
+          entity_id TEXT NOT NULL,
+          operation TEXT NOT NULL,
+          payload TEXT NOT NULL,
+          created_at INTEGER NOT NULL,
+          last_attempt_at INTEGER,
+          attempts INTEGER NOT NULL DEFAULT 0,
+          last_error TEXT,
+          status TEXT NOT NULL DEFAULT 'pending'
+        );
+      ''');
+
+      final appDb = AppDatabase.forTesting(NativeDatabase.opened(sqliteDb));
+      final ver = await appDb.customSelect('PRAGMA user_version;').getSingle();
+      expect(ver.read<int>('user_version'), equals(9));
+
+      // Valida migração de contas para tabela email_accounts sem senhas + fila sync
+      final emailAccs = await appDb.select(appDb.emailAccounts).get();
+      expect(emailAccs.length, equals(1));
+      expect(emailAccs.first.id, equals('acc-ex-1'));
+      expect(emailAccs.first.incomingProtocol, equals('exchange'));
+      final queued = await (appDb.select(
+        appDb.syncQueue,
+      )..where((t) => t.entityType.equals('email_accounts'))).get();
+      expect(queued.length, equals(1));
+      expect(queued.first.payload, isNot(contains('password')));
+
+      // Valida preservação da nota existente + valores default das novas colunas Segundo Cérebro
+      final notes = await appDb.select(appDb.knowledgeNotes).get();
+      expect(notes.length, equals(1));
+      expect(notes.first.title, equals('Nota Pré-v9'));
+      expect(notes.first.propertiesJson, equals('{}'));
+      expect(notes.first.reviewLevel, equals(0));
+      expect(notes.first.parentNoteId, isNull);
+      expect(notes.first.areaId, isNull);
+
+      // Valida inserção em KnowledgeAreas e KnowledgeLinks
+      final now = DateTime.now();
+      await appDb
+          .into(appDb.knowledgeAreas)
+          .insert(
+            KnowledgeAreasCompanion.insert(
+              id: 'area-1',
+              name: 'Ministério & Idiomas',
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+      await appDb
+          .into(appDb.knowledgeLinks)
+          .insert(
+            KnowledgeLinksCompanion.insert(
+              id: 'link-1',
+              sourceType: 'note',
+              sourceId: 'n1',
+              targetType: 'area',
+              targetId: 'area-1',
+              targetUri: 'app://ref/note/n1',
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+      expect(
+        (await appDb.select(appDb.knowledgeAreas).get()).length,
+        equals(1),
+      );
+      expect(
+        (await appDb.select(appDb.knowledgeLinks).get()).length,
+        equals(1),
+      );
+
+      await appDb.close();
+    });
   });
 }

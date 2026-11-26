@@ -4,6 +4,8 @@ import 'package:drift/drift.dart' as drift;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:uuid/uuid.dart';
 
+import '../core/app_logger.dart';
+import '../core/sync_timestamp.dart';
 import '../database/app_database.dart';
 import 'oauth_token_store.dart';
 
@@ -72,6 +74,61 @@ class EmailAccount {
   bool get isMicrosoftGraph => incomingProtocol == 'microsoft_graph';
   bool get isExchange => incomingProtocol == 'exchange';
   bool get isImap => incomingProtocol == 'imap';
+  bool get supportsDirectBrowserSync => isGmailApi || isMicrosoftGraph;
+
+  factory EmailAccount.fromDbEntry(EmailAccountDbEntry row) {
+    var prov = EmailProviderType.custom;
+    for (final p in EmailProviderType.values) {
+      if (p.name == row.providerType) {
+        prov = p;
+        break;
+      }
+    }
+    return EmailAccount(
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      providerType: prov,
+      incomingHost: row.incomingHost,
+      incomingPort: row.incomingPort,
+      incomingProtocol: row.incomingProtocol,
+      outgoingHost: row.outgoingHost,
+      outgoingPort: row.outgoingPort,
+      outgoingSecurity: row.outgoingSecurity,
+      outgoingProtocol: row.outgoingProtocol,
+      username: row.username,
+      isActive: row.isActive,
+      createdAt: row.createdAt,
+      signatureHtml: row.signatureHtml,
+    );
+  }
+
+  EmailAccountsCompanion toDbCompanion({
+    required DateTime updatedAt,
+    int revision = 1,
+    DateTime? deletedAt,
+  }) {
+    return EmailAccountsCompanion(
+      id: drift.Value(id),
+      name: drift.Value(name),
+      email: drift.Value(email),
+      providerType: drift.Value(providerType.name),
+      incomingHost: drift.Value(incomingHost),
+      incomingPort: drift.Value(incomingPort),
+      incomingProtocol: drift.Value(incomingProtocol),
+      outgoingHost: drift.Value(outgoingHost),
+      outgoingPort: drift.Value(outgoingPort),
+      outgoingSecurity: drift.Value(outgoingSecurity),
+      outgoingProtocol: drift.Value(outgoingProtocol),
+      username: drift.Value(username),
+      isActive: drift.Value(isActive),
+      signatureHtml: drift.Value(signatureHtml),
+      createdAt: drift.Value(createdAt),
+      updatedAt: drift.Value(updatedAt),
+      deletedAt: drift.Value(deletedAt),
+      revision: drift.Value(revision),
+    );
+  }
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -268,7 +325,9 @@ class EmailAccount {
   }
 }
 
-/// Gerenciador central de Multi-Contas de e-mail
+/// Gerenciador central de Multi-Contas de e-mail.
+/// Persiste metadados de conta (sem senhas nem tokens OAuth) na tabela tipada `email_accounts`
+/// com fila de sincronização E2EE multi-dispositivos, mantendo senhas/tokens estritamente locais.
 class EmailAccountsManager {
   static const String _accountsKvKey = 'multi_email_accounts_registry';
   static const FlutterSecureStorage _secureStorage = FlutterSecureStorage();
@@ -278,13 +337,110 @@ class EmailAccountsManager {
   static String _passwordKey(String accountId) =>
       'email_acc_${accountId}_password';
 
-  /// Carrega todas as contas de e-mail cadastradas
+  static Future<void> _enqueueSync(
+    AppDatabase db, {
+    required String operation,
+    required EmailAccountDbEntry entry,
+    Map<String, dynamic>? baseData,
+  }) async {
+    final now = DateTime.now();
+    final payload = SyncTimestamp.normalizeMapDates(entry.toJson());
+    // Garantia defensiva extra: nunca gravar senha ou tokens em sync_queue.
+    payload.remove('password');
+    payload.remove('accessToken');
+    payload.remove('refreshToken');
+    if (baseData != null) {
+      payload['_base'] = SyncTimestamp.normalizeMapDates(baseData);
+    }
+    await db
+        .into(db.syncQueue)
+        .insert(
+          SyncQueueCompanion.insert(
+            id: const Uuid().v4(),
+            entityType: 'email_accounts',
+            entityId: entry.id,
+            operation: operation,
+            payload: jsonEncode(payload),
+            createdAt: now,
+          ),
+        );
+  }
+
+  static Future<void> _syncKvMirror(
+    AppDatabase db,
+    List<EmailAccount> activeAccounts,
+  ) async {
+    final encoded = jsonEncode(activeAccounts.map((a) => a.toJson()).toList());
+    await db
+        .into(db.appKvStore)
+        .insertOnConflictUpdate(
+          AppKvStoreCompanion.insert(
+            key: _accountsKvKey,
+            value: encoded,
+            updatedAt: drift.Value(DateTime.now()),
+          ),
+        );
+  }
+
+  /// Observa contas de e-mail ativas reativamente (atualiza ao receber via E2EE).
+  static Stream<List<EmailAccount>> watchAccounts(AppDatabase db) {
+    final query = db.select(db.emailAccounts)
+      ..where((t) => t.deletedAt.isNull())
+      ..orderBy([(t) => drift.OrderingTerm.asc(t.createdAt)]);
+    return query.watch().map(
+      (rows) => rows
+          .map(EmailAccount.fromDbEntry)
+          .where((a) => a.email.isNotEmpty)
+          .toList(),
+    );
+  }
+
+  /// Verifica se este dispositivo possui credencial local (senha ou token OAuth) para [account].
+  static Future<bool> hasLocalCredentials(
+    EmailAccount account, [
+    AppDatabase? db,
+  ]) async {
+    if (account.isOAuth) {
+      try {
+        final bundle = await const OAuthTokenStore().readTokenBundle(
+          account.id,
+        );
+        if (bundle == null) return false;
+        final hasRefresh =
+            bundle.refreshToken != null && bundle.refreshToken!.isNotEmpty;
+        return !bundle.isExpired || hasRefresh;
+      } catch (e, st) {
+        AppLogger.debug(
+          'Falha ao consultar OAuth local para ${account.id}: $e',
+          st,
+        );
+        return false;
+      }
+    }
+    final pass = await getAccountPassword(account.id, db);
+    return pass != null && pass.trim().isNotEmpty;
+  }
+
+  /// Carrega todas as contas de e-mail cadastradas (migra automaticamente de KV legado se necessário).
   static Future<List<EmailAccount>> loadAccounts(AppDatabase db) async {
+    final typedRows =
+        await (db.select(db.emailAccounts)
+              ..where((t) => t.deletedAt.isNull())
+              ..orderBy([(t) => drift.OrderingTerm.asc(t.createdAt)]))
+            .get();
+
+    if (typedRows.isNotEmpty) {
+      return typedRows
+          .map(EmailAccount.fromDbEntry)
+          .where((a) => a.email.isNotEmpty)
+          .toList();
+    }
+
+    // Fallback de promoção única caso o KV tenha contas ainda não gravadas em `email_accounts`.
+    final accounts = <EmailAccount>[];
     final row = await (db.select(
       db.appKvStore,
     )..where((t) => t.key.equals(_accountsKvKey))).getSingleOrNull();
-
-    final accounts = <EmailAccount>[];
     if (row != null && row.value.isNotEmpty) {
       try {
         final decoded = jsonDecode(row.value);
@@ -299,10 +455,15 @@ class EmailAccountsManager {
                 .where((a) => a.email.isNotEmpty),
           );
         }
-      } catch (_) {}
+      } catch (e, st) {
+        AppLogger.warning(
+          'JSON inválido ao carregar registro legado $_accountsKvKey',
+          e,
+          st,
+        );
+      }
     }
 
-    // Se nenhuma conta estiver no multi-registro, sincroniza a conta primária legada se existir
     if (accounts.isEmpty) {
       final legacyImapEmail = await (db.select(
         db.appKvStore,
@@ -319,40 +480,63 @@ class EmailAccountsManager {
         final host = await (db.select(
           db.appKvStore,
         )..where((t) => t.key.equals('jw_eas_host'))).getSingleOrNull();
-        final acc = EmailAccount.createPreset(
-          id: legacyEasAccountId,
-          providerType: EmailProviderType.exchange,
-          name: 'Exchange Principal',
-          email: legacyEasEmail!.value,
-          username: legacyEasEmail.value,
-          customHost: host?.value,
+        accounts.add(
+          EmailAccount.createPreset(
+            id: legacyEasAccountId,
+            providerType: EmailProviderType.exchange,
+            name: 'Exchange Principal',
+            email: legacyEasEmail!.value,
+            username: legacyEasEmail.value,
+            customHost: host?.value,
+          ),
         );
-        accounts.add(acc);
       } else if (legacyImapEmail?.value.isNotEmpty == true) {
         final host = await (db.select(
           db.appKvStore,
         )..where((t) => t.key.equals('jw_imap_host'))).getSingleOrNull();
-        final acc = EmailAccount.createPreset(
-          id: legacyImapAccountId,
-          providerType: EmailProviderType.jwpub,
-          name: 'JWPUB Principal',
-          email: legacyImapEmail!.value,
-          username: legacyImapEmail.value,
-          customHost: host?.value,
+        accounts.add(
+          EmailAccount.createPreset(
+            id: legacyImapAccountId,
+            providerType: EmailProviderType.jwpub,
+            name: 'JWPUB Principal',
+            email: legacyImapEmail!.value,
+            username: legacyImapEmail.value,
+            customHost: host?.value,
+          ),
         );
-        accounts.add(acc);
       }
+    }
+
+    if (accounts.isNotEmpty) {
+      final now = DateTime.now();
+      await db.transaction(() async {
+        for (final acc in accounts) {
+          final existing = await (db.select(
+            db.emailAccounts,
+          )..where((t) => t.id.equals(acc.id))).getSingleOrNull();
+          if (existing != null) continue;
+          await db
+              .into(db.emailAccounts)
+              .insert(acc.toDbCompanion(updatedAt: now));
+          final inserted = await (db.select(
+            db.emailAccounts,
+          )..where((t) => t.id.equals(acc.id))).getSingle();
+          await _enqueueSync(db, operation: 'INSERT', entry: inserted);
+        }
+      });
     }
 
     return accounts;
   }
 
-  /// Salva uma conta e sua senha de forma segura, deduplicando por (username, incomingProtocol)
+  /// Salva uma conta (metadados sincronizados via E2EE sem senha) e senha local no cofre seguro,
+  /// deduplicando por `(username, incomingProtocol)`.
   static Future<void> saveAccount(
     AppDatabase db,
     EmailAccount account, {
     String? password,
   }) async {
+    final now = DateTime.now();
     final existing = await loadAccounts(db);
     final targetUser =
         (account.username.trim().isNotEmpty
@@ -361,44 +545,77 @@ class EmailAccountsManager {
             .toLowerCase();
     final targetProtocol = account.incomingProtocol;
 
-    final result = <EmailAccount>[];
+    final result = <EmailAccount>[account];
     final seenKeys = <String>{};
-
-    // Insere ou atualiza a conta atual com prioridade
-    result.add(account);
     if (targetUser.isNotEmpty) {
       seenKeys.add('$targetUser::$targetProtocol');
     }
 
-    // Filtra e deduplica contas existentes
+    final duplicateIdsToDelete = <String>[];
     for (final a in existing) {
       if (a.id == account.id) continue;
       final u =
           (a.username.trim().isNotEmpty ? a.username.trim() : a.email.trim())
               .toLowerCase();
-      final p = a.incomingProtocol;
-      final key = '$u::$p';
-
+      final key = '$u::${a.incomingProtocol}';
       if (u.isNotEmpty && seenKeys.contains(key)) {
-        // Ignora duplicata idêntica
+        duplicateIdsToDelete.add(a.id);
         continue;
       }
-      if (u.isNotEmpty) {
-        seenKeys.add(key);
-      }
+      if (u.isNotEmpty) seenKeys.add(key);
       result.add(a);
     }
 
-    final encoded = jsonEncode(result.map((a) => a.toJson()).toList());
-    await db
-        .into(db.appKvStore)
-        .insertOnConflictUpdate(
-          AppKvStoreCompanion.insert(
-            key: _accountsKvKey,
-            value: encoded,
-            updatedAt: drift.Value(DateTime.now()),
-          ),
-        );
+    await db.transaction(() async {
+      // Marca duplicatas substituídas com soft-delete e enfileira tombstone E2EE.
+      for (final dupId in duplicateIdsToDelete) {
+        final dupRow = await (db.select(
+          db.emailAccounts,
+        )..where((t) => t.id.equals(dupId))).getSingleOrNull();
+        if (dupRow != null && dupRow.deletedAt == null) {
+          await (db.update(
+            db.emailAccounts,
+          )..where((t) => t.id.equals(dupId))).write(
+            EmailAccountsCompanion(
+              deletedAt: drift.Value(now),
+              updatedAt: drift.Value(now),
+              revision: drift.Value(dupRow.revision + 1),
+            ),
+          );
+          final deletedRow = await (db.select(
+            db.emailAccounts,
+          )..where((t) => t.id.equals(dupId))).getSingle();
+          await _enqueueSync(
+            db,
+            operation: 'DELETE',
+            entry: deletedRow,
+            baseData: dupRow.toJson(),
+          );
+        }
+      }
+
+      final prevRow = await (db.select(
+        db.emailAccounts,
+      )..where((t) => t.id.equals(account.id))).getSingleOrNull();
+      final nextRev = prevRow == null ? 1 : prevRow.revision + 1;
+      final comp = account.toDbCompanion(
+        updatedAt: now,
+        revision: nextRev,
+        deletedAt: null,
+      );
+      await db.into(db.emailAccounts).insertOnConflictUpdate(comp);
+      final persisted = await (db.select(
+        db.emailAccounts,
+      )..where((t) => t.id.equals(account.id))).getSingle();
+
+      await _enqueueSync(
+        db,
+        operation: prevRow == null ? 'INSERT' : 'UPDATE',
+        entry: persisted,
+        baseData: prevRow?.toJson(),
+      );
+      await _syncKvMirror(db, result);
+    });
 
     if (password != null && password.isNotEmpty) {
       await _secureStorage.write(
@@ -408,7 +625,17 @@ class EmailAccountsManager {
     }
   }
 
-  /// Recupera a senha armazenada com criptografia de hardware
+  /// Atualiza apenas a senha local deste dispositivo sem alterar os metadados sincronizados.
+  static Future<void> setLocalAccountPassword(
+    String accountId,
+    String password,
+  ) async {
+    final clean = password.trim();
+    if (clean.isEmpty) return;
+    await _secureStorage.write(key: _passwordKey(accountId), value: clean);
+  }
+
+  /// Recupera a senha armazenada com criptografia de hardware (estritamente local).
   static Future<String?> getAccountPassword(
     String accountId, [
     AppDatabase? db,
@@ -446,28 +673,58 @@ class EmailAccountsManager {
     return null;
   }
 
-  /// Remove uma conta cadastrada e suas credenciais
+  /// Remove uma conta cadastrada (propaga tombstone E2EE entre aparelhos) e limpa credenciais locais.
   static Future<void> deleteAccount(AppDatabase db, String accountId) async {
-    final existing = await loadAccounts(db);
-    final filtered = existing.where((a) => a.id != accountId).toList();
-
-    final encoded = jsonEncode(filtered.map((a) => a.toJson()).toList());
-    await db
-        .into(db.appKvStore)
-        .insertOnConflictUpdate(
-          AppKvStoreCompanion.insert(
-            key: _accountsKvKey,
-            value: encoded,
-            updatedAt: drift.Value(DateTime.now()),
+    final now = DateTime.now();
+    await db.transaction(() async {
+      final existingRow = await (db.select(
+        db.emailAccounts,
+      )..where((t) => t.id.equals(accountId))).getSingleOrNull();
+      if (existingRow != null && existingRow.deletedAt == null) {
+        await (db.update(
+          db.emailAccounts,
+        )..where((t) => t.id.equals(accountId))).write(
+          EmailAccountsCompanion(
+            deletedAt: drift.Value(now),
+            updatedAt: drift.Value(now),
+            revision: drift.Value(existingRow.revision + 1),
           ),
         );
+        final updatedRow = await (db.select(
+          db.emailAccounts,
+        )..where((t) => t.id.equals(accountId))).getSingle();
+        await _enqueueSync(
+          db,
+          operation: 'DELETE',
+          entry: updatedRow,
+          baseData: existingRow.toJson(),
+        );
+      }
+
+      final active = await (db.select(
+        db.emailAccounts,
+      )..where((t) => t.deletedAt.isNull())).get();
+      await _syncKvMirror(db, active.map(EmailAccount.fromDbEntry).toList());
+    });
 
     try {
       await _secureStorage.delete(key: _passwordKey(accountId));
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.warning(
+        'Falha ao limpar senha local ao remover conta $accountId',
+        e,
+        st,
+      );
+    }
     try {
       await OAuthTokenStore(secureStorage: _secureStorage)
           .deleteTokenBundle(accountId);
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.warning(
+        'Falha ao limpar token OAuth local ao remover conta $accountId',
+        e,
+        st,
+      );
+    }
   }
 }

@@ -22,9 +22,10 @@ class SyncPrivacyPolicy {
 
   static bool get isCloudSyncEnabled => _enableE2eeSyncCompileFlag;
 
-  /// Na Web não há Keychain/Keystore nativo; sincronização persistente na Web
-  /// permanece desabilitada por padrão até solução validada de passphrase por sessão.
-  static bool get webPersistentSyncAllowed => false;
+  /// Na Web utilizamos persistência encapsulada via WebCrypto não-extraível no
+  /// IndexedDB (ou proteção opcional por PIN PBKDF2-HMAC-SHA256) sem gravar
+  /// a frase mnemônica em texto claro.
+  static bool get webPersistentSyncAllowed => true;
 
   /// Verifica se a sincronização remota pode operar na plataforma atual.
   static bool canRunRemoteSync({bool allowInTesting = false}) {

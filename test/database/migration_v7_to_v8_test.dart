@@ -259,11 +259,12 @@ void main() {
       final appDb = AppDatabase.forTesting(NativeDatabase.opened(sqliteDb));
       addTearDown(appDb.close);
 
-      // Dispara migração v7 -> v8
+      // Dispara migração v7 -> schema atual (>= v8)
       final verRow = await appDb
           .customSelect('PRAGMA user_version;')
           .getSingle();
-      expect(verRow.read<int>('user_version'), equals(8));
+      expect(verRow.read<int>('user_version'), equals(appDb.schemaVersion));
+      expect(verRow.read<int>('user_version'), greaterThanOrEqualTo(8));
 
       // Coordenadas e alterações offline devem sobreviver ao upgrade.
       final ponto = await appDb
