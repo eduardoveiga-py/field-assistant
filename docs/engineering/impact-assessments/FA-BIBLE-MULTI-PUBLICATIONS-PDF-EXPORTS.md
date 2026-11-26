@@ -108,7 +108,8 @@
 ## 5. Edge Cases, Failure Modes & Rollback
 
 - **Edge cases:**
-  - EPUB in non-Portuguese language (e.g., Spanish/English/French/German): solved by parsing `biblechapternav(\d+)\.xhtml` / `bibleversenav(\d+)_` canonical book numbers in JW EPUBs plus expanded `NwtBibleBooks` aliases.
+  - EPUB in non-Portuguese language (e.g., Spanish/English/French/German/Ticuna): solved by parsing `biblechapternav(\d+)\.xhtml` / `bibleversenav(\d+)_` canonical book numbers in JW EPUBs plus expanded `NwtBibleBooks` aliases (`tca`/`tcn` -> `Ticuna`).
+  - Partial/selection Bible translations (missing books/chapters/verses): `_loadImportedChapter` never falls back to `bible_nwt_book_*` for a distinct non-default `translationId`, preventing false verse bleed across translations; `BibleVersePopupDialog` consistently displays *"O versículo selecionado não aparece nesta versão da Bíblia."* per translation card when absent.
   - Legacy single-Bible installation upgrading to multi-translation: automatically detected from `bible_nwt_catalog_v1` / `bible_nwt_book_*` with zero data loss.
   - Large EPUBs (e.g. `lff_T.epub` ~103 MB): images other than compact cover (`<= 150 KB`) are skipped so `AppKvStore` stays compact and fast on Web IndexedDB / iOS SQLite.
   - `.jwpub`/`.jwlpub` or PDF masquerading as `.jwpub`: cleanly detected and rejected with explicit user-friendly explanation.

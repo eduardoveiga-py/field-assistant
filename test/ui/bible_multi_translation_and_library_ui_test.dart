@@ -266,6 +266,114 @@ void main() {
     );
 
     testWidgets(
+      'BibleVersePopupDialog exibe aviso claro quando traducao parcial nao contem o versiculo',
+      (tester) async {
+        final db = AppDatabase.forTesting(NativeDatabase.memory());
+        addTearDown(() async {
+          await tester.pumpWidget(const SizedBox.shrink());
+          await tester.pumpAndSettle();
+          await db.close();
+        });
+
+        final fullPt = await NwtBibleService.importFromBytes(
+          db,
+          bytes: Uint8List.fromList(
+            utf8.encode(
+              jsonEncode({
+                'title': 'Tupanaarü Ore (Brasil)',
+                'language': 'tca',
+                'books': {
+                  '51': {
+                    '1': {'21': 'Rü pema ga ü̃pa rü tama...'},
+                  },
+                },
+              }),
+            ),
+          ),
+          fileName: 'sbi2.json',
+        );
+        final partialNwtp = await NwtBibleService.importFromBytes(
+          db,
+          bytes: Uint8List.fromList(
+            utf8.encode(
+              jsonEncode({
+                'title': 'Norü wetchicurugü i tnn (nwtp)',
+                'language': 'tca',
+                'books': {
+                  '55': {
+                    '3': {'1': 'Notürü nüü̃ nacuaꞌ...'},
+                  },
+                },
+              }),
+            ),
+          ),
+          fileName: 'nwtp.json',
+        );
+
+        tester.view.physicalSize = const Size(900, 900);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        // Comparação entre completa e parcial em Colossenses 1:21
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: BibleVersePopupDialog(
+                db: db,
+                bookNumber: 51,
+                chapter: 1,
+                verseSpec: '21',
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(Key('bible_compare_card_${fullPt.catalog.id}')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(Key('bible_compare_card_${partialNwtp.catalog.id}')),
+          findsOneWidget,
+        );
+        expect(
+          find.textContaining('Rü pema ga ü̃pa rü tama...'),
+          findsOneWidget,
+        );
+        expect(
+          find.text(
+            'O versículo selecionado não aparece nesta versão da Bíblia.',
+          ),
+          findsOneWidget,
+        );
+
+        // Seleciona apenas a parcial e abre versículo ausente nela
+        await tester.tap(find.byKey(const Key('btn_bible_compare_versions')));
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(Key('chk_compare_bible_${fullPt.catalog.id}')),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('btn_apply_compare_versions')));
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(Key('bible_compare_card_${partialNwtp.catalog.id}')),
+          findsOneWidget,
+        );
+        expect(
+          find.text(
+            'O versículo selecionado não aparece nesta versão da Bíblia.',
+          ),
+          findsOneWidget,
+        );
+        expect(find.text('Colar / Salvar Versículo Manual'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
       'AppReferencePickerDialog nao tem botao de importacao e lista Publicacoes Importadas',
       (tester) async {
         final db = AppDatabase.forTesting(NativeDatabase.memory());

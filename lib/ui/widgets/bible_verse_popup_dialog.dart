@@ -589,13 +589,26 @@ class _BibleVersePopupDialogState extends State<BibleVersePopupDialog> {
                     isDark: isDark,
                     keyPrefix: 'bible_${passage.translationId}',
                   )
-                : Text(
-                    'Passagem não localizada nesta tradução.',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontStyle: FontStyle.italic,
-                      color: isDark ? Colors.white54 : Colors.black54,
-                    ),
+                : Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.info_outline_rounded,
+                        size: 17,
+                        color: isDark ? Colors.white54 : Colors.black45,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'O versículo selecionado não aparece nesta versão da Bíblia.',
+                          style: TextStyle(
+                            fontSize: 13.5,
+                            fontStyle: FontStyle.italic,
+                            color: isDark ? Colors.white70 : Colors.black54,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
           ),
         ],
@@ -717,7 +730,7 @@ class _BibleVersePopupDialogState extends State<BibleVersePopupDialog> {
             Expanded(
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
-                  : anyFoundVerses
+                  : anyFoundVerses || _passages.isNotEmpty
                   ? Builder(
                       builder: (ctx) {
                         return NotificationListener<ScrollNotification>(
@@ -727,13 +740,23 @@ class _BibleVersePopupDialogState extends State<BibleVersePopupDialog> {
                           },
                           child: SingleChildScrollView(
                             padding: const EdgeInsets.all(16),
-                            child: isComparing
+                            child: isComparing || !anyFoundVerses
                                 ? Column(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.stretch,
                                     children: [
                                       for (final p in _passages)
                                         _buildComparisonCard(ctx, p, isDark),
+                                      if (!anyFoundVerses) ...[
+                                        const SizedBox(height: 6),
+                                        OutlinedButton.icon(
+                                          onPressed: _showManualVerseModal,
+                                          icon: const Icon(Icons.edit_note),
+                                          label: const Text(
+                                            'Colar / Salvar Versículo Manual',
+                                          ),
+                                        ),
+                                      ],
                                     ],
                                   )
                                 : Padding(

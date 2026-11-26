@@ -1076,8 +1076,17 @@ class NwtBibleService {
                     language.trim().toLowerCase(),
           )
           .firstOrNull;
-      targetId =
+      var candidate =
           matching?.id ?? _buildTranslationId(language: language, title: title);
+      if (matching == null) {
+        final usedIds = existingList.map((e) => e.id).toSet();
+        var suffix = 2;
+        while (usedIds.contains(candidate)) {
+          candidate = '${candidate}_$suffix';
+          suffix++;
+        }
+      }
+      targetId = candidate;
     }
 
     final shouldBePrimary =
@@ -1766,17 +1775,12 @@ class NwtBibleService {
     required int bookNumber,
     required int chapter,
   }) async {
-    var row =
+    final row =
         await (db.select(db.appKvStore)..where(
               (t) =>
                   t.key.equals(translationBookKvKey(translationId, bookNumber)),
             ))
             .getSingleOrNull();
-    if (row == null && translationId != defaultTranslationId) {
-      row = await (db.select(
-        db.appKvStore,
-      )..where((t) => t.key.equals(bookKvKey(bookNumber)))).getSingleOrNull();
-    }
     if (row == null || row.value.isEmpty) return const {};
     try {
       final decoded = jsonDecode(row.value);
