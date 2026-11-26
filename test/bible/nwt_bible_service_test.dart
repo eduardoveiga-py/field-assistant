@@ -602,5 +602,107 @@ void main() {
         ),
       );
     });
+
+    test('tradução parcial não faz fallback para livros da tradução padrão e preserva versículos combinados', () async {
+      await NwtBibleService.importFromBytes(
+        db,
+        bytes: Uint8List.fromList(
+          utf8.encode(
+            jsonEncode({
+              'title': 'Bíblia Completa PT',
+              'language': 'pt-BR',
+              'books': {
+                '51': {
+                  '1': {'21': 'Colossenses completo em português.'},
+                },
+              },
+            }),
+          ),
+        ),
+        fileName: 'pt_full.json',
+      );
+
+      final partial = await NwtBibleService.importFromBytes(
+        db,
+        bytes: Uint8List.fromList(
+          utf8.encode(
+            jsonEncode({
+              'title': 'Norü wetchicurugü i tnn (nwtp)',
+              'language': 'tca',
+              'books': {
+                '49': {
+                  '2': {
+                    '11': '2:11-12 Rü ngẽmaca̱ i pema...',
+                    '12': 'Nüü̃ nadau 2:11',
+                  },
+                },
+              },
+            }),
+          ),
+        ),
+        fileName: 'nwtp_partial.json',
+      );
+
+      final colInPartial = await NwtBibleService.lookupPassage(
+        db,
+        bookNumber: 51,
+        chapter: 1,
+        verseSpec: '21',
+        translationId: partial.catalog.id,
+      );
+      expect(colInPartial.verses, isEmpty);
+
+      final ep12 = await NwtBibleService.lookupPassage(
+        db,
+        bookNumber: 49,
+        chapter: 2,
+        verseSpec: '12',
+        translationId: partial.catalog.id,
+      );
+      expect(ep12.verses.single.text, equals('Nüü̃ nadau 2:11'));
+
+      // Mesmo conteúdo via EPUB com <span class="verse" id="v49-2-12">
+      final epubArchive = Archive();
+      void addStr(String p, String c) {
+        final b = utf8.encode(c);
+        epubArchive.addFile(ArchiveFile(p, b.length, b));
+      }
+
+      addStr('META-INF/container.xml', '''<?xml version="1.0"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles>
+</container>''');
+      addStr('OEBPS/content.opf', '''<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://www.idpf.org/opf" version="2.0">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:title>Tupanaãrü Ore (Perú)</dc:title>
+    <dc:language>tca</dc:language>
+  </metadata>
+  <manifest><item id="e2" href="b49_c002.xhtml" media-type="application/xhtml+xml"/></manifest>
+  <spine><itemref idref="e2"/></spine>
+</package>''');
+      addStr('OEBPS/b49_c002.xhtml', '''<?xml version="1.0" encoding="utf-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<body>
+  <p class="w_biblebookname"><a href="biblechapternav49.xhtml">2</a></p>
+  <p class="sb"><span class="verse" id="v49-2-11"><sup>11</sup> 2:11-12 Rü ngẽmaca̱...</span></p>
+  <p class="sb"><span class="verse" id="v49-2-12"><sup>12</sup> Nüü̃ nadau 2:11</span></p>
+</body>
+</html>''');
+      final epubImport = await NwtBibleService.importFromBytes(
+        db,
+        bytes: Uint8List.fromList(ZipEncoder().encode(epubArchive)),
+        fileName: 'peru.epub',
+      );
+      expect(epubImport.catalog.languageDisplay, equals('Ticuna'));
+      final ep12Epub = await NwtBibleService.lookupPassage(
+        db,
+        bookNumber: 49,
+        chapter: 2,
+        verseSpec: '12',
+        translationId: epubImport.catalog.id,
+      );
+      expect(ep12Epub.verses.single.text, equals('Nüü̃ nadau 2:11'));
+    });
   });
 }
