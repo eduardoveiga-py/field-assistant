@@ -70,6 +70,11 @@ final retainedEmailsStreamProvider = StreamProvider<List<JwEmailMessage>>((
   return emailService.watchRetainedEmails();
 });
 
+final unreadEmailsCountProvider = StreamProvider<int>((ref) {
+  final emailService = ref.watch(jwEmailServiceProvider);
+  return emailService.watchUnreadEmailsCount();
+});
+
 // ==========================================
 // MÓDULO B — TAREFAS E PROJETOS
 // ==========================================
