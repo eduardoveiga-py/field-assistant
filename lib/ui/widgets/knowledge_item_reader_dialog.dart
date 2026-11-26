@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/app_theme.dart';
 import '../../references/app_reference.dart';
+import '../../reports/knowledge_and_email_pdf_service.dart';
 import 'app_inline_image_view.dart';
 import 'app_reference_viewer.dart';
 import 'highlight_text_helper.dart';
@@ -27,6 +28,7 @@ Future<void> showKnowledgeItemReader(
   VoidCallback? onEdit,
   VoidCallback? onDelete,
   VoidCallback? onExport,
+  Future<void> Function()? onExportPdf,
   bool allowHighlights = false,
   Future<void> Function(String updatedContent)? onContentUpdated,
   VoidCallback? onJumpToTab,
@@ -48,6 +50,7 @@ Future<void> showKnowledgeItemReader(
       onEdit: onEdit,
       onDelete: onDelete,
       onExport: onExport,
+      onExportPdf: onExportPdf,
       allowHighlights: allowHighlights,
       onContentUpdated: onContentUpdated,
       onJumpToTab: onJumpToTab,
@@ -96,6 +99,7 @@ class KnowledgeItemReaderDialog extends StatefulWidget {
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
   final VoidCallback? onExport;
+  final Future<void> Function()? onExportPdf;
   final bool allowHighlights;
   final Future<void> Function(String updatedContent)? onContentUpdated;
   final VoidCallback? onJumpToTab;
@@ -115,6 +119,7 @@ class KnowledgeItemReaderDialog extends StatefulWidget {
     this.onEdit,
     this.onDelete,
     this.onExport,
+    this.onExportPdf,
     this.allowHighlights = false,
     this.onContentUpdated,
     this.onJumpToTab,
@@ -340,24 +345,38 @@ class _KnowledgeItemReaderDialogState extends State<KnowledgeItemReaderDialog> {
     final typeColor = _getTypeColor();
 
     return Dialog(
-      backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      backgroundColor: isDark ? const Color(0xFF111827) : Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.08)
+              : const Color(0xFFE2E8F0),
+        ),
+      ),
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         child: SizedBox(
-          width: 780,
-          height: 680,
+          width: 800,
+          height: 690,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // Barra Superior / Cabeçalho
               Container(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
-                  color: isDark
-                      ? const Color(0xFF1E293B)
-                      : const Color(0xFFF8FAFC),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      typeColor.withValues(alpha: isDark ? 0.16 : 0.08),
+                      isDark
+                          ? const Color(0xFF172033)
+                          : const Color(0xFFF8FAFC),
+                    ],
+                  ),
                   border: Border(
                     bottom: BorderSide(
                       color: isDark ? Colors.white10 : Colors.black12,
@@ -569,6 +588,43 @@ class _KnowledgeItemReaderDialogState extends State<KnowledgeItemReaderDialog> {
                         );
                       },
                     ),
+                    IconButton(
+                      key: const Key('btn_reader_export_pdf'),
+                      icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
+                      tooltip: 'Exportar PDF',
+                      onPressed: () async {
+                        try {
+                          if (widget.onExportPdf != null) {
+                            await widget.onExportPdf!();
+                          } else {
+                            await KnowledgeAndEmailPdfService.exportSingleItemPdf(
+                              title: widget.title,
+                              content: _content,
+                              itemType: widget.itemType,
+                              category: widget.category,
+                              subtitle: widget.subtitle,
+                              url: widget.url,
+                              tags: widget.tags,
+                              updatedAt: widget.updatedAt,
+                            );
+                          }
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('PDF gerado com sucesso!'),
+                            ),
+                          );
+                        } catch (e) {
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Erro ao gerar PDF: $e'),
+                              backgroundColor: Colors.redAccent,
+                            ),
+                          );
+                        }
+                      },
+                    ),
                     if (widget.onExport != null)
                       IconButton(
                         icon: const Icon(Icons.share_outlined, size: 18),
@@ -689,8 +745,8 @@ class _KnowledgeItemReaderDialogState extends State<KnowledgeItemReaderDialog> {
     }
 
     final baseStyle = TextStyle(
-      fontSize: 14.5,
-      height: 1.55,
+      fontSize: 15.2,
+      height: 1.65,
       color: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF1E293B),
     );
 

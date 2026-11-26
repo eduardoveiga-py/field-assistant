@@ -41,6 +41,7 @@ class BibleVerseEntry {
 
 /// Resumo leve do acervo bíblico importado armazenado localmente.
 class BibleNwtCatalog {
+  final String id;
   final String title;
   final String language;
   final String sourceFormat; // 'epub', 'json', 'manual'
@@ -49,8 +50,11 @@ class BibleNwtCatalog {
   final int chapterCount;
   final int verseCount;
   final Map<int, int> chaptersByBook;
+  final String? coverBase64;
+  final bool isPrimary;
 
   const BibleNwtCatalog({
+    this.id = NwtBibleService.defaultTranslationId,
     required this.title,
     required this.language,
     required this.sourceFormat,
@@ -59,11 +63,44 @@ class BibleNwtCatalog {
     required this.chapterCount,
     required this.verseCount,
     required this.chaptersByBook,
+    this.coverBase64,
+    this.isPrimary = true,
   });
 
   bool get hasFullLibrary => bookCount > 0 && verseCount > 0;
 
+  String get languageDisplay => NwtBibleBooks.languageDisplayName(language);
+
+  BibleNwtCatalog copyWith({
+    String? id,
+    String? title,
+    String? language,
+    String? sourceFormat,
+    DateTime? importedAt,
+    int? bookCount,
+    int? chapterCount,
+    int? verseCount,
+    Map<int, int>? chaptersByBook,
+    String? coverBase64,
+    bool? isPrimary,
+  }) {
+    return BibleNwtCatalog(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      language: language ?? this.language,
+      sourceFormat: sourceFormat ?? this.sourceFormat,
+      importedAt: importedAt ?? this.importedAt,
+      bookCount: bookCount ?? this.bookCount,
+      chapterCount: chapterCount ?? this.chapterCount,
+      verseCount: verseCount ?? this.verseCount,
+      chaptersByBook: chaptersByBook ?? this.chaptersByBook,
+      coverBase64: coverBase64 ?? this.coverBase64,
+      isPrimary: isPrimary ?? this.isPrimary,
+    );
+  }
+
   Map<String, dynamic> toJson() => {
+    'id': id,
     'title': title,
     'language': language,
     'sourceFormat': sourceFormat,
@@ -71,6 +108,9 @@ class BibleNwtCatalog {
     'bookCount': bookCount,
     'chapterCount': chapterCount,
     'verseCount': verseCount,
+    if (coverBase64 != null && coverBase64!.isNotEmpty)
+      'coverBase64': coverBase64,
+    'isPrimary': isPrimary,
     'chaptersByBook': {
       for (final e in chaptersByBook.entries) '${e.key}': e.value,
     },
@@ -91,6 +131,9 @@ class BibleNwtCatalog {
       }
     }
     return BibleNwtCatalog(
+      id: json['id']?.toString().trim().isNotEmpty == true
+          ? json['id'].toString().trim()
+          : NwtBibleService.defaultTranslationId,
       title:
           json['title']?.toString() ??
           'Bíblia Sagrada (Tradução do Novo Mundo)',
@@ -103,6 +146,8 @@ class BibleNwtCatalog {
       chapterCount: (json['chapterCount'] as num?)?.toInt() ?? 0,
       verseCount: (json['verseCount'] as num?)?.toInt() ?? 0,
       chaptersByBook: map,
+      coverBase64: json['coverBase64']?.toString(),
+      isPrimary: json['isPrimary'] as bool? ?? true,
     );
   }
 }
@@ -114,6 +159,8 @@ class BiblePassageLookupResult {
   final String verseSpec;
   final List<BibleVerseEntry> verses;
   final bool hasImportedBible;
+  final String? translationId;
+  final BibleNwtCatalog? catalog;
 
   const BiblePassageLookupResult({
     required this.book,
@@ -121,9 +168,32 @@ class BiblePassageLookupResult {
     required this.verseSpec,
     required this.verses,
     required this.hasImportedBible,
+    this.translationId,
+    this.catalog,
   });
 
   bool get hasFoundVerses => verses.isNotEmpty;
+}
+
+/// Passagem resolvida para uma tradução específica no modo de comparação.
+class BibleTranslationPassage {
+  final String translationId;
+  final String title;
+  final String language;
+  final String languageDisplay;
+  final String? coverBase64;
+  final bool isManualFallback;
+  final BiblePassageLookupResult lookup;
+
+  const BibleTranslationPassage({
+    required this.translationId,
+    required this.title,
+    required this.language,
+    required this.languageDisplay,
+    this.coverBase64,
+    this.isManualFallback = false,
+    required this.lookup,
+  });
 }
 
 /// Resultado de importação de arquivo EPUB ou JSON da TNM.
@@ -134,14 +204,26 @@ class BibleImportResult {
 }
 
 /// Serviço offline-first para importação local pelo usuário (EPUB oficial jw.org ou JSON)
-/// e armazenamento sharded por livro em [AppKvStore], preservando fluidez na Web/Mobile.
+/// com suporte a múltiplas traduções/idiomas e armazenamento sharded por livro em [AppKvStore].
 class NwtBibleService {
   NwtBibleService._();
 
+  static const String defaultTranslationId = 'default';
   static const String catalogKvKey = 'bible_nwt_catalog_v1';
+  static const String translationsCatalogKvKey =
+      'bible_translations_catalog_v1';
+  static const String selectedCompareIdsKvKey = 'bible_compare_selected_ids_v1';
   static const String manualKvKey = 'bible_nwt_manual_v1';
   static const String highlightsKvKey = 'bible_nwt_highlights_v1';
   static String bookKvKey(int bookNumber) => 'bible_nwt_book_$bookNumber';
+  static String translationBookKvKey(String translationId, int bookNumber) =>
+      translationId == defaultTranslationId
+      ? bookKvKey(bookNumber)
+      : 'bible_tr_${translationId}_book_$bookNumber';
+  static String translationHighlightsKvKey(String? translationId) =>
+      (translationId == null || translationId == defaultTranslationId)
+      ? highlightsKvKey
+      : 'bible_tr_highlights_$translationId';
   static String _verseHighlightKey(int bookNumber, int chapter, int verse) =>
       '$bookNumber:$chapter:$verse';
 
@@ -180,8 +262,48 @@ class NwtBibleService {
     return out;
   }
 
-  /// Lê o catálogo resumido da Bíblia importada localmente.
-  static Future<BibleNwtCatalog?> loadCatalog(AppDatabase db) async {
+  /// Lista todas as traduções bíblicas importadas localmente (migrando a legada se houver).
+  static Future<List<BibleNwtCatalog>> listTranslations(AppDatabase db) async {
+    final row = await (db.select(
+      db.appKvStore,
+    )..where((t) => t.key.equals(translationsCatalogKvKey))).getSingleOrNull();
+
+    final list = <BibleNwtCatalog>[];
+    if (row != null && row.value.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(row.value);
+        if (decoded is List) {
+          for (final item in decoded) {
+            if (item is Map) {
+              list.add(
+                BibleNwtCatalog.fromJson(Map<String, dynamic>.from(item)),
+              );
+            }
+          }
+        }
+      } catch (e, st) {
+        AppLogger.warning('Falha ao ler catálogo de traduções bíblicas', e, st);
+      }
+    }
+
+    final legacy = await _loadLegacyCatalog(db);
+    if (legacy != null &&
+        legacy.hasFullLibrary &&
+        !list.any((c) => c.id == legacy.id)) {
+      list.insert(0, legacy.copyWith(isPrimary: list.isEmpty));
+    }
+
+    if (list.isNotEmpty && !list.any((c) => c.isPrimary)) {
+      list[0] = list[0].copyWith(isPrimary: true);
+    }
+    list.sort((a, b) {
+      if (a.isPrimary != b.isPrimary) return a.isPrimary ? -1 : 1;
+      return b.importedAt.compareTo(a.importedAt);
+    });
+    return list;
+  }
+
+  static Future<BibleNwtCatalog?> _loadLegacyCatalog(AppDatabase db) async {
     final row = await (db.select(
       db.appKvStore,
     )..where((t) => t.key.equals(catalogKvKey))).getSingleOrNull();
@@ -197,6 +319,132 @@ class NwtBibleService {
     return null;
   }
 
+  /// Lê o catálogo resumido da Bíblia principal importada localmente.
+  static Future<BibleNwtCatalog?> loadCatalog(AppDatabase db) async {
+    final list = await listTranslations(db);
+    if (list.isNotEmpty) {
+      return list.where((c) => c.isPrimary).firstOrNull ?? list.first;
+    }
+    return _loadLegacyCatalog(db);
+  }
+
+  /// Lê a lista de IDs de traduções selecionadas para leitura/comparação no popup.
+  static Future<List<String>> loadSelectedComparisonIds(AppDatabase db) async {
+    final translations = await listTranslations(db);
+    final validIds = translations.map((t) => t.id).toSet();
+    final row = await (db.select(
+      db.appKvStore,
+    )..where((t) => t.key.equals(selectedCompareIdsKvKey))).getSingleOrNull();
+    if (row != null && row.value.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(row.value);
+        if (decoded is List) {
+          final filtered = decoded
+              .map((e) => e.toString())
+              .where(validIds.contains)
+              .toList();
+          if (filtered.isNotEmpty) return filtered;
+        }
+      } catch (_) {}
+    }
+    if (translations.isEmpty) return const [];
+    final primary =
+        translations.where((t) => t.isPrimary).firstOrNull ??
+        translations.first;
+    return [primary.id];
+  }
+
+  /// Persiste as traduções selecionadas para leitura/comparação no popup.
+  static Future<void> saveSelectedComparisonIds(
+    AppDatabase db,
+    List<String> ids,
+  ) async {
+    final dedup = <String>[];
+    for (final id in ids) {
+      if (id.isNotEmpty && !dedup.contains(id)) dedup.add(id);
+    }
+    await _putKv(db, selectedCompareIdsKvKey, jsonEncode(dedup));
+  }
+
+  /// Define uma tradução importada como principal.
+  static Future<void> setPrimaryTranslation(
+    AppDatabase db,
+    String translationId,
+  ) async {
+    final list = await listTranslations(db);
+    if (list.isEmpty) return;
+    final updated = <BibleNwtCatalog>[];
+    BibleNwtCatalog? primary;
+    for (final item in list) {
+      final isTarget = item.id == translationId;
+      final next = item.copyWith(isPrimary: isTarget);
+      if (isTarget) primary = next;
+      updated.add(next);
+    }
+    if (primary == null) return;
+    await db.transaction(() async {
+      await _putKv(
+        db,
+        translationsCatalogKvKey,
+        jsonEncode(updated.map((e) => e.toJson()).toList()),
+      );
+      await _putKv(db, catalogKvKey, jsonEncode(primary!.toJson()));
+    });
+  }
+
+  /// Remove uma tradução específica preservando as demais e versículos manuais.
+  static Future<void> deleteTranslation(
+    AppDatabase db,
+    String translationId,
+  ) async {
+    final current = await listTranslations(db);
+    final remaining = current.where((c) => c.id != translationId).toList();
+    if (remaining.isNotEmpty && !remaining.any((c) => c.isPrimary)) {
+      remaining[0] = remaining[0].copyWith(isPrimary: true);
+    }
+    final newPrimary = remaining.where((c) => c.isPrimary).firstOrNull;
+
+    await db.transaction(() async {
+      if (translationId == defaultTranslationId) {
+        await (db.delete(
+          db.appKvStore,
+        )..where((t) => t.key.like('bible_nwt_book_%'))).go();
+      } else {
+        await (db.delete(
+          db.appKvStore,
+        )..where((t) => t.key.like('bible_tr_${translationId}_book_%'))).go();
+        await (db.delete(db.appKvStore)..where(
+              (t) => t.key.equals(translationHighlightsKvKey(translationId)),
+            ))
+            .go();
+      }
+
+      if (remaining.isEmpty) {
+        await (db.delete(
+          db.appKvStore,
+        )..where((t) => t.key.equals(catalogKvKey))).go();
+        await (db.delete(
+          db.appKvStore,
+        )..where((t) => t.key.equals(translationsCatalogKvKey))).go();
+      } else {
+        await _putKv(
+          db,
+          translationsCatalogKvKey,
+          jsonEncode(remaining.map((e) => e.toJson()).toList()),
+        );
+        if (newPrimary != null) {
+          await _putKv(db, catalogKvKey, jsonEncode(newPrimary.toJson()));
+        }
+      }
+    });
+
+    final selected = await loadSelectedComparisonIds(db);
+    final filteredSelected = selected
+        .where((id) => id != translationId)
+        .toList();
+    await saveSelectedComparisonIds(db, filteredSelected);
+  }
+
   /// Remove os dados locais importados (preserva anotações manuais caso [includeManual] seja falso).
   static Future<void> clearImportedBible(
     AppDatabase db, {
@@ -208,7 +456,16 @@ class NwtBibleService {
       )..where((t) => t.key.equals(catalogKvKey))).go();
       await (db.delete(
         db.appKvStore,
+      )..where((t) => t.key.equals(translationsCatalogKvKey))).go();
+      await (db.delete(
+        db.appKvStore,
+      )..where((t) => t.key.equals(selectedCompareIdsKvKey))).go();
+      await (db.delete(
+        db.appKvStore,
       )..where((t) => t.key.like('bible_nwt_book_%'))).go();
+      await (db.delete(
+        db.appKvStore,
+      )..where((t) => t.key.like('bible_tr_%'))).go();
       if (includeManual) {
         await (db.delete(
           db.appKvStore,
@@ -224,8 +481,9 @@ class NwtBibleService {
     required int chapter,
     required int verse,
     required String? markedText,
+    String? translationId,
   }) async {
-    final store = await _loadHighlightStore(db);
+    final store = await _loadHighlightStore(db, translationId: translationId);
     final key = _verseHighlightKey(bookNumber, chapter, verse);
     final hasTags =
         markedText != null &&
@@ -238,15 +496,22 @@ class NwtBibleService {
     } else {
       store[key] = markedText;
     }
-    await _putKv(db, highlightsKvKey, jsonEncode(store));
+    await _putKv(
+      db,
+      translationHighlightsKvKey(translationId),
+      jsonEncode(store),
+    );
   }
 
   static Future<Map<String, dynamic>> _loadHighlightStore(
-    AppDatabase db,
-  ) async {
-    final row = await (db.select(
-      db.appKvStore,
-    )..where((t) => t.key.equals(highlightsKvKey))).getSingleOrNull();
+    AppDatabase db, {
+    String? translationId,
+  }) async {
+    final row =
+        await (db.select(db.appKvStore)..where(
+              (t) => t.key.equals(translationHighlightsKvKey(translationId)),
+            ))
+            .getSingleOrNull();
     if (row == null || row.value.isEmpty) return {};
     try {
       final decoded = jsonDecode(row.value);
@@ -290,6 +555,7 @@ class NwtBibleService {
     required int bookNumber,
     required int chapter,
     String? verseSpec,
+    String? translationId,
   }) async {
     final book =
         NwtBibleBooks.byNumber(bookNumber) ??
@@ -300,18 +566,27 @@ class NwtBibleService {
           code: 'BIB',
           chapterCount: 1,
         );
-    final catalog = await loadCatalog(db);
+    final translations = await listTranslations(db);
+    final targetCatalog = translationId != null
+        ? translations.where((c) => c.id == translationId).firstOrNull
+        : (translations.where((c) => c.isPrimary).firstOrNull ??
+              translations.firstOrNull);
+    final resolvedId =
+        targetCatalog?.id ?? translationId ?? defaultTranslationId;
     final importedChapter = await _loadImportedChapter(
       db,
+      translationId: resolvedId,
       bookNumber: bookNumber,
       chapter: chapter,
     );
-    final manualChapter = await _loadManualChapter(
-      db,
-      bookNumber: bookNumber,
-      chapter: chapter,
-    );
-    final highlights = await _loadHighlightStore(db);
+    final includeManual =
+        targetCatalog == null ||
+        targetCatalog.isPrimary ||
+        translationId == null;
+    final manualChapter = includeManual
+        ? await _loadManualChapter(db, bookNumber: bookNumber, chapter: chapter)
+        : const <int, String>{};
+    final highlights = await _loadHighlightStore(db, translationId: resolvedId);
 
     final merged = <int, BibleVerseEntry>{};
     for (final e in importedChapter.entries) {
@@ -360,8 +635,68 @@ class NwtBibleService {
       chapter: chapter,
       verseSpec: verseSpec?.trim() ?? '',
       verses: result,
-      hasImportedBible: catalog?.hasFullLibrary ?? false,
+      hasImportedBible: targetCatalog?.hasFullLibrary ?? false,
+      translationId: resolvedId,
+      catalog: targetCatalog,
     );
+  }
+
+  /// Consulta múltiplas traduções simultaneamente para o modo Comparar Versões (estilo JW Library).
+  static Future<List<BibleTranslationPassage>> lookupComparisonPassages(
+    AppDatabase db, {
+    required List<String> translationIds,
+    required int bookNumber,
+    required int chapter,
+    String? verseSpec,
+  }) async {
+    final translations = await listTranslations(db);
+    final byId = {for (final t in translations) t.id: t};
+    final idsToQuery = translationIds.where(byId.containsKey).toList();
+
+    if (idsToQuery.isEmpty) {
+      final manualOnly = await lookupPassage(
+        db,
+        bookNumber: bookNumber,
+        chapter: chapter,
+        verseSpec: verseSpec,
+      );
+      if (manualOnly.hasFoundVerses) {
+        return [
+          BibleTranslationPassage(
+            translationId: defaultTranslationId,
+            title: 'Versículos Salvos Manualmente',
+            language: 'pt',
+            languageDisplay: 'Português',
+            isManualFallback: true,
+            lookup: manualOnly,
+          ),
+        ];
+      }
+      return const [];
+    }
+
+    final results = <BibleTranslationPassage>[];
+    for (final id in idsToQuery) {
+      final cat = byId[id]!;
+      final lookup = await lookupPassage(
+        db,
+        bookNumber: bookNumber,
+        chapter: chapter,
+        verseSpec: verseSpec,
+        translationId: id,
+      );
+      results.add(
+        BibleTranslationPassage(
+          translationId: cat.id,
+          title: cat.title,
+          language: cat.language,
+          languageDisplay: cat.languageDisplay,
+          coverBase64: cat.coverBase64,
+          lookup: lookup,
+        ),
+      );
+    }
+    return results;
   }
 
   /// Importa arquivo `.epub` (baixado pelo usuário no jw.org) ou `.json` estruturado.
@@ -369,32 +704,56 @@ class NwtBibleService {
     AppDatabase db, {
     required Uint8List bytes,
     required String fileName,
+    String? translationId,
+    bool setAsPrimary = false,
     void Function(int processed, int total)? onProgress,
   }) async {
     if (bytes.isEmpty) {
       throw const BibleImportException('O arquivo selecionado está vazio.');
     }
+    if (_looksLikePdf(bytes)) {
+      throw BibleImportException(
+        'O arquivo "$fileName" é um documento PDF, não um EPUB ou JSON bíblico.',
+      );
+    }
 
     final lowerName = fileName.toLowerCase().trim();
-    if (lowerName.endsWith('.jwpub')) {
-      throw const BibleImportException(
-        'Arquivos .jwpub utilizam banco interno criptografado exclusivo do JW Library.\n'
+    if (lowerName.endsWith('.jwpub') || lowerName.endsWith('.jwlpub')) {
+      final titleHint = _tryReadJwpubManifestTitle(bytes);
+      final label = titleHint != null ? ' ("$titleHint")' : '';
+      throw BibleImportException(
+        'Arquivos .jwpub$label utilizam banco interno criptografado exclusivo do JW Library.\n'
         'Para leitura offline aqui no app, baixe no site jw.org a edição oficial em formato .epub '
         '(ou importe um arquivo .json próprio).',
       );
     }
 
     if (lowerName.endsWith('.json')) {
-      return _importJsonBytes(db, bytes, onProgress: onProgress);
+      return _importJsonBytes(
+        db,
+        bytes,
+        translationId: translationId,
+        setAsPrimary: setAsPrimary,
+        onProgress: onProgress,
+      );
     }
 
     // Trata como EPUB (ZIP + OPF + XHTML) ou detecta JWPUB disfarçado
-    return _importEpubBytes(db, bytes, fileName, onProgress: onProgress);
+    return _importEpubBytes(
+      db,
+      bytes,
+      fileName,
+      translationId: translationId,
+      setAsPrimary: setAsPrimary,
+      onProgress: onProgress,
+    );
   }
 
   static Future<BibleImportResult> _importJsonBytes(
     AppDatabase db,
     Uint8List bytes, {
+    String? translationId,
+    bool setAsPrimary = false,
     void Function(int processed, int total)? onProgress,
   }) async {
     dynamic decoded;
@@ -487,6 +846,8 @@ class NwtBibleService {
       title: title,
       language: language,
       sourceFormat: 'json',
+      translationId: translationId,
+      setAsPrimary: setAsPrimary,
       onProgress: onProgress,
     );
   }
@@ -495,6 +856,8 @@ class NwtBibleService {
     AppDatabase db,
     Uint8List bytes,
     String fileName, {
+    String? translationId,
+    bool setAsPrimary = false,
     void Function(int processed, int total)? onProgress,
   }) async {
     final Archive archive;
@@ -514,7 +877,8 @@ class NwtBibleService {
     }
 
     if (filesByPath.containsKey('manifest.json') &&
-        filesByPath.keys.any((k) => k.endsWith('.db'))) {
+        (filesByPath.containsKey('contents') ||
+            filesByPath.keys.any((k) => k.endsWith('.db')))) {
       throw const BibleImportException(
         'Este arquivo é um pacote .jwpub com banco criptografado do JW Library.\n'
         'Por favor, baixe no site jw.org a edição oficial em formato .epub.',
@@ -544,11 +908,19 @@ class NwtBibleService {
         opfXml.findAllElements('dc:language').firstOrNull?.innerText.trim() ??
         'pt';
 
-    // Mapeia ID -> href e verifica arquivo de navegação (ncx / nav)
+    // Mapeia ID -> href e verifica arquivo de navegação (ncx / nav) e capa
     final manifestHrefById = <String, String>{};
     final manifestMediaById = <String, String>{};
     String? ncxPath;
     String? navXhtmlPath;
+    String? coverImagePath;
+    String? coverMetaId;
+
+    for (final meta in opfXml.findAllElements('meta')) {
+      if (meta.getAttribute('name')?.toLowerCase() == 'cover') {
+        coverMetaId = meta.getAttribute('content');
+      }
+    }
 
     for (final item in opfXml.findAllElements('item')) {
       final id = item.getAttribute('id') ?? '';
@@ -563,9 +935,21 @@ class NwtBibleService {
             resolved.toLowerCase().endsWith('.ncx')) {
           ncxPath ??= resolved;
         }
-        if (properties.split(' ').contains('nav')) {
+        if (properties.split(RegExp(r'\s+')).contains('nav')) {
           navXhtmlPath ??= resolved;
         }
+        if (properties.split(RegExp(r'\s+')).contains('cover-image') ||
+            (coverMetaId != null && id == coverMetaId)) {
+          coverImagePath ??= resolved;
+        }
+      }
+    }
+
+    String? coverBase64;
+    if (coverImagePath != null && filesByPath.containsKey(coverImagePath)) {
+      final coverBytes = filesByPath[coverImagePath]!.content;
+      if (coverBytes.isNotEmpty && coverBytes.length <= 180 * 1024) {
+        coverBase64 = base64Encode(coverBytes);
       }
     }
 
@@ -623,7 +1007,7 @@ class NwtBibleService {
           RegExp(r'(?:^|/)(?:toc|nav|cover|pagenav)\.xhtml$')
               .hasMatch(lowerPath);
       if (isNonChapterNavOrExtract) {
-        if (idx % 60 == 0) {
+        if (idx > 0 && idx % 60 == 0) {
           onProgress?.call(idx + 1, total);
           await Future<void>.delayed(Duration.zero);
         }
@@ -639,7 +1023,7 @@ class NwtBibleService {
         outBooks: parsedBooks,
       );
 
-      if (idx % 12 == 0) {
+      if (idx > 0 && idx % 12 == 0) {
         onProgress?.call(idx + 1, total);
         await Future<void>.delayed(Duration.zero);
       }
@@ -648,8 +1032,8 @@ class NwtBibleService {
 
     if (parsedBooks.isEmpty) {
       throw const BibleImportException(
-        'Não foi possível identificar capítulos/versículos da TNM neste EPUB.\n'
-        'Verifique se o arquivo selecionado é a Bíblia Tradução do Novo Mundo completa em .epub.',
+        'Não foi possível identificar capítulos/versículos da Bíblia neste EPUB.\n'
+        'Verifique se o arquivo selecionado é uma Bíblia em .epub válido.',
       );
     }
 
@@ -659,6 +1043,9 @@ class NwtBibleService {
       title: title,
       language: language,
       sourceFormat: 'epub',
+      coverBase64: coverBase64,
+      translationId: translationId,
+      setAsPrimary: setAsPrimary,
       onProgress: onProgress,
     );
   }
@@ -669,16 +1056,49 @@ class NwtBibleService {
     required String title,
     required String language,
     required String sourceFormat,
+    String? coverBase64,
+    String? translationId,
+    bool setAsPrimary = false,
     void Function(int processed, int total)? onProgress,
   }) async {
+    final existingList = await listTranslations(db);
+    String targetId;
+    if (translationId != null && translationId.trim().isNotEmpty) {
+      targetId = translationId.trim();
+    } else if (existingList.isEmpty) {
+      targetId = defaultTranslationId;
+    } else {
+      final matching = existingList
+          .where(
+            (c) =>
+                c.title.trim().toLowerCase() == title.trim().toLowerCase() &&
+                c.language.trim().toLowerCase() ==
+                    language.trim().toLowerCase(),
+          )
+          .firstOrNull;
+      targetId =
+          matching?.id ?? _buildTranslationId(language: language, title: title);
+    }
+
+    final shouldBePrimary =
+        setAsPrimary ||
+        existingList.isEmpty ||
+        existingList.any((c) => c.id == targetId && c.isPrimary);
+
     final chaptersByBook = <int, int>{};
     var totalChapters = 0;
     var totalVerses = 0;
 
     final sortedBookNums = parsedBooks.keys.toList()..sort();
-    await (db.delete(
-      db.appKvStore,
-    )..where((t) => t.key.like('bible_nwt_book_%'))).go();
+    if (targetId == defaultTranslationId) {
+      await (db.delete(
+        db.appKvStore,
+      )..where((t) => t.key.like('bible_nwt_book_%'))).go();
+    } else {
+      await (db.delete(
+        db.appKvStore,
+      )..where((t) => t.key.like('bible_tr_${targetId}_book_%'))).go();
+    }
 
     for (var i = 0; i < sortedBookNums.length; i++) {
       final bookNum = sortedBookNums[i];
@@ -695,14 +1115,19 @@ class NwtBibleService {
         };
       }
 
-      await _putKv(db, bookKvKey(bookNum), jsonEncode(encodedChapters));
-      if (i % 6 == 0) {
+      await _putKv(
+        db,
+        translationBookKvKey(targetId, bookNum),
+        jsonEncode(encodedChapters),
+      );
+      if (i > 0 && i % 6 == 0) {
         onProgress?.call(i + 1, sortedBookNums.length);
         await Future<void>.delayed(Duration.zero);
       }
     }
 
     final catalog = BibleNwtCatalog(
+      id: targetId,
       title: title,
       language: language,
       sourceFormat: sourceFormat,
@@ -711,9 +1136,75 @@ class NwtBibleService {
       chapterCount: totalChapters,
       verseCount: totalVerses,
       chaptersByBook: chaptersByBook,
+      coverBase64: coverBase64,
+      isPrimary: shouldBePrimary,
     );
-    await _putKv(db, catalogKvKey, jsonEncode(catalog.toJson()));
+
+    final nextList = <BibleNwtCatalog>[];
+    for (final item in existingList) {
+      if (item.id == targetId) continue;
+      nextList.add(shouldBePrimary ? item.copyWith(isPrimary: false) : item);
+    }
+    nextList.insert(0, catalog);
+
+    await _putKv(
+      db,
+      translationsCatalogKvKey,
+      jsonEncode(nextList.map((e) => e.toJson()).toList()),
+    );
+    if (shouldBePrimary || targetId == defaultTranslationId) {
+      await _putKv(db, catalogKvKey, jsonEncode(catalog.toJson()));
+    }
+
+    final currentSelected = await loadSelectedComparisonIds(db);
+    if (!currentSelected.contains(targetId)) {
+      await saveSelectedComparisonIds(db, [...currentSelected, targetId]);
+    }
+
     return BibleImportResult(catalog);
+  }
+
+  static String _buildTranslationId({
+    required String language,
+    required String title,
+  }) {
+    final clean = '${language}_$title'
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
+        .replaceAll(RegExp(r'^_+|_+$'), '');
+    final prefix = clean.isEmpty
+        ? 'bible'
+        : (clean.length > 24 ? clean.substring(0, 24) : clean);
+    return '${prefix}_${DateTime.now().millisecondsSinceEpoch}';
+  }
+
+  static bool _looksLikePdf(Uint8List bytes) {
+    if (bytes.length < 4) return false;
+    return bytes[0] == 0x25 &&
+        bytes[1] == 0x50 &&
+        bytes[2] == 0x44 &&
+        bytes[3] == 0x46;
+  }
+
+  static String? _tryReadJwpubManifestTitle(Uint8List bytes) {
+    try {
+      final arch = ZipDecoder().decodeBytes(bytes);
+      for (final f in arch.files) {
+        if (f.isFile && _normalizeZipPath(f.name) == 'manifest.json') {
+          final decoded = jsonDecode(
+            utf8.decode(f.content, allowMalformed: true),
+          );
+          if (decoded is Map) {
+            final pub = decoded['publication'];
+            if (pub is Map && pub['title'] != null) {
+              final t = pub['title'].toString().trim();
+              if (t.isNotEmpty) return t;
+            }
+          }
+        }
+      }
+    } catch (_) {}
+    return null;
   }
 
   static void _extractBibleFromXhtml(
@@ -1075,6 +1566,36 @@ class NwtBibleService {
     required String filePath,
     String? tocTitleHint,
   }) {
+    if (doc != null) {
+      for (final p in doc.findAllElements('p')) {
+        final cls = (p.getAttribute('class') ?? '').toLowerCase();
+        if (cls.contains('w_biblebookname')) {
+          for (final a in p.findElements('a')) {
+            final href = (a.getAttribute('href') ?? '').toLowerCase();
+            final chapNavMatch = RegExp(
+              r'biblechapternav(\d{1,2})\.(?:xhtml|html)',
+            ).firstMatch(href);
+            if (chapNavMatch != null) {
+              final num = int.tryParse(chapNavMatch.group(1)!);
+              if (num != null && num >= 1 && num <= 66) return num;
+            }
+            final verseNavMatch = RegExp(
+              r'bibleversenav(\d{1,2})_\d+\.(?:xhtml|html)',
+            ).firstMatch(href);
+            if (verseNavMatch != null) {
+              final num = int.tryParse(verseNavMatch.group(1)!);
+              if (num != null && num >= 1 && num <= 66) return num;
+            }
+          }
+          final bookLink = p.findElements('a').firstOrNull;
+          if (bookLink != null) {
+            final found = NwtBibleBooks.findByQuery(bookLink.innerText);
+            if (found != null) return found.number;
+          }
+        }
+      }
+    }
+
     if (tocTitleHint != null && tocTitleHint.isNotEmpty) {
       final byToc = NwtBibleBooks.findByQuery(tocTitleHint);
       if (byToc != null) return byToc.number;
@@ -1101,16 +1622,6 @@ class NwtBibleService {
     }
 
     if (doc != null) {
-      for (final p in doc.findAllElements('p')) {
-        final cls = (p.getAttribute('class') ?? '').toLowerCase();
-        if (cls.contains('w_biblebookname')) {
-          final bookLink = p.findElements('a').firstOrNull;
-          if (bookLink != null) {
-            final found = NwtBibleBooks.findByQuery(bookLink.innerText);
-            if (found != null) return found.number;
-          }
-        }
-      }
       for (final tag in const ['title', 'h1', 'h2']) {
         for (final el in doc.findAllElements(tag)) {
           final txt = el.innerText.trim();
@@ -1251,12 +1762,21 @@ class NwtBibleService {
 
   static Future<Map<int, String>> _loadImportedChapter(
     AppDatabase db, {
+    String translationId = defaultTranslationId,
     required int bookNumber,
     required int chapter,
   }) async {
-    final row = await (db.select(
-      db.appKvStore,
-    )..where((t) => t.key.equals(bookKvKey(bookNumber)))).getSingleOrNull();
+    var row =
+        await (db.select(db.appKvStore)..where(
+              (t) =>
+                  t.key.equals(translationBookKvKey(translationId, bookNumber)),
+            ))
+            .getSingleOrNull();
+    if (row == null && translationId != defaultTranslationId) {
+      row = await (db.select(
+        db.appKvStore,
+      )..where((t) => t.key.equals(bookKvKey(bookNumber)))).getSingleOrNull();
+    }
     if (row == null || row.value.isEmpty) return const {};
     try {
       final decoded = jsonDecode(row.value);

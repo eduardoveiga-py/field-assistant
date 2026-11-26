@@ -16,6 +16,7 @@ import '../../official_docs/official_doc_pdf_generator.dart';
 import '../../official_docs/official_doc_presets.dart';
 import '../../references/app_reference.dart';
 import '../../reports/binary_file_saver.dart';
+import '../../reports/knowledge_and_email_pdf_service.dart';
 import '../providers.dart';
 import 'inbox_screen.dart';
 import '../widgets/official_docs/official_doc_preview_widget.dart';
@@ -151,6 +152,10 @@ class _OfficialDocumentsScreenState
       _participantsCtrl.text = doc.participants;
       _bodyCtrl = newBody;
     });
+    if (widget.externalSelectionNotifier != null &&
+        widget.externalSelectionNotifier!.value != doc.id) {
+      widget.externalSelectionNotifier!.value = doc.id;
+    }
     _suppressAutoSave = false;
   }
 
@@ -691,6 +696,45 @@ class _OfficialDocumentsScreenState
     );
   }
 
+  Future<void> _exportQuickPdf() async {
+    if (_exporting) return;
+    if (_editingDoc != null) {
+      final bundle =
+          ref.read(officialDocBundleStreamProvider).value ??
+          await _manager.loadBundle();
+      await _exportFile('pdf', bundle);
+      return;
+    }
+    setState(() => _exporting = true);
+    try {
+      final docs = await _manager.watchDocuments().first;
+      await KnowledgeAndEmailPdfService.exportOfficialDocsIndexPdf(docs);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Relatório de Cartas & Atas exportado em PDF!'),
+          ),
+        );
+      }
+    } catch (e, st) {
+      AppLogger.warning(
+        'Falha ao exportar índice de Cartas & Atas em PDF',
+        e,
+        st,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao gerar PDF: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
+  }
+
   Widget _buildTopActionBar(bool isDark) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -711,6 +755,14 @@ class _OfficialDocumentsScreenState
             onPressed: () => OfficialDocProfilesDialog.show(context),
             icon: const Icon(Icons.tune_rounded, size: 18),
             label: const Text('Perfis & Drive'),
+          ),
+          OutlinedButton.icon(
+            key: const Key('btn_official_doc_quick_pdf'),
+            onPressed: _exporting ? null : _exportQuickPdf,
+            icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
+            label: Text(
+              _editingDoc != null ? 'Exportar PDF' : 'Exportar Lista PDF',
+            ),
           ),
           if (_exporting)
             const Row(
@@ -748,6 +800,9 @@ class _OfficialDocumentsScreenState
                   _editingDoc = null;
                   _selectedDocId = null;
                 });
+                if (widget.externalSelectionNotifier != null) {
+                  widget.externalSelectionNotifier!.value = null;
+                }
               }
             },
             icon: const Icon(Icons.arrow_back),
@@ -773,6 +828,15 @@ class _OfficialDocumentsScreenState
             ),
           ),
           const SizedBox(width: 6),
+          IconButton(
+            key: const Key('btn_official_doc_mobile_pdf'),
+            tooltip: 'Exportar PDF',
+            onPressed: _exporting ? null : () => _exportFile('pdf', bundle),
+            icon: const Icon(
+              Icons.picture_as_pdf_outlined,
+              color: Colors.redAccent,
+            ),
+          ),
           IconButton(
             tooltip: 'Enviar por E-mail',
             onPressed: () => _sendByEmail(bundle),

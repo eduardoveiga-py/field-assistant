@@ -23,6 +23,7 @@ import '../core/app_logger.dart';
 import '../core/biometric_auth_service.dart';
 import '../core/sync_timestamp.dart';
 import '../database/app_database.dart';
+import '../reports/knowledge_and_email_pdf_service.dart';
 import '../reports/web_downloader.dart';
 import 'email_account_model.dart';
 import 'email_contacts_manager.dart';
@@ -2516,11 +2517,15 @@ class JwEmailService {
     return sentMsg;
   }
 
-  /// Exportação dinâmica de mensagens ou anotações (Markdown, Texto ou EML)
+  /// Exportação dinâmica de mensagens ou anotações (PDF, Markdown, Texto ou EML)
   Future<String> exportEmail(
     JwEmailMessage message, {
-    required String format, // 'markdown', 'text', 'eml'
+    required String format, // 'pdf', 'markdown', 'text', 'eml'
   }) async {
+    if (format.toLowerCase() == 'pdf') {
+      final saved = await KnowledgeAndEmailPdfService.exportEmailPdf(message);
+      return saved ?? '';
+    }
     String content;
     String extension;
 
@@ -2558,11 +2563,17 @@ class JwEmailService {
     return content;
   }
 
-  /// Exportação dinâmica de itens genéricos do Inbox (Notas, ditados, etc.)
+  /// Exportação dinâmica de itens genéricos do Inbox (PDF, Markdown ou Texto)
   Future<String> exportInboxEntry(
     InboxEntry entry, {
-    required String format, // 'markdown', 'text'
+    required String format, // 'pdf', 'markdown', 'text'
   }) async {
+    if (format.toLowerCase() == 'pdf') {
+      final saved = await KnowledgeAndEmailPdfService.exportInboxEntryPdf(
+        entry,
+      );
+      return saved ?? '';
+    }
     final buffer = StringBuffer();
     final dateStr = DateFormat('dd/MM/yyyy HH:mm').format(entry.capturedAt);
 

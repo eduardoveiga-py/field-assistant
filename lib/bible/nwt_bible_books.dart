@@ -564,15 +564,26 @@ class NwtBibleBooks {
       'à': 'a',
       'â': 'a',
       'ã': 'a',
+      'ä': 'a',
       'é': 'e',
+      'è': 'e',
       'ê': 'e',
+      'ë': 'e',
       'í': 'i',
+      'ì': 'i',
+      'î': 'i',
+      'ï': 'i',
       'ó': 'o',
+      'ò': 'o',
       'ô': 'o',
       'õ': 'o',
+      'ö': 'o',
       'ú': 'u',
+      'ù': 'u',
+      'û': 'u',
       'ü': 'u',
       'ç': 'c',
+      'ñ': 'n',
     };
     final lower = raw.toLowerCase().trim();
     final buf = StringBuffer();
@@ -586,6 +597,107 @@ class NwtBibleBooks {
         .replaceAll(RegExp(r'\s+'), ' ')
         .trim();
   }
+
+  /// Retorna nome amigável para códigos de idioma comuns em arquivos EPUB.
+  static String languageDisplayName(String? rawCode) {
+    final norm = (rawCode ?? '').trim().toLowerCase().replaceAll('_', '-');
+    if (norm.isEmpty) return 'Idioma não informado';
+    const known = <String, String>{
+      'pt': 'Português',
+      'pt-br': 'Português (Brasil)',
+      'pt-pt': 'Português (Portugal)',
+      't': 'Português',
+      'tca': 'Ticuna',
+      'tcn': 'Ticuna',
+      'es': 'Espanhol',
+      's': 'Espanhol',
+      'en': 'Inglês',
+      'e': 'Inglês',
+      'fr': 'Francês',
+      'f': 'Francês',
+      'de': 'Alemão',
+      'x': 'Alemão',
+      'it': 'Italiano',
+      'i': 'Italiano',
+      'bzs': 'Libras',
+      'gn': 'Guarani',
+      'gug': 'Guarani',
+      'qu': 'Quéchua',
+      'ay': 'Aimará',
+      'ht': 'Crioulo Haitiano',
+      'ja': 'Japonês',
+      'zh': 'Chinês',
+      'ko': 'Coreano',
+      'ru': 'Russo',
+    };
+    if (known.containsKey(norm)) return known[norm]!;
+    final base = norm.split('-').first;
+    if (known.containsKey(base)) return known[base]!;
+    return rawCode!.trim().toUpperCase();
+  }
+
+  static const Map<int, List<String>> _extraMultilingualAliases = {
+    1: ['genese', 'mose', '1 mose'],
+    2: ['exodo', 'exode'],
+    3: ['levitico', 'levitique'],
+    4: ['numeros', 'nombres'],
+    5: ['deuteronomio', 'deuteronome'],
+    6: ['josue'],
+    7: ['jueces', 'juges'],
+    8: ['rut', 'ruth'],
+    11: ['1 reyes', '1 rois'],
+    12: ['2 reyes', '2 rois'],
+    13: ['1 cronicas', '1 chroniques'],
+    14: ['2 cronicas', '2 chroniques'],
+    15: ['esdras'],
+    16: ['nehemias', 'nehemie'],
+    17: ['ester'],
+    19: ['salmos', 'salmo', 'psaume', 'psaumes'],
+    20: ['proverbios', 'proverbes'],
+    21: ['eclesiastes', 'ecclesiaste'],
+    22: ['cantar de los cantares', 'cantique'],
+    23: ['isaias', 'esaie'],
+    24: ['jeremias', 'jeremie'],
+    25: ['lamentaciones', 'lamentations'],
+    26: ['ezequiel'],
+    28: ['oseas', 'osee'],
+    31: ['abdias', 'abdiou'],
+    32: ['jonas'],
+    33: ['miqueas', 'michee'],
+    34: ['nahum'],
+    35: ['habacuc'],
+    36: ['sofonias', 'sophonie'],
+    37: ['hageo', 'ageo', 'aggee'],
+    38: ['zacarias', 'zacharie'],
+    39: ['malaquias', 'malachie'],
+    40: ['mateo', 'matthieu'],
+    41: ['marcos', 'marc'],
+    42: ['lucas', 'luc'],
+    43: ['juan', 'jean'],
+    44: ['hechos', 'actes'],
+    45: ['romanos', 'romains'],
+    46: ['1 corintios', '1 corinthiens'],
+    47: ['2 corintios', '2 corinthiens'],
+    48: ['galatas', 'galates'],
+    49: ['efesios', 'ephesiens'],
+    50: ['filipenses', 'philippiens'],
+    51: ['colosenses', 'colossiens'],
+    52: ['1 tesalonicenses', '1 thessaloniciens'],
+    53: ['2 tesalonicenses', '2 thessaloniciens'],
+    54: ['1 timoteo', '1 timothee'],
+    55: ['2 timoteo', '2 timothee'],
+    56: ['tito', 'tite'],
+    57: ['filemon', 'philemon'],
+    58: ['hebreos', 'hebreux'],
+    59: ['santiago', 'jacques'],
+    60: ['1 pedro', '1 pierre'],
+    61: ['2 pedro', '2 pierre'],
+    62: ['1 juan', '1 jean'],
+    63: ['2 juan', '2 jean'],
+    64: ['3 juan', '3 jean'],
+    65: ['judas'],
+    66: ['apocalipsis', 'revelacion', 'apocalypse'],
+  };
 
   /// Tenta identificar o livro bíblico a partir de nome, código ou alias.
   static NwtBibleBookInfo? findByQuery(String raw) {
@@ -601,10 +713,12 @@ class NwtBibleBooks {
     for (final book in all) {
       final pt = normalizeName(book.namePt);
       final en = normalizeName(book.nameEn);
+      final extra = _extraMultilingualAliases[book.number] ?? const [];
       if (norm == pt ||
           norm == en ||
           compact == book.code.toLowerCase() ||
-          book.aliases.contains(compact)) {
+          book.aliases.contains(compact) ||
+          extra.contains(norm)) {
         return book;
       }
     }
@@ -613,8 +727,10 @@ class NwtBibleBooks {
     for (final book in all) {
       final pt = normalizeName(book.namePt);
       final en = normalizeName(book.nameEn);
+      final extra = _extraMultilingualAliases[book.number] ?? const [];
       if (norm.startsWith('$pt ') ||
           norm.startsWith('$en ') ||
+          extra.any((e) => norm.startsWith('$e ')) ||
           book.aliases.any((a) => norm.startsWith('$a '))) {
         return book;
       }

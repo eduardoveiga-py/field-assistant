@@ -438,5 +438,169 @@ void main() {
       expect(jhn8.hasFoundVerses, isTrue);
       expect(jhn8.verses.single.text, equals('Texto sintetico do verso doze.'));
     });
+
+    test('Importa multiplas traduções e idiomas (Portugues + Ticuna), compara lado a lado, isola grifos e rejeita .jwpub com título do manifesto', () async {
+      final ptJson = jsonEncode({
+        'title': 'Tradução do Novo Mundo (PT)',
+        'language': 'pt-BR',
+        'books': {
+          '43': {
+            '3': {'16': 'Porque Deus amou tanto o mundo em portugues.'},
+          },
+        },
+      });
+      final ptImport = await NwtBibleService.importFromBytes(
+        db,
+        bytes: Uint8List.fromList(utf8.encode(ptJson)),
+        fileName: 'nwt_T.json',
+      );
+
+      // EPUB sintético em idioma Ticuna usando links biblechapternav / bibleversenav
+      final tcnArchive = Archive();
+      void addTcn(String path, String text) {
+        final raw = utf8.encode(text);
+        tcnArchive.addFile(ArchiveFile(path, raw.length, raw));
+      }
+
+      // Tiny 1x1 PNG transparente válido como capa sintética
+      final coverPng = base64Decode(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+      );
+      tcnArchive.addFile(
+        ArchiveFile('OEBPS/images/cover.png', coverPng.length, coverPng),
+      );
+      addTcn('META-INF/container.xml', '''<?xml version="1.0"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles>
+</container>''');
+      addTcn('OEBPS/content.opf', '''<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:title>Tupanaãrü Ore (Ticuna)</dc:title>
+    <dc:language>tca</dc:language>
+  </metadata>
+  <manifest>
+    <item id="cover-img" href="images/cover.png" media-type="image/png" properties="cover-image"/>
+    <item id="c1" href="jhn3.xhtml" media-type="application/xhtml+xml"/>
+  </manifest>
+  <spine><itemref idref="c1"/></spine>
+</package>''');
+      addTcn('OEBPS/jhn3.xhtml', '''<?xml version="1.0" encoding="utf-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<body>
+<p class="w_navigation w_biblebookname"><a href="biblebooknav.xhtml">Juaũ</a> <a href="biblechapternav43.xhtml">3</a></p>
+<p id="p1" class="p1 sb"><span id="chapter3"></span><span id="chapter3_verse16"></span><strong><sup>16</sup></strong>&#x202F;Tupana rü meãxü̃chi i naãnecü̃ãxü̃.</p>
+</body></html>''');
+      final tcnBytes = Uint8List.fromList(ZipEncoder().encode(tcnArchive));
+      final tcnImport = await NwtBibleService.importFromBytes(
+        db,
+        bytes: tcnBytes,
+        fileName: 'sbi1_TCN.epub',
+      );
+
+      final translations = await NwtBibleService.listTranslations(db);
+      expect(translations.length, equals(2));
+      expect(tcnImport.catalog.language, equals('tca'));
+      expect(tcnImport.catalog.languageDisplay, equals('Ticuna'));
+      expect(tcnImport.catalog.coverBase64, isNotNull);
+
+      await NwtBibleService.saveSelectedComparisonIds(db, [
+        ptImport.catalog.id,
+        tcnImport.catalog.id,
+      ]);
+      final savedIds = await NwtBibleService.loadSelectedComparisonIds(db);
+      expect(savedIds, equals([ptImport.catalog.id, tcnImport.catalog.id]));
+
+      final passages = await NwtBibleService.lookupComparisonPassages(
+        db,
+        translationIds: savedIds,
+        bookNumber: 43,
+        chapter: 3,
+        verseSpec: '16',
+      );
+      expect(passages.length, equals(2));
+      expect(
+        passages[0].lookup.verses.single.text,
+        contains('Deus amou tanto'),
+      );
+      expect(
+        passages[1].lookup.verses.single.text,
+        contains('Tupana rü meãxü̃chi'),
+      );
+
+      // Grifo aplicado apenas na tradução Ticuna não contamina a tradução em Português
+      await NwtBibleService.saveVerseHighlightMarkup(
+        db,
+        bookNumber: 43,
+        chapter: 3,
+        verse: 16,
+        translationId: tcnImport.catalog.id,
+        markedText:
+            '<u style="color:#3B82F6">Tupana</u> rü meãxü̃chi i naãnecü̃ãxü̃.',
+      );
+      final ptAfterHl = await NwtBibleService.lookupPassage(
+        db,
+        bookNumber: 43,
+        chapter: 3,
+        verseSpec: '16',
+        translationId: ptImport.catalog.id,
+      );
+      final tcnAfterHl = await NwtBibleService.lookupPassage(
+        db,
+        bookNumber: 43,
+        chapter: 3,
+        verseSpec: '16',
+        translationId: tcnImport.catalog.id,
+      );
+      expect(ptAfterHl.verses.single.highlightedMarkup, isNull);
+      expect(
+        tcnAfterHl.verses.single.highlightedMarkup,
+        startsWith('<u style="color:#3B82F6">Tupana</u>'),
+      );
+
+      // Alterna principal e exclui uma tradução preservando a restante
+      await NwtBibleService.setPrimaryTranslation(db, tcnImport.catalog.id);
+      final reloaded = await NwtBibleService.listTranslations(db);
+      expect(
+        reloaded.firstWhere((t) => t.id == tcnImport.catalog.id).isPrimary,
+        isTrue,
+      );
+      await NwtBibleService.deleteTranslation(db, ptImport.catalog.id);
+      final afterDelete = await NwtBibleService.listTranslations(db);
+      expect(afterDelete.length, equals(1));
+      expect(afterDelete.single.id, equals(tcnImport.catalog.id));
+
+      // Arquivo .jwpub criptografado com manifest.json retorna erro contextualizado
+      final jwpubArchive = Archive();
+      final manifestRaw = utf8.encode(
+        jsonEncode({
+          'name': 'sbi1_TCN',
+          'publication': {'title': 'Tupanaãrü Ore (Perú)'},
+          'contentFormat': 'z-a',
+        }),
+      );
+      jwpubArchive.addFile(
+        ArchiveFile('manifest.json', manifestRaw.length, manifestRaw),
+      );
+      final jwpubBytes = Uint8List.fromList(ZipEncoder().encode(jwpubArchive));
+      await expectLater(
+        NwtBibleService.importFromBytes(
+          db,
+          bytes: jwpubBytes,
+          fileName: 'sbi1_TCN.jwpub',
+        ),
+        throwsA(
+          isA<BibleImportException>().having(
+            (e) => e.message,
+            'message',
+            allOf(
+              contains('Tupanaãrü Ore (Perú)'),
+              contains('.epub'),
+              contains('jw.org'),
+            ),
+          ),
+        ),
+      );
+    });
   });
 }

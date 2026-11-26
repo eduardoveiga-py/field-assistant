@@ -1,13 +1,12 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../../bible/nwt_bible_books.dart';
 import '../../bible/nwt_bible_service.dart';
 import '../../core/app_theme.dart';
 import '../../database/app_database.dart';
+import '../../publications/imported_publications_service.dart';
 import '../../references/app_reference.dart';
 
 /// Resultado devolvido pelo seletor de referências cruzadas.
@@ -65,10 +64,9 @@ class _AppReferencePickerDialogState extends State<AppReferencePickerDialog> {
   List<AppReferenceCandidate> _candidates = const [];
   bool _loadingCandidates = false;
   int _selectedBookNum = 43; // João
-  BibleNwtCatalog? _bibleCatalog;
+  List<BibleNwtCatalog> _bibleTranslations = const [];
+  String? _selectedBibleTranslationId;
   BiblePassageLookupResult? _biblePreview;
-  bool _importingBible = false;
-  String? _bibleStatus;
 
   @override
   void initState() {
@@ -104,7 +102,13 @@ class _AppReferencePickerDialogState extends State<AppReferencePickerDialog> {
   }
 
   Future<void> _refreshBiblePreview() async {
-    final catalog = await NwtBibleService.loadCatalog(widget.db);
+    final translations = await NwtBibleService.listTranslations(widget.db);
+    var selectedId = _selectedBibleTranslationId;
+    if (selectedId == null || !translations.any((t) => t.id == selectedId)) {
+      selectedId =
+          translations.where((t) => t.isPrimary).firstOrNull?.id ??
+          translations.firstOrNull?.id;
+    }
     final bookInfo =
         NwtBibleBooks.byNumber(_selectedBookNum) ?? NwtBibleBooks.all.first;
     final chapter = (int.tryParse(_chapterCtrl.text.trim()) ?? 1).clamp(
@@ -116,71 +120,96 @@ class _AppReferencePickerDialogState extends State<AppReferencePickerDialog> {
       bookNumber: _selectedBookNum,
       chapter: chapter,
       verseSpec: _versesCtrl.text.trim(),
+      translationId: selectedId,
     );
     if (!mounted) return;
     setState(() {
-      _bibleCatalog = catalog;
+      _bibleTranslations = translations;
+      _selectedBibleTranslationId = selectedId;
       _biblePreview = preview;
     });
   }
 
-  Future<void> _importBibleFile() async {
-    setState(() {
-      _importingBible = true;
-      _bibleStatus = null;
-    });
-    try {
-      final files = await FilePicker.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: const ['epub', 'json', 'jwpub'],
+  Future<void> _pickPublicationChapter(AppReferenceCandidate item) async {
+    final summary = await ImportedPublicationsService.getPublication(
+      widget.db,
+      item.id,
+    );
+    if (!mounted) return;
+    if (summary == null || summary.chapters.isEmpty) {
+      Navigator.of(context).pop(
+        AppReferencePickResult(
+          category: item.category,
+          markdownToken: item.buildMarkdownLink(),
+          candidate: item,
+        ),
       );
-      if (files.isEmpty) {
-        if (mounted) setState(() => _importingBible = false);
-        return;
-      }
-      final file = files.first;
-      Uint8List bytes;
-      try {
-        bytes = await file.readAsBytes();
-      } catch (e) {
-        if (mounted) {
-          setState(() {
-            _importingBible = false;
-            _bibleStatus = 'Não foi possível ler "${file.name}": $e';
-          });
-        }
-        return;
-      }
-      if (bytes.isEmpty) {
-        if (mounted) {
-          setState(() {
-            _importingBible = false;
-            _bibleStatus = 'O arquivo "${file.name}" está vazio.';
-          });
-        }
-        return;
-      }
-      final imported = await NwtBibleService.importFromBytes(
-        widget.db,
-        bytes: bytes,
-        fileName: file.name,
-      );
-      await _refreshBiblePreview();
-      if (mounted) {
-        setState(() {
-          _importingBible = false;
-          _bibleStatus =
-              'TNM importada (${imported.catalog.bookCount} livros, ${imported.catalog.verseCount} versículos).';
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _importingBible = false;
-          _bibleStatus = e.toString();
-        });
-      }
+      return;
     }
+    final selectedChapter = await showDialog<ImportedPublicationChapterMeta>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(
+          summary.title,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+        content: SizedBox(
+          width: 440,
+          height: 360,
+          child: ListView.separated(
+            itemCount: summary.chapters.length,
+            separatorBuilder: (_, _) => const Divider(height: 1),
+            itemBuilder: (_, idx) {
+              final ch = summary.chapters[idx];
+              return ListTile(
+                dense: true,
+                title: Text(
+                  ch.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                trailing: const Icon(Icons.add_circle_outline, size: 18),
+                onTap: () => Navigator.of(ctx).pop(ch),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(ctx).pop(null);
+              Navigator.of(context).pop(
+                AppReferencePickResult(
+                  category: item.category,
+                  markdownToken: item.buildMarkdownLink(),
+                  candidate: item,
+                ),
+              );
+            },
+            child: const Text('Publicação inteira'),
+          ),
+        ],
+      ),
+    );
+    if (selectedChapter == null || !mounted) return;
+    final token = AppReferenceHelper.buildPublicationMarkdownLink(
+      publicationId: summary.id,
+      title: summary.title,
+      chapterIndex: selectedChapter.index,
+      chapterTitle: selectedChapter.title,
+    );
+    Navigator.of(context).pop(
+      AppReferencePickResult(
+        category: AppRefCategory.publication,
+        markdownToken: token,
+        candidate: item,
+      ),
+    );
   }
 
   Future<void> _insertBibleReference() async {
@@ -401,17 +430,6 @@ class _AppReferencePickerDialogState extends State<AppReferencePickerDialog> {
                         ],
                       ),
                       const SizedBox(height: 10),
-                      if (_bibleStatus != null)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: Text(
-                            _bibleStatus!,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: AppTheme.primaryBlue,
-                            ),
-                          ),
-                        ),
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
@@ -426,36 +444,65 @@ class _AppReferencePickerDialogState extends State<AppReferencePickerDialog> {
                             Row(
                               children: [
                                 Icon(
-                                  _bibleCatalog?.hasFullLibrary == true
+                                  _bibleTranslations.isNotEmpty
                                       ? Icons.check_circle_outline
                                       : Icons.info_outline,
                                   size: 16,
-                                  color: _bibleCatalog?.hasFullLibrary == true
+                                  color: _bibleTranslations.isNotEmpty
                                       ? Colors.green
                                       : Colors.amber,
                                 ),
                                 const SizedBox(width: 6),
                                 Expanded(
-                                  child: Text(
-                                    _bibleCatalog?.hasFullLibrary == true
-                                        ? '${_bibleCatalog!.title} (${_bibleCatalog!.bookCount} livros)'
-                                        : 'Nenhuma Bíblia TNM local importada ainda.',
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                                TextButton(
-                                  onPressed: _importingBible
-                                      ? null
-                                      : _importBibleFile,
-                                  child: Text(
-                                    _importingBible
-                                        ? 'Importando...'
-                                        : 'Importar .epub/.json',
-                                    style: const TextStyle(fontSize: 12),
-                                  ),
+                                  child: _bibleTranslations.isEmpty
+                                      ? const Text(
+                                          'Nenhuma Bíblia importada ainda. Importe traduções em Configurações > Biblioteca Offline.',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        )
+                                      : _bibleTranslations.length == 1
+                                      ? Text(
+                                          '${_bibleTranslations.first.title} (${_bibleTranslations.first.languageDisplay}) • ${_bibleTranslations.first.bookCount} livros',
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        )
+                                      : DropdownButtonHideUnderline(
+                                          child: DropdownButton<String>(
+                                            key: const Key(
+                                              'dropdown_picker_bible_translation',
+                                            ),
+                                            isDense: true,
+                                            isExpanded: true,
+                                            value: _selectedBibleTranslationId,
+                                            items: _bibleTranslations.map((t) {
+                                              return DropdownMenuItem<String>(
+                                                value: t.id,
+                                                child: Text(
+                                                  '${t.title} (${t.languageDisplay})',
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style: const TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              );
+                                            }).toList(),
+                                            onChanged: (val) {
+                                              if (val == null) return;
+                                              setState(() {
+                                                _selectedBibleTranslationId =
+                                                    val;
+                                              });
+                                              _refreshBiblePreview();
+                                            },
+                                          ),
+                                        ),
                                 ),
                               ],
                             ),
@@ -526,7 +573,9 @@ class _AppReferencePickerDialogState extends State<AppReferencePickerDialog> {
                         child: Padding(
                           padding: const EdgeInsets.all(24),
                           child: Text(
-                            'Nenhum item disponível em "${_selectedCategory.label}".',
+                            _selectedCategory == AppRefCategory.publication
+                                ? 'Nenhuma publicação EPUB importada ainda.\nImporte publicações em Configurações > Biblioteca Offline.'
+                                : 'Nenhum item disponível em "${_selectedCategory.label}".',
                             textAlign: TextAlign.center,
                             style: const TextStyle(color: Colors.grey),
                           ),
@@ -574,10 +623,25 @@ class _AppReferencePickerDialogState extends State<AppReferencePickerDialog> {
                                     style: const TextStyle(fontSize: 11.5),
                                   )
                                 : null,
-                            trailing: const Icon(
-                              Icons.add_circle_outline,
-                              size: 18,
-                              color: AppTheme.primaryBlue,
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (item.category == AppRefCategory.publication)
+                                  IconButton(
+                                    tooltip: 'Escolher capítulo/artigo',
+                                    icon: const Icon(
+                                      Icons.menu_book_outlined,
+                                      size: 18,
+                                    ),
+                                    onPressed: () =>
+                                        _pickPublicationChapter(item),
+                                  ),
+                                const Icon(
+                                  Icons.add_circle_outline,
+                                  size: 18,
+                                  color: AppTheme.primaryBlue,
+                                ),
+                              ],
                             ),
                             onTap: () {
                               Navigator.of(context).pop(

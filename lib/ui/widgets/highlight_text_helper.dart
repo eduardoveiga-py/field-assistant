@@ -334,6 +334,17 @@ class HighlightTextHelper {
             disposables?.add(recognizer);
           }
 
+          final isBible = url.contains('/bible/');
+          final linkColor = isBible
+              ? (isDark ? const Color(0xFFA5B4FC) : const Color(0xFF4338CA))
+              : (isAppRef
+                    ? (isDark
+                          ? const Color(0xFF5EEAD4)
+                          : const Color(0xFF0F766E))
+                    : (isDark
+                          ? const Color(0xFF93C5FD)
+                          : AppTheme.primaryBlue));
+
           Color? effectiveBg = currentStyle.backgroundColor;
           final legacyTag = anyHighlightTagRegex.firstMatch(rawLabel);
           if (!hasActiveHighlight && legacyTag != null) {
@@ -341,15 +352,8 @@ class HighlightTextHelper {
             final legacyColor = parseHexColor(legacyHex);
             effectiveBg = legacyColor.withValues(alpha: isDark ? 0.42 : 0.34);
           } else if (!hasActiveHighlight && effectiveBg == null && isAppRef) {
-            final baseLinkColor = url.contains('/bible/')
-                ? const Color(0xFF4338CA)
-                : AppTheme.accentTeal;
-            effectiveBg = baseLinkColor.withValues(alpha: 0.10);
+            effectiveBg = linkColor.withValues(alpha: isDark ? 0.16 : 0.10);
           }
-
-          final linkColor = url.contains('/bible/')
-              ? const Color(0xFF6366F1)
-              : (isAppRef ? AppTheme.accentTeal : AppTheme.primaryBlue);
 
           final cleanLabel = stripHighlightTags(rawLabel);
           emitTransformedSpan(
