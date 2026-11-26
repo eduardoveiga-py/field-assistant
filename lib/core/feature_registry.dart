@@ -127,6 +127,14 @@ enum AppFeature {
     icon: Icons.photo_library_outlined,
     category: FeatureCategory.tools,
     isEssential: false,
+  ),
+  officialDocuments(
+    id: 'official_documents',
+    title: 'Cartas & Atas',
+    description: 'Cartas congregacionais, pautas e atas com timbres, fontes, assinatura e exportação PDF/PNG/DOCX',
+    icon: Icons.description_outlined,
+    category: FeatureCategory.tools,
+    isEssential: false,
   );
 
   final String id;

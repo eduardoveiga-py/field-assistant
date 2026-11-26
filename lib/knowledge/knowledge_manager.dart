@@ -40,6 +40,7 @@ class KnowledgeManager {
   // ==========================================
 
   Future<KnowledgeNoteEntry> createNote({
+    String? id,
     required String title,
     required String content,
     String category = 'general',
@@ -51,11 +52,13 @@ class KnowledgeManager {
     List<String> tags = const [],
     List<Map<String, dynamic>>? attachments,
   }) async {
-    final id = _uuid.v4();
+    final noteId = (id != null && id.trim().isNotEmpty)
+        ? id.trim()
+        : _uuid.v4();
     final now = DateTime.now();
 
     final companion = KnowledgeNotesCompanion.insert(
-      id: id,
+      id: noteId,
       title: title.trim(),
       content: content.trim(),
       category: drift.Value(category),
@@ -73,11 +76,11 @@ class KnowledgeManager {
     );
 
     await db.into(db.knowledgeNotes).insert(companion);
-    await _recordSyncQueue(id, 'knowledge_notes', 'INSERT');
+    await _recordSyncQueue(noteId, 'knowledge_notes', 'INSERT');
 
     return (await (db.select(
       db.knowledgeNotes,
-    )..where((t) => t.id.equals(id))).getSingle());
+    )..where((t) => t.id.equals(noteId))).getSingle());
   }
 
   Future<void> updateNote(
@@ -167,6 +170,9 @@ class KnowledgeManager {
 
     if (category != null && category.isNotEmpty && category != 'all') {
       q.where((t) => t.category.equals(category));
+    } else {
+      // Categorias internas de documentos oficiais / templates possuem fluxo próprio
+      q.where((t) => t.category.like('official_%').not());
     }
     if (projectId != null && projectId.isNotEmpty) {
       q.where((t) => t.projectId.equals(projectId));
@@ -318,6 +324,9 @@ class KnowledgeManager {
     }
     if (category != null && category.isNotEmpty && category != 'all') {
       q.where((t) => t.category.equals(category));
+    } else {
+      // Categorias internas de documentos oficiais / templates possuem fluxo próprio
+      q.where((t) => t.category.like('official_%').not());
     }
     if (personId != null && personId.isNotEmpty) {
       q.where((t) => t.personId.equals(personId));
@@ -446,6 +455,9 @@ class KnowledgeManager {
 
     if (category != null && category.isNotEmpty && category != 'all') {
       q.where((t) => t.category.equals(category));
+    } else {
+      // Categorias internas de documentos oficiais / templates possuem fluxo próprio
+      q.where((t) => t.category.like('official_%').not());
     }
     if (projectId != null && projectId.isNotEmpty) {
       q.where((t) => t.projectId.equals(projectId));
@@ -567,6 +579,9 @@ class KnowledgeManager {
     }
     if (category != null && category.isNotEmpty && category != 'all') {
       q.where((t) => t.category.equals(category));
+    } else {
+      // Categorias internas de documentos oficiais / templates possuem fluxo próprio
+      q.where((t) => t.category.like('official_%').not());
     }
     if (query != null && query.trim().isNotEmpty) {
       final pattern = '%${query.trim()}%';
@@ -603,13 +618,34 @@ class KnowledgeManager {
               ..limit(15))
             .get();
     for (final n in notes) {
+      if (n.category == 'official_profile_bundle' ||
+          n.category == 'official_template') {
+        continue;
+      }
+      var snippet = n.content;
+      if (n.category == 'official_doc') {
+        try {
+          final parsed = jsonDecode(n.content);
+          if (parsed is Map<String, dynamic>) {
+            final refSubj = (parsed['referenceSubject'] as String? ?? '')
+                .trim();
+            final body = (parsed['bodyMarkup'] as String? ?? '').trim();
+            snippet = [
+              if (refSubj.isNotEmpty) refSubj,
+              if (body.isNotEmpty) body,
+            ].join(' — ');
+          }
+        } catch (_) {
+          snippet = n.title;
+        }
+      }
       results.add(
         KnowledgeSearchResult(
           id: n.id,
           title: n.title,
-          snippet: n.content.length > 120
-              ? '${n.content.substring(0, 120)}...'
-              : n.content,
+          snippet: snippet.length > 120
+              ? '${snippet.substring(0, 120)}...'
+              : snippet,
           entityType: 'note',
           category: n.category,
           updatedAt: n.updatedAt,

@@ -26,6 +26,7 @@ import 'screens/contacts_map_screen.dart';
 import 'screens/inbox_screen.dart';
 import 'screens/tasks_screen.dart';
 import 'screens/knowledge_base_screen.dart';
+import 'screens/official_documents_screen.dart';
 import 'screens/picture_bank_screen.dart';
 
 class MainNavigationShell extends ConsumerStatefulWidget {
@@ -222,6 +223,8 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
         );
       case AppFeature.pictureBank:
         return const PictureBankScreen();
+      case AppFeature.officialDocuments:
+        return const OfficialDocumentsScreen();
     }
   }
 
@@ -378,6 +381,8 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
         return isSelected ? Icons.mail : Icons.mail_outline;
       case AppFeature.pictureBank:
         return isSelected ? Icons.photo_library : Icons.photo_library_outlined;
+      case AppFeature.officialDocuments:
+        return isSelected ? Icons.description : Icons.description_outlined;
       case AppFeature.tasksProjects:
         return isSelected ? Icons.task_alt : Icons.task_alt_outlined;
       case AppFeature.knowledge:
@@ -494,6 +499,8 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
         return 'Conhecimento';
       case AppFeature.pictureBank:
         return 'Gravuras';
+      case AppFeature.officialDocuments:
+        return 'Cartas & Atas';
     }
   }
 
@@ -554,6 +561,7 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
         AppFeature.tasksProjects,
         AppFeature.knowledge,
         AppFeature.pictureBank,
+        AppFeature.officialDocuments,
       ];
 
       for (final f in railCandidates) {
