@@ -476,6 +476,10 @@ class _SecondBrainRichEditorState extends ConsumerState<SecondBrainRichEditor> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 40;
+    final effectiveMinLines = keyboardOpen && widget.minLines > 4
+        ? 4
+        : widget.minLines;
     final filteredSlash = _activeTriggerType == 'slash'
         ? _slashCommands
               .where(
@@ -499,17 +503,19 @@ class _SecondBrainRichEditorState extends ConsumerState<SecondBrainRichEditor> {
           initialReferenceCategory: widget.initialReferenceCategory,
           onChanged: widget.onChanged,
         ),
-        const SizedBox(height: 6),
+        SizedBox(height: keyboardOpen ? 4 : 6),
         TextField(
           controller: widget.controller,
-          minLines: widget.minLines,
+          minLines: effectiveMinLines,
           maxLines: widget.maxLines,
+          scrollPadding: const EdgeInsets.only(bottom: 148),
           onChanged: (_) => widget.onChanged?.call(),
           decoration: InputDecoration(
             labelText: widget.labelText,
             hintText: widget.hintText,
             alignLabelWithHint: true,
             border: const OutlineInputBorder(),
+            isDense: keyboardOpen,
           ),
         ),
         if (_activeTriggerType == 'wikilink')

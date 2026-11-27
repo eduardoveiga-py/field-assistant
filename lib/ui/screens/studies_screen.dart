@@ -21,6 +21,7 @@ import '../../dashboard/counting_rules.dart';
 import '../providers.dart';
 import '../widgets/global_appointment_scheduling_section.dart';
 import '../widgets/managed_text_controllers.dart';
+import '../widgets/notion/notion_collection_views.dart';
 import '../widgets/rich_formatted_editing_controller.dart';
 import '../widgets/rich_markdown_toolbar.dart';
 import '../../publications/lff_book_catalog.dart';
@@ -45,6 +46,7 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
   void _updateState(VoidCallback fn) => setState(fn);
   String _selectedStatusFilter =
       'Ativos'; // 'Ativos', 'Prioridade & Progresso', 'Encerrados'
+  NotionViewMode _viewMode = NotionViewMode.list;
   final Map<String, int> _manualOrderMap = {};
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
@@ -170,14 +172,7 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
             }
           }
 
-          final filtered = studies.where((s) {
-            if (_selectedStatusFilter == 'Ativos' ||
-                _selectedStatusFilter == 'Prioridade & Progresso') {
-              if (s.status != 'ativo') return false;
-            } else if (_selectedStatusFilter == 'Encerrados') {
-              if (s.status == 'ativo') return false;
-            }
-
+          bool matchesBaseFilters(BibleStudyEntry s) {
             if (_selectedPubFilter != null &&
                 s.publicationId != _selectedPubFilter) {
               return false;
@@ -253,6 +248,17 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
               }
             }
 
+            return true;
+          }
+
+          final baseFiltered = studies.where(matchesBaseFilters).toList();
+          final filtered = baseFiltered.where((s) {
+            if (_selectedStatusFilter == 'Ativos' ||
+                _selectedStatusFilter == 'Prioridade & Progresso') {
+              return s.status == 'ativo';
+            } else if (_selectedStatusFilter == 'Encerrados') {
+              return s.status != 'ativo';
+            }
             return true;
           }).toList();
 
@@ -504,6 +510,19 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                     ),
 
                   const Divider(height: 1),
+                  if (_selectedStatusFilter != 'Prioridade & Progresso')
+                    NotionViewModeBar(
+                      mode: _viewMode,
+                      availableModes: const [
+                        NotionViewMode.list,
+                        NotionViewMode.table,
+                        NotionViewMode.kanban,
+                        NotionViewMode.gallery,
+                      ],
+                      onChanged: (m) => setState(() => _viewMode = m),
+                      isDark: isDark,
+                      keyPrefix: 'studies_view',
+                    ),
                   Expanded(
                     child: _selectedStatusFilter == 'Prioridade & Progresso'
                         ? _buildPriorityAndProgressView(
@@ -515,7 +534,8 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                             allPhotos: allPhotos,
                             isDark: isDark,
                           )
-                        : filtered.isEmpty
+                        : (filtered.isEmpty &&
+                              _viewMode != NotionViewMode.kanban)
                         ? Center(
                             child: Padding(
                               padding: const EdgeInsets.all(24),
@@ -547,6 +567,346 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                                 ],
                               ),
                             ),
+                          )
+                        : _viewMode == NotionViewMode.table
+                        ? NotionResponsiveTable(
+                            isDark: isDark,
+                            columns: const [
+                              NotionTableColumnDef(
+                                label: 'Estudo / Estudante',
+                                width: 240,
+                              ),
+                              NotionTableColumnDef(
+                                label: 'Publicação',
+                                width: 190,
+                              ),
+                              NotionTableColumnDef(
+                                label: 'Progresso',
+                                width: 110,
+                              ),
+                              NotionTableColumnDef(
+                                label: 'Situação',
+                                width: 110,
+                              ),
+                            ],
+                            rows: [
+                              for (final study in filtered)
+                                NotionTableRowItem(
+                                  onTap: () =>
+                                      _showEditStudyDialog(context, study),
+                                  cells: [
+                                    Text(
+                                      study.title,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                    Text(
+                                      PublicationCatalog.getById(
+                                            study.publicationId,
+                                          )?.title ??
+                                          study.publicationId,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
+                                    Text(
+                                      study.currentLesson != null
+                                          ? 'Lição ${study.currentLesson}${study.currentParagraph != null ? ' • § ${study.currentParagraph}' : ''}'
+                                          : 'Inicial',
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
+                                    Text(
+                                      study.status.toUpperCase(),
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w700,
+                                        color: study.status == 'ativo'
+                                            ? AppTheme.successGreen
+                                            : AppTheme.textMuted,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                            ],
+                          )
+                        : _viewMode == NotionViewMode.kanban
+                        ? NotionKanbanBoard<BibleStudyEntry>(
+                            isDark: isDark,
+                            keyPrefix: 'studies_kanban',
+                            columns: const [
+                              NotionKanbanColumnSpec(
+                                statusKey: 'ativo',
+                                label: 'Ativo',
+                                accentColor: AppTheme.successGreen,
+                              ),
+                              NotionKanbanColumnSpec(
+                                statusKey: 'pausado',
+                                label: 'Pausado',
+                                accentColor: Color(0xFFF59E0B),
+                              ),
+                              NotionKanbanColumnSpec(
+                                statusKey: 'concluido',
+                                label: 'Concluído',
+                                accentColor: AppTheme.primaryBlue,
+                              ),
+                              NotionKanbanColumnSpec(
+                                statusKey: 'encerrado',
+                                label: 'Encerrado',
+                                accentColor: Colors.grey,
+                              ),
+                            ],
+                            itemsByColumn: {
+                              'ativo': baseFiltered
+                                  .where((s) => s.status == 'ativo')
+                                  .toList(),
+                              'pausado': baseFiltered
+                                  .where((s) => s.status == 'pausado')
+                                  .toList(),
+                              'concluido': baseFiltered
+                                  .where((s) => s.status == 'concluido')
+                                  .toList(),
+                              'encerrado': baseFiltered
+                                  .where(
+                                    (s) =>
+                                        s.status != 'ativo' &&
+                                        s.status != 'pausado' &&
+                                        s.status != 'concluido',
+                                  )
+                                  .toList(),
+                            },
+                            itemId: (s) => s.id,
+                            onMoveToColumn: (study, targetCol) async {
+                              if (targetCol == 'encerrado') {
+                                _showEndStudyDialog(context, study);
+                                return;
+                              }
+                              if (targetCol == 'ativo') {
+                                await _reactivateStudy(context, study);
+                                return;
+                              }
+                              final repo = ref.read(repositoryProvider);
+                              await repo.updateStudy(
+                                study.copyWith(status: targetCol),
+                              );
+                            },
+                            cardBuilder:
+                                (
+                                  ctx,
+                                  study,
+                                  colKey, {
+                                  required bool isFeedback,
+                                }) {
+                                  final pubTitle =
+                                      PublicationCatalog.getById(
+                                        study.publicationId,
+                                      )?.title ??
+                                      study.publicationId;
+                                  return Card(
+                                    elevation: isFeedback ? 8 : 0,
+                                    margin: EdgeInsets.zero,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      side: BorderSide(
+                                        color: isFeedback
+                                            ? AppTheme.primaryBlue
+                                            : (isDark
+                                                  ? Colors.white.withValues(
+                                                      alpha: 0.08,
+                                                    )
+                                                  : const Color(0xFFE2E8F0)),
+                                      ),
+                                    ),
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(12),
+                                      onTap: isFeedback
+                                          ? null
+                                          : () => _showEditStudyDialog(
+                                              context,
+                                              study,
+                                            ),
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(12),
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              study.title,
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.w700,
+                                                fontSize: 13.5,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              '📖 $pubTitle',
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                color: AppTheme.primaryBlue,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 6),
+                                            Text(
+                                              study.currentLesson != null
+                                                  ? 'Lição ${study.currentLesson}${study.currentParagraph != null ? ' • § ${study.currentParagraph}' : ''}'
+                                                  : 'Não iniciada',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: isDark
+                                                    ? const Color(0xFF94A3B8)
+                                                    : AppTheme.textMuted,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                          )
+                        : _viewMode == NotionViewMode.gallery
+                        ? NotionGalleryGrid<BibleStudyEntry>(
+                            items: filtered,
+                            itemBuilder: (ctx, study) {
+                              final pubTitle =
+                                  PublicationCatalog.getById(
+                                    study.publicationId,
+                                  )?.title ??
+                                  study.publicationId;
+                              final isActive = study.status == 'ativo';
+                              final accent = isActive
+                                  ? AppTheme.successGreen
+                                  : AppTheme.primaryBlue;
+                              return Card(
+                                margin: EdgeInsets.zero,
+                                clipBehavior: Clip.antiAlias,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  side: BorderSide(
+                                    color: isDark
+                                        ? Colors.white.withValues(alpha: 0.08)
+                                        : const Color(0xFFE2E8F0),
+                                  ),
+                                ),
+                                child: InkWell(
+                                  onTap: () =>
+                                      _showEditStudyDialog(context, study),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      Container(
+                                        height: 44,
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            colors: [
+                                              accent.withValues(
+                                                alpha: isDark ? 0.35 : 0.2,
+                                              ),
+                                              accent.withValues(
+                                                alpha: isDark ? 0.12 : 0.06,
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              Icons.menu_book_rounded,
+                                              size: 16,
+                                              color: accent,
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Expanded(
+                                              child: Text(
+                                                study.status.toUpperCase(),
+                                                style: TextStyle(
+                                                  fontSize: 11.5,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: accent,
+                                                ),
+                                              ),
+                                            ),
+                                            Text(
+                                              study.currentLesson != null
+                                                  ? 'Lição ${study.currentLesson}'
+                                                  : 'Inicial',
+                                              style: const TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      Expanded(
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(12),
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                study.title,
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.w800,
+                                                  fontSize: 14,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 6),
+                                              Expanded(
+                                                child: Text(
+                                                  pubTitle,
+                                                  maxLines: 2,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    color: isDark
+                                                        ? const Color(
+                                                            0xFF94A3B8,
+                                                          )
+                                                        : AppTheme.textMuted,
+                                                  ),
+                                                ),
+                                              ),
+                                              if (study.learningGoals != null &&
+                                                  study.learningGoals!
+                                                      .trim()
+                                                      .isNotEmpty)
+                                                Text(
+                                                  study.learningGoals!,
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    color: accent,
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
                           )
                         : ListView.builder(
                             padding: const EdgeInsets.all(12),
@@ -1337,7 +1697,7 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                 ],
               );
 
-              if (!isWide) {
+              if (!isWide || _viewMode != NotionViewMode.list) {
                 return masterPane;
               }
 

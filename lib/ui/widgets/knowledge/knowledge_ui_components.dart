@@ -5,8 +5,10 @@ import 'package:flutter/material.dart';
 import '../../../core/app_theme.dart';
 import '../../../database/app_database.dart';
 import '../../../knowledge/knowledge_backlink_indexer.dart';
+import '../../../knowledge/note_cover_config.dart';
 import '../../../references/app_reference.dart';
 import '../markdown_preview_text.dart';
+import 'note_cover_picker_dialog.dart';
 import 'rich_block_markdown_view.dart';
 
 /// Identidade visual (cor + ícone + rótulo amigável) para itens da Base de Conhecimento.
@@ -407,6 +409,7 @@ class KnowledgeNoteDetailPane extends StatelessWidget {
   final VoidCallback onShare;
   final VoidCallback onTogglePin;
   final VoidCallback onTransformResearch;
+  final VoidCallback? onCustomizeCover;
   final Future<void> Function(String updatedContent) onContentUpdated;
   final ValueChanged<String> onOpenLink;
   final String? areaName;
@@ -430,6 +433,7 @@ class KnowledgeNoteDetailPane extends StatelessWidget {
     required this.onShare,
     required this.onTogglePin,
     required this.onTransformResearch,
+    this.onCustomizeCover,
     required this.onContentUpdated,
     required this.onOpenLink,
     this.areaName,
@@ -478,6 +482,8 @@ class KnowledgeNoteDetailPane extends StatelessWidget {
     final style = resolveNoteCategoryStyle(note.category, note.tags);
     final extractedLinks = extractMarkdownLinks(note.content);
     final props = _decodeProperties(note.propertiesJson);
+    final cover = NoteCoverConfig.fromPropertiesJson(note.propertiesJson);
+    final hasCustomCover = cover != null && cover.hasCustomCover;
     final areaColor = _parseHex(areaColorHex, const Color(0xFF6366F1));
     final sheetBg = isDark ? const Color(0xFF111827) : Colors.white;
     final headerGradStart = style.accent.withValues(
@@ -486,6 +492,311 @@ class KnowledgeNoteDetailPane extends StatelessWidget {
     final headerGradEnd = isDark
         ? const Color(0xFF111827)
         : const Color(0xFFF8FAFC);
+
+    final headerContent = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (breadcrumbAncestors.isNotEmpty) ...[
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                Icon(
+                  Icons.account_tree_outlined,
+                  size: 14,
+                  color: hasCustomCover
+                      ? Colors.white70
+                      : (isDark
+                            ? const Color(0xFF94A3B8)
+                            : const Color(0xFF64748B)),
+                ),
+                const SizedBox(width: 6),
+                for (final anc in breadcrumbAncestors) ...[
+                  InkWell(
+                    onTap: onSelectNote != null
+                        ? () => onSelectNote!(anc)
+                        : null,
+                    borderRadius: BorderRadius.circular(6),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 2,
+                      ),
+                      child: Text(
+                        anc.title,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: hasCustomCover
+                              ? Colors.white
+                              : AppTheme.primaryBlue,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Text(
+                    ' / ',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: hasCustomCover ? Colors.white60 : Colors.grey,
+                    ),
+                  ),
+                ],
+                Text(
+                  note.title,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: hasCustomCover
+                        ? Colors.white70
+                        : (isDark
+                              ? const Color(0xFF94A3B8)
+                              : const Color(0xFF64748B)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: hasCustomCover
+                    ? Colors.white.withValues(alpha: 0.16)
+                    : style.accent.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: hasCustomCover
+                      ? Colors.white.withValues(alpha: 0.30)
+                      : style.accent.withValues(alpha: 0.35),
+                ),
+              ),
+              child: Icon(
+                style.icon,
+                color: hasCustomCover ? Colors.white : style.accent,
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Semantics(
+                    header: true,
+                    child: Text(
+                      note.title,
+                      style: TextStyle(
+                        fontSize: 23,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.3,
+                        color: hasCustomCover
+                            ? Colors.white
+                            : (isDark
+                                  ? const Color(0xFFF8FAFC)
+                                  : const Color(0xFF0F172A)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      KnowledgePillBadge(
+                        label: style.label,
+                        color: style.accent,
+                        isDark: hasCustomCover || isDark,
+                      ),
+                      if (note.isPinned)
+                        KnowledgePillBadge(
+                          icon: Icons.push_pin_rounded,
+                          label: 'Fixada',
+                          color: const Color(0xFFF59E0B),
+                          isDark: hasCustomCover || isDark,
+                        ),
+                      if (areaName != null && areaName!.trim().isNotEmpty)
+                        KnowledgePillBadge(
+                          icon: Icons.layers_outlined,
+                          label: areaName!,
+                          color: areaColor,
+                          isDark: hasCustomCover || isDark,
+                        ),
+                      if (props['status'] != null &&
+                          props['status'].toString().trim().isNotEmpty)
+                        KnowledgePillBadge(
+                          icon: Icons.flag_outlined,
+                          label: _statusLabel(props['status'].toString()),
+                          color: const Color(0xFF0EA5E9),
+                          isDark: hasCustomCover || isDark,
+                        ),
+                      if (props['priority'] != null &&
+                          props['priority'].toString().trim().isNotEmpty)
+                        KnowledgePillBadge(
+                          label: 'Prioridade: ${props['priority']}',
+                          color: const Color(0xFFEC4899),
+                          isDark: hasCustomCover || isDark,
+                        ),
+                      if (note.nextReviewAt != null)
+                        KnowledgePillBadge(
+                          icon: Icons.replay_rounded,
+                          label: 'SM-2 Nível ${note.reviewLevel}',
+                          color: const Color(0xFF10B981),
+                          isDark: hasCustomCover || isDark,
+                        ),
+                      for (final tag in tags)
+                        KnowledgePillBadge(
+                          label: '#$tag',
+                          color: const Color(0xFF14B8A6),
+                          isDark: hasCustomCover || isDark,
+                        ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.update_rounded,
+                            size: 13,
+                            color: hasCustomCover
+                                ? Colors.white70
+                                : (isDark
+                                      ? const Color(0xFF94A3B8)
+                                      : AppTheme.textMuted),
+                          ),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              'Atualizado em $formattedDate',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: hasCustomCover
+                                    ? Colors.white70
+                                    : (isDark
+                                          ? const Color(0xFF94A3B8)
+                                          : AppTheme.textMuted),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Semantics(
+              button: true,
+              label: 'Editar nota ${note.title}',
+              child: FilledButton.tonalIcon(
+                onPressed: onEdit,
+                icon: const Icon(Icons.edit_outlined, size: 16),
+                label: const Text('Editar'),
+              ),
+            ),
+            if (onCustomizeCover != null)
+              Semantics(
+                button: true,
+                label: 'Personalizar capa da nota ${note.title}',
+                child: FilledButton.tonalIcon(
+                  key: const Key('btn_note_detail_customize_cover'),
+                  onPressed: onCustomizeCover,
+                  icon: const Icon(Icons.palette_outlined, size: 16),
+                  label: Text(hasCustomCover ? 'Capa' : 'Adicionar Capa'),
+                ),
+              ),
+            Semantics(
+              button: true,
+              label: 'Exportar nota ${note.title} em PDF',
+              child: IconButton.filledTonal(
+                key: const Key('btn_note_detail_export_pdf'),
+                tooltip: 'Exportar PDF',
+                style: IconButton.styleFrom(
+                  backgroundColor: const Color(0xFFEF4444)
+                      .withValues(alpha: 0.14),
+                  foregroundColor: hasCustomCover || isDark
+                      ? const Color(0xFFFCA5A5)
+                      : const Color(0xFFDC2626),
+                ),
+                icon: const Icon(Icons.picture_as_pdf_outlined, size: 19),
+                onPressed: onExportPdf,
+              ),
+            ),
+            Semantics(
+              button: true,
+              label: 'Exportar nota ${note.title}',
+              child: IconButton.filledTonal(
+                tooltip: 'Exportar Nota',
+                icon: const Icon(Icons.share_outlined, size: 18),
+                onPressed: onShare,
+              ),
+            ),
+            PopupMenuButton<String>(
+              tooltip: 'Mais ações',
+              icon: Icon(
+                Icons.more_horiz_rounded,
+                color: hasCustomCover ? Colors.white : null,
+              ),
+              onSelected: (val) {
+                if (val == 'pin') onTogglePin();
+                if (val == 'cover') onCustomizeCover?.call();
+                if (val == 'subpage') onCreateSubpage?.call();
+                if (val == 'spaced_review') {
+                  onToggleSpacedReview?.call();
+                }
+                if (val == 'research') {
+                  onTransformResearch();
+                }
+              },
+              itemBuilder: (_) => [
+                if (onCustomizeCover != null)
+                  const PopupMenuItem(
+                    value: 'cover',
+                    child: Text('Personalizar Capa'),
+                  ),
+                PopupMenuItem(
+                  value: 'pin',
+                  child: Text(
+                    note.isPinned ? 'Desafixar nota' : 'Fixar no topo',
+                  ),
+                ),
+                if (onCreateSubpage != null)
+                  const PopupMenuItem(
+                    value: 'subpage',
+                    child: Text('Nova Subpágina'),
+                  ),
+                if (onToggleSpacedReview != null)
+                  PopupMenuItem(
+                    value: 'spaced_review',
+                    child: Text(
+                      note.nextReviewAt != null
+                          ? 'Pausar Revisão Espaçada'
+                          : 'Ativar Revisão Espaçada (SM-2)',
+                    ),
+                  ),
+                const PopupMenuItem(
+                  value: 'research',
+                  child: Text('Transformar em Pesquisa'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ],
+    );
 
     return Container(
       color: isDark ? const Color(0xFF090D16) : const Color(0xFFF1F5F9),
@@ -515,312 +826,47 @@ class KnowledgeNoteDetailPane extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Faixa de cabeçalho com gradiente sutil e ações modernas
-                  Container(
-                    padding: const EdgeInsets.fromLTRB(24, 22, 20, 18),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [headerGradStart, headerGradEnd],
-                      ),
-                      border: Border(
-                        bottom: BorderSide(
-                          color: isDark
-                              ? Colors.white.withValues(alpha: 0.08)
-                              : const Color(0xFFE2E8F0),
-                        ),
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                  if (hasCustomCover)
+                    Stack(
                       children: [
-                        if (breadcrumbAncestors.isNotEmpty) ...[
-                          SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.account_tree_outlined,
-                                  size: 14,
-                                  color: isDark
-                                      ? const Color(0xFF94A3B8)
-                                      : const Color(0xFF64748B),
-                                ),
-                                const SizedBox(width: 6),
-                                for (final anc in breadcrumbAncestors) ...[
-                                  InkWell(
-                                    onTap: onSelectNote != null
-                                        ? () => onSelectNote!(anc)
-                                        : null,
-                                    borderRadius: BorderRadius.circular(6),
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 4,
-                                        vertical: 2,
-                                      ),
-                                      child: Text(
-                                        anc.title,
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                          color: AppTheme.primaryBlue,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  const Text(
-                                    ' / ',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                                ],
-                                Text(
-                                  note.title,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: isDark
-                                        ? const Color(0xFF94A3B8)
-                                        : const Color(0xFF64748B),
-                                  ),
-                                ),
-                              ],
+                        Positioned.fill(
+                          child: NoteCoverHeaderBackground(
+                            cover: cover,
+                            height: 220,
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.fromLTRB(24, 22, 20, 18),
+                          decoration: BoxDecoration(
+                            border: Border(
+                              bottom: BorderSide(
+                                color: Colors.white.withValues(alpha: 0.14),
+                              ),
                             ),
                           ),
-                          const SizedBox(height: 8),
-                        ],
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: style.accent.withValues(alpha: 0.18),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: style.accent.withValues(alpha: 0.35),
-                                ),
-                              ),
-                              child: Icon(
-                                style.icon,
-                                color: style.accent,
-                                size: 22,
-                              ),
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Semantics(
-                                    header: true,
-                                    child: Text(
-                                      note.title,
-                                      style: TextStyle(
-                                        fontSize: 23,
-                                        fontWeight: FontWeight.w800,
-                                        letterSpacing: -0.3,
-                                        color: isDark
-                                            ? const Color(0xFFF8FAFC)
-                                            : const Color(0xFF0F172A),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Wrap(
-                                    spacing: 8,
-                                    runSpacing: 6,
-                                    crossAxisAlignment:
-                                        WrapCrossAlignment.center,
-                                    children: [
-                                      KnowledgePillBadge(
-                                        label: style.label,
-                                        color: style.accent,
-                                        isDark: isDark,
-                                      ),
-                                      if (note.isPinned)
-                                        KnowledgePillBadge(
-                                          icon: Icons.push_pin_rounded,
-                                          label: 'Fixada',
-                                          color: const Color(0xFFF59E0B),
-                                          isDark: isDark,
-                                        ),
-                                      if (areaName != null &&
-                                          areaName!.trim().isNotEmpty)
-                                        KnowledgePillBadge(
-                                          icon: Icons.layers_outlined,
-                                          label: areaName!,
-                                          color: areaColor,
-                                          isDark: isDark,
-                                        ),
-                                      if (props['status'] != null &&
-                                          props['status']
-                                              .toString()
-                                              .trim()
-                                              .isNotEmpty)
-                                        KnowledgePillBadge(
-                                          icon: Icons.flag_outlined,
-                                          label: _statusLabel(
-                                            props['status'].toString(),
-                                          ),
-                                          color: const Color(0xFF0EA5E9),
-                                          isDark: isDark,
-                                        ),
-                                      if (props['priority'] != null &&
-                                          props['priority']
-                                              .toString()
-                                              .trim()
-                                              .isNotEmpty)
-                                        KnowledgePillBadge(
-                                          label:
-                                              'Prioridade: ${props['priority']}',
-                                          color: const Color(0xFFEC4899),
-                                          isDark: isDark,
-                                        ),
-                                      if (note.nextReviewAt != null)
-                                        KnowledgePillBadge(
-                                          icon: Icons.replay_rounded,
-                                          label:
-                                              'SM-2 Nível ${note.reviewLevel}',
-                                          color: const Color(0xFF10B981),
-                                          isDark: isDark,
-                                        ),
-                                      for (final tag in tags)
-                                        KnowledgePillBadge(
-                                          label: '#$tag',
-                                          color: const Color(0xFF14B8A6),
-                                          isDark: isDark,
-                                        ),
-                                      Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(
-                                            Icons.update_rounded,
-                                            size: 13,
-                                            color: isDark
-                                                ? const Color(0xFF94A3B8)
-                                                : AppTheme.textMuted,
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Flexible(
-                                            child: Text(
-                                              'Atualizado em $formattedDate',
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                color: isDark
-                                                    ? const Color(0xFF94A3B8)
-                                                    : AppTheme.textMuted,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 14),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          children: [
-                            Semantics(
-                              button: true,
-                              label: 'Editar nota ${note.title}',
-                              child: FilledButton.tonalIcon(
-                                onPressed: onEdit,
-                                icon: const Icon(Icons.edit_outlined, size: 16),
-                                label: const Text('Editar'),
-                              ),
-                            ),
-                            Semantics(
-                              button: true,
-                              label: 'Exportar nota ${note.title} em PDF',
-                              child: IconButton.filledTonal(
-                                key: const Key('btn_note_detail_export_pdf'),
-                                tooltip: 'Exportar PDF',
-                                style: IconButton.styleFrom(
-                                  backgroundColor: const Color(0xFFEF4444)
-                                      .withValues(alpha: 0.14),
-                                  foregroundColor: isDark
-                                      ? const Color(0xFFFCA5A5)
-                                      : const Color(0xFFDC2626),
-                                ),
-                                icon: const Icon(
-                                  Icons.picture_as_pdf_outlined,
-                                  size: 19,
-                                ),
-                                onPressed: onExportPdf,
-                              ),
-                            ),
-                            Semantics(
-                              button: true,
-                              label: 'Exportar nota ${note.title}',
-                              child: IconButton.filledTonal(
-                                tooltip: 'Exportar Nota',
-                                icon: const Icon(
-                                  Icons.share_outlined,
-                                  size: 18,
-                                ),
-                                onPressed: onShare,
-                              ),
-                            ),
-                            PopupMenuButton<String>(
-                              tooltip: 'Mais ações',
-                              icon: const Icon(Icons.more_horiz_rounded),
-                              onSelected: (val) {
-                                if (val == 'pin') onTogglePin();
-                                if (val == 'subpage') onCreateSubpage?.call();
-                                if (val == 'spaced_review') {
-                                  onToggleSpacedReview?.call();
-                                }
-                                if (val == 'research') {
-                                  onTransformResearch();
-                                }
-                              },
-                              itemBuilder: (_) => [
-                                PopupMenuItem(
-                                  value: 'pin',
-                                  child: Text(
-                                    note.isPinned
-                                        ? 'Desafixar nota'
-                                        : 'Fixar no topo',
-                                  ),
-                                ),
-                                if (onCreateSubpage != null)
-                                  const PopupMenuItem(
-                                    value: 'subpage',
-                                    child: Text('Nova Subpágina'),
-                                  ),
-                                if (onToggleSpacedReview != null)
-                                  PopupMenuItem(
-                                    value: 'spaced_review',
-                                    child: Text(
-                                      note.nextReviewAt != null
-                                          ? 'Pausar Revisão Espaçada'
-                                          : 'Ativar Revisão Espaçada (SM-2)',
-                                    ),
-                                  ),
-                                const PopupMenuItem(
-                                  value: 'research',
-                                  child: Text('Transformar em Pesquisa'),
-                                ),
-                              ],
-                            ),
-                          ],
+                          child: headerContent,
                         ),
                       ],
+                    )
+                  else
+                    Container(
+                      padding: const EdgeInsets.fromLTRB(24, 22, 20, 18),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [headerGradStart, headerGradEnd],
+                        ),
+                        border: Border(
+                          bottom: BorderSide(
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.08)
+                                : const Color(0xFFE2E8F0),
+                          ),
+                        ),
+                      ),
+                      child: headerContent,
                     ),
-                  ),
 
                   // Corpo da nota com tipografia editorial, blocos Notion e sublinhado JW Library
                   Padding(

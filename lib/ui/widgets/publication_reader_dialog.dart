@@ -12,6 +12,7 @@ Future<void> showPublicationReaderDialog(
   required AppDatabase db,
   required String publicationId,
   int? initialChapterIndex,
+  String? initialParagraphSpec,
 }) async {
   await showDialog<void>(
     context: context,
@@ -20,6 +21,7 @@ Future<void> showPublicationReaderDialog(
       db: db,
       publicationId: publicationId,
       initialChapterIndex: initialChapterIndex,
+      initialParagraphSpec: initialParagraphSpec,
     ),
   );
 }
@@ -28,12 +30,14 @@ class PublicationReaderDialog extends StatefulWidget {
   final AppDatabase db;
   final String publicationId;
   final int? initialChapterIndex;
+  final String? initialParagraphSpec;
 
   const PublicationReaderDialog({
     super.key,
     required this.db,
     required this.publicationId,
     this.initialChapterIndex,
+    this.initialParagraphSpec,
   });
 
   @override
@@ -47,6 +51,7 @@ class _PublicationReaderDialogState extends State<PublicationReaderDialog> {
   int _chapterIndex = 0;
   bool _loading = true;
   double _fontSize = 15.5;
+  final Map<int, GlobalKey> _paragraphKeys = {};
 
   @override
   void initState() {
@@ -55,12 +60,44 @@ class _PublicationReaderDialogState extends State<PublicationReaderDialog> {
     _load();
   }
 
+  Set<int> get _highlightedNumbers {
+    if (_chapter == null ||
+        widget.initialParagraphSpec == null ||
+        widget.initialParagraphSpec!.trim().isEmpty) {
+      return const {};
+    }
+    if (widget.initialChapterIndex != null &&
+        _chapterIndex != widget.initialChapterIndex) {
+      return const {};
+    }
+    return ImportedPublicationsService.parseParagraphNumbers(
+      widget.initialParagraphSpec,
+    ).toSet();
+  }
+
+  void _scrollToFirstHighlighted() {
+    if (_highlightedNumbers.isEmpty || _chapter == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final firstEntry = _paragraphKeys.entries.firstOrNull;
+      final ctx = firstEntry?.value.currentContext;
+      if (ctx != null) {
+        Scrollable.ensureVisible(
+          ctx,
+          duration: const Duration(milliseconds: 260),
+          alignment: 0.15,
+        );
+      }
+    });
+  }
+
   Future<void> _load() async {
     setState(() => _loading = true);
-    final summary = await ImportedPublicationsService.getPublication(
-      widget.db,
-      widget.publicationId,
-    );
+    final summary =
+        await ImportedPublicationsService.repairNumericChapterTitlesIfNeeded(
+          widget.db,
+          widget.publicationId,
+        );
     ImportedPublicationChapterContent? chapter;
     if (summary != null && summary.chapters.isNotEmpty) {
       final safeIdx = _chapterIndex.clamp(0, summary.chapters.length - 1);
@@ -72,11 +109,13 @@ class _PublicationReaderDialogState extends State<PublicationReaderDialog> {
       );
     }
     if (!mounted) return;
+    _paragraphKeys.clear();
     setState(() {
       _summary = summary;
       _chapter = chapter;
       _loading = false;
     });
+    _scrollToFirstHighlighted();
   }
 
   Future<void> _selectChapter(int index) async {
@@ -90,6 +129,7 @@ class _PublicationReaderDialogState extends State<PublicationReaderDialog> {
       chapterIndex: index,
     );
     if (!mounted) return;
+    _paragraphKeys.clear();
     setState(() {
       _chapter = chapter;
       _loading = false;
@@ -201,6 +241,31 @@ class _PublicationReaderDialogState extends State<PublicationReaderDialog> {
                   },
                 ),
               ),
+            if (_chapter != null && _highlightedNumbers.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Chip(
+                    avatar: const Icon(
+                      Icons.bookmark_rounded,
+                      size: 16,
+                      color: AppTheme.accentTeal,
+                    ),
+                    label: Text(
+                      'Destacando parágrafo(s): ${widget.initialParagraphSpec}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    backgroundColor: AppTheme.accentTeal.withValues(
+                      alpha: 0.12,
+                    ),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+              ),
             Expanded(
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
@@ -216,9 +281,68 @@ class _PublicationReaderDialogState extends State<PublicationReaderDialog> {
                     )
                   : SingleChildScrollView(
                       padding: const EdgeInsets.all(20),
-                      child: SelectableText(
-                        _chapter!.plainText,
-                        style: TextStyle(fontSize: _fontSize, height: 1.6),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          for (
+                            var idx = 0;
+                            idx < _chapter!.resolvedParagraphs.length;
+                            idx++
+                          )
+                            Builder(
+                              builder: (ctx) {
+                                final item = _chapter!.resolvedParagraphs[idx];
+                                final highlighted = _highlightedNumbers;
+                                final isHighlighted =
+                                    item.number != null &&
+                                    highlighted.contains(item.number);
+                                final key = isHighlighted
+                                    ? _paragraphKeys.putIfAbsent(
+                                        idx,
+                                        () => GlobalKey(),
+                                      )
+                                    : null;
+                                return Container(
+                                  key: key,
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  padding: isHighlighted
+                                      ? const EdgeInsets.fromLTRB(12, 8, 12, 8)
+                                      : EdgeInsets.zero,
+                                  decoration: isHighlighted
+                                      ? BoxDecoration(
+                                          color: AppTheme.accentTeal.withValues(
+                                            alpha: isDark ? 0.16 : 0.10,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            10,
+                                          ),
+                                          border: Border(
+                                            left: BorderSide(
+                                              color: AppTheme.accentTeal,
+                                              width: 3.5,
+                                            ),
+                                          ),
+                                        )
+                                      : null,
+                                  child: SelectableText(
+                                    item.text,
+                                    style: TextStyle(
+                                      fontSize: item.isHeadingOnly
+                                          ? _fontSize + 1
+                                          : _fontSize,
+                                      fontWeight: item.isHeadingOnly
+                                          ? FontWeight.w700
+                                          : FontWeight.normal,
+                                      color: item.isHeadingOnly
+                                          ? AppTheme.primaryColor(context)
+                                          : null,
+                                      height: 1.6,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                        ],
                       ),
                     ),
             ),

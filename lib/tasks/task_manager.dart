@@ -120,6 +120,11 @@ class TaskManager {
         status: status != null
             ? drift.Value(status)
             : const drift.Value.absent(),
+        completedAt: status == 'completed'
+            ? drift.Value(now)
+            : (status != null
+                  ? const drift.Value(null)
+                  : const drift.Value.absent()),
         projectId: projectId != null
             ? drift.Value(projectId)
             : const drift.Value.absent(),
@@ -282,6 +287,36 @@ class TaskManager {
     }
     if (projectId != null && projectId.isNotEmpty) {
       q.where((t) => t.projectId.equals(projectId));
+    }
+    if (priority != null && priority.isNotEmpty && priority != 'all') {
+      q.where((t) => t.priority.equals(priority));
+    }
+
+    q.orderBy([
+      (t) => drift.OrderingTerm(
+        expression: t.dueDate,
+        mode: drift.OrderingMode.asc,
+        nulls: drift.NullsOrder.last,
+      ),
+      (t) => drift.OrderingTerm(
+        expression: t.createdAt,
+        mode: drift.OrderingMode.desc,
+      ),
+    ]);
+
+    return q.watch();
+  }
+
+  /// Lista todas as tarefas ativas e concluídas (para colunas Kanban A Fazer / Em Andamento / Concluídas).
+  Stream<List<TaskEntry>> watchAllTasks({String? category, String? priority}) {
+    final q = db.select(db.tasks)
+      ..where(
+        (t) =>
+            t.status.isNotIn(['cancelled', 'archived']) & t.deletedAt.isNull(),
+      );
+
+    if (category != null && category.isNotEmpty && category != 'all') {
+      q.where((t) => t.category.equals(category));
     }
     if (priority != null && priority.isNotEmpty && priority != 'all') {
       q.where((t) => t.priority.equals(priority));

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:drift/drift.dart' as drift;
 
 import '../bible/nwt_bible_books.dart';
+import '../bible/nwt_bible_service.dart';
 import '../core/app_logger.dart';
 import '../core/feature_registry.dart';
 import '../database/app_database.dart';
@@ -151,6 +152,9 @@ enum AppRefCategory {
   }
 }
 
+/// Modo de inserção de referências bíblicas ou de publicações no editor.
+enum ReferenceInsertMode { linkOnly, linkAndTranscript, transcriptOnly }
+
 /// Referência interna parsed de uma URI `app://ref/...`.
 class ParsedAppReference {
   final AppRefCategory category;
@@ -159,6 +163,7 @@ class ParsedAppReference {
   final int? chapter;
   final String? verseSpec;
   final int? publicationChapterIndex;
+  final String? publicationParagraphSpec;
 
   const ParsedAppReference({
     required this.category,
@@ -167,6 +172,7 @@ class ParsedAppReference {
     this.chapter,
     this.verseSpec,
     this.publicationChapterIndex,
+    this.publicationParagraphSpec,
   });
 }
 
@@ -218,12 +224,21 @@ class AppReferenceHelper {
     return '${schemePrefix}bible/$bookNumber/$chapter/${Uri.encodeComponent(cleanSpec)}';
   }
 
-  static String buildPublicationUri(String publicationId, {int? chapterIndex}) {
+  static String buildPublicationUri(
+    String publicationId, {
+    int? chapterIndex,
+    String? paragraphSpec,
+  }) {
     final encodedId = Uri.encodeComponent(publicationId);
     if (chapterIndex == null) {
       return '${schemePrefix}publication/$encodedId';
     }
-    return '${schemePrefix}publication/$encodedId/$chapterIndex';
+    final spec = paragraphSpec?.trim() ?? '';
+    if (spec.isEmpty) {
+      return '${schemePrefix}publication/$encodedId/$chapterIndex';
+    }
+    final encodedSpec = Uri.encodeComponent(spec);
+    return '${schemePrefix}publication/$encodedId/$chapterIndex/$encodedSpec';
   }
 
   static String buildPublicationMarkdownLink({
@@ -231,14 +246,23 @@ class AppReferenceHelper {
     required String title,
     int? chapterIndex,
     String? chapterTitle,
+    String? paragraphSpec,
   }) {
-    final rawLabel = (chapterTitle != null && chapterTitle.trim().isNotEmpty)
+    final baseLabel = (chapterTitle != null && chapterTitle.trim().isNotEmpty)
         ? '$title — ${chapterTitle.trim()}'
         : title;
+    final cleanSpec = paragraphSpec?.trim() ?? '';
+    final rawLabel = (cleanSpec.isNotEmpty && chapterIndex != null)
+        ? '$baseLabel (§/$cleanSpec)'
+        : baseLabel;
     final safeTitle = sanitizeLabel(
       rawLabel.isEmpty ? AppRefCategory.publication.shortLabel : rawLabel,
     );
-    final uri = buildPublicationUri(publicationId, chapterIndex: chapterIndex);
+    final uri = buildPublicationUri(
+      publicationId,
+      chapterIndex: chapterIndex,
+      paragraphSpec: paragraphSpec,
+    );
     return '[${AppRefCategory.publication.emoji} $safeTitle]($uri)';
   }
 
@@ -318,10 +342,14 @@ class AppReferenceHelper {
       final chapterIdx = parts.length >= 3 && parts[2].isNotEmpty
           ? int.tryParse(parts[2])
           : null;
+      final parSpec = parts.length >= 4 && parts[3].trim().isNotEmpty
+          ? Uri.decodeComponent(parts[3]).trim()
+          : null;
       return ParsedAppReference(
         category: cat,
         itemId: pubId,
         publicationChapterIndex: chapterIdx,
+        publicationParagraphSpec: parSpec,
       );
     }
 
@@ -331,6 +359,31 @@ class AppReferenceHelper {
   }
 
   /// Carrega os itens disponíveis de uma [category] no banco Drift para o menu seletor.
+  /// Formata versículos bíblicos em citação Markdown limpa para leitura direta ou impressão.
+  static String formatBibleTranscript({
+    required int bookNumber,
+    required int chapter,
+    String? verseSpec,
+    String? translationTitle,
+    required List<BibleVerseEntry> verses,
+  }) {
+    if (verses.isEmpty) return '';
+    final refLabel = NwtBibleBooks.formatReferenceLabel(
+      bookNumber: bookNumber,
+      chapter: chapter,
+      verseSpec: verseSpec,
+    );
+    final suffix =
+        (translationTitle != null && translationTitle.trim().isNotEmpty)
+        ? ' (${translationTitle.trim()})'
+        : '';
+    final lines = <String>['> 📖 **$refLabel$suffix**'];
+    for (final v in verses) {
+      lines.add('> ${v.number} ${v.text.trim()}');
+    }
+    return lines.join('\n');
+  }
+
   static Future<List<AppReferenceCandidate>> loadCandidates(
     AppDatabase db,
     AppRefCategory category,

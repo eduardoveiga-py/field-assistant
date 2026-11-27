@@ -780,6 +780,52 @@ class RichFormattedEditingController extends TextEditingController {
     notifyListeners();
   }
 
+  /// Insere um bloco de citação transcrita (Bíblia ou Publicação) com estilo visual de citação
+  /// e cabeçalho em negrito, evitando marcações cruas `>` ou `**` durante a edição.
+  void insertQuotedTranscript({String? header, required List<String> lines}) {
+    final cleanHeader = header?.trim() ?? '';
+    final cleanLines = lines
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+    if (cleanHeader.isEmpty && cleanLines.isEmpty) return;
+
+    final sel = selection;
+    final cur = text;
+    final cursor = (sel.isValid ? sel.end : cur.length).clamp(0, cur.length);
+    final leadingNl = (cursor > 0 && cur[cursor - 1] != '\n') ? '\n' : '';
+
+    final allLines = <String>[
+      if (cleanHeader.isNotEmpty) cleanHeader,
+      ...cleanLines,
+    ];
+    final bodyText = allLines.join('\n');
+    final trailingNl = '\n';
+    final inserted = '$leadingNl$bodyText$trailingNl';
+    final nextText = cur.replaceRange(cursor, cursor, inserted);
+    final contentStart = cursor + leadingNl.length;
+
+    value = TextEditingValue(
+      text: nextText,
+      selection: TextSelection.collapsed(offset: cursor + inserted.length),
+    );
+
+    final startLineIndex = '\n'
+        .allMatches(nextText.substring(0, contentStart))
+        .length;
+    for (var i = 0; i < allLines.length; i++) {
+      _lineStyles[startLineIndex + i] = RichBlockStyle.quote;
+    }
+    if (cleanHeader.isNotEmpty) {
+      _applySpanOverRange(
+        contentStart,
+        contentStart + cleanHeader.length,
+        bold: true,
+      );
+    }
+    notifyListeners();
+  }
+
   void addInlineImage({required String alt, required String src}) {
     final cleanSrc = src.trim();
     if (cleanSrc.isEmpty) return;
