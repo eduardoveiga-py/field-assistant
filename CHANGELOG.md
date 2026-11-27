@@ -4,6 +4,34 @@ Todas as notas de versão, melhorias, correções de bugs e novidades do aplicat
 
 ---
 
+## 🚀 [2.2.0] — 27/11/2026 (Lançamento Oficial Multiplataforma)
+
+### 🧩 Visões Estilo Notion Multi-Módulo (Lista, Tabela, Kanban e Galeria)
+- **Experiência Unificada**: Criação de componentes reutilizáveis (`NotionViewModeBar`, `NotionKanbanBoard`, `NotionResponsiveTable`, `NotionGalleryGrid`) para alternância imediata sem perda de regras de negócio:
+  - **Base de Conhecimento**: *Notas* (`Lista | Tabela | Kanban | Galeria` enriquecido com capas), *Perguntas & Dúvidas* (`Lista | Tabela | Kanban` com drag-and-drop), *Documentos* (`Lista | Tabela | Galeria`) e *Recursos* (`Lista | Tabela | Galeria`).
+  - **Tarefas & Projetos**: *Minhas Tarefas* (`Lista | Tabela | Kanban` com persistência de `completedAt` ao arrastar) e *Projetos* (`Lista | Tabela | Kanban | Galeria`).
+  - **Estudos Bíblicos**: `Lista | Tabela | Kanban | Galeria` preservando o filtro *Prioridade & Progresso* e o fluxo oficial de liberação de horários ao encerrar.
+  - **Inbox & Experiências**: *Inbox Capturas* (`Lista | Tabela | Kanban` com drag-and-drop de triagem) e *Experiências de Campo* (`Lista | Tabela | Galeria`).
+
+### 🎨 Capas nas Notas, Base de Conhecimento Segundo Cérebro & Exportação PDF
+- **Capas Personalizáveis**: Suporte a **gradientes curados**, **12 ícones de marca d'água no canto direito** e **foto personalizada** (dispositivo ou Banco de Gravuras, comprimida client-side para `<= 180 KB` em Web/Mobile/Desktop), exibida no cabeçalho da nota, nos cards da Galeria e no topo do PDF exportado (`KnowledgeAndEmailPdfService`).
+- **Editores WYSIWYG Zero-Sintaxe**: Formatação rica visual sem vazamento de tags HTML/Markdown na exibição ou edição, destaques coloridos estilo JW Library, subpáginas, backlinks e revisão espaçada.
+- **Cartas, Pautas & Atas Oficiais**: Novo módulo com 7 estilos tipográficos, fontes customizadas e exportação em PDF, PNG e DOCX.
+
+### 📚 Bíblias Multi-Tradução Offline & Publicações EPUB Inteligentes
+- **Importação Real NWT EPUB3 e JSON + Comparador**: Comparação lado a lado de múltiplas traduções bíblicas e avisos claros quando uma tradução parcial não contém o versículo.
+- **Índices Reais e Seleção por Parágrafo/Ponto**: Correção definitiva do importador EPUB (`toc.ncx` e `nav.xhtml` ignorando `page-list`/`#pageN`) com reparo automático de publicações já salvas, extração de `data-pnum`, subtítulos (`h2`/`h3`) e seções numeradas estilo *Seja Feliz Para Sempre!*, além de menu suspenso de capítulos/lições + seleção por parágrafos/pontos e scroll com destaque automático no leitor.
+- **Modo Transcrito**: Inserção em **Somente link**, **Link + Transcrito** ou **Só Transcrito** tanto para passagens bíblicas quanto para publicações.
+
+### ⌨️ Otimização Global de Digitação (iPad, iPhone e Android)
+- **Modais Adaptativos com Foco em Escrita**: `showAdaptiveMinistrySheet` reage dinamicamente à abertura do teclado virtual (`viewInsets.bottom`), mantém barra fixa de ações para salvar, oferece alternância de **Tela Cheia**, compacta a barra de formatação e posiciona **Título + Conteúdo no topo** recolhendo propriedades secundárias em painel colapsável.
+
+### 📬 Inbox Pro, OAuth 2.0 & Sincronização E2EE Multiplataforma
+- **OAuth 2.0 Moderno & Isolamento JW Mail**: Fluxo Gmail e Microsoft Graph com refresh resiliente, assinaturas HTML por conta, viewer HTML sandboxed na Web, imagens remotas sem CORS, badge de não lidos na tela Inicial e tags nos contatos de e-mail.
+- **Desbloqueio E2EE Persistente & Fila em Tempo Real**: Persistência segura em WebCrypto/IndexedDB e Keychain, desbloqueio automático da fila de sincronização bidirecional e backfill em tempo real para notas, tarefas, e-mails, inbox, documentos e recursos.
+
+---
+
 ## 🚀 [2.1.0] — 21/11/2026 (Lançamento Oficial Multiplataforma)
 
 ### 🎨 Redesign Minimalista Profissional (Linear / Apple HIG)

@@ -6,8 +6,8 @@
   "subtitle": "Fonte oficial do Ministério Pessoal",
   "description": "Repositório oficial para instalação e atualização automática do aplicativo Ministério Pessoal no LiveContainer e AltStore.",
   "tintColor": "#1E3A8A",
-  "iconURL": "https://cdn.jsdelivr.net/gh/eduardoveiga-py/field-assistant@v2.1.0/web/icons/Icon-512.png",
-  "headerURL": "https://cdn.jsdelivr.net/gh/eduardoveiga-py/field-assistant@v2.1.0/web/icons/Icon-512.png",
+  "iconURL": "https://cdn.jsdelivr.net/gh/eduardoveiga-py/field-assistant@v2.2.0/web/icons/Icon-512.png",
+  "headerURL": "https://cdn.jsdelivr.net/gh/eduardoveiga-py/field-assistant@v2.2.0/web/icons/Icon-512.png",
   "news": [],
   "apps": [
     {
@@ -16,17 +16,25 @@
       "bundleIdentifier": "com.ministeriopessoal.ministerioPessoal",
       "developerName": "Ministério Pessoal",
       "subtitle": "Gestão eficiente e offline-first do ministério de campo",
-      "version": "2.1.0",
-      "versionDate": "2026-11-21",
-      "versionDescription": "Lançamento Oficial 2.1.0: Redesign minimalista profissional (estilo Linear e Apple HIG) no tema e tela Hoje; Map Engine com estilos vetoriais claros e escuros estilo Organic Maps e overzoom offline; Filtros da Caixa de Entrada, correções em anexos e visual profissional da lista de e-mails; Correções multi-contas no envio Exchange ActiveSync; Melhorias de UX no iOS com gestos de pinch-to-zoom e GPS nativo; Exclusão rápida no Banco de Gravuras.",
-      "downloadURL": "https://github.com/eduardoveiga-py/field-assistant/releases/download/v2.1.0/app-release-unsigned.ipa",
-      "localizedDescription": "Um aplicativo completo, ágil e focado no usuário para organizar contatos, revisitas, estudos bíblicos, compromissos e relatórios mensais.\n\n• Redesign minimalista profissional (estilo Linear / Apple HIG) e navegação sóbria\n• Map Engine vetorial estilo Organic Maps (estilos Claro e Escuro, overzoom offline)\n• Briefing na Porta em 30 segundos\n• Assistente Linguístico Multilíngue (Ticuna, Guajajara e outros) com frases situacionais e SRS\n• Ditado e anotações rápidas por voz\n• Agenda inteligente com agendamento por proximidade e detecção de conflitos\n• Liberação Atômica da Agenda ao encerrar ou excluir estudos, revisitas ou pessoas\n• Exclusão Definitiva de Pessoa e Contatos com proteção de integridade relacional de 5 pontos\n• Sistema de E-mails Exchange / JWPUB / Multi-contas com filtros na Caixa de Entrada, Enviados, Rascunhos e Lixeira\n• Banco de Gravuras com visualizador em tela cheia, zoom contínuo até 10x e exclusão rápida\n• Verificador de atualizações integrado com suporte direto ao LiveContainer e SideStore\n• Modo Sol Intenso de alto contraste (WCAG AAA)\n• Relatório e contagem rigorosa de estudos e horas",
-      "iconURL": "https://cdn.jsdelivr.net/gh/eduardoveiga-py/field-assistant@v2.1.0/web/icons/Icon-512.png",
+      "version": "2.2.0",
+      "versionDate": "2026-11-27",
+      "versionDescription": "Lançamento Oficial 2.2.0: Visões estilo Notion (Lista, Tabela, Kanban drag-and-drop e Galeria) em Base de Conhecimento, Tarefas, Projetos, Estudos, Inbox e Experiências; Capas personalizáveis em notas (gradientes, ícones e foto) com exportação PDF; Bíblias NWT offline multi-tradução e importador de publicações EPUB com índices reais, seleção por parágrafos/pontos e inserção transcrita; Otimização de digitação para teclado no iPad, iPhone e Android; Cartas & Atas Oficiais; Inbox Pro com OAuth 2.0 (Gmail/Microsoft), viewer HTML sandboxed, badge na Home e sincronização E2EE persistente.",
+      "downloadURL": "https://github.com/eduardoveiga-py/field-assistant/releases/download/v2.2.0/app-release-unsigned.ipa",
+      "localizedDescription": "Um aplicativo completo, ágil e focado no usuário para organizar contatos, revisitas, estudos bíblicos, conhecimento ministerial, e-mails, compromissos e relatórios mensais.\n\n• Visões estilo Notion (Lista, Tabela, Kanban drag-and-drop e Galeria) em Notas, Dúvidas, Documentos, Recursos, Tarefas, Projetos, Estudos, Inbox e Experiências\n• Base de Conhecimento Segundo Cérebro com editores WYSIWYG, capas com gradiente/ícones/foto e exportação em PDF\n• Bíblias Offline Multi-Tradução (JSON/NWT EPUB3), comparador lado a lado, destaques e referências cruzadas com modo transcrito\n• Publicações EPUB com índices reais de capítulos/lições, seleção por pontos/parágrafos e destaque automático no leitor\n• Cartas, Pautas & Atas Oficiais com 7 estilos e exportação PDF/PNG/DOCX\n• Digitação otimizada para iPad, iPhone e Android com foco automático no conteúdo acima do teclado\n• Map Engine vetorial estilo Organic Maps e roteamento offline A*\n• Sistema de E-mails Exchange / Gmail OAuth 2.0 / Microsoft Graph multi-contas com isolamento JW Mail e Inbox Pro\n• Sincronização E2EE persistente e verificador de atualizações integrado para LiveContainer e SideStore",
+      "iconURL": "https://cdn.jsdelivr.net/gh/eduardoveiga-py/field-assistant@v2.2.0/web/icons/Icon-512.png",
       "tintColor": "#1E3A8A",
       "category": "utilities",
-      "size": 19593526,
+      "size": 0,
       "minOSVersion": "15.0",
       "versions": [
+        {
+          "version": "2.2.0",
+          "date": "2026-11-27",
+          "localizedDescription": "Lançamento Oficial 2.2.0: Visões estilo Notion (Lista, Tabela, Kanban e Galeria) em todos os módulos principais; Capas de notas (gradiente, ícones e foto) + PDF; Bíblias NWT e publicações EPUB com índices reais, pontos/parágrafos e transcrição; Otimização de digitação mobile/iPad; Cartas & Atas Oficiais; Inbox Pro com OAuth 2.0 (Gmail/Microsoft) e E2EE persistente.",
+          "downloadURL": "https://github.com/eduardoveiga-py/field-assistant/releases/download/v2.2.0/app-release-unsigned.ipa",
+          "size": 0,
+          "minOSVersion": "15.0"
+        },
         {
           "version": "2.1.0",
           "date": "2026-11-21",
