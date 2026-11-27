@@ -1779,51 +1779,66 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                             onOpen: () => _openDocument(doc),
                             onOpenDetails: openDocDetails,
                             onExportPdf: exportDocPdf,
-                            trailingMenu: Row(mainAxisSize: MainAxisSize.min, children: [IconButton(icon: const Icon(Icons.open_in_full, size: 18), tooltip: 'Abrir em tela cheia', visualDensity: VisualDensity.compact, onPressed: () => openDocDetails(fullScreen: true)), : PopupMenuButton<String>(
-                              icon: const Icon(Icons.more_vert, size: 20),
-                              onSelected: (val) {
-                                if (val == 'open') _openDocument(doc);
-                                if (val == 'details') openDocDetails();
-                                if (val == 'external') {
-                                  _openDocumentExternal(doc);
-                                }
-                                if (val == 'export_pdf') exportDocPdf();
-                                if (val == 'edit') _showEditDocumentModal(doc);
-                                if (val == 'delete') {
-                                  km.softDeleteDocument(doc.id);
-                                }
-                              },
-                              itemBuilder: (_) => [
-                                const PopupMenuItem(
-                                  value: 'open',
-                                  child: Text('Abrir Arquivo no App'),
-                                ),
-                                const PopupMenuItem(
-                                  value: 'details',
-                                  child: Text('Anotações & Referências'),
-                                ),
-                                const PopupMenuItem(
-                                  value: 'external',
-                                  child: Text('Abrir Externamente'),
-                                ),
-                                const PopupMenuItem(
-                                  value: 'export_pdf',
-                                  child: Text('Exportar Resumo em PDF'),
-                                ),
-                                const PopupMenuItem(
-                                  value: 'edit',
-                                  child: Text('Editar'),
-                                ),
-                                const PopupMenuItem(
-                                  value: 'delete',
-                                  child: Text(
-                                    'Excluir',
-                                    style: TextStyle(color: Colors.redAccent),
+                            trailingMenu: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.open_in_full,
+                                    size: 18,
                                   ),
+                                  tooltip: 'Abrir em tela cheia',
+                                  visualDensity: VisualDensity.compact,
+                                  onPressed: () =>
+                                      openDocDetails(fullScreen: true),
+                                ),
+                                PopupMenuButton<String>(
+                                  icon: const Icon(Icons.more_vert, size: 20),
+                                  onSelected: (val) {
+                                    if (val == 'open') _openDocument(doc);
+                                    if (val == 'details') openDocDetails();
+                                    if (val == 'external') {
+                                      _openDocumentExternal(doc);
+                                    }
+                                    if (val == 'export_pdf') exportDocPdf();
+                                    if (val == 'edit') _showEditDocumentModal(doc);
+                                    if (val == 'delete') {
+                                      km.softDeleteDocument(doc.id);
+                                    }
+                                  },
+                                  itemBuilder: (_) => [
+                                const PopupMenuItem(
+                                      value: 'open',
+                                      child: Text('Abrir Arquivo no App'),
+                                    ),
+                                    const PopupMenuItem(
+                                      value: 'details',
+                                      child: Text('Anotações & Referências'),
+                                    ),
+                                    const PopupMenuItem(
+                                      value: 'external',
+                                      child: Text('Abrir Externamente'),
+                                    ),
+                                    const PopupMenuItem(
+                                      value: 'export_pdf',
+                                      child: Text('Exportar Resumo em PDF'),
+                                    ),
+                                    const PopupMenuItem(
+                                      value: 'edit',
+                                      child: Text('Editar'),
+                                    ),
+                                    const PopupMenuItem(
+                                      value: 'delete',
+                                      child: Text(
+                                        'Excluir',
+                                        style: TextStyle(color: Colors.redAccent),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
-                          ]), );
+                          );
                         },
                       ),
                   ],
