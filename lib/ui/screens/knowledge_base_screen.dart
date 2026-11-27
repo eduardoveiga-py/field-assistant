@@ -2785,19 +2785,19 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
               final propSummary = '$catLabel • $statusLabel • $priorityProp';
 
               return Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Flexible(
-              child: SingleChildScrollView(
-                controller: scroll,
-                physics: const ClampingScrollPhysics(),
-                padding: EdgeInsets.fromLTRB(
-                  16,
-                  keyboardOpen ? 6 : 16,
-                  16,
-                  keyboardOpen ? 6 : 12,
-                ),
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Flexible(
+                    child: SingleChildScrollView(
+                      controller: scroll,
+                      physics: const ClampingScrollPhysics(),
+                      padding: EdgeInsets.fromLTRB(
+                        16,
+                        keyboardOpen ? 6 : 16,
+                        16,
+                        keyboardOpen ? 6 : 12,
+                      ),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.stretch,
