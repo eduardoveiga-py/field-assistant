@@ -39,6 +39,7 @@ Future<void> showKnowledgeItemReader(
   String jumpToTabLabel = 'Ir para a aba',
   String? backlinkTargetType,
   String? backlinkTargetId,
+   bool initialFullScreen = false, 
 }) async {
   await showDialog(
     context: context,
@@ -63,6 +64,7 @@ Future<void> showKnowledgeItemReader(
       jumpToTabLabel: jumpToTabLabel,
       backlinkTargetType: backlinkTargetType,
       backlinkTargetId: backlinkTargetId,
+      initialFullScreen: initialFullScreen,
     ),
   );
 }
@@ -114,6 +116,7 @@ class KnowledgeItemReaderDialog extends StatefulWidget {
   final String jumpToTabLabel;
   final String? backlinkTargetType;
   final String? backlinkTargetId;
+  final bool initialFullScreen;
 
   const KnowledgeItemReaderDialog({
     super.key,
@@ -136,6 +139,7 @@ class KnowledgeItemReaderDialog extends StatefulWidget {
     this.jumpToTabLabel = 'Ir para a aba',
     this.backlinkTargetType,
     this.backlinkTargetId,
+    this.initialFullScreen = false,
   });
 
   @override
@@ -145,6 +149,7 @@ class KnowledgeItemReaderDialog extends StatefulWidget {
 
 class _KnowledgeItemReaderDialogState extends State<KnowledgeItemReaderDialog> {
   late String _content;
+  late bool _isFullScreen;
   final List<GestureRecognizer> _recognizers = [];
   final JwHighlightFloatingController _hlFloating =
       JwHighlightFloatingController();
@@ -153,6 +158,7 @@ class _KnowledgeItemReaderDialogState extends State<KnowledgeItemReaderDialog> {
   void initState() {
     super.initState();
     _content = widget.content;
+    _isFullScreen = widget.initialFullScreen;
   }
 
   @override
@@ -366,12 +372,14 @@ class _KnowledgeItemReaderDialogState extends State<KnowledgeItemReaderDialog> {
               : const Color(0xFFE2E8F0),
         ),
       ),
-      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      insetPadding: _isFullScreen
+          ? const EdgeInsets.all(8)
+          : const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(20),
         child: SizedBox(
-          width: 800,
-          height: 690,
+          width: _isFullScreen ? double.infinity : 800,
+          height: _isFullScreen ? double.infinity : 690,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -510,6 +518,18 @@ class _KnowledgeItemReaderDialogState extends State<KnowledgeItemReaderDialog> {
                             widget.onJumpToTab!();
                           },
                         ),
+                      ),
+                    IconButton(
+                       icon: Icon(
+                          _isFullScreen
+                               ? Icons.close_fullscreen
+                               : Icons.open_in_full,
+                           ),
+                        tooltip: _isFullScreen
+                            ? 'Sair da tela cheia'
+                            : 'Tela cheia',
+                        onPressed: () =>
+                            setState(() => _isFullScreen = !_isFullScreen),
                       ),
                     IconButton(
                       icon: const Icon(Icons.close),
