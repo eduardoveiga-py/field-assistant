@@ -21,6 +21,7 @@ Future<T?> showAdaptiveMinistrySheet<T>({
   bool enableDrag = true,
   EdgeInsetsGeometry? contentPadding,
   bool enableFullscreenToggle = true,
+  bool initialFullScreen = false,
   Widget Function(BuildContext context)? bottomBarBuilder,
 }) {
   final isTabletOrDesktop = MediaQuery.sizeOf(context).width > 600;
@@ -31,7 +32,7 @@ Future<T?> showAdaptiveMinistrySheet<T>({
       context: context,
       barrierDismissible: isDismissible,
       builder: (dialogContext) {
-        var isFullscreen = false;
+        var isFullscreen = initialFullScreen;
         return StatefulBuilder(
           builder: (sbCtx, setModalState) {
             final mqSize = MediaQuery.sizeOf(sbCtx);
@@ -44,19 +45,21 @@ Future<T?> showAdaptiveMinistrySheet<T>({
             final maxWidth = isFullscreen
                 ? (mqSize.width - 16).clamp(360.0, 1280.0)
                 : (keyboardOpen ? 820.0 : 720.0);
-            final maxHeight = isFullscreen
-                ? availableHeight * 0.98
-                : availableHeight * (keyboardOpen ? 0.96 : 0.88);
-            final vertPad = isFullscreen || keyboardOpen ? 8.0 : 20.0;
-            final horizPad = isFullscreen ? 8.0 : 20.0;
+            final isLandscape = mqSize.width > mqSize.height;
+          final isCompactHeight = availableHeight < 520;
+          final maxHeight = isFullscreen || (keyboardOpen && isLandscape)
+              ? availableHeight
+              : availableHeight * (keyboardOpen ? 0.96 : 0.88);
+          final vertPad = isFullscreen || keyboardOpen ? 8.0 : 20.0;
+          final horizPad = isFullscreen
+              ? 8.0
+              : (isCompactHeight ? 12.0 : 20.0);
 
             return Dialog(
               backgroundColor: Colors.transparent,
-              insetPadding: EdgeInsets.fromLTRB(
-                horizPad,
-                vertPad,
-                horizPad,
-                bottomInset + vertPad,
+              insetPadding: EdgeInsets.symmetric(
+                horizontal: horizPad,
+                vertical: vertPad,
               ),
               elevation: 0,
               child: Center(
@@ -214,7 +217,7 @@ Future<T?> showAdaptiveMinistrySheet<T>({
     enableDrag: enableDrag,
     backgroundColor: Colors.transparent,
     builder: (sheetContext) {
-      var isFullscreen = false;
+      var isFullscreen = initialFullScreen;
       return StatefulBuilder(
         builder: (sbCtx, setModalState) {
           final mqSize = MediaQuery.sizeOf(sbCtx);
