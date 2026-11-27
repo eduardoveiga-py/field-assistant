@@ -2785,18 +2785,19 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
               final propSummary = '$catLabel • $statusLabel • $priorityProp';
 
               return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(
-                    child: SingleChildScrollView(
-                      controller: scroll,
-                      physics: const ClampingScrollPhysics(),
-                      padding: EdgeInsets.fromLTRB(
-                        16,
-                        keyboardOpen ? 10 : 16,
-                        16,
-                        12,
-                      ),
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Flexible(
+              child: SingleChildScrollView(
+                controller: scroll,
+                physics: const ClampingScrollPhysics(),
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  keyboardOpen ? 6 : 16,
+                  16,
+                  keyboardOpen ? 6 : 12,
+                ),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2909,8 +2910,8 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                           SecondBrainRichEditor(
                             controller: contentCtrl,
                             labelText: 'Conteúdo da Nota',
-                            minLines: isEdit ? 7 : 6,
-                            maxLines: 16,
+                            minLines: keyboardOpen ? 5 : (isEdit ? 10 : 8),
+                  maxLines: keyboardOpen ? 10 : 20,
                             onCreateInlineNote: (title) =>
                                 _createInlineNoteFromEditor(title, areaId),
                           ),
