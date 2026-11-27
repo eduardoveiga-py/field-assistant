@@ -509,6 +509,7 @@ jobs:
               $defines += "--dart-define=$k=$($v.Trim())"
             }
           }
+          $defines += "--dart-define=ENABLE_E2EE_SYNC=true"
           flutter build windows --release @defines 2>&1 | Tee-Object -FilePath build-windows.log
           $exitCode = $LASTEXITCODE
           if ($exitCode -ne 0) {
@@ -577,6 +578,7 @@ jobs:
               DART_DEFINES="$DART_DEFINES --dart-define=$k=$v"
             fi
           done
+          DART_DEFINES="$DART_DEFINES --dart-define=ENABLE_E2EE_SYNC=true"
           flutter build linux --release $DART_DEFINES
 
       - name: Package Linux Artifact
@@ -634,6 +636,7 @@ jobs:
               DART_DEFINES="$DART_DEFINES --dart-define=$k=$v"
             fi
           done
+          DART_DEFINES="$DART_DEFINES --dart-define=ENABLE_E2EE_SYNC=true"
           flutter build macos --release $DART_DEFINES
 
       - name: Package macOS Artifact

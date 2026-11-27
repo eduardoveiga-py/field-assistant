@@ -3,11 +3,11 @@
 # 📖 Ministério Pessoal
 ### *Gestão Eficiente, Discreta e Offline-First do Ministério de Campo*
 
-[![Versão](https://img.shields.io/badge/Versão-2.1.0_(Build_15)-blue?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/eduardoveiga-py/field-assistant/releases/latest)
+[![Versão](https://img.shields.io/badge/Versão-2.2.0_(Build_16)-blue?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/eduardoveiga-py/field-assistant/releases/latest)
 [![Flutter](https://img.shields.io/badge/Flutter-3.47+-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev)
 [![Dart](https://img.shields.io/badge/Dart-3.13+-0175C2?style=for-the-badge&logo=dart&logoColor=white)](https://dart.dev)
 [![Offline First](https://img.shields.io/badge/Arquitetura-Offline--First-success?style=for-the-badge&logo=sqlite&logoColor=white)](https://drift.simonbinder.eu/)
-[![Testes](https://img.shields.io/badge/Testes-1300+_Passando_(100%25)-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](https://github.com/eduardoveiga-py/field-assistant/actions)
+[![Testes](https://img.shields.io/badge/Testes-1870+_Passando_(100%25)-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](https://github.com/eduardoveiga-py/field-assistant/actions)
 [![Plataformas](https://img.shields.io/badge/Plataformas-Android%20%7C%20iOS%20%7C%20Web%20%7C%20Windows%20%7C%20Linux%20%7C%20macOS-orange?style=for-the-badge)](https://github.com/eduardoveiga-py/field-assistant/releases)
 
 <p align="center">
@@ -384,19 +384,19 @@ flowchart LR
 
 ## 📋 Histórico de Lançamentos e Changelog
 
-> **Versão Homologada Atual:** **v2.1.0 (Build 15)** — Data de Lançamento: **21/11/2026** *(versão 2.0.0 lançada em 18/11/2026 e consolidada em 20/11/2026)*.
+> **Versão Homologada Atual:** **v2.2.0 (Build 16)** — Data de Lançamento: **27/11/2026** *(versão 2.1.0 lançada em 21/11/2026 e versão 2.0.0 consolidada em 20/11/2026)*.
 
 As notas de atualização detalhadas de cada lançamento foram retiradas do README principal e organizadas em documento próprio e anexadas a cada release:
 
 - 📦 **[Releases Oficiais no GitHub](https://github.com/eduardoveiga-py/field-assistant/releases)**: Download dos pacotes oficiais para todas as plataformas (Android APK, iOS unsigned IPA, Web PWA, Windows x64, Linux x64 e macOS) e notas de versão de cada lançamento.
-- 📜 **[CHANGELOG.md](CHANGELOG.md)**: Histórico completo, auditável e detalhado de todas as versões desde a versão 1.0.0 até a versão 2.1.0.
+- 📜 **[CHANGELOG.md](CHANGELOG.md)**: Histórico completo, auditável e detalhado de todas as versões desde a versão 1.0.0 até a versão 2.2.0.
 
-### 🚀 Destaques do Lançamento 2.1.0 (21/11/2026)
-- **🎨 Redesign Minimalista Profissional**: Design system moderno e sóbrio (estilo Linear e Apple HIG) no Dark Mode e Light Mode, barra de navegação/sidebar com pills translúcidas e tela "Hoje no Ministério" limpa com tipografia hierárquica e cards de atalho 40x40.
-- **🗺️ Map Engine Padrão Organic Maps**: Estilos vetoriais claros (`organic_maps_light.json`) e escuros (`organic_maps_dark.json`), suporte a overzoom offline sem telas pretas e gestos de pinça (pinch-to-zoom) aprimorados no iOS.
-- **📬 Caixa de Entrada & E-mails Pro**: Filtros inteligentes na Inbox, correções no fluxo de envio Exchange ActiveSync multi-contas e guarda no loop de SyncKey.
-- **🎨 Banco de Gravuras**: Exclusão rápida integrada e visualizador interativo em tela cheia com zoom contínuo de até 10x.
-- **🛡️ Estabilidade & Qualidade**: Correção definitiva do teste de integração SMTP intermitente, concorrência de pipeline CI e scripts pré-push padronizados.
+### 🚀 Destaques do Lançamento 2.2.0 (27/11/2026)
+- **🧩 Visões Estilo Notion Multi-Módulo**: Alternância fluida entre **Lista, Tabela, Kanban (arrastar e soltar) e Galeria** em Base de Conhecimento (Notas, Dúvidas, Documentos, Recursos), Tarefas & Projetos, Estudos Bíblicos, Inbox e Experiências.
+- **🎨 Capas Personalizadas & PDF**: Capas com gradientes curados, ícones sutis no canto direito ou fotos comprimidas nas notas, galeria e cabeçalho de exportação PDF.
+- **📚 Bíblias NWT Offline & Publicações EPUB**: Comparação multi-tradução, importação EPUB3/JSON com índices reais por capítulo/lição, seleção por pontos/parágrafos, destaque automático no leitor e inserção em modo **Link**, **Link + Transcrito** ou **Só Transcrito**.
+- **⌨️ Digitação Adaptativa (iPad/iPhone/Android)**: Modais otimizados acima do teclado virtual com foco imediato em Título + Conteúdo, barra inferior fixa de salvamento e modo Tela Cheia.
+- **✉️ Cartas & Atas Oficiais, Inbox OAuth 2.0 & E2EE Persistente**: Módulo oficial com exportação PDF/PNG/DOCX, autenticação moderna Gmail/Microsoft Graph, isolamento JW Mail e sincronização E2EE persistente em nuvem.
 
 ---
 
