@@ -572,7 +572,7 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
               ),
             );
 
-            void openSingleNote(KnowledgeNoteEntry note) {
+            void openSingleNote(KnowledgeNoteEntry note, {bool fullScreen = false}) {
               List<String> noteTags = [];
               try {
                 noteTags = (jsonDecode(note.tags) as List)
@@ -582,6 +582,7 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
               } catch (_) {}
               showKnowledgeItemReader(
                 context,
+                initialFullScreen: fullScreen,
                 title: note.title,
                 content: note.content,
                 category: note.category,
@@ -693,7 +694,16 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                                   }
                                   openSingleNote(note);
                                 },
-                                trailingMenu: PopupMenuButton<String>(
+                                trailingMenu: Row(
+                                   mainAxisSize: MainAxisSize.min,
+                                   children: [
+                                       IconButton(
+                                           icon: const Icon(Icons.open_in_full, size: 18),
+                                         tooltip: 'Abrir em tela cheia',
+                                         visualDensity: VisualDensity.compact,
+                                         onPressed: () => openSingleNote(note, fullScreen: true),
+                                         ),
+                                     PopupMenuButton<String>(
                                   icon: const Icon(Icons.more_vert, size: 20),
                                   onSelected: (val) {
                                     if (val == 'pin') {
@@ -751,7 +761,9 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                                     ),
                                   ],
                                 ),
-                              );
+                                  ],
+                                ),
+                                );
                             },
                           );
 
@@ -1010,7 +1022,9 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
 
         final questions = snapshot.data ?? [];
 
-        void openQuestionReader(KnowledgeQuestionEntry q) {
+        void openQuestionReader(KnowledgeQuestionEntry q, {
+            bool fullScreen = false,
+        }    ) {
           final isAnswered = q.status == 'answered';
           final hasAnswer = q.answer != null && q.answer!.trim().isNotEmpty;
           final readerSubtitle = isAnswered
@@ -1020,6 +1034,7 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
               : 'Em Aberto';
           showKnowledgeItemReader(
             context,
+            initialFullScreen: fullScreen,
             title: q.question,
             content: hasAnswer
                 ? q.answer!
@@ -1287,7 +1302,8 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                             isDark: isDark,
                             onTap: () => openQuestionReader(q),
                             onQuickAnswer: () => _showAnswerQuestionModal(q),
-                            trailingMenu: PopupMenuButton<String>(
+                            trailingMenu: Row(mainAxisSize: MainAxisSize.min, children: [IconButton(icon: const Icon(Icons.open_in_full, size: 18), tooltip: 'Abrir em tela cheia', visualDensity: VisualDensity.compact, onPressed: () => openQuestionReader(q, fullScreen: true)), 
+                              PopupMenuButton<String>(
                               icon: const Icon(Icons.more_vert, size: 20),
                               onSelected: (val) {
                                 if (val == 'answer') {
@@ -1332,7 +1348,7 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                                 ),
                               ],
                             ),
-                          );
+                          ]), );
                         },
                       ),
                   ],
@@ -1728,9 +1744,9 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                             }
                           }
 
-                          void openDocDetails() {
+                          void openDocDetails({bool fullScreen = false}) {
                             showKnowledgeItemReader(
-                              context,
+                              context, initialFullScreen: fullScreen,
                               title: doc.title,
                               content:
                                   doc.description?.trim().isNotEmpty == true
@@ -1763,7 +1779,7 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                             onOpen: () => _openDocument(doc),
                             onOpenDetails: openDocDetails,
                             onExportPdf: exportDocPdf,
-                            trailingMenu: PopupMenuButton<String>(
+                            trailingMenu: Row(mainAxisSize: MainAxisSize.min, children: [IconButton(icon: const Icon(Icons.open_in_full, size: 18), tooltip: 'Abrir em tela cheia', visualDensity: VisualDensity.compact, onPressed: () => openDocDetails(fullScreen: true)), : PopupMenuButton<String>(
                               icon: const Icon(Icons.more_vert, size: 20),
                               onSelected: (val) {
                                 if (val == 'open') _openDocument(doc);
@@ -1807,7 +1823,7 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                                 ),
                               ],
                             ),
-                          );
+                          ]), );
                         },
                       ),
                   ],
@@ -2205,7 +2221,7 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                                 ? () => _openUrl(r.url!)
                                 : null,
                             onExportPdf: exportResPdf,
-                            trailingMenu: PopupMenuButton<String>(
+                            trailingMenu:Row(mainAxisSize: MainAxisSize.min, children: [IconButton(icon: const Icon(Icons.open_in_full, size: 18), tooltip: 'Abrir em tela cheia', visualDensity: VisualDensity.compact, onPressed: () { final hasDesc = r.description != null && r.description!.trim().isNotEmpty; showKnowledgeItemReader(context, title: r.title, content: r.description ?? 'Recurso / Link salvo na Base de Conhecimento.', category: r.category, itemType: 'Recurso', url: r.url, tags: resTags, updatedAt: r.updatedAt, allowHighlights: hasDesc, backlinkTargetType: 'resource', backlinkTargetId: r.id, initialFullScreen: true, onContentUpdated: hasDesc ? (updated) async { await km.updateResource(r.id, description: updated); } : null, onEdit: () => _showEditResourceModal(r), onDelete: () => km.softDeleteResource(r.id), onExportPdf: exportResPdf); }),  PopupMenuButton<String>(
                               icon: const Icon(Icons.more_vert, size: 20),
                               onSelected: (val) {
                                 if (val == 'open' &&
@@ -2242,7 +2258,7 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                                 ),
                               ],
                             ),
-                          );
+                          ]), );
                         },
                       ),
                   ],
