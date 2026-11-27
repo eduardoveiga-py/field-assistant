@@ -130,6 +130,7 @@ class AppReferenceViewer {
           db: db,
           publicationId: parsed.itemId,
           initialChapterIndex: parsed.publicationChapterIndex,
+          initialParagraphSpec: parsed.publicationParagraphSpec,
         );
         return;
 

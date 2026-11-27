@@ -44,6 +44,7 @@ import '../widgets/email_html_frame.dart';
 import '../widgets/knowledge_item_reader_dialog.dart';
 import '../widgets/managed_text_controllers.dart';
 import '../widgets/markdown_preview_text.dart';
+import '../widgets/notion/notion_collection_views.dart';
 import '../widgets/quick_capture_sheet.dart';
 import '../widgets/rich_formatted_editing_controller.dart';
 import '../widgets/rich_markdown_toolbar.dart';
@@ -129,6 +130,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
     with SingleTickerProviderStateMixin {
   String _selectedFilter =
       'unprocessed'; // unprocessed, in_review, converted, all
+  NotionViewMode _capturesViewMode = NotionViewMode.list;
   String? _selectedEntryId;
   late final AudioPlayerService _playerService;
   String? _currentlyPlayingPath;
@@ -925,13 +927,25 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
           ),
         ),
         _buildCaptureAccountFilterBar(isDark),
-        const Divider(height: 1),
+        NotionViewModeBar(
+          mode: _capturesViewMode,
+          availableModes: const [
+            NotionViewMode.list,
+            NotionViewMode.table,
+            NotionViewMode.kanban,
+          ],
+          onChanged: (m) => setState(() => _capturesViewMode = m),
+          isDark: isDark,
+          keyPrefix: 'inbox_view',
+        ),
 
         // Lista de Entradas Reativa
         Expanded(
           child: StreamBuilder<List<InboxEntry>>(
             stream: inboxMgr.watchEntries(
-              statusFilter: _selectedFilter == 'all' ? null : _selectedFilter,
+              statusFilter: _capturesViewMode == NotionViewMode.kanban
+                  ? null
+                  : (_selectedFilter == 'all' ? null : _selectedFilter),
             ),
             builder: (context, snapshot) {
               if (snapshot.hasData) {
@@ -944,8 +958,190 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
 
               final allEntries = snapshot.data ?? _cachedCaptures;
               final entries = _filterCapturesByAccount(allEntries);
-              if (entries.isEmpty) {
+              if (entries.isEmpty &&
+                  _capturesViewMode != NotionViewMode.kanban) {
                 return _buildEmptyState(isDark);
+              }
+
+              void openCaptureReader(InboxEntry entry) {
+                final attList = _parseJsonList(entry.attachments);
+                showKnowledgeItemReader(
+                  context,
+                  title: _resolveCategoryLabel(entry),
+                  content: entry.content,
+                  category: entry.suggestedCategory ?? 'Captura',
+                  itemType: 'Captura Inbox',
+                  subtitle: _formatDate(entry.capturedAt),
+                  attachments: attList,
+                  updatedAt: entry.updatedAt,
+                  allowHighlights: true,
+                  onContentUpdated: (updated) async {
+                    await inboxMgr.updateEntry(entry.id, content: updated);
+                  },
+                  onDelete: () => inboxMgr.softDeleteEntry(entry.id),
+                );
+              }
+
+              if (_capturesViewMode == NotionViewMode.table) {
+                return NotionResponsiveTable(
+                  isDark: isDark,
+                  columns: const [
+                    NotionTableColumnDef(label: 'Captura', width: 300),
+                    NotionTableColumnDef(label: 'Origem', width: 120),
+                    NotionTableColumnDef(label: 'Status', width: 130),
+                    NotionTableColumnDef(label: 'Data', width: 120),
+                  ],
+                  rows: [
+                    for (final entry in entries)
+                      NotionTableRowItem(
+                        onTap: () => openCaptureReader(entry),
+                        cells: [
+                          Text(
+                            MarkdownPreviewText.cleanMarkdown(entry.content),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                          Text(
+                            entry.sourceType,
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          Text(
+                            entry.status == 'converted'
+                                ? 'Processada'
+                                : (entry.status == 'in_review'
+                                      ? 'Em Análise'
+                                      : 'Pendente'),
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: entry.status == 'converted'
+                                  ? const Color(0xFF10B981)
+                                  : (entry.status == 'in_review'
+                                        ? const Color(0xFFF59E0B)
+                                        : AppTheme.primaryBlue),
+                            ),
+                          ),
+                          Text(
+                            '${entry.capturedAt.day.toString().padLeft(2, '0')}/${entry.capturedAt.month.toString().padLeft(2, '0')}',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        ],
+                      ),
+                  ],
+                );
+              }
+
+              if (_capturesViewMode == NotionViewMode.kanban) {
+                return NotionKanbanBoard<InboxEntry>(
+                  isDark: isDark,
+                  keyPrefix: 'inbox_kanban',
+                  columns: const [
+                    NotionKanbanColumnSpec(
+                      statusKey: 'unprocessed',
+                      label: 'Pendentes',
+                      accentColor: AppTheme.primaryBlue,
+                    ),
+                    NotionKanbanColumnSpec(
+                      statusKey: 'in_review',
+                      label: 'Em Análise',
+                      accentColor: Color(0xFFF59E0B),
+                    ),
+                    NotionKanbanColumnSpec(
+                      statusKey: 'converted',
+                      label: 'Processadas',
+                      accentColor: Color(0xFF10B981),
+                    ),
+                  ],
+                  itemsByColumn: {
+                    'unprocessed': entries
+                        .where(
+                          (e) =>
+                              e.status != 'in_review' &&
+                              e.status != 'converted',
+                        )
+                        .toList(),
+                    'in_review': entries
+                        .where((e) => e.status == 'in_review')
+                        .toList(),
+                    'converted': entries
+                        .where((e) => e.status == 'converted')
+                        .toList(),
+                  },
+                  itemId: (e) => e.id,
+                  onMoveToColumn: (e, targetCol) async {
+                    await inboxMgr.updateEntry(e.id, status: targetCol);
+                  },
+                  cardBuilder: (ctx, entry, colKey, {required bool isFeedback}) {
+                    final preview = MarkdownPreviewText.cleanMarkdown(
+                      entry.content,
+                    );
+                    return Card(
+                      elevation: isFeedback ? 8 : 0,
+                      margin: EdgeInsets.zero,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(
+                          color: isFeedback
+                              ? AppTheme.primaryBlue
+                              : (isDark
+                                    ? Colors.white.withValues(alpha: 0.08)
+                                    : const Color(0xFFE2E8F0)),
+                        ),
+                      ),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: isFeedback
+                            ? null
+                            : () => openCaptureReader(entry),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                preview.isEmpty ? '(Sem texto)' : preview,
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  Text(
+                                    entry.sourceType,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppTheme.primaryBlue,
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  Text(
+                                    '${entry.capturedAt.day.toString().padLeft(2, '0')}/${entry.capturedAt.month.toString().padLeft(2, '0')}',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: isDark
+                                          ? const Color(0xFF94A3B8)
+                                          : AppTheme.textMuted,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                );
               }
 
               return LayoutBuilder(

@@ -10,9 +10,11 @@ import '../../core/date_utils.dart';
 import '../../experiences/experience_manager.dart';
 import '../../media/media_picker_helper.dart';
 import '../providers.dart';
+import '../widgets/adaptive_ministry_sheet.dart';
 import '../widgets/knowledge_item_reader_dialog.dart';
 import '../widgets/managed_text_controllers.dart';
 import '../widgets/markdown_preview_text.dart';
+import '../widgets/notion/notion_collection_views.dart';
 import '../widgets/rich_formatted_editing_controller.dart';
 import '../widgets/rich_markdown_toolbar.dart';
 import '../widgets/universal_attachment_viewer.dart';
@@ -27,6 +29,7 @@ class ExperiencesScreen extends ConsumerStatefulWidget {
 class _ExperiencesScreenState extends ConsumerState<ExperiencesScreen> {
   final TextEditingController _searchController = TextEditingController();
   String? _selectedTagFilter;
+  NotionViewMode _viewMode = NotionViewMode.list;
 
   @override
   void dispose() {
@@ -163,9 +166,16 @@ class _ExperiencesScreenState extends ConsumerState<ExperiencesScreen> {
     final mediaList = List<String>.from(existing?.mediaUrls ?? []);
     final tags = List<String>.from(existing?.tags ?? []);
 
-    showDialog(
+    showAdaptiveMinistrySheet(
       context: context,
-      builder: (ctx) => ManagedTextControllers(
+      title: existing != null
+          ? 'Editar Experiência'
+          : 'Relatar Nova Experiência',
+      titleLeading: Icon(
+        existing != null ? Icons.edit_note : Icons.auto_stories,
+        color: AppTheme.accentTeal,
+      ),
+      builder: (ctx, scroll) => ManagedTextControllers(
         initialTexts: [existing?.title ?? '', existing?.content ?? '', ''],
         customFactories: [
           null,
@@ -179,285 +189,233 @@ class _ExperiencesScreenState extends ConsumerState<ExperiencesScreen> {
 
           return StatefulBuilder(
             builder: (ctx, setDialogState) {
-              final isDark = Theme.of(ctx).brightness == Brightness.dark;
-              return Dialog(
-                backgroundColor: isDark
-                    ? const Color(0xFF1E293B)
-                    : Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(
-                    maxWidth: 580,
-                    maxHeight: 720,
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        // Cabeçalho com Título e Fechar
-                        Row(
-                          children: [
-                            Icon(
-                              existing != null
-                                  ? Icons.edit_note
-                                  : Icons.auto_stories,
-                              color: AppTheme.accentTeal,
-                              size: 26,
+              final keyboardOpen = MediaQuery.viewInsetsOf(ctx).bottom > 40;
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Flexible(
+                    child: SingleChildScrollView(
+                      controller: scroll,
+                      physics: const ClampingScrollPhysics(),
+                      padding: EdgeInsets.fromLTRB(
+                        16,
+                        keyboardOpen ? 10 : 16,
+                        16,
+                        12,
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          TextField(
+                            controller: titleController,
+                            decoration: InputDecoration(
+                              labelText: 'Título da Experiência *',
+                              hintText: 'Ex: Conversa marcante sobre o consolo bíblico',
+                              isDense: keyboardOpen,
+                              border: const OutlineInputBorder(),
                             ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                existing != null
-                                    ? 'Editar Experiência'
-                                    : 'Relatar Nova Experiência',
+                            autofocus: existing == null,
+                          ),
+                          SizedBox(height: keyboardOpen ? 8 : 10),
+                          RichMarkdownToolbar(controller: contentController),
+                          const SizedBox(height: 6),
+                          TextField(
+                            controller: contentController,
+                            maxLines: 6,
+                            minLines: 4,
+                            scrollPadding: const EdgeInsets.only(bottom: 140),
+                            decoration: const InputDecoration(
+                              labelText: 'Relato da Experiência *',
+                              hintText: 'Escreva como foi o contato, reações, textos bíblicos usados e lições aprendidas...',
+                              alignLabelWithHint: true,
+                              border: OutlineInputBorder(),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          // Barra compacta para anexar mídia sem esconder atrás de menu
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                mediaList.isEmpty
+                                    ? 'Mídias / Fotos (opcional)'
+                                    : 'Mídias Anexadas (${mediaList.length})',
                                 style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 12.5,
                                 ),
-                                overflow: TextOverflow.ellipsis,
                               ),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.close, size: 20),
-                              tooltip: 'Fechar',
-                              onPressed: () => Navigator.pop(ctx),
+                              IconButton.filledTonal(
+                                icon: const Icon(
+                                  Icons.add_photo_alternate,
+                                  size: 18,
+                                ),
+                                tooltip: 'Adicionar Foto / Vídeo',
+                                visualDensity: VisualDensity.compact,
+                                onPressed: () async {
+                                  final img = await MediaPickerHelper.pickImage(
+                                    context,
+                                    title: 'Adicionar Foto à Experiência',
+                                    pictureBankDb: ref.read(databaseProvider),
+                                  );
+                                  if (img != null && img.isNotEmpty) {
+                                    setDialogState(() => mediaList.add(img));
+                                  }
+                                },
+                              ),
+                            ],
+                          ),
+                          if (mediaList.isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: List.generate(mediaList.length, (i) {
+                                return Stack(
+                                  clipBehavior: Clip.none,
+                                  children: [
+                                    Container(
+                                      width: 64,
+                                      height: 64,
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: Colors.grey.shade300,
+                                        ),
+                                      ),
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(8),
+                                        child:
+                                            MediaPickerHelper.buildImageWidget(
+                                              mediaList[i],
+                                            ),
+                                      ),
+                                    ),
+                                    Positioned(
+                                      top: -4,
+                                      right: -4,
+                                      child: InkWell(
+                                        onTap: () => setDialogState(
+                                          () => mediaList.removeAt(i),
+                                        ),
+                                        child: Container(
+                                          padding: const EdgeInsets.all(2),
+                                          decoration: const BoxDecoration(
+                                            color: Colors.black87,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(
+                                            Icons.close,
+                                            color: Colors.white,
+                                            size: 14,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              }),
                             ),
                           ],
-                        ),
-                        const Divider(height: 20),
-                        // Conteúdo com rolagem garantida
-                        Expanded(
-                          child: SingleChildScrollView(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                TextField(
-                                  controller: titleController,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Título da Experiência *',
-                                    hintText: 'Ex: Conversa marcante sobre o consolo bíblico',
-                                  ),
-                                  autofocus: existing == null,
-                                ),
-                                const SizedBox(height: 12),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: OutlinedButton.icon(
-                                        icon: const Icon(
-                                          Icons.date_range,
-                                          size: 16,
-                                        ),
-                                        label: Text(
-                                          '${chosenDate.day}/${chosenDate.month}/${chosenDate.year}',
-                                        ),
-                                        onPressed: () async {
-                                          final p = await showDatePicker(
-                                            context: context,
-                                            initialDate: chosenDate,
-                                            firstDate: DateTime(2020),
-                                            lastDate: DateTime.now().add(
-                                              const Duration(days: 30),
-                                            ),
-                                          );
-                                          if (p != null) {
-                                            setDialogState(
-                                              () => chosenDate = p,
-                                            );
-                                          }
-                                        },
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: OutlinedButton.icon(
-                                        icon: const Icon(
-                                          Icons.access_time,
-                                          size: 16,
-                                        ),
-                                        label: Text(
-                                          '${chosenTime.hour.toString().padLeft(2, '0')}:${chosenTime.minute.toString().padLeft(2, '0')}',
-                                        ),
-                                        onPressed: () async {
-                                          final t = await showTimePicker(
-                                            context: context,
-                                            initialTime: chosenTime,
-                                          );
-                                          if (t != null) {
-                                            setDialogState(
-                                              () => chosenTime = t,
-                                            );
-                                          }
-                                        },
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 10),
-                                DropdownButtonFormField<String>(
-                                  initialValue: selectedModality,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Modalidade / Local',
-                                  ),
-                                  items: const [
-                                    DropdownMenuItem(
-                                      value: 'De Casa em Casa',
-                                      child: Text('🏠 De Casa em Casa'),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: 'TPL / Carrinho',
-                                      child: Text(
-                                        '🛒 TPL (Testemunho Público)',
-                                      ),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: 'Testemunho Informal',
-                                      child: Text('💬 Testemunho Informal'),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: 'Telefone',
-                                      child: Text('📞 Telefone / Cartas'),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: 'Revisita / Estudo',
-                                      child: Text(
-                                        '📖 Revisita / Estudo Bíblico',
-                                      ),
-                                    ),
-                                  ],
-                                  onChanged: (val) {
-                                    if (val != null) {
-                                      setDialogState(
-                                        () => selectedModality = val,
-                                      );
-                                    }
-                                  },
-                                ),
-                                const SizedBox(height: 12),
-                                RichMarkdownToolbar(
-                                  controller: contentController,
-                                ),
-                                const SizedBox(height: 6),
-                                TextField(
-                                  controller: contentController,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Relato da Experiência *',
-                                    hintText: 'Escreva como foi o contato, reações, textos bíblicos usados e lições aprendidas...',
-                                  ),
-                                  maxLines: 5,
-                                ),
-                                const SizedBox(height: 12),
-
-                                // INSERÇÃO DE IMAGEM / VÍDEO
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    const Text(
-                                      'Fotos / Mídias Anexadas:',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                    IconButton.filledTonal(
+                          const SizedBox(height: 8),
+                          CollapsibleMetadataSection(
+                            title: 'Data, Hora, Modalidade & Tags',
+                            summary:
+                                '${chosenDate.day}/${chosenDate.month}/${chosenDate.year} • $selectedModality',
+                            initiallyExpanded: false,
+                            children: [
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: OutlinedButton.icon(
                                       icon: const Icon(
-                                        Icons.add_photo_alternate,
-                                        size: 18,
+                                        Icons.date_range,
+                                        size: 16,
                                       ),
-                                      tooltip: 'Adicionar Foto / Vídeo',
+                                      label: Text(
+                                        '${chosenDate.day}/${chosenDate.month}/${chosenDate.year}',
+                                      ),
                                       onPressed: () async {
-                                        final img =
-                                            await MediaPickerHelper.pickImage(
-                                              context,
-                                              title: 'Adicionar Foto à Experiência',
-                                              pictureBankDb: ref.read(
-                                                databaseProvider,
-                                              ),
-                                            );
-                                        if (img != null && img.isNotEmpty) {
-                                          setDialogState(
-                                            () => mediaList.add(img),
-                                          );
+                                        final p = await showDatePicker(
+                                          context: context,
+                                          initialDate: chosenDate,
+                                          firstDate: DateTime(2020),
+                                          lastDate: DateTime.now().add(
+                                            const Duration(days: 30),
+                                          ),
+                                        );
+                                        if (p != null) {
+                                          setDialogState(() => chosenDate = p);
                                         }
                                       },
                                     ),
-                                  ],
-                                ),
-                                if (mediaList.isNotEmpty) ...[
-                                  const SizedBox(height: 8),
-                                  Wrap(
-                                    spacing: 8,
-                                    runSpacing: 8,
-                                    children: List.generate(mediaList.length, (
-                                      i,
-                                    ) {
-                                      return Stack(
-                                        clipBehavior: Clip.none,
-                                        children: [
-                                          Container(
-                                            width: 70,
-                                            height: 70,
-                                            decoration: BoxDecoration(
-                                              borderRadius:
-                                                  BorderRadius.circular(8),
-                                              border: Border.all(
-                                                color: Colors.grey.shade300,
-                                              ),
-                                            ),
-                                            child: ClipRRect(
-                                              borderRadius:
-                                                  BorderRadius.circular(8),
-                                              child:
-                                                  MediaPickerHelper.buildImageWidget(
-                                                    mediaList[i],
-                                                  ),
-                                            ),
-                                          ),
-                                          Positioned(
-                                            top: -4,
-                                            right: -4,
-                                            child: InkWell(
-                                              onTap: () => setDialogState(
-                                                () => mediaList.removeAt(i),
-                                              ),
-                                              child: Container(
-                                                padding: const EdgeInsets.all(
-                                                  2,
-                                                ),
-                                                decoration: const BoxDecoration(
-                                                  color: Colors.black87,
-                                                  shape: BoxShape.circle,
-                                                ),
-                                                child: const Icon(
-                                                  Icons.close,
-                                                  color: Colors.white,
-                                                  size: 14,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      );
-                                    }),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: OutlinedButton.icon(
+                                      icon: const Icon(
+                                        Icons.access_time,
+                                        size: 16,
+                                      ),
+                                      label: Text(
+                                        '${chosenTime.hour.toString().padLeft(2, '0')}:${chosenTime.minute.toString().padLeft(2, '0')}',
+                                      ),
+                                      onPressed: () async {
+                                        final t = await showTimePicker(
+                                          context: context,
+                                          initialTime: chosenTime,
+                                        );
+                                        if (t != null) {
+                                          setDialogState(() => chosenTime = t);
+                                        }
+                                      },
+                                    ),
                                   ),
                                 ],
-
-                                const SizedBox(height: 12),
-                                // TAGS
-                                const Text(
-                                  'Tags da Experiência:',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 13,
-                                  ),
+                              ),
+                              const SizedBox(height: 10),
+                              DropdownButtonFormField<String>(
+                                initialValue: selectedModality,
+                                decoration: const InputDecoration(
+                                  labelText: 'Modalidade / Local',
+                                  isDense: true,
+                                  border: OutlineInputBorder(),
                                 ),
-                                const SizedBox(height: 6),
+                                items: const [
+                                  DropdownMenuItem(
+                                    value: 'De Casa em Casa',
+                                    child: Text('🏠 De Casa em Casa'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'TPL / Carrinho',
+                                    child: Text('🛒 TPL (Testemunho Público)'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'Testemunho Informal',
+                                    child: Text('💬 Testemunho Informal'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'Telefone',
+                                    child: Text('📞 Telefone / Cartas'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'Revisita / Estudo',
+                                    child: Text('📖 Revisita / Estudo Bíblico'),
+                                  ),
+                                ],
+                                onChanged: (val) {
+                                  if (val != null) {
+                                    setDialogState(
+                                      () => selectedModality = val,
+                                    );
+                                  }
+                                },
+                              ),
+                              const SizedBox(height: 10),
+                              if (tags.isNotEmpty)
                                 Wrap(
                                   spacing: 6,
                                   children: tags.map((t) {
@@ -476,130 +434,138 @@ class _ExperiencesScreenState extends ConsumerState<ExperiencesScreen> {
                                     );
                                   }).toList(),
                                 ),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: TextField(
-                                        controller: tagInputController,
-                                        decoration: const InputDecoration(
-                                          labelText: 'Nova tag',
-                                          hintText:
-                                              'Ex: jovem, oração, folheto',
-                                          isDense: true,
-                                        ),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: TextField(
+                                      controller: tagInputController,
+                                      decoration: const InputDecoration(
+                                        labelText: 'Nova tag',
+                                        hintText: 'Ex: jovem, oração, folheto',
+                                        isDense: true,
                                       ),
                                     ),
-                                    IconButton(
-                                      icon: const Icon(
-                                        Icons.add_circle,
-                                        color: AppTheme.accentTeal,
-                                      ),
-                                      onPressed: () {
-                                        final text = tagInputController.text
-                                            .trim();
-                                        if (text.isNotEmpty &&
-                                            !tags.contains(text)) {
-                                          setDialogState(() {
-                                            tags.add(text);
-                                            tagInputController.clear();
-                                          });
-                                        }
-                                      },
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.add_circle,
+                                      color: AppTheme.accentTeal,
                                     ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const Divider(height: 20),
-                        // Botões de Ação Inferiores
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(ctx),
-                              child: const Text('Cancelar'),
-                            ),
-                            const SizedBox(width: 8),
-                            ElevatedButton.icon(
-                              icon: const Icon(Icons.check, size: 18),
-                              label: const Text('Salvar Experiência'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppTheme.accentTeal,
-                                foregroundColor: Colors.white,
+                                    onPressed: () {
+                                      final text = tagInputController.text
+                                          .trim();
+                                      if (text.isNotEmpty &&
+                                          !tags.contains(text)) {
+                                        setDialogState(() {
+                                          tags.add(text);
+                                          tagInputController.clear();
+                                        });
+                                      }
+                                    },
+                                  ),
+                                ],
                               ),
-                              onPressed: () async {
-                                final title = titleController.text.trim();
-                                final content =
-                                    RichFormattedEditingController.readMarkup(
-                                      contentController,
-                                    ).trim();
-                                if (title.isEmpty || content.isEmpty) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Informe ao menos o título e o relato da experiência.',
-                                      ),
-                                    ),
-                                  );
-                                  return;
-                                }
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+                    decoration: BoxDecoration(
+                      border: Border(
+                        top: BorderSide(
+                          color: Theme.of(ctx).brightness == Brightness.dark
+                              ? Colors.white.withValues(alpha: 0.08)
+                              : Colors.black.withValues(alpha: 0.08),
+                        ),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text('Cancelar'),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton.icon(
+                          icon: const Icon(Icons.check, size: 18),
+                          label: const Text('Salvar Experiência'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.accentTeal,
+                            foregroundColor: Colors.white,
+                          ),
+                          onPressed: () async {
+                            final title = titleController.text.trim();
+                            final content =
+                                RichFormattedEditingController.readMarkup(
+                                  contentController,
+                                ).trim();
+                            if (title.isEmpty || content.isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Informe ao menos o título e o relato da experiência.',
+                                  ),
+                                ),
+                              );
+                              return;
+                            }
 
-                                final dt = DateTime(
-                                  chosenDate.year,
-                                  chosenDate.month,
-                                  chosenDate.day,
-                                  chosenTime.hour,
-                                  chosenTime.minute,
-                                );
-                                final mgr = ref.read(experienceManagerProvider);
+                            final dt = DateTime(
+                              chosenDate.year,
+                              chosenDate.month,
+                              chosenDate.day,
+                              chosenTime.hour,
+                              chosenTime.minute,
+                            );
+                            final mgr = ref.read(experienceManagerProvider);
 
-                                if (existing != null) {
-                                  await mgr.updateExperience(
-                                    MinistryExperienceItem(
-                                      id: existing.id,
-                                      title: title,
-                                      content: content,
-                                      mediaUrls: mediaList,
-                                      tags: tags,
-                                      dateTime: dt,
-                                      locationOrModality: selectedModality,
-                                      createdAt: existing.createdAt,
-                                      updatedAt: DateTime.now(),
-                                    ),
-                                  );
-                                } else {
-                                  await mgr.addExperience(
-                                    title: title,
-                                    content: content,
-                                    mediaUrls: mediaList,
-                                    tags: tags,
-                                    dateTime: dt,
-                                    locationOrModality: selectedModality,
-                                  );
-                                }
+                            if (existing != null) {
+                              await mgr.updateExperience(
+                                MinistryExperienceItem(
+                                  id: existing.id,
+                                  title: title,
+                                  content: content,
+                                  mediaUrls: mediaList,
+                                  tags: tags,
+                                  dateTime: dt,
+                                  locationOrModality: selectedModality,
+                                  createdAt: existing.createdAt,
+                                  updatedAt: DateTime.now(),
+                                ),
+                              );
+                            } else {
+                              await mgr.addExperience(
+                                title: title,
+                                content: content,
+                                mediaUrls: mediaList,
+                                tags: tags,
+                                dateTime: dt,
+                                locationOrModality: selectedModality,
+                              );
+                            }
 
-                                if (ctx.mounted) Navigator.pop(ctx);
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        existing != null
-                                            ? 'Experiência atualizada!'
-                                            : 'Experiência salva com sucesso!',
-                                      ),
-                                    ),
-                                  );
-                                }
-                              },
-                            ),
-                          ],
+                            if (ctx.mounted) Navigator.pop(ctx);
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    existing != null
+                                        ? 'Experiência atualizada!'
+                                        : 'Experiência salva com sucesso!',
+                                  ),
+                                ),
+                              );
+                            }
+                          },
                         ),
                       ],
                     ),
                   ),
-                ),
+                ],
               );
             },
           );
@@ -722,7 +688,20 @@ class _ExperiencesScreenState extends ConsumerState<ExperiencesScreen> {
             const SizedBox(height: 8),
           ],
 
-          // Lista de Experiências
+          if (filtered.isNotEmpty)
+            NotionViewModeBar(
+              mode: _viewMode,
+              availableModes: const [
+                NotionViewMode.list,
+                NotionViewMode.table,
+                NotionViewMode.gallery,
+              ],
+              onChanged: (m) => setState(() => _viewMode = m),
+              isDark: isDark,
+              keyPrefix: 'experiences_view',
+            ),
+
+          // Lista / Tabela / Galeria de Experiências
           Expanded(
             child: filtered.isEmpty
                 ? Center(
@@ -752,6 +731,180 @@ class _ExperiencesScreenState extends ConsumerState<ExperiencesScreen> {
                         ],
                       ),
                     ),
+                  )
+                : _viewMode == NotionViewMode.table
+                ? NotionResponsiveTable(
+                    isDark: isDark,
+                    columns: const [
+                      NotionTableColumnDef(label: 'Experiência', width: 250),
+                      NotionTableColumnDef(label: 'Modalidade', width: 160),
+                      NotionTableColumnDef(label: 'Data', width: 130),
+                      NotionTableColumnDef(label: 'Resumo', width: 240),
+                    ],
+                    rows: [
+                      for (final exp in filtered)
+                        NotionTableRowItem(
+                          onTap: () => _showAddEditExperienceModal(
+                            context,
+                            existing: exp,
+                          ),
+                          cells: [
+                            Text(
+                              exp.title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
+                              ),
+                            ),
+                            Text(
+                              exp.locationOrModality ?? 'Ministério',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppTheme.accentTeal,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            Text(
+                              AppDateUtils.formatDateTimeWithAt(exp.dateTime),
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                            Text(
+                              MarkdownPreviewText.cleanMarkdown(exp.content),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                          ],
+                        ),
+                    ],
+                  )
+                : _viewMode == NotionViewMode.gallery
+                ? NotionGalleryGrid<MinistryExperienceItem>(
+                    items: filtered,
+                    itemBuilder: (ctx, exp) {
+                      final hasPhoto = exp.mediaUrls.isNotEmpty;
+                      return Card(
+                        margin: EdgeInsets.zero,
+                        clipBehavior: Clip.antiAlias,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          side: BorderSide(
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.08)
+                                : const Color(0xFFE2E8F0),
+                          ),
+                        ),
+                        child: InkWell(
+                          onTap: () => _showAddEditExperienceModal(
+                            context,
+                            existing: exp,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              SizedBox(
+                                height: 64,
+                                child: hasPhoto
+                                    ? MediaPickerHelper.buildImageWidget(
+                                        exp.mediaUrls.first,
+                                      )
+                                    : Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            colors: [
+                                              AppTheme.accentTeal.withValues(
+                                                alpha: isDark ? 0.35 : 0.22,
+                                              ),
+                                              AppTheme.primaryBlue.withValues(
+                                                alpha: isDark ? 0.16 : 0.08,
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            const Icon(
+                                              Icons.auto_stories,
+                                              size: 18,
+                                              color: AppTheme.accentTeal,
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Expanded(
+                                              child: Text(
+                                                exp.locationOrModality ??
+                                                    'Ministério',
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  fontSize: 11.5,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: AppTheme.accentTeal,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                              ),
+                              Expanded(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(12),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        exp.title,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Expanded(
+                                        child: Text(
+                                          MarkdownPreviewText.cleanMarkdown(
+                                            exp.content,
+                                          ),
+                                          maxLines: 3,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: isDark
+                                                ? const Color(0xFF94A3B8)
+                                                : AppTheme.textMuted,
+                                          ),
+                                        ),
+                                      ),
+                                      Text(
+                                        AppDateUtils.formatDateTimeWithAt(
+                                          exp.dateTime,
+                                        ),
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: isDark
+                                              ? const Color(0xFF94A3B8)
+                                              : AppTheme.textMuted,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
                   )
                 : ListView.builder(
                     padding: const EdgeInsets.all(12),

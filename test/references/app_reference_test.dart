@@ -350,7 +350,9 @@ void main() {
         title: summary.title,
         chapterIndex: 1,
         chapterTitle: 'Capítulo 1',
+        paragraphSpec: '2-4',
       );
+      expect(link, contains('(§/2-4)'));
       final uriMatch = RegExp(r'\((app://ref/[^\)]+)\)').firstMatch(link);
       expect(uriMatch, isNotNull);
       final parsed = AppReferenceHelper.parseUri(uriMatch!.group(1)!);
@@ -358,6 +360,7 @@ void main() {
       expect(parsed!.category, equals(AppRefCategory.publication));
       expect(parsed.itemId, equals(summary.id));
       expect(parsed.publicationChapterIndex, equals(1));
+      expect(parsed.publicationParagraphSpec, equals('2-4'));
     });
   });
 }

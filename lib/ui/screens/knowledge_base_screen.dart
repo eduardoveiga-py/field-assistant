@@ -17,6 +17,7 @@ import '../../core/app_theme.dart';
 import '../../core/feature_registry.dart';
 import '../../knowledge/knowledge_backlink_indexer.dart';
 import '../../knowledge/knowledge_manager.dart';
+import '../../knowledge/note_cover_config.dart';
 import '../../knowledge/second_brain_review_service.dart';
 import '../../official_docs/official_doc_manager.dart';
 import '../../official_docs/official_doc_models.dart';
@@ -33,12 +34,14 @@ import '../widgets/adaptive_ministry_sheet.dart';
 import '../widgets/app_inline_image_view.dart';
 import '../widgets/app_reference_viewer.dart';
 import '../widgets/knowledge/knowledge_ui_components.dart';
+import '../widgets/knowledge/note_cover_picker_dialog.dart';
 import '../widgets/knowledge/second_brain_database_views.dart';
 import '../widgets/knowledge/second_brain_dialogs.dart';
 import '../widgets/knowledge/second_brain_rich_editor.dart';
 import '../widgets/knowledge_item_reader_dialog.dart';
 import '../widgets/managed_text_controllers.dart';
 import '../widgets/markdown_preview_text.dart';
+import '../widgets/notion/notion_collection_views.dart';
 import '../widgets/rich_formatted_editing_controller.dart';
 import '../widgets/rich_markdown_toolbar.dart';
 import '../widgets/universal_attachment_viewer.dart';
@@ -73,6 +76,9 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
   String _searchQuery = '';
   String? _selectedAreaId;
   NotesDatabaseViewMode _notesViewMode = NotesDatabaseViewMode.list;
+  NotionViewMode _questionsViewMode = NotionViewMode.list;
+  NotionViewMode _docsViewMode = NotionViewMode.list;
+  NotionViewMode _resourcesViewMode = NotionViewMode.list;
   String? _selectedNoteTag;
   String? _selectedNoteId;
   String? _selectedQuestionStatus = 'all'; // 'all', 'answered', 'unanswered'
@@ -953,6 +959,7 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                     }
                   },
                   onEdit: () => _showEditNoteModal(selectedNote),
+                  onCustomizeCover: () => _customizeNoteCover(selectedNote),
                   onExportPdf: () => _exportNotePdf(selectedNote),
                   onShare: () => _exportNote(selectedNote),
                   onTogglePin: () => km.togglePinNote(selectedNote.id),
@@ -986,9 +993,11 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
 
     return StreamBuilder<List<KnowledgeQuestionEntry>>(
       stream: km.watchQuestions(
-        status: _selectedQuestionStatus == 'all'
+        status: _questionsViewMode == NotionViewMode.kanban
             ? null
-            : _selectedQuestionStatus,
+            : (_selectedQuestionStatus == 'all'
+                  ? null
+                  : _selectedQuestionStatus),
         category: _selectedQuestionCategory,
         areaId: _selectedAreaId,
         query: _searchQuery.isNotEmpty ? _searchQuery : null,
@@ -1000,6 +1009,41 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
         }
 
         final questions = snapshot.data ?? [];
+
+        void openQuestionReader(KnowledgeQuestionEntry q) {
+          final isAnswered = q.status == 'answered';
+          final hasAnswer = q.answer != null && q.answer!.trim().isNotEmpty;
+          final readerSubtitle = isAnswered
+              ? (q.context?.trim().isNotEmpty == true
+                    ? 'Respondida • Contexto: ${q.context!.trim()}'
+                    : 'Respondida')
+              : 'Em Aberto';
+          showKnowledgeItemReader(
+            context,
+            title: q.question,
+            content: hasAnswer
+                ? q.answer!
+                : (q.context ??
+                      'Dúvida ainda sem resposta bíblica cadastrada.'),
+            category: q.category,
+            itemType: 'Dúvida',
+            updatedAt: q.updatedAt,
+            subtitle: readerSubtitle,
+            allowHighlights: true,
+            backlinkTargetType: 'question',
+            backlinkTargetId: q.id,
+            onContentUpdated: (updated) async {
+              if (hasAnswer) {
+                await km.updateQuestion(q.id, answer: updated);
+              } else {
+                await km.updateQuestion(q.id, context: updated);
+              }
+            },
+            onEdit: () => _showEditQuestionModal(q),
+            onDelete: () => km.softDeleteQuestion(q.id),
+            onExport: () => _exportQuestion(q),
+          );
+        }
 
         return Column(
           children: [
@@ -1051,6 +1095,19 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
               ),
             ),
 
+            if (questions.isNotEmpty)
+              NotionViewModeBar(
+                mode: _questionsViewMode,
+                availableModes: const [
+                  NotionViewMode.list,
+                  NotionViewMode.table,
+                  NotionViewMode.kanban,
+                ],
+                onChanged: (m) => setState(() => _questionsViewMode = m),
+                isDark: isDark,
+                keyPrefix: 'questions_view',
+              ),
+
             if (questions.isEmpty)
               Expanded(
                 child: _buildEmptyState(
@@ -1060,6 +1117,160 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                   isDark: isDark,
                   actionLabel: 'Nova Dúvida',
                   onAction: _showCreateQuestionModal,
+                ),
+              )
+            else if (_questionsViewMode == NotionViewMode.table)
+              Expanded(
+                child: NotionResponsiveTable(
+                  isDark: isDark,
+                  columns: const [
+                    NotionTableColumnDef(label: 'Pergunta', width: 260),
+                    NotionTableColumnDef(label: 'Situação', width: 130),
+                    NotionTableColumnDef(
+                      label: 'Resumo / Resposta',
+                      width: 240,
+                    ),
+                    NotionTableColumnDef(label: 'Atualizado', width: 100),
+                  ],
+                  rows: [
+                    for (final q in questions)
+                      NotionTableRowItem(
+                        onTap: () => openQuestionReader(q),
+                        cells: [
+                          Text(
+                            q.question,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                            ),
+                          ),
+                          KnowledgePillBadge(
+                            label: q.status == 'answered'
+                                ? 'Respondida'
+                                : 'Em Aberto',
+                            color: q.status == 'answered'
+                                ? const Color(0xFF10B981)
+                                : const Color(0xFFF59E0B),
+                            isDark: isDark,
+                          ),
+                          Text(
+                            MarkdownPreviewText.cleanMarkdown(
+                              q.answer?.trim().isNotEmpty == true
+                                  ? q.answer!
+                                  : (q.context ?? '—'),
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          Text(
+                            _formatDate(q.updatedAt),
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
+              )
+            else if (_questionsViewMode == NotionViewMode.kanban)
+              Expanded(
+                child: NotionKanbanBoard<KnowledgeQuestionEntry>(
+                  isDark: isDark,
+                  keyPrefix: 'questions_kanban',
+                  columns: [
+                    NotionKanbanColumnSpec(
+                      statusKey: 'unanswered',
+                      label: 'Em Aberto',
+                      accentColor: const Color(0xFFF59E0B),
+                      onQuickAdd: _showCreateQuestionModal,
+                    ),
+                    const NotionKanbanColumnSpec(
+                      statusKey: 'answered',
+                      label: 'Respondidas',
+                      accentColor: Color(0xFF10B981),
+                    ),
+                  ],
+                  itemsByColumn: {
+                    'unanswered': questions
+                        .where((q) => q.status != 'answered')
+                        .toList(),
+                    'answered': questions
+                        .where((q) => q.status == 'answered')
+                        .toList(),
+                  },
+                  itemId: (q) => q.id,
+                  onMoveToColumn: (q, targetCol) async {
+                    await km.updateQuestion(q.id, status: targetCol);
+                  },
+                  cardBuilder: (ctx, q, colKey, {required bool isFeedback}) {
+                    final preview = MarkdownPreviewText.cleanMarkdown(
+                      q.answer?.trim().isNotEmpty == true
+                          ? q.answer!
+                          : (q.context ?? ''),
+                    );
+                    return Card(
+                      elevation: isFeedback ? 8 : 0,
+                      margin: EdgeInsets.zero,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(
+                          color: isFeedback
+                              ? const Color(0xFFF59E0B)
+                              : (isDark
+                                    ? Colors.white.withValues(alpha: 0.08)
+                                    : const Color(0xFFE2E8F0)),
+                        ),
+                      ),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: isFeedback ? null : () => openQuestionReader(q),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                q.question,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13.5,
+                                ),
+                              ),
+                              if (preview.isNotEmpty) ...[
+                                const SizedBox(height: 6),
+                                Text(
+                                  preview,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: isDark
+                                        ? const Color(0xFF94A3B8)
+                                        : AppTheme.textMuted,
+                                  ),
+                                ),
+                              ],
+                              const SizedBox(height: 6),
+                              Text(
+                                _formatDate(q.updatedAt),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: isDark
+                                      ? const Color(0xFF64748B)
+                                      : AppTheme.textMuted,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
               )
             else
@@ -1074,47 +1285,7 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                             question: q,
                             formattedDate: _formatDate(q.updatedAt),
                             isDark: isDark,
-                            onTap: () {
-                              final hasAnswer =
-                                  q.answer != null &&
-                                  q.answer!.trim().isNotEmpty;
-                              final readerSubtitle = isAnswered
-                                  ? (q.context?.trim().isNotEmpty == true
-                                        ? 'Respondida • Contexto: ${q.context!.trim()}'
-                                        : 'Respondida')
-                                  : 'Em Aberto';
-                              showKnowledgeItemReader(
-                                context,
-                                title: q.question,
-                                content: hasAnswer
-                                    ? q.answer!
-                                    : (q.context ??
-                                          'Dúvida ainda sem resposta bíblica cadastrada.'),
-                                category: q.category,
-                                itemType: 'Dúvida',
-                                updatedAt: q.updatedAt,
-                                subtitle: readerSubtitle,
-                                allowHighlights: true,
-                                backlinkTargetType: 'question',
-                                backlinkTargetId: q.id,
-                                onContentUpdated: (updated) async {
-                                  if (hasAnswer) {
-                                    await km.updateQuestion(
-                                      q.id,
-                                      answer: updated,
-                                    );
-                                  } else {
-                                    await km.updateQuestion(
-                                      q.id,
-                                      context: updated,
-                                    );
-                                  }
-                                },
-                                onEdit: () => _showEditQuestionModal(q),
-                                onDelete: () => km.softDeleteQuestion(q.id),
-                                onExport: () => _exportQuestion(q),
-                              );
-                            },
+                            onTap: () => openQuestionReader(q),
                             onQuickAnswer: () => _showAnswerQuestionModal(q),
                             trailingMenu: PopupMenuButton<String>(
                               icon: const Icon(Icons.more_vert, size: 20),
@@ -1326,146 +1497,322 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                 ),
               ),
 
-            Expanded(
-              child: KnowledgeResponsiveCardGrid(
-                children: [
-                  for (final doc in docs)
-                    Builder(
-                      builder: (ctx) {
-                        List<String> docTags = [];
-                        try {
-                          docTags = (jsonDecode(doc.tags) as List)
-                              .map((e) => e.toString())
-                              .toList();
-                        } catch (e, st) {
-                          AppLogger.debug(
-                            'Falha ao ler tags JSON na listagem de documentos (${doc.id}): $e',
-                            st,
-                          );
-                        }
+            NotionViewModeBar(
+              mode: _docsViewMode,
+              availableModes: const [
+                NotionViewMode.list,
+                NotionViewMode.table,
+                NotionViewMode.gallery,
+              ],
+              onChanged: (m) => setState(() => _docsViewMode = m),
+              isDark: isDark,
+              keyPrefix: 'docs_view',
+            ),
 
-                        Future<void> exportDocPdf() async {
+            if (_docsViewMode == NotionViewMode.table)
+              Expanded(
+                child: NotionResponsiveTable(
+                  isDark: isDark,
+                  columns: const [
+                    NotionTableColumnDef(label: 'Documento', width: 250),
+                    NotionTableColumnDef(label: 'Arquivo', width: 170),
+                    NotionTableColumnDef(label: 'Categoria', width: 120),
+                    NotionTableColumnDef(label: 'Atualizado', width: 100),
+                  ],
+                  rows: [
+                    for (final doc in docs)
+                      NotionTableRowItem(
+                        onTap: () => _openDocument(doc),
+                        cells: [
+                          Text(
+                            doc.title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                            ),
+                          ),
+                          Text(
+                            doc.fileName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          KnowledgePillBadge(
+                            label: doc.category,
+                            color: AppTheme.primaryBlue,
+                            isDark: isDark,
+                          ),
+                          Text(
+                            _formatDate(doc.updatedAt),
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
+              )
+            else if (_docsViewMode == NotionViewMode.gallery)
+              Expanded(
+                child: NotionGalleryGrid<KnowledgeDocumentEntry>(
+                  items: docs,
+                  itemBuilder: (ctx, doc) {
+                    return Card(
+                      margin: EdgeInsets.zero,
+                      clipBehavior: Clip.antiAlias,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        side: BorderSide(
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.08)
+                              : const Color(0xFFE2E8F0),
+                        ),
+                      ),
+                      child: InkWell(
+                        onTap: () => _openDocument(doc),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Container(
+                              height: 44,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                              ),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    AppTheme.primaryBlue.withValues(
+                                      alpha: isDark ? 0.35 : 0.2,
+                                    ),
+                                    AppTheme.primaryBlue.withValues(
+                                      alpha: isDark ? 0.12 : 0.06,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.description_outlined,
+                                    size: 16,
+                                    color: AppTheme.primaryBlue,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      doc.fileType.toUpperCase(),
+                                      style: const TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppTheme.primaryBlue,
+                                      ),
+                                    ),
+                                  ),
+                                  Text(
+                                    _formatDate(doc.updatedAt),
+                                    style: TextStyle(
+                                      fontSize: 10.5,
+                                      color: isDark
+                                          ? const Color(0xFF94A3B8)
+                                          : AppTheme.textMuted,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Expanded(
+                              child: Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      doc.title,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Expanded(
+                                      child: Text(
+                                        doc.description?.trim().isNotEmpty ==
+                                                true
+                                            ? MarkdownPreviewText.cleanMarkdown(
+                                                doc.description!,
+                                              )
+                                            : doc.fileName,
+                                        maxLines: 3,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: isDark
+                                              ? const Color(0xFF94A3B8)
+                                              : AppTheme.textMuted,
+                                        ),
+                                      ),
+                                    ),
+                                    KnowledgePillBadge(
+                                      label: doc.category,
+                                      color: AppTheme.primaryBlue,
+                                      isDark: isDark,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              )
+            else
+              Expanded(
+                child: KnowledgeResponsiveCardGrid(
+                  children: [
+                    for (final doc in docs)
+                      Builder(
+                        builder: (ctx) {
+                          List<String> docTags = [];
                           try {
-                            await KnowledgeAndEmailPdfService.exportSingleItemPdf(
+                            docTags = (jsonDecode(doc.tags) as List)
+                                .map((e) => e.toString())
+                                .toList();
+                          } catch (e, st) {
+                            AppLogger.debug(
+                              'Falha ao ler tags JSON na listagem de documentos (${doc.id}): $e',
+                              st,
+                            );
+                          }
+
+                          Future<void> exportDocPdf() async {
+                            try {
+                              await KnowledgeAndEmailPdfService.exportSingleItemPdf(
+                                title: doc.title,
+                                content:
+                                    doc.description?.trim().isNotEmpty == true
+                                    ? doc.description!
+                                    : 'Arquivo: ${doc.fileName} (${doc.fileType})',
+                                itemType: 'Documento',
+                                category: doc.category,
+                                subtitle: doc.fileName,
+                                tags: docTags,
+                                updatedAt: doc.updatedAt,
+                              );
+                              if (!ctx.mounted) return;
+                              ScaffoldMessenger.of(ctx).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'PDF do documento gerado com sucesso!',
+                                  ),
+                                ),
+                              );
+                            } catch (e, st) {
+                              AppLogger.warning(
+                                'Falha ao exportar PDF do documento (${doc.id})',
+                                e,
+                                st,
+                              );
+                              if (!ctx.mounted) return;
+                              ScaffoldMessenger.of(ctx).showSnackBar(
+                                SnackBar(
+                                  content: Text('Erro ao gerar PDF: $e'),
+                                  backgroundColor: Colors.redAccent,
+                                ),
+                              );
+                            }
+                          }
+
+                          void openDocDetails() {
+                            showKnowledgeItemReader(
+                              context,
                               title: doc.title,
                               content:
                                   doc.description?.trim().isNotEmpty == true
                                   ? doc.description!
                                   : 'Arquivo: ${doc.fileName} (${doc.fileType})',
-                              itemType: 'Documento',
                               category: doc.category,
+                              itemType: 'Documento',
                               subtitle: doc.fileName,
                               tags: docTags,
                               updatedAt: doc.updatedAt,
-                            );
-                            if (!ctx.mounted) return;
-                            ScaffoldMessenger.of(ctx).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'PDF do documento gerado com sucesso!',
-                                ),
-                              ),
-                            );
-                          } catch (e, st) {
-                            AppLogger.warning(
-                              'Falha ao exportar PDF do documento (${doc.id})',
-                              e,
-                              st,
-                            );
-                            if (!ctx.mounted) return;
-                            ScaffoldMessenger.of(ctx).showSnackBar(
-                              SnackBar(
-                                content: Text('Erro ao gerar PDF: $e'),
-                                backgroundColor: Colors.redAccent,
-                              ),
+                              allowHighlights: true,
+                              backlinkTargetType: 'document',
+                              backlinkTargetId: doc.id,
+                              onContentUpdated: (updated) async {
+                                await km.updateDocument(
+                                  doc.id,
+                                  description: updated,
+                                );
+                              },
+                              onEdit: () => _showEditDocumentModal(doc),
+                              onDelete: () => km.softDeleteDocument(doc.id),
+                              onExportPdf: exportDocPdf,
                             );
                           }
-                        }
 
-                        void openDocDetails() {
-                          showKnowledgeItemReader(
-                            context,
-                            title: doc.title,
-                            content: doc.description?.trim().isNotEmpty == true
-                                ? doc.description!
-                                : 'Arquivo: ${doc.fileName} (${doc.fileType})',
-                            category: doc.category,
-                            itemType: 'Documento',
-                            subtitle: doc.fileName,
+                          return KnowledgeDocumentCard(
+                            doc: doc,
                             tags: docTags,
-                            updatedAt: doc.updatedAt,
-                            allowHighlights: true,
-                            backlinkTargetType: 'document',
-                            backlinkTargetId: doc.id,
-                            onContentUpdated: (updated) async {
-                              await km.updateDocument(
-                                doc.id,
-                                description: updated,
-                              );
-                            },
-                            onEdit: () => _showEditDocumentModal(doc),
-                            onDelete: () => km.softDeleteDocument(doc.id),
+                            isDark: isDark,
+                            onOpen: () => _openDocument(doc),
+                            onOpenDetails: openDocDetails,
                             onExportPdf: exportDocPdf,
-                          );
-                        }
-
-                        return KnowledgeDocumentCard(
-                          doc: doc,
-                          tags: docTags,
-                          isDark: isDark,
-                          onOpen: () => _openDocument(doc),
-                          onOpenDetails: openDocDetails,
-                          onExportPdf: exportDocPdf,
-                          trailingMenu: PopupMenuButton<String>(
-                            icon: const Icon(Icons.more_vert, size: 20),
-                            onSelected: (val) {
-                              if (val == 'open') _openDocument(doc);
-                              if (val == 'details') openDocDetails();
-                              if (val == 'external') {
-                                _openDocumentExternal(doc);
-                              }
-                              if (val == 'export_pdf') exportDocPdf();
-                              if (val == 'edit') _showEditDocumentModal(doc);
-                              if (val == 'delete') {
-                                km.softDeleteDocument(doc.id);
-                              }
-                            },
-                            itemBuilder: (_) => [
-                              const PopupMenuItem(
-                                value: 'open',
-                                child: Text('Abrir Arquivo no App'),
-                              ),
-                              const PopupMenuItem(
-                                value: 'details',
-                                child: Text('Anotações & Referências'),
-                              ),
-                              const PopupMenuItem(
-                                value: 'external',
-                                child: Text('Abrir Externamente'),
-                              ),
-                              const PopupMenuItem(
-                                value: 'export_pdf',
-                                child: Text('Exportar Resumo em PDF'),
-                              ),
-                              const PopupMenuItem(
-                                value: 'edit',
-                                child: Text('Editar'),
-                              ),
-                              const PopupMenuItem(
-                                value: 'delete',
-                                child: Text(
-                                  'Excluir',
-                                  style: TextStyle(color: Colors.redAccent),
+                            trailingMenu: PopupMenuButton<String>(
+                              icon: const Icon(Icons.more_vert, size: 20),
+                              onSelected: (val) {
+                                if (val == 'open') _openDocument(doc);
+                                if (val == 'details') openDocDetails();
+                                if (val == 'external') {
+                                  _openDocumentExternal(doc);
+                                }
+                                if (val == 'export_pdf') exportDocPdf();
+                                if (val == 'edit') _showEditDocumentModal(doc);
+                                if (val == 'delete') {
+                                  km.softDeleteDocument(doc.id);
+                                }
+                              },
+                              itemBuilder: (_) => [
+                                const PopupMenuItem(
+                                  value: 'open',
+                                  child: Text('Abrir Arquivo no App'),
                                 ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                ],
+                                const PopupMenuItem(
+                                  value: 'details',
+                                  child: Text('Anotações & Referências'),
+                                ),
+                                const PopupMenuItem(
+                                  value: 'external',
+                                  child: Text('Abrir Externamente'),
+                                ),
+                                const PopupMenuItem(
+                                  value: 'export_pdf',
+                                  child: Text('Exportar Resumo em PDF'),
+                                ),
+                                const PopupMenuItem(
+                                  value: 'edit',
+                                  child: Text('Editar'),
+                                ),
+                                const PopupMenuItem(
+                                  value: 'delete',
+                                  child: Text(
+                                    'Excluir',
+                                    style: TextStyle(color: Colors.redAccent),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                  ],
+                ),
               ),
-            ),
           ],
         );
       },
@@ -1581,141 +1928,326 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                 ),
               ),
 
-            Expanded(
-              child: KnowledgeResponsiveCardGrid(
-                children: [
-                  for (final r in resources)
-                    Builder(
-                      builder: (ctx) {
-                        List<String> resTags = [];
-                        try {
-                          resTags = (jsonDecode(r.tags) as List)
-                              .map((e) => e.toString())
-                              .toList();
-                        } catch (e, st) {
-                          AppLogger.debug(
-                            'Falha ao ler tags JSON na listagem de recursos (${r.id}): $e',
-                            st,
-                          );
-                        }
+            NotionViewModeBar(
+              mode: _resourcesViewMode,
+              availableModes: const [
+                NotionViewMode.list,
+                NotionViewMode.table,
+                NotionViewMode.gallery,
+              ],
+              onChanged: (m) => setState(() => _resourcesViewMode = m),
+              isDark: isDark,
+              keyPrefix: 'resources_view',
+            ),
 
-                        Future<void> exportResPdf() async {
-                          try {
-                            await KnowledgeAndEmailPdfService.exportSingleItemPdf(
-                              title: r.title,
-                              content: r.description?.trim().isNotEmpty == true
-                                  ? r.description!
-                                  : 'Recurso salvo na Base de Conhecimento.',
-                              itemType: 'Recurso',
-                              category: r.category,
-                              url: r.url,
-                              tags: resTags,
-                              updatedAt: r.updatedAt,
-                            );
-                            if (!ctx.mounted) return;
-                            ScaffoldMessenger.of(ctx).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'PDF do recurso gerado com sucesso!',
+            if (_resourcesViewMode == NotionViewMode.table)
+              Expanded(
+                child: NotionResponsiveTable(
+                  isDark: isDark,
+                  columns: const [
+                    NotionTableColumnDef(label: 'Recurso', width: 240),
+                    NotionTableColumnDef(label: 'Tipo', width: 130),
+                    NotionTableColumnDef(label: 'Link / Descrição', width: 250),
+                    NotionTableColumnDef(label: 'Atualizado', width: 100),
+                  ],
+                  rows: [
+                    for (final r in resources)
+                      NotionTableRowItem(
+                        onTap: () => _showEditResourceModal(r),
+                        cells: [
+                          Text(
+                            r.title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                            ),
+                          ),
+                          KnowledgePillBadge(
+                            label: r.resourceType,
+                            color: Colors.teal,
+                            isDark: isDark,
+                          ),
+                          Text(
+                            r.url?.trim().isNotEmpty == true
+                                ? r.url!
+                                : MarkdownPreviewText.cleanMarkdown(
+                                    r.description ?? '—',
+                                  ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          Text(
+                            _formatDate(r.updatedAt),
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
+              )
+            else if (_resourcesViewMode == NotionViewMode.gallery)
+              Expanded(
+                child: NotionGalleryGrid<KnowledgeResourceEntry>(
+                  items: resources,
+                  itemBuilder: (ctx, r) {
+                    return Card(
+                      margin: EdgeInsets.zero,
+                      clipBehavior: Clip.antiAlias,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        side: BorderSide(
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.08)
+                              : const Color(0xFFE2E8F0),
+                        ),
+                      ),
+                      child: InkWell(
+                        onTap: () {
+                          if (r.url != null && r.url!.isNotEmpty) {
+                            _openUrl(r.url!);
+                          } else {
+                            _showEditResourceModal(r);
+                          }
+                        },
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Container(
+                              height: 44,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                              ),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    Colors.teal.withValues(
+                                      alpha: isDark ? 0.35 : 0.2,
+                                    ),
+                                    Colors.teal.withValues(
+                                      alpha: isDark ? 0.12 : 0.06,
+                                    ),
+                                  ],
                                 ),
                               ),
-                            );
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.link_rounded,
+                                    size: 16,
+                                    color: Colors.teal,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      r.resourceType.toUpperCase(),
+                                      style: const TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.teal,
+                                      ),
+                                    ),
+                                  ),
+                                  Text(
+                                    _formatDate(r.updatedAt),
+                                    style: TextStyle(
+                                      fontSize: 10.5,
+                                      color: isDark
+                                          ? const Color(0xFF94A3B8)
+                                          : AppTheme.textMuted,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Expanded(
+                              child: Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      r.title,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Expanded(
+                                      child: Text(
+                                        r.description?.trim().isNotEmpty == true
+                                            ? MarkdownPreviewText.cleanMarkdown(
+                                                r.description!,
+                                              )
+                                            : (r.url ?? ''),
+                                        maxLines: 3,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: isDark
+                                              ? const Color(0xFF94A3B8)
+                                              : AppTheme.textMuted,
+                                        ),
+                                      ),
+                                    ),
+                                    KnowledgePillBadge(
+                                      label: r.category,
+                                      color: Colors.teal,
+                                      isDark: isDark,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              )
+            else
+              Expanded(
+                child: KnowledgeResponsiveCardGrid(
+                  children: [
+                    for (final r in resources)
+                      Builder(
+                        builder: (ctx) {
+                          List<String> resTags = [];
+                          try {
+                            resTags = (jsonDecode(r.tags) as List)
+                                .map((e) => e.toString())
+                                .toList();
                           } catch (e, st) {
-                            AppLogger.warning(
-                              'Falha ao exportar PDF do recurso (${r.id})',
-                              e,
+                            AppLogger.debug(
+                              'Falha ao ler tags JSON na listagem de recursos (${r.id}): $e',
                               st,
                             );
-                            if (!ctx.mounted) return;
-                            ScaffoldMessenger.of(ctx).showSnackBar(
-                              SnackBar(
-                                content: Text('Erro ao gerar PDF: $e'),
-                                backgroundColor: Colors.redAccent,
-                              ),
-                            );
                           }
-                        }
 
-                        return KnowledgeResourceCard(
-                          resource: r,
-                          tags: resTags,
-                          isDark: isDark,
-                          onTap: () {
-                            final hasDesc =
-                                r.description != null &&
-                                r.description!.trim().isNotEmpty;
-                            showKnowledgeItemReader(
-                              context,
-                              title: r.title,
-                              content: r.description ?? 'Recurso / Link salvo na Base de Conhecimento.',
-                              category: r.category,
-                              itemType: 'Recurso',
-                              url: r.url,
-                              tags: resTags,
-                              updatedAt: r.updatedAt,
-                              allowHighlights: hasDesc,
-                              backlinkTargetType: 'resource',
-                              backlinkTargetId: r.id,
-                              onContentUpdated: hasDesc
-                                  ? (updated) async {
-                                      await km.updateResource(
-                                        r.id,
-                                        description: updated,
-                                      );
-                                    }
-                                  : null,
-                              onEdit: () => _showEditResourceModal(r),
-                              onDelete: () => km.softDeleteResource(r.id),
-                              onExportPdf: exportResPdf,
-                            );
-                          },
-                          onOpenUrl: r.url != null && r.url!.isNotEmpty
-                              ? () => _openUrl(r.url!)
-                              : null,
-                          onExportPdf: exportResPdf,
-                          trailingMenu: PopupMenuButton<String>(
-                            icon: const Icon(Icons.more_vert, size: 20),
-                            onSelected: (val) {
-                              if (val == 'open' &&
-                                  r.url != null &&
-                                  r.url!.isNotEmpty) {
-                                _openUrl(r.url!);
-                              }
-                              if (val == 'export_pdf') exportResPdf();
-                              if (val == 'edit') _showEditResourceModal(r);
-                              if (val == 'delete') {
-                                km.softDeleteResource(r.id);
-                              }
+                          Future<void> exportResPdf() async {
+                            try {
+                              await KnowledgeAndEmailPdfService.exportSingleItemPdf(
+                                title: r.title,
+                                content:
+                                    r.description?.trim().isNotEmpty == true
+                                    ? r.description!
+                                    : 'Recurso salvo na Base de Conhecimento.',
+                                itemType: 'Recurso',
+                                category: r.category,
+                                url: r.url,
+                                tags: resTags,
+                                updatedAt: r.updatedAt,
+                              );
+                              if (!ctx.mounted) return;
+                              ScaffoldMessenger.of(ctx).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'PDF do recurso gerado com sucesso!',
+                                  ),
+                                ),
+                              );
+                            } catch (e, st) {
+                              AppLogger.warning(
+                                'Falha ao exportar PDF do recurso (${r.id})',
+                                e,
+                                st,
+                              );
+                              if (!ctx.mounted) return;
+                              ScaffoldMessenger.of(ctx).showSnackBar(
+                                SnackBar(
+                                  content: Text('Erro ao gerar PDF: $e'),
+                                  backgroundColor: Colors.redAccent,
+                                ),
+                              );
+                            }
+                          }
+
+                          return KnowledgeResourceCard(
+                            resource: r,
+                            tags: resTags,
+                            isDark: isDark,
+                            onTap: () {
+                              final hasDesc =
+                                  r.description != null &&
+                                  r.description!.trim().isNotEmpty;
+                              showKnowledgeItemReader(
+                                context,
+                                title: r.title,
+                                content: r.description ?? 'Recurso / Link salvo na Base de Conhecimento.',
+                                category: r.category,
+                                itemType: 'Recurso',
+                                url: r.url,
+                                tags: resTags,
+                                updatedAt: r.updatedAt,
+                                allowHighlights: hasDesc,
+                                backlinkTargetType: 'resource',
+                                backlinkTargetId: r.id,
+                                onContentUpdated: hasDesc
+                                    ? (updated) async {
+                                        await km.updateResource(
+                                          r.id,
+                                          description: updated,
+                                        );
+                                      }
+                                    : null,
+                                onEdit: () => _showEditResourceModal(r),
+                                onDelete: () => km.softDeleteResource(r.id),
+                                onExportPdf: exportResPdf,
+                              );
                             },
-                            itemBuilder: (_) => [
-                              if (r.url != null && r.url!.isNotEmpty)
+                            onOpenUrl: r.url != null && r.url!.isNotEmpty
+                                ? () => _openUrl(r.url!)
+                                : null,
+                            onExportPdf: exportResPdf,
+                            trailingMenu: PopupMenuButton<String>(
+                              icon: const Icon(Icons.more_vert, size: 20),
+                              onSelected: (val) {
+                                if (val == 'open' &&
+                                    r.url != null &&
+                                    r.url!.isNotEmpty) {
+                                  _openUrl(r.url!);
+                                }
+                                if (val == 'export_pdf') exportResPdf();
+                                if (val == 'edit') _showEditResourceModal(r);
+                                if (val == 'delete') {
+                                  km.softDeleteResource(r.id);
+                                }
+                              },
+                              itemBuilder: (_) => [
+                                if (r.url != null && r.url!.isNotEmpty)
+                                  const PopupMenuItem(
+                                    value: 'open',
+                                    child: Text('Abrir Link'),
+                                  ),
                                 const PopupMenuItem(
-                                  value: 'open',
-                                  child: Text('Abrir Link'),
+                                  value: 'export_pdf',
+                                  child: Text('Exportar em PDF'),
                                 ),
-                              const PopupMenuItem(
-                                value: 'export_pdf',
-                                child: Text('Exportar em PDF'),
-                              ),
-                              const PopupMenuItem(
-                                value: 'edit',
-                                child: Text('Editar'),
-                              ),
-                              const PopupMenuItem(
-                                value: 'delete',
-                                child: Text(
-                                  'Excluir',
-                                  style: TextStyle(color: Colors.redAccent),
+                                const PopupMenuItem(
+                                  value: 'edit',
+                                  child: Text('Editar'),
                                 ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                ],
+                                const PopupMenuItem(
+                                  value: 'delete',
+                                  child: Text(
+                                    'Excluir',
+                                    style: TextStyle(color: Colors.redAccent),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                  ],
+                ),
               ),
-            ),
           ],
         );
       },
@@ -2056,302 +2588,88 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
     String? initialAreaId,
     String? initialStatus,
   }) {
-    String category = 'general';
-    String? areaId = initialAreaId ?? _selectedAreaId;
-    String? parentNoteId = initialParentNoteId;
-    String statusProp = initialStatus ?? 'rascunho';
-    String priorityProp = 'normal';
-    bool spacedReviewEnabled = false;
-    final km = ref.read(knowledgeManagerProvider);
-
-    showAdaptiveMinistrySheet(
-      context: context,
-      title: parentNoteId != null ? 'Nova Subpágina' : 'Nova Nota',
-      titleLeading: const Icon(Icons.note_add, color: Color(0xFF8B5CF6)),
-      builder: (ctx, scroll) => ManagedTextControllers(
-        initialTexts: const ['', '', ''],
-        customFactories: [
-          null,
-          (text) => RichFormattedEditingController.fromMarkup(text),
-          null,
-        ],
-        builder: (ctx, ctrls) {
-          final titleCtrl = ctrls[0];
-          final contentCtrl = ctrls[1];
-          final tagsCtrl = ctrls[2];
-
-          return StatefulBuilder(
-            builder: (ctx, setSheetState) {
-              return SingleChildScrollView(
-                controller: scroll,
-                physics: const ClampingScrollPhysics(),
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    TextField(
-                      controller: titleCtrl,
-                      autofocus: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Título da Nota',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: DropdownButtonFormField<String>(
-                            initialValue: category,
-                            decoration: const InputDecoration(
-                              labelText: 'Categoria',
-                              border: OutlineInputBorder(),
-                            ),
-                            items: const [
-                              DropdownMenuItem(
-                                value: 'general',
-                                child: Text('Geral'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'ministry',
-                                child: Text('Ministério'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'research',
-                                child: Text('Pesquisa'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'pastoral',
-                                child: Text('Pastoral'),
-                              ),
-                            ],
-                            onChanged: (v) =>
-                                setSheetState(() => category = v ?? 'general'),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: DropdownButtonFormField<String>(
-                            initialValue: statusProp,
-                            decoration: const InputDecoration(
-                              labelText: 'Status (Kanban)',
-                              border: OutlineInputBorder(),
-                            ),
-                            items: const [
-                              DropdownMenuItem(
-                                value: 'rascunho',
-                                child: Text('Rascunho'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'em_estudo',
-                                child: Text('Em Estudo'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'revisar',
-                                child: Text('Revisar'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'concluido',
-                                child: Text('Concluído'),
-                              ),
-                            ],
-                            onChanged: (v) => setSheetState(
-                              () => statusProp = v ?? 'rascunho',
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    _buildAreaDropdown(
-                      km: km,
-                      selectedAreaId: areaId,
-                      onChanged: (v) => setSheetState(() => areaId = v),
-                    ),
-                    _buildParentNoteDropdown(
-                      km: km,
-                      excludeNoteId: null,
-                      selectedParentId: parentNoteId,
-                      onChanged: (v) => setSheetState(() => parentNoteId = v),
-                    ),
-                    TextField(
-                      controller: tagsCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Tags (separadas por vírgula)',
-                        hintText: 'Ex: pregação, consolo, promessas',
-                        prefixIcon: Icon(Icons.tag, size: 18),
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      initialValue: priorityProp,
-                      decoration: const InputDecoration(
-                        labelText: 'Prioridade',
-                        border: OutlineInputBorder(),
-                      ),
-                      items: const [
-                        DropdownMenuItem(value: 'baixa', child: Text('Baixa')),
-                        DropdownMenuItem(
-                          value: 'normal',
-                          child: Text('Normal'),
-                        ),
-                        DropdownMenuItem(value: 'alta', child: Text('Alta')),
-                      ],
-                      onChanged: (v) =>
-                          setSheetState(() => priorityProp = v ?? 'normal'),
-                    ),
-                    SwitchListTile.adaptive(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text(
-                        'Incluir na Revisão Espaçada (SM-2)',
-                        style: TextStyle(fontSize: 13.5),
-                      ),
-                      value: spacedReviewEnabled,
-                      onChanged: (val) =>
-                          setSheetState(() => spacedReviewEnabled = val),
-                    ),
-                    const SizedBox(height: 6),
-                    SecondBrainRichEditor(
-                      controller: contentCtrl,
-                      labelText: 'Conteúdo da Nota',
-                      minLines: 6,
-                      maxLines: 12,
-                      onCreateInlineNote: (title) =>
-                          _createInlineNoteFromEditor(title, areaId),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            icon: const Icon(Icons.auto_stories, size: 16),
-                            label: const Text('Salvar & Pesquisar'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: const Color(0xFF8B5CF6),
-                              side: const BorderSide(color: Color(0xFF8B5CF6)),
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                            ),
-                            onPressed: () async {
-                              final title = titleCtrl.text.trim();
-                              if (title.isEmpty) return;
-                              final content =
-                                  RichFormattedEditingController.readMarkup(
-                                    contentCtrl,
-                                  ).trim();
-                              final rawTags = tagsCtrl.text
-                                  .split(',')
-                                  .map((t) => t.trim())
-                                  .where((t) => t.isNotEmpty)
-                                  .toList();
-                              final note = await km.createNote(
-                                title: title,
-                                content: content,
-                                category: category,
-                                areaId: areaId,
-                                parentNoteId: parentNoteId,
-                                properties: {
-                                  'status': statusProp,
-                                  'priority': priorityProp,
-                                },
-                                nextReviewAt: spacedReviewEnabled
-                                    ? DateTime.now().toUtc()
-                                    : null,
-                                tags: rawTags,
-                              );
-                              if (ctx.mounted) Navigator.of(ctx).pop();
-                              await _transformNoteToResearch(note);
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF8B5CF6),
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                            ),
-                            onPressed: () async {
-                              final title = titleCtrl.text.trim();
-                              if (title.isEmpty) return;
-                              final content =
-                                  RichFormattedEditingController.readMarkup(
-                                    contentCtrl,
-                                  ).trim();
-                              final rawTags = tagsCtrl.text
-                                  .split(',')
-                                  .map((t) => t.trim())
-                                  .where((t) => t.isNotEmpty)
-                                  .toList();
-                              await km.createNote(
-                                title: title,
-                                content: content,
-                                category: category,
-                                areaId: areaId,
-                                parentNoteId: parentNoteId,
-                                properties: {
-                                  'status': statusProp,
-                                  'priority': priorityProp,
-                                },
-                                nextReviewAt: spacedReviewEnabled
-                                    ? DateTime.now().toUtc()
-                                    : null,
-                                tags: rawTags,
-                              );
-                              if (ctx.mounted) Navigator.of(ctx).pop();
-                            },
-                            child: const Text(
-                              'Salvar Nota',
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              );
-            },
-          );
-        },
-      ),
+    _showNoteFormSheet(
+      initialParentNoteId: initialParentNoteId,
+      initialAreaId: initialAreaId,
+      initialStatus: initialStatus,
     );
   }
 
   void _showEditNoteModal(KnowledgeNoteEntry note) {
+    _showNoteFormSheet(existingNote: note);
+  }
+
+  void _showNoteFormSheet({
+    KnowledgeNoteEntry? existingNote,
+    String? initialParentNoteId,
+    String? initialAreaId,
+    String? initialStatus,
+  }) {
+    final isEdit = existingNote != null;
     List<String> existingTags = [];
-    try {
-      existingTags = (jsonDecode(note.tags) as List)
-          .map((e) => e.toString())
-          .where((t) => !t.startsWith('research:'))
-          .toList();
-    } catch (e, st) {
-      AppLogger.debug(
-        'Falha ao decodificar tags ao editar nota (${note.id}): $e',
-        st,
-      );
+    if (existingNote != null) {
+      try {
+        existingTags = (jsonDecode(existingNote.tags) as List)
+            .map((e) => e.toString())
+            .where((t) => !t.startsWith('research:'))
+            .toList();
+      } catch (e, st) {
+        AppLogger.debug(
+          'Falha ao decodificar tags ao editar nota (${existingNote.id}): $e',
+          st,
+        );
+      }
     }
-    String category = note.category;
-    String? areaId = note.areaId;
-    String? parentNoteId = note.parentNoteId;
-    final propMap = KnowledgeManager.decodeProperties(note.propertiesJson);
-    final propMeta = NotePropertyMeta.fromJson(note.propertiesJson);
-    String statusProp = propMeta.status;
-    String priorityProp =
-        ['baixa', 'normal', 'alta'].contains(propMeta.priority.toLowerCase())
-        ? propMeta.priority.toLowerCase()
+
+    String category = existingNote?.category ?? 'general';
+    String? areaId = isEdit
+        ? existingNote.areaId
+        : (initialAreaId ?? _selectedAreaId);
+    String? parentNoteId = isEdit
+        ? existingNote.parentNoteId
+        : initialParentNoteId;
+    final propMap = isEdit
+        ? KnowledgeManager.decodeProperties(existingNote.propertiesJson)
+        : <String, dynamic>{};
+    final propMeta = isEdit
+        ? NotePropertyMeta.fromJson(existingNote.propertiesJson)
+        : null;
+    String statusProp = isEdit
+        ? propMeta!.status
+        : (initialStatus ?? 'rascunho');
+    String priorityProp = isEdit
+        ? ([
+                'baixa',
+                'normal',
+                'alta',
+              ].contains(propMeta!.priority.toLowerCase())
+              ? propMeta.priority.toLowerCase()
+              : 'normal')
         : 'normal';
-    bool spacedReviewEnabled = note.nextReviewAt != null;
+    bool spacedReviewEnabled = isEdit && existingNote.nextReviewAt != null;
+    NoteCoverConfig? coverConfig = isEdit
+        ? NoteCoverConfig.fromPropertiesJson(existingNote.propertiesJson)
+        : null;
     final km = ref.read(knowledgeManagerProvider);
+    final db = ref.read(repositoryProvider).db;
 
     showAdaptiveMinistrySheet(
       context: context,
-      title: 'Editar Nota',
-      titleLeading: const Icon(Icons.edit_note, color: Color(0xFF8B5CF6)),
+      title: isEdit
+          ? 'Editar Nota'
+          : (parentNoteId != null ? 'Nova Subpágina' : 'Nova Nota'),
+      titleLeading: Icon(
+        isEdit ? Icons.edit_note : Icons.note_add,
+        color: const Color(0xFF8B5CF6),
+      ),
       builder: (ctx, scroll) => ManagedTextControllers(
-        initialTexts: [note.title, note.content, existingTags.join(', ')],
+        initialTexts: isEdit
+            ? [
+                existingNote.title,
+                existingNote.content,
+                existingTags.join(', '),
+              ]
+            : const ['', '', ''],
         customFactories: [
           null,
           (text) => RichFormattedEditingController.fromMarkup(text),
@@ -2362,310 +2680,442 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
           final contentCtrl = ctrls[1];
           final tagsCtrl = ctrls[2];
 
+          Future<void> save({required bool sendToResearch}) async {
+            final title = titleCtrl.text.trim();
+            if (title.isEmpty) return;
+            final content = RichFormattedEditingController.readMarkup(
+              contentCtrl,
+            ).trim();
+            final rawTags = tagsCtrl.text
+                .split(',')
+                .map((t) => t.trim())
+                .where((t) => t.isNotEmpty)
+                .toList();
+
+            if (isEdit) {
+              try {
+                final internal = (jsonDecode(existingNote.tags) as List)
+                    .map((e) => e.toString())
+                    .where((t) => t.startsWith('research:'))
+                    .toList();
+                rawTags.addAll(internal);
+              } catch (e, st) {
+                AppLogger.debug(
+                  'Falha ao preservar tags research ao editar nota (${existingNote.id}): $e',
+                  st,
+                );
+              }
+            }
+
+            var mergedProps =
+                NoteCoverConfig.mergeCoverIntoPropertiesMap(
+                    propMap,
+                    coverConfig,
+                  )
+                  ..['status'] = statusProp
+                  ..['priority'] = priorityProp;
+
+            try {
+              if (!isEdit) {
+                final created = await km.createNote(
+                  title: title,
+                  content: content,
+                  category: category,
+                  areaId: areaId,
+                  parentNoteId: parentNoteId,
+                  properties: mergedProps,
+                  nextReviewAt: spacedReviewEnabled
+                      ? DateTime.now().toUtc()
+                      : null,
+                  tags: rawTags,
+                );
+                if (ctx.mounted) Navigator.of(ctx).pop();
+                if (sendToResearch) {
+                  await _transformNoteToResearch(created);
+                }
+              } else {
+                await km.updateNote(
+                  existingNote.id,
+                  title: title,
+                  content: content,
+                  category: category,
+                  areaId: areaId,
+                  clearAreaId: areaId == null,
+                  parentNoteId: parentNoteId,
+                  clearParentNoteId: parentNoteId == null,
+                  properties: mergedProps,
+                  nextReviewAt: spacedReviewEnabled
+                      ? (existingNote.nextReviewAt ?? DateTime.now().toUtc())
+                      : null,
+                  clearNextReviewAt: !spacedReviewEnabled,
+                  tags: rawTags,
+                );
+                final updatedNote = sendToResearch
+                    ? await km.getNoteById(existingNote.id)
+                    : null;
+                if (ctx.mounted) Navigator.of(ctx).pop();
+                if (updatedNote != null) {
+                  await _transformNoteToResearch(updatedNote);
+                }
+              }
+            } on ArgumentError catch (e) {
+              if (ctx.mounted) {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  SnackBar(
+                    content: Text(e.message.toString()),
+                    backgroundColor: Colors.redAccent,
+                  ),
+                );
+              }
+            }
+          }
+
           return StatefulBuilder(
             builder: (ctx, setSheetState) {
-              return SingleChildScrollView(
-                controller: scroll,
-                physics: const ClampingScrollPhysics(),
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    TextField(
-                      controller: titleCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Título da Nota',
-                        border: OutlineInputBorder(),
+              final keyboardOpen = MediaQuery.viewInsetsOf(ctx).bottom > 40;
+              final catLabel =
+                  const {
+                    'general': 'Geral',
+                    'ministry': 'Ministério',
+                    'research': 'Pesquisa',
+                    'pastoral': 'Pastoral',
+                  }[category] ??
+                  category;
+              final statusLabel = NotePropertyMeta.statusLabel(statusProp);
+              final propSummary = '$catLabel • $statusLabel • $priorityProp';
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: SingleChildScrollView(
+                      controller: scroll,
+                      physics: const ClampingScrollPhysics(),
+                      padding: EdgeInsets.fromLTRB(
+                        16,
+                        keyboardOpen ? 10 : 16,
+                        16,
+                        12,
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: DropdownButtonFormField<String>(
-                            initialValue:
-                                [
-                                  'general',
-                                  'ministry',
-                                  'research',
-                                  'pastoral',
-                                ].contains(category)
-                                ? category
-                                : 'general',
-                            decoration: const InputDecoration(
-                              labelText: 'Categoria',
-                              border: OutlineInputBorder(),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (coverConfig != null &&
+                              coverConfig!.hasCustomCover &&
+                              !keyboardOpen) ...[
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Stack(
+                                children: [
+                                  NoteCoverHeaderBackground(
+                                    cover: coverConfig!,
+                                    height: 68,
+                                  ),
+                                  Positioned(
+                                    right: 8,
+                                    top: 8,
+                                    child: FilledButton.tonalIcon(
+                                      style: FilledButton.styleFrom(
+                                        visualDensity: VisualDensity.compact,
+                                        backgroundColor: Colors.black
+                                            .withValues(alpha: 0.45),
+                                        foregroundColor: Colors.white,
+                                      ),
+                                      onPressed: () async {
+                                        final picked =
+                                            await showNoteCoverPickerDialog(
+                                              ctx,
+                                              initialCover: coverConfig,
+                                              pictureBankDb: db,
+                                              previewTitle: titleCtrl.text,
+                                            );
+                                        if (picked != null) {
+                                          setSheetState(() {
+                                            coverConfig = picked.cleared
+                                                ? null
+                                                : picked.cover;
+                                          });
+                                        }
+                                      },
+                                      icon: const Icon(
+                                        Icons.palette_outlined,
+                                        size: 15,
+                                      ),
+                                      label: const Text(
+                                        'Capa',
+                                        style: TextStyle(fontSize: 12),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                            items: const [
-                              DropdownMenuItem(
-                                value: 'general',
-                                child: Text('Geral'),
+                            const SizedBox(height: 10),
+                          ],
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: titleCtrl,
+                                  autofocus: !isEdit,
+                                  decoration: InputDecoration(
+                                    labelText: 'Título da Nota',
+                                    isDense: keyboardOpen,
+                                    border: const OutlineInputBorder(),
+                                  ),
+                                ),
                               ),
-                              DropdownMenuItem(
-                                value: 'ministry',
-                                child: Text('Ministério'),
+                              if (coverConfig == null ||
+                                  !coverConfig!.hasCustomCover ||
+                                  keyboardOpen) ...[
+                                const SizedBox(width: 8),
+                                OutlinedButton.icon(
+                                  key: const Key('btn_note_form_cover'),
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 12,
+                                    ),
+                                  ),
+                                  onPressed: () async {
+                                    final picked =
+                                        await showNoteCoverPickerDialog(
+                                          ctx,
+                                          initialCover: coverConfig,
+                                          pictureBankDb: db,
+                                          previewTitle: titleCtrl.text,
+                                        );
+                                    if (picked != null) {
+                                      setSheetState(() {
+                                        coverConfig = picked.cleared
+                                            ? null
+                                            : picked.cover;
+                                      });
+                                    }
+                                  },
+                                  icon: const Icon(
+                                    Icons.palette_outlined,
+                                    size: 18,
+                                  ),
+                                  label: const Text('Capa'),
+                                ),
+                              ],
+                            ],
+                          ),
+                          SizedBox(height: keyboardOpen ? 8 : 10),
+                          // Editor Principal priorizado logo no topo para digitação confortável
+                          SecondBrainRichEditor(
+                            controller: contentCtrl,
+                            labelText: 'Conteúdo da Nota',
+                            minLines: isEdit ? 7 : 6,
+                            maxLines: 16,
+                            onCreateInlineNote: (title) =>
+                                _createInlineNoteFromEditor(title, areaId),
+                          ),
+                          SizedBox(height: keyboardOpen ? 8 : 12),
+                          // Propriedades recolhíveis (não ocupam o espaço de digitação!)
+                          CollapsibleMetadataSection(
+                            key: const Key('note_form_metadata_section'),
+                            title: 'Propriedades da Nota',
+                            summary: propSummary,
+                            initiallyExpanded: false,
+                            children: [
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: DropdownButtonFormField<String>(
+                                      initialValue:
+                                          [
+                                            'general',
+                                            'ministry',
+                                            'research',
+                                            'pastoral',
+                                          ].contains(category)
+                                          ? category
+                                          : 'general',
+                                      decoration: const InputDecoration(
+                                        labelText: 'Categoria',
+                                        isDense: true,
+                                        border: OutlineInputBorder(),
+                                      ),
+                                      items: const [
+                                        DropdownMenuItem(
+                                          value: 'general',
+                                          child: Text('Geral'),
+                                        ),
+                                        DropdownMenuItem(
+                                          value: 'ministry',
+                                          child: Text('Ministério'),
+                                        ),
+                                        DropdownMenuItem(
+                                          value: 'research',
+                                          child: Text('Pesquisa'),
+                                        ),
+                                        DropdownMenuItem(
+                                          value: 'pastoral',
+                                          child: Text('Pastoral'),
+                                        ),
+                                      ],
+                                      onChanged: (v) => setSheetState(
+                                        () => category = v ?? 'general',
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: DropdownButtonFormField<String>(
+                                      initialValue: statusProp,
+                                      decoration: const InputDecoration(
+                                        labelText: 'Status (Kanban)',
+                                        isDense: true,
+                                        border: OutlineInputBorder(),
+                                      ),
+                                      items: const [
+                                        DropdownMenuItem(
+                                          value: 'rascunho',
+                                          child: Text('Rascunho'),
+                                        ),
+                                        DropdownMenuItem(
+                                          value: 'em_estudo',
+                                          child: Text('Em Estudo'),
+                                        ),
+                                        DropdownMenuItem(
+                                          value: 'revisar',
+                                          child: Text('Revisar'),
+                                        ),
+                                        DropdownMenuItem(
+                                          value: 'concluido',
+                                          child: Text('Concluído'),
+                                        ),
+                                      ],
+                                      onChanged: (v) => setSheetState(
+                                        () => statusProp = v ?? 'rascunho',
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                              DropdownMenuItem(
-                                value: 'research',
-                                child: Text('Pesquisa'),
+                              const SizedBox(height: 10),
+                              _buildAreaDropdown(
+                                km: km,
+                                selectedAreaId: areaId,
+                                onChanged: (v) =>
+                                    setSheetState(() => areaId = v),
                               ),
-                              DropdownMenuItem(
-                                value: 'pastoral',
-                                child: Text('Pastoral'),
+                              _buildParentNoteDropdown(
+                                km: km,
+                                excludeNoteId: existingNote?.id,
+                                selectedParentId: parentNoteId,
+                                onChanged: (v) =>
+                                    setSheetState(() => parentNoteId = v),
+                              ),
+                              TextField(
+                                controller: tagsCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Tags (separadas por vírgula)',
+                                  hintText: 'Ex: pregação, consolo, promessas',
+                                  prefixIcon: Icon(Icons.tag, size: 18),
+                                  isDense: true,
+                                  border: OutlineInputBorder(),
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              DropdownButtonFormField<String>(
+                                initialValue: priorityProp,
+                                decoration: const InputDecoration(
+                                  labelText: 'Prioridade',
+                                  isDense: true,
+                                  border: OutlineInputBorder(),
+                                ),
+                                items: const [
+                                  DropdownMenuItem(
+                                    value: 'baixa',
+                                    child: Text('Baixa'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'normal',
+                                    child: Text('Normal'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'alta',
+                                    child: Text('Alta'),
+                                  ),
+                                ],
+                                onChanged: (v) => setSheetState(
+                                  () => priorityProp = v ?? 'normal',
+                                ),
+                              ),
+                              SwitchListTile.adaptive(
+                                contentPadding: EdgeInsets.zero,
+                                title: const Text(
+                                  'Incluir na Revisão Espaçada (SM-2)',
+                                  style: TextStyle(fontSize: 13.5),
+                                ),
+                                value: spacedReviewEnabled,
+                                onChanged: (val) => setSheetState(
+                                  () => spacedReviewEnabled = val,
+                                ),
                               ),
                             ],
-                            onChanged: (v) =>
-                                setSheetState(() => category = v ?? 'general'),
                           ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: DropdownButtonFormField<String>(
-                            initialValue: statusProp,
-                            decoration: const InputDecoration(
-                              labelText: 'Status (Kanban)',
-                              border: OutlineInputBorder(),
-                            ),
-                            items: const [
-                              DropdownMenuItem(
-                                value: 'rascunho',
-                                child: Text('Rascunho'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'em_estudo',
-                                child: Text('Em Estudo'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'revisar',
-                                child: Text('Revisar'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'concluido',
-                                child: Text('Concluído'),
-                              ),
-                            ],
-                            onChanged: (v) => setSheetState(
-                              () => statusProp = v ?? 'rascunho',
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    _buildAreaDropdown(
-                      km: km,
-                      selectedAreaId: areaId,
-                      onChanged: (v) => setSheetState(() => areaId = v),
-                    ),
-                    _buildParentNoteDropdown(
-                      km: km,
-                      excludeNoteId: note.id,
-                      selectedParentId: parentNoteId,
-                      onChanged: (v) => setSheetState(() => parentNoteId = v),
-                    ),
-                    TextField(
-                      controller: tagsCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Tags (separadas por vírgula)',
-                        hintText: 'Ex: pregação, consolo, promessas',
-                        prefixIcon: Icon(Icons.tag, size: 18),
-                        border: OutlineInputBorder(),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      initialValue: priorityProp,
-                      decoration: const InputDecoration(
-                        labelText: 'Prioridade',
-                        border: OutlineInputBorder(),
-                      ),
-                      items: const [
-                        DropdownMenuItem(value: 'baixa', child: Text('Baixa')),
-                        DropdownMenuItem(
-                          value: 'normal',
-                          child: Text('Normal'),
+                  ),
+                  // Barra fixa inferior sempre visível para salvar mesmo com teclado aberto
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+                    decoration: BoxDecoration(
+                      border: Border(
+                        top: BorderSide(
+                          color: Theme.of(ctx).brightness == Brightness.dark
+                              ? Colors.white.withValues(alpha: 0.08)
+                              : Colors.black.withValues(alpha: 0.08),
                         ),
-                        DropdownMenuItem(value: 'alta', child: Text('Alta')),
-                      ],
-                      onChanged: (v) =>
-                          setSheetState(() => priorityProp = v ?? 'normal'),
-                    ),
-                    SwitchListTile.adaptive(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text(
-                        'Incluir na Revisão Espaçada (SM-2)',
-                        style: TextStyle(fontSize: 13.5),
                       ),
-                      value: spacedReviewEnabled,
-                      onChanged: (val) =>
-                          setSheetState(() => spacedReviewEnabled = val),
                     ),
-                    const SizedBox(height: 6),
-                    SecondBrainRichEditor(
-                      controller: contentCtrl,
-                      labelText: 'Conteúdo da Nota',
-                      minLines: 6,
-                      maxLines: 12,
-                      onCreateInlineNote: (title) =>
-                          _createInlineNoteFromEditor(title, areaId),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
+                    child: Row(
                       children: [
                         Expanded(
                           child: OutlinedButton.icon(
                             icon: const Icon(Icons.auto_stories, size: 16),
-                            label: const Text('Salvar & Pesquisar'),
+                            label: Text(
+                              keyboardOpen ? 'Pesquisar' : 'Salvar & Pesquisar',
+                              overflow: TextOverflow.ellipsis,
+                            ),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: const Color(0xFF8B5CF6),
                               side: const BorderSide(color: Color(0xFF8B5CF6)),
-                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
                             ),
-                            onPressed: () async {
-                              final title = titleCtrl.text.trim();
-                              if (title.isEmpty) return;
-                              final content =
-                                  RichFormattedEditingController.readMarkup(
-                                    contentCtrl,
-                                  ).trim();
-                              final rawTags = tagsCtrl.text
-                                  .split(',')
-                                  .map((t) => t.trim())
-                                  .where((t) => t.isNotEmpty)
-                                  .toList();
-                              try {
-                                final internal = (jsonDecode(note.tags) as List)
-                                    .map((e) => e.toString())
-                                    .where((t) => t.startsWith('research:'))
-                                    .toList();
-                                rawTags.addAll(internal);
-                              } catch (e, st) {
-                                AppLogger.debug(
-                                  'Falha ao preservar tags research ao editar nota (${note.id}): $e',
-                                  st,
-                                );
-                              }
-
-                              final mergedProps =
-                                  Map<String, dynamic>.from(propMap)
-                                    ..['status'] = statusProp
-                                    ..['priority'] = priorityProp;
-                              try {
-                                await km.updateNote(
-                                  note.id,
-                                  title: title,
-                                  content: content,
-                                  category: category,
-                                  areaId: areaId,
-                                  clearAreaId: areaId == null,
-                                  parentNoteId: parentNoteId,
-                                  clearParentNoteId: parentNoteId == null,
-                                  properties: mergedProps,
-                                  nextReviewAt: spacedReviewEnabled
-                                      ? (note.nextReviewAt ??
-                                            DateTime.now().toUtc())
-                                      : null,
-                                  clearNextReviewAt: !spacedReviewEnabled,
-                                  tags: rawTags,
-                                );
-                                final updatedNote = await km.getNoteById(
-                                  note.id,
-                                );
-                                if (ctx.mounted) Navigator.of(ctx).pop();
-                                if (updatedNote != null) {
-                                  await _transformNoteToResearch(updatedNote);
-                                }
-                              } on ArgumentError catch (e) {
-                                if (ctx.mounted) {
-                                  ScaffoldMessenger.of(ctx).showSnackBar(
-                                    SnackBar(
-                                      content: Text(e.message.toString()),
-                                      backgroundColor: Colors.redAccent,
-                                    ),
-                                  );
-                                }
-                              }
-                            },
+                            onPressed: () => save(sendToResearch: true),
                           ),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: ElevatedButton(
+                            key: const Key('btn_note_form_save'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF8B5CF6),
                               foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
                             ),
-                            onPressed: () async {
-                              final title = titleCtrl.text.trim();
-                              if (title.isEmpty) return;
-                              final content =
-                                  RichFormattedEditingController.readMarkup(
-                                    contentCtrl,
-                                  ).trim();
-                              final rawTags = tagsCtrl.text
-                                  .split(',')
-                                  .map((t) => t.trim())
-                                  .where((t) => t.isNotEmpty)
-                                  .toList();
-                              try {
-                                final internal = (jsonDecode(note.tags) as List)
-                                    .map((e) => e.toString())
-                                    .where((t) => t.startsWith('research:'))
-                                    .toList();
-                                rawTags.addAll(internal);
-                              } catch (e, st) {
-                                AppLogger.debug(
-                                  'Falha ao preservar tags research ao salvar nota (${note.id}): $e',
-                                  st,
-                                );
-                              }
-
-                              final mergedProps =
-                                  Map<String, dynamic>.from(propMap)
-                                    ..['status'] = statusProp
-                                    ..['priority'] = priorityProp;
-                              try {
-                                await km.updateNote(
-                                  note.id,
-                                  title: title,
-                                  content: content,
-                                  category: category,
-                                  areaId: areaId,
-                                  clearAreaId: areaId == null,
-                                  parentNoteId: parentNoteId,
-                                  clearParentNoteId: parentNoteId == null,
-                                  properties: mergedProps,
-                                  nextReviewAt: spacedReviewEnabled
-                                      ? (note.nextReviewAt ??
-                                            DateTime.now().toUtc())
-                                      : null,
-                                  clearNextReviewAt: !spacedReviewEnabled,
-                                  tags: rawTags,
-                                );
-                                if (ctx.mounted) Navigator.of(ctx).pop();
-                              } on ArgumentError catch (e) {
-                                if (ctx.mounted) {
-                                  ScaffoldMessenger.of(ctx).showSnackBar(
-                                    SnackBar(
-                                      content: Text(e.message.toString()),
-                                      backgroundColor: Colors.redAccent,
-                                    ),
-                                  );
-                                }
-                              }
-                            },
-                            child: const Text(
-                              'Salvar Alterações',
-                              style: TextStyle(fontWeight: FontWeight.bold),
+                            onPressed: () => save(sendToResearch: false),
+                            child: Text(
+                              isEdit ? 'Salvar Alterações' : 'Salvar Nota',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                         ),
                       ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               );
             },
           );
@@ -2711,22 +3161,7 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                       border: OutlineInputBorder(),
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  _buildAreaDropdown(
-                    km: km,
-                    selectedAreaId: areaId,
-                    onChanged: (v) => setSheetState(() => areaId = v),
-                  ),
-                  SecondBrainRichEditor(
-                    controller: ctxCtrl,
-                    labelText: 'Contexto ou Objeção',
-                    minLines: 2,
-                    maxLines: 5,
-                    enableImagePicker: false,
-                    onCreateInlineNote: (t) =>
-                        _createInlineNoteFromEditor(t, areaId),
-                  ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 10),
                   SecondBrainRichEditor(
                     controller: ansCtrl,
                     labelText: 'Resposta Bíblica',
@@ -2735,15 +3170,40 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                     onCreateInlineNote: (t) =>
                         _createInlineNoteFromEditor(t, areaId),
                   ),
-                  SwitchListTile.adaptive(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text(
-                      'Incluir na Revisão Espaçada (SM-2)',
-                      style: TextStyle(fontSize: 13.5),
-                    ),
-                    value: spacedReviewEnabled,
-                    onChanged: (val) =>
-                        setSheetState(() => spacedReviewEnabled = val),
+                  const SizedBox(height: 10),
+                  CollapsibleMetadataSection(
+                    title: 'Contexto, Área & Revisão',
+                    summary: spacedReviewEnabled
+                        ? 'Revisão SM-2 ativa'
+                        : 'Contexto e organização',
+                    initiallyExpanded: false,
+                    children: [
+                      const SizedBox(height: 6),
+                      _buildAreaDropdown(
+                        km: km,
+                        selectedAreaId: areaId,
+                        onChanged: (v) => setSheetState(() => areaId = v),
+                      ),
+                      SecondBrainRichEditor(
+                        controller: ctxCtrl,
+                        labelText: 'Contexto ou Objeção',
+                        minLines: 2,
+                        maxLines: 5,
+                        enableImagePicker: false,
+                        onCreateInlineNote: (t) =>
+                            _createInlineNoteFromEditor(t, areaId),
+                      ),
+                      SwitchListTile.adaptive(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text(
+                          'Incluir na Revisão Espaçada (SM-2)',
+                          style: TextStyle(fontSize: 13.5),
+                        ),
+                        value: spacedReviewEnabled,
+                        onChanged: (val) =>
+                            setSheetState(() => spacedReviewEnabled = val),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 12),
                   ElevatedButton(
@@ -2843,61 +3303,78 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                         border: OutlineInputBorder(),
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      initialValue:
-                          [
-                            'manual',
-                            'study',
-                            'outline',
-                            'other',
-                          ].contains(category)
-                          ? category
-                          : 'manual',
-                      decoration: const InputDecoration(
-                        labelText: 'Categoria',
-                        border: OutlineInputBorder(),
-                      ),
-                      items: const [
-                        DropdownMenuItem(
-                          value: 'manual',
-                          child: Text('Manual / Guia'),
-                        ),
-                        DropdownMenuItem(value: 'study', child: Text('Estudo')),
-                        DropdownMenuItem(
-                          value: 'outline',
-                          child: Text('Esboço'),
-                        ),
-                        DropdownMenuItem(value: 'other', child: Text('Outro')),
-                      ],
-                      onChanged: (v) =>
-                          setSheetState(() => category = v ?? 'manual'),
-                    ),
-                    const SizedBox(height: 12),
-                    _buildAreaDropdown(
-                      km: km,
-                      selectedAreaId: areaId,
-                      onChanged: (v) => setSheetState(() => areaId = v),
-                    ),
-                    TextField(
-                      controller: tagsCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Tags (separadas por vírgula)',
-                        hintText: 'Ex: ministério, apostilas, roteiros',
-                        prefixIcon: Icon(Icons.tag, size: 18),
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 10),
                     RichMarkdownToolbar(controller: descCtrl),
                     const SizedBox(height: 6),
                     TextField(
                       controller: descCtrl,
-                      maxLines: 4,
+                      maxLines: 5,
+                      scrollPadding: const EdgeInsets.only(bottom: 140),
                       decoration: const InputDecoration(
                         labelText: 'Anotações e Referências',
                         border: OutlineInputBorder(),
                       ),
+                    ),
+                    const SizedBox(height: 10),
+                    CollapsibleMetadataSection(
+                      title: 'Categoria, Área & Tags',
+                      summary: 'Categoria: $category',
+                      initiallyExpanded: false,
+                      children: [
+                        const SizedBox(height: 6),
+                        DropdownButtonFormField<String>(
+                          initialValue:
+                              [
+                                'manual',
+                                'study',
+                                'outline',
+                                'other',
+                              ].contains(category)
+                              ? category
+                              : 'manual',
+                          decoration: const InputDecoration(
+                            labelText: 'Categoria',
+                            isDense: true,
+                            border: OutlineInputBorder(),
+                          ),
+                          items: const [
+                            DropdownMenuItem(
+                              value: 'manual',
+                              child: Text('Manual / Guia'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'study',
+                              child: Text('Estudo'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'outline',
+                              child: Text('Esboço'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'other',
+                              child: Text('Outro'),
+                            ),
+                          ],
+                          onChanged: (v) =>
+                              setSheetState(() => category = v ?? 'manual'),
+                        ),
+                        const SizedBox(height: 10),
+                        _buildAreaDropdown(
+                          km: km,
+                          selectedAreaId: areaId,
+                          onChanged: (v) => setSheetState(() => areaId = v),
+                        ),
+                        TextField(
+                          controller: tagsCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'Tags (separadas por vírgula)',
+                            hintText: 'Ex: ministério, apostilas, roteiros',
+                            prefixIcon: Icon(Icons.tag, size: 18),
+                            isDense: true,
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 16),
                     ElevatedButton(
@@ -3000,7 +3477,7 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                         border: OutlineInputBorder(),
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 10),
                     TextField(
                       controller: urlCtrl,
                       decoration: const InputDecoration(
@@ -3008,69 +3485,83 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                         border: OutlineInputBorder(),
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    _buildAreaDropdown(
-                      km: km,
-                      selectedAreaId: areaId,
-                      onChanged: (v) => setSheetState(() => areaId = v),
-                    ),
-                    TextField(
-                      controller: tagsCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Tags (separadas por vírgula)',
-                        hintText: 'Ex: jw, vídeos, pregação',
-                        prefixIcon: Icon(Icons.tag, size: 18),
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 10),
                     RichMarkdownToolbar(controller: descCtrl),
                     const SizedBox(height: 6),
                     TextField(
                       controller: descCtrl,
-                      maxLines: 3,
+                      maxLines: 4,
+                      scrollPadding: const EdgeInsets.only(bottom: 140),
                       decoration: const InputDecoration(
                         labelText: 'Descrição / Para que serve?',
                         border: OutlineInputBorder(),
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      initialValue:
-                          [
-                            'jw_pub',
-                            'video',
-                            'article',
-                            'scripture_chain',
-                            'link',
-                          ].contains(resourceType)
-                          ? resourceType
-                          : 'link',
-                      decoration: const InputDecoration(
-                        labelText: 'Tipo de Recurso',
-                        border: OutlineInputBorder(),
-                      ),
-                      items: const [
-                        DropdownMenuItem(
-                          value: 'jw_pub',
-                          child: Text('Publicação JW'),
+                    const SizedBox(height: 10),
+                    CollapsibleMetadataSection(
+                      title: 'Tipo, Área & Tags',
+                      summary: 'Tipo: $resourceType',
+                      initiallyExpanded: false,
+                      children: [
+                        const SizedBox(height: 6),
+                        _buildAreaDropdown(
+                          km: km,
+                          selectedAreaId: areaId,
+                          onChanged: (v) => setSheetState(() => areaId = v),
                         ),
-                        DropdownMenuItem(value: 'video', child: Text('Vídeo')),
-                        DropdownMenuItem(
-                          value: 'article',
-                          child: Text('Artigo de Revista'),
+                        TextField(
+                          controller: tagsCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'Tags (separadas por vírgula)',
+                            hintText: 'Ex: jw, vídeos, pregação',
+                            prefixIcon: Icon(Icons.tag, size: 18),
+                            isDense: true,
+                            border: OutlineInputBorder(),
+                          ),
                         ),
-                        DropdownMenuItem(
-                          value: 'scripture_chain',
-                          child: Text('Cadeia de Textos'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'link',
-                          child: Text('Outro Link'),
+                        const SizedBox(height: 10),
+                        DropdownButtonFormField<String>(
+                          initialValue:
+                              [
+                                'jw_pub',
+                                'video',
+                                'article',
+                                'scripture_chain',
+                                'link',
+                              ].contains(resourceType)
+                              ? resourceType
+                              : 'link',
+                          decoration: const InputDecoration(
+                            labelText: 'Tipo de Recurso',
+                            isDense: true,
+                            border: OutlineInputBorder(),
+                          ),
+                          items: const [
+                            DropdownMenuItem(
+                              value: 'jw_pub',
+                              child: Text('Publicação JW'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'video',
+                              child: Text('Vídeo'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'article',
+                              child: Text('Artigo de Revista'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'scripture_chain',
+                              child: Text('Cadeia de Textos'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'link',
+                              child: Text('Outro Link'),
+                            ),
+                          ],
+                          onChanged: (v) =>
+                              setSheetState(() => resourceType = v ?? 'link'),
                         ),
                       ],
-                      onChanged: (v) =>
-                          setSheetState(() => resourceType = v ?? 'link'),
                     ),
                     const SizedBox(height: 16),
                     ElevatedButton(
@@ -3179,6 +3670,37 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
     }
   }
 
+  Future<void> _customizeNoteCover(KnowledgeNoteEntry note) async {
+    final db = ref.read(repositoryProvider).db;
+    final km = ref.read(knowledgeManagerProvider);
+    final outcome = await showNoteCoverPickerDialog(
+      context,
+      initialCover: NoteCoverConfig.fromPropertiesJson(note.propertiesJson),
+      pictureBankDb: db,
+      previewTitle: note.title,
+    );
+    if (outcome == null) return;
+    final currentProps = NoteCoverConfig.decodePropertiesMap(
+      note.propertiesJson,
+    );
+    final nextProps = NoteCoverConfig.mergeCoverIntoPropertiesMap(
+      currentProps,
+      outcome.cleared ? null : outcome.cover,
+    );
+    await km.updateNote(note.id, properties: nextProps);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            outcome.cleared
+                ? 'Capa da nota removida.'
+                : 'Capa da nota atualizada!',
+          ),
+        ),
+      );
+    }
+  }
+
   Future<void> _exportNotePdf(KnowledgeNoteEntry note) async {
     try {
       await KnowledgeAndEmailPdfService.exportSingleItemPdf(
@@ -3188,6 +3710,7 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
         category: note.category,
         tags: _decodeNoteTagsSafe(note.tags),
         updatedAt: note.updatedAt,
+        cover: NoteCoverConfig.fromPropertiesJson(note.propertiesJson),
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -3491,29 +4014,40 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                       border: OutlineInputBorder(),
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  _buildAreaDropdown(
-                    km: km,
-                    selectedAreaId: areaId,
-                    onChanged: (v) => setSheetState(() => areaId = v),
-                  ),
+                  const SizedBox(height: 10),
                   SecondBrainRichEditor(
                     controller: ctxCtrl,
                     labelText: 'Contexto ou Objeção (opcional)',
-                    minLines: 3,
-                    maxLines: 6,
+                    minLines: 4,
+                    maxLines: 8,
                     onCreateInlineNote: (t) =>
                         _createInlineNoteFromEditor(t, areaId),
                   ),
-                  SwitchListTile.adaptive(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text(
-                      'Incluir na Revisão Espaçada (SM-2)',
-                      style: TextStyle(fontSize: 13.5),
-                    ),
-                    value: spacedReviewEnabled,
-                    onChanged: (val) =>
-                        setSheetState(() => spacedReviewEnabled = val),
+                  const SizedBox(height: 10),
+                  CollapsibleMetadataSection(
+                    title: 'Área & Revisão Espaçada',
+                    summary: spacedReviewEnabled
+                        ? 'Revisão SM-2 ativa'
+                        : 'Organização P.A.R.A.',
+                    initiallyExpanded: false,
+                    children: [
+                      const SizedBox(height: 6),
+                      _buildAreaDropdown(
+                        km: km,
+                        selectedAreaId: areaId,
+                        onChanged: (v) => setSheetState(() => areaId = v),
+                      ),
+                      SwitchListTile.adaptive(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text(
+                          'Incluir na Revisão Espaçada (SM-2)',
+                          style: TextStyle(fontSize: 13.5),
+                        ),
+                        value: spacedReviewEnabled,
+                        onChanged: (val) =>
+                            setSheetState(() => spacedReviewEnabled = val),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 12),
                   ElevatedButton(
@@ -3875,7 +4409,7 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                       border: OutlineInputBorder(),
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 10),
                   TextField(
                     controller: urlCtrl,
                     decoration: const InputDecoration(
@@ -3883,31 +4417,40 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                       border: OutlineInputBorder(),
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  _buildAreaDropdown(
-                    km: km,
-                    selectedAreaId: areaId,
-                    onChanged: (v) => setSheetState(() => areaId = v),
-                  ),
-                  TextField(
-                    controller: tagsCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Tags (separadas por vírgula)',
-                      hintText: 'Ex: jw, vídeos, pregação',
-                      prefixIcon: Icon(Icons.tag, size: 18),
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 10),
                   RichMarkdownToolbar(controller: descCtrl),
                   const SizedBox(height: 6),
                   TextField(
                     controller: descCtrl,
                     maxLines: 4,
+                    scrollPadding: const EdgeInsets.only(bottom: 140),
                     decoration: const InputDecoration(
                       labelText: 'Descrição / Para qual ocasião serve?',
                       border: OutlineInputBorder(),
                     ),
+                  ),
+                  const SizedBox(height: 10),
+                  CollapsibleMetadataSection(
+                    title: 'Área P.A.R.A. & Tags',
+                    initiallyExpanded: false,
+                    children: [
+                      const SizedBox(height: 6),
+                      _buildAreaDropdown(
+                        km: km,
+                        selectedAreaId: areaId,
+                        onChanged: (v) => setSheetState(() => areaId = v),
+                      ),
+                      TextField(
+                        controller: tagsCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Tags (separadas por vírgula)',
+                          hintText: 'Ex: jw, vídeos, pregação',
+                          prefixIcon: Icon(Icons.tag, size: 18),
+                          isDense: true,
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 16),
                   ElevatedButton(
@@ -4486,8 +5029,8 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
   }) {
     final accent = AppTheme.primaryColor(context);
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(28),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
         child: Container(
           constraints: const BoxConstraints(maxWidth: 400),
           padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),

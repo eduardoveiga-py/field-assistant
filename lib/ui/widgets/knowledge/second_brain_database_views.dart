@@ -5,8 +5,10 @@ import 'package:flutter/material.dart';
 
 import '../../../core/app_theme.dart';
 import '../../../database/app_database.dart';
+import '../../../knowledge/note_cover_config.dart';
 import '../markdown_preview_text.dart';
 import 'knowledge_ui_components.dart';
+import 'note_cover_picker_dialog.dart';
 import 'rich_block_markdown_view.dart';
 
 /// Modos de visualização estilo Banco de Dados do Notion para Notas.
@@ -641,6 +643,7 @@ class NotesGalleryView extends StatelessWidget {
             ? _parseAreaColor(area.colorHex)
             : style.accent;
         final meta = NotePropertyMeta.fromJson(note.propertiesJson);
+        final cover = NoteCoverConfig.fromPropertiesJson(note.propertiesJson);
         final tags = _decodeNoteTags(note.tags);
         final previewMarkup = SecondBrainBlockParser.toInlinePreviewMarkup(
           note.content,
@@ -660,45 +663,84 @@ class NotesGalleryView extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Container(
-                    height: 36,
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          accent.withValues(alpha: isDark ? 0.35 : 0.22),
-                          accent.withValues(alpha: isDark ? 0.14 : 0.08),
+                  if (cover != null && cover.hasCustomCover)
+                    SizedBox(
+                      height: 52,
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          NoteCoverHeaderBackground(cover: cover, height: 52),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            child: Row(
+                              children: [
+                                Icon(style.icon, size: 16, color: Colors.white),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    area?.name ?? style.label,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                                Text(
+                                  formatDate(note.updatedAt),
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    color: Colors.white.withValues(alpha: 0.85),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    Container(
+                      height: 36,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            accent.withValues(alpha: isDark ? 0.35 : 0.22),
+                            accent.withValues(alpha: isDark ? 0.14 : 0.08),
+                          ],
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(style.icon, size: 16, color: accent),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              area?.name ?? style.label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
+                                color: accent,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            formatDate(note.updatedAt),
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              color: isDark
+                                  ? const Color(0xFF94A3B8)
+                                  : AppTheme.textMuted,
+                            ),
+                          ),
                         ],
                       ),
                     ),
-                    child: Row(
-                      children: [
-                        Icon(style.icon, size: 16, color: accent),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            area?.name ?? style.label,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w700,
-                              color: accent,
-                            ),
-                          ),
-                        ),
-                        Text(
-                          formatDate(note.updatedAt),
-                          style: TextStyle(
-                            fontSize: 10.5,
-                            color: isDark
-                                ? const Color(0xFF94A3B8)
-                                : AppTheme.textMuted,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
                   Expanded(
                     child: Padding(
                       padding: const EdgeInsets.all(12),

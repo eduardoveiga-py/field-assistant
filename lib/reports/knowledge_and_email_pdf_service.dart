@@ -9,6 +9,7 @@ import '../core/app_logger.dart';
 import '../database/app_database.dart';
 import '../inbox/email_html_sanitizer.dart';
 import '../inbox/jw_email_service.dart';
+import '../knowledge/note_cover_config.dart';
 import '../official_docs/official_doc_fonts.dart';
 import '../official_docs/official_doc_models.dart';
 import '../reports/binary_file_saver.dart';
@@ -250,6 +251,102 @@ class KnowledgeAndEmailPdfService {
     );
   }
 
+  static pw.Widget _buildCoverBannerForPdf({
+    required String title,
+    required String itemType,
+    required String category,
+    required String dateText,
+    required NoteCoverConfig cover,
+    String? subtitle,
+  }) {
+    final preset = cover.resolvedPreset ?? NoteCoverConfig.presets.first;
+    final startColor = PdfColor.fromInt(preset.startColor.toARGB32());
+    final endColor = PdfColor.fromInt(preset.endColor.toARGB32());
+    final imgBytes = cover.decodeImageBytes();
+    pw.ImageProvider? coverImage;
+    if (imgBytes != null) {
+      try {
+        coverImage = pw.MemoryImage(imgBytes);
+      } catch (e, st) {
+        AppLogger.debug('Falha ao embutir imagem de capa no PDF: $e', st);
+      }
+    }
+
+    final metaLine =
+        'Categoria: $category • Data: $dateText'
+        '${subtitle != null && subtitle.trim().isNotEmpty ? ' • $subtitle' : ''}';
+
+    final overlayText = pw.Padding(
+      padding: const pw.EdgeInsets.all(18),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        mainAxisAlignment: pw.MainAxisAlignment.end,
+        children: [
+          pw.Text(
+            'BASE DE CONHECIMENTO — ${itemType.toUpperCase()}',
+            style: const pw.TextStyle(
+              fontSize: 8.5,
+              color: PdfColors.grey200,
+              letterSpacing: 0.8,
+            ),
+          ),
+          pw.SizedBox(height: 4),
+          pw.Text(
+            title,
+            style: pw.TextStyle(
+              fontSize: 18,
+              fontWeight: pw.FontWeight.bold,
+              color: PdfColors.white,
+            ),
+          ),
+          pw.SizedBox(height: 4),
+          pw.Text(
+            metaLine,
+            style: const pw.TextStyle(fontSize: 9.5, color: PdfColors.grey200),
+          ),
+        ],
+      ),
+    );
+
+    if (coverImage != null) {
+      return pw.ClipRRect(
+        horizontalRadius: 10,
+        verticalRadius: 10,
+        child: pw.SizedBox(
+          height: 120,
+          width: double.infinity,
+          child: pw.Stack(
+            children: [
+              pw.Positioned.fill(
+                child: pw.Image(coverImage, fit: pw.BoxFit.cover),
+              ),
+              pw.Positioned.fill(
+                child: pw.Container(
+                  color: const PdfColor(0.05, 0.08, 0.16, 0.56),
+                ),
+              ),
+              pw.Positioned.fill(child: overlayText),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return pw.Container(
+      width: double.infinity,
+      padding: const pw.EdgeInsets.symmetric(vertical: 6),
+      decoration: pw.BoxDecoration(
+        gradient: pw.LinearGradient(
+          colors: [startColor, endColor],
+          begin: pw.Alignment.topLeft,
+          end: pw.Alignment.bottomRight,
+        ),
+        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(10)),
+      ),
+      child: overlayText,
+    );
+  }
+
   static Future<Uint8List> buildSingleItemPdfBytes({
     required String title,
     required String content,
@@ -259,6 +356,7 @@ class KnowledgeAndEmailPdfService {
     String? url,
     List<String> tags = const [],
     DateTime? updatedAt,
+    NoteCoverConfig? cover,
   }) async {
     final theme = await _buildUnicodePdfTheme();
     final pdf = pw.Document(title: title, theme: theme);
@@ -266,6 +364,7 @@ class KnowledgeAndEmailPdfService {
     final dateText = updatedAt != null
         ? DateFormat('dd/MM/yyyy').format(updatedAt)
         : DateFormat('dd/MM/yyyy').format(DateTime.now());
+    final hasCustomCover = cover != null && cover.hasCustomCover;
 
     pdf.addPage(
       pw.MultiPage(
@@ -279,30 +378,42 @@ class KnowledgeAndEmailPdfService {
           ),
         ),
         build: (ctx) => [
-          pw.Text(
-            'BASE DE CONHECIMENTO — ${itemType.toUpperCase()}',
-            style: pw.TextStyle(
-              fontSize: 9.5,
-              fontWeight: pw.FontWeight.bold,
-              color: PdfColors.blue800,
-              letterSpacing: 0.8,
+          if (hasCustomCover) ...[
+            _buildCoverBannerForPdf(
+              title: title,
+              itemType: itemType,
+              category: category,
+              dateText: dateText,
+              subtitle: subtitle,
+              cover: cover,
             ),
-          ),
-          pw.SizedBox(height: 4),
-          pw.Text(
-            title,
-            style: pw.TextStyle(
-              fontSize: 17,
-              fontWeight: pw.FontWeight.bold,
-              color: PdfColors.grey900,
+            pw.SizedBox(height: 10),
+          ] else ...[
+            pw.Text(
+              'BASE DE CONHECIMENTO — ${itemType.toUpperCase()}',
+              style: pw.TextStyle(
+                fontSize: 9.5,
+                fontWeight: pw.FontWeight.bold,
+                color: PdfColors.blue800,
+                letterSpacing: 0.8,
+              ),
             ),
-          ),
-          pw.SizedBox(height: 4),
-          pw.Text(
-            'Categoria: $category • Data: $dateText'
-            '${subtitle != null && subtitle.trim().isNotEmpty ? ' • $subtitle' : ''}',
-            style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
-          ),
+            pw.SizedBox(height: 4),
+            pw.Text(
+              title,
+              style: pw.TextStyle(
+                fontSize: 17,
+                fontWeight: pw.FontWeight.bold,
+                color: PdfColors.grey900,
+              ),
+            ),
+            pw.SizedBox(height: 4),
+            pw.Text(
+              'Categoria: $category • Data: $dateText'
+              '${subtitle != null && subtitle.trim().isNotEmpty ? ' • $subtitle' : ''}',
+              style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
+            ),
+          ],
           if (tags.isNotEmpty) ...[
             pw.SizedBox(height: 3),
             pw.Text(
@@ -358,6 +469,7 @@ class KnowledgeAndEmailPdfService {
     String? url,
     List<String> tags = const [],
     DateTime? updatedAt,
+    NoteCoverConfig? cover,
   }) async {
     final bytes = await buildSingleItemPdfBytes(
       title: title,
@@ -368,6 +480,7 @@ class KnowledgeAndEmailPdfService {
       url: url,
       tags: tags,
       updatedAt: updatedAt,
+      cover: cover,
     );
     return BinaryFileSaver.saveBytes(
       fileName:

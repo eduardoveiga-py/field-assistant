@@ -104,21 +104,63 @@ class ImportedPublicationSummary {
   }
 }
 
+/// Bloco/parágrafo estruturado dentro de um capítulo de publicação importada.
+class ImportedPublicationParagraph {
+  final int? number;
+  final String? heading;
+  final String text;
+
+  const ImportedPublicationParagraph({
+    this.number,
+    this.heading,
+    required this.text,
+  });
+
+  bool get isHeadingOnly =>
+      heading != null && heading == text && number == null;
+
+  Map<String, dynamic> toJson() => {
+    if (number != null) 'number': number,
+    if (heading != null && heading!.isNotEmpty) 'heading': heading,
+    'text': text,
+  };
+
+  factory ImportedPublicationParagraph.fromJson(Map<String, dynamic> json) {
+    return ImportedPublicationParagraph(
+      number: (json['number'] as num?)?.toInt(),
+      heading: json['heading']?.toString(),
+      text: json['text']?.toString() ?? '',
+    );
+  }
+}
+
 /// Conteúdo completo de um capítulo/lição extraído de uma publicação EPUB.
 class ImportedPublicationChapterContent {
   final String publicationId;
   final int index;
   final String title;
   final List<String> paragraphs;
+  final List<ImportedPublicationParagraph> paragraphItems;
 
   const ImportedPublicationChapterContent({
     required this.publicationId,
     required this.index,
     required this.title,
     required this.paragraphs,
+    this.paragraphItems = const [],
   });
 
   String get plainText => paragraphs.join('\n\n');
+
+  /// Retorna os parágrafos estruturados (com número e subtítulo quando disponíveis),
+  /// inferindo metadados dinamicamente para publicações importadas em versões anteriores.
+  List<ImportedPublicationParagraph> get resolvedParagraphs {
+    if (paragraphItems.isNotEmpty) return paragraphItems;
+    return ImportedPublicationsService.deriveParagraphItems(
+      paragraphs,
+      chapterTitle: title,
+    );
+  }
 }
 
 /// Serviço offline-first para importação e leitura local de publicações em EPUB
@@ -187,11 +229,21 @@ class ImportedPublicationsService {
       final decoded = jsonDecode(row.value);
       if (decoded is Map) {
         final rawParas = (decoded['paragraphs'] as List?) ?? const [];
+        final rawItems = (decoded['paragraphItems'] as List?) ?? const [];
+        final items = rawItems
+            .whereType<Map>()
+            .map(
+              (m) => ImportedPublicationParagraph.fromJson(
+                Map<String, dynamic>.from(m),
+              ),
+            )
+            .toList();
         return ImportedPublicationChapterContent(
           publicationId: publicationId,
           index: chapterIndex,
           title: decoded['title']?.toString() ?? 'Capítulo ${chapterIndex + 1}',
           paragraphs: rawParas.map((e) => e.toString()).toList(),
+          paragraphItems: items,
         );
       }
     } catch (e, st) {
@@ -391,7 +443,14 @@ class ImportedPublicationsService {
     }
 
     final extractedChapters =
-        <({String title, String href, List<String> paragraphs})>[];
+        <
+          ({
+            String title,
+            String href,
+            List<String> paragraphs,
+            List<ImportedPublicationParagraph> paragraphItems,
+          })
+        >[];
     final total = spinePaths.length;
     for (var i = 0; i < total; i++) {
       final path = spinePaths[i];
@@ -420,6 +479,7 @@ class ImportedPublicationsService {
           title: extracted.title,
           href: path,
           paragraphs: extracted.paragraphs,
+          paragraphItems: extracted.paragraphItems,
         ));
       }
       if (i > 0 && i % 10 == 0) {
@@ -463,7 +523,11 @@ class ImportedPublicationsService {
         await _putKv(
           db,
           chapterKvKey(pubId, idx),
-          jsonEncode({'title': ch.title, 'paragraphs': ch.paragraphs}),
+          jsonEncode({
+            'title': ch.title,
+            'paragraphs': ch.paragraphs,
+            'paragraphItems': ch.paragraphItems.map((p) => p.toJson()).toList(),
+          }),
         );
       }
 
@@ -519,7 +583,314 @@ class ImportedPublicationsService {
         bytes[3] == 0x46;
   }
 
-  static ({String title, List<String> paragraphs})? _extractChapterFromXhtml(
+  static final RegExp _numericOnlyLabelRe = RegExp(r'^\d{1,4}$');
+
+  static bool isNumericOnlyLabel(String? label) {
+    if (label == null) return true;
+    final t = label.trim();
+    return t.isEmpty || _numericOnlyLabelRe.hasMatch(t);
+  }
+
+  /// Faz o parsing de intervalos de parágrafos (`3`, `3-5`, `1, 4-6`) no mesmo formato dos versículos.
+  static List<int> parseParagraphNumbers(String? spec) {
+    if (spec == null || spec.trim().isEmpty) return const [];
+    final normalized = spec.replaceAll(RegExp(r'\s+'), '');
+    final out = <int>[];
+    for (final chunk in normalized.split(',')) {
+      if (chunk.isEmpty) continue;
+      final rangeParts = chunk.split('-');
+      if (rangeParts.length == 2) {
+        final start = int.tryParse(rangeParts[0]);
+        final end = int.tryParse(rangeParts[1]);
+        if (start != null && end != null && start > 0 && end >= start) {
+          final cappedEnd = (end - start > 150) ? start + 150 : end;
+          for (var n = start; n <= cappedEnd; n++) {
+            if (!out.contains(n)) out.add(n);
+          }
+        }
+      } else if (rangeParts.length == 1) {
+        final single = int.tryParse(rangeParts[0]);
+        if (single != null && single > 0 && !out.contains(single)) {
+          out.add(single);
+        }
+      }
+    }
+    return out;
+  }
+
+  /// Infere estrutura de parágrafos (números e subtítulos) para capítulos já gravados sem `paragraphItems`.
+  static List<ImportedPublicationParagraph> deriveParagraphItems(
+    List<String> paragraphs, {
+    String? chapterTitle,
+  }) {
+    final items = <ImportedPublicationParagraph>[];
+    String? activeHeading;
+    final normalizedChapter = (chapterTitle ?? '').trim().toLowerCase();
+
+    for (final raw in paragraphs) {
+      final text = raw.trim();
+      if (text.isEmpty) continue;
+      final lower = text.toLowerCase();
+
+      // Detecta subtítulo numerado (ex: "1. Quais são...", ou pergunta curta de seção)
+      final numberedPoint = RegExp(r'^(\d{1,2})\.\s+\S').firstMatch(text);
+      if (numberedPoint != null && text.length < 180) {
+        activeHeading = text;
+        items.add(
+          ImportedPublicationParagraph(heading: activeHeading, text: text),
+        );
+        continue;
+      }
+
+      // Detecta número de parágrafo inicial (ex: "2 Estamos felizes...")
+      final leadingPar = RegExp(r'^(\d{1,3})\s+(?=[A-ZÁÀÂÃÉÊÍÓÔÕÚÜÇ“"\(\[])')
+          .firstMatch(text);
+      int? parNum;
+      if (leadingPar != null) {
+        final parsed = int.tryParse(leadingPar.group(1)!);
+        if (parsed != null &&
+            parsed > 0 &&
+            parsed <= 250 &&
+            lower != normalizedChapter) {
+          parNum = parsed;
+        }
+      }
+
+      items.add(
+        ImportedPublicationParagraph(
+          number: parNum,
+          heading: activeHeading,
+          text: text,
+        ),
+      );
+    }
+    return _applyNumberedSectionFallback(items);
+  }
+
+  /// Quando o capítulo não usa números explícitos de parágrafo (`data-pnum`),
+  /// atribui o número dos subtítulos de ponto (`1. ...`, `2. ...`) aos parágrafos
+  /// correspondentes (estilo *Seja Feliz Para Sempre!* / LFF).
+  static List<ImportedPublicationParagraph> _applyNumberedSectionFallback(
+    List<ImportedPublicationParagraph> items,
+  ) {
+    if (items.isEmpty || items.any((p) => p.number != null)) {
+      return items;
+    }
+    final pointRe = RegExp(r'^(\d{1,3})\.\s+\S');
+    return items.map((p) {
+      if (p.isHeadingOnly || p.heading == null) return p;
+      final match = pointRe.firstMatch(p.heading!.trim());
+      if (match == null) return p;
+      final n = int.tryParse(match.group(1)!);
+      if (n == null || n <= 0 || n > 200) return p;
+      return ImportedPublicationParagraph(
+        number: n,
+        heading: p.heading,
+        text: p.text,
+      );
+    }).toList();
+  }
+
+  /// Seleciona os parágrafos de um capítulo de acordo com [paragraphSpec] (`"1"`, `"3-5"`, `"1, 4-6"`).
+  static List<ImportedPublicationParagraph> selectParagraphs(
+    ImportedPublicationChapterContent chapter, {
+    String? paragraphSpec,
+  }) {
+    final items = chapter.resolvedParagraphs;
+    final requested = parseParagraphNumbers(paragraphSpec);
+    if (requested.isEmpty) return items;
+
+    final requestedSet = requested.toSet();
+    final hasExplicitNumbers = items.any((p) => p.number != null);
+    if (hasExplicitNumbers) {
+      final matched = items
+          .where((p) => p.number != null && requestedSet.contains(p.number))
+          .toList();
+      if (matched.isNotEmpty) return matched;
+    }
+
+    // Fallback para publicações sem parNum (ex: Lições lff com pontos 1., 2., ou blocos)
+    final pointBuckets = <int, List<ImportedPublicationParagraph>>{};
+    var fallbackIdx = 0;
+    for (final item in items) {
+      final pointMatch = RegExp(r'^(\d{1,2})\.\s+\S')
+          .firstMatch((item.heading ?? item.text).trim());
+      if (pointMatch != null) {
+        final pt = int.tryParse(pointMatch.group(1)!);
+        if (pt != null && pt > 0) {
+          pointBuckets.putIfAbsent(pt, () => []).add(item);
+        }
+      }
+    }
+    if (pointBuckets.isNotEmpty) {
+      final out = <ImportedPublicationParagraph>[];
+      for (final num in requested) {
+        final bucket = pointBuckets[num];
+        if (bucket != null) {
+          for (final item in bucket) {
+            if (!out.contains(item)) out.add(item);
+          }
+        }
+      }
+      if (out.isNotEmpty) return out;
+    }
+
+    final bodyOnly = items.where((p) => !p.isHeadingOnly).toList();
+    final out = <ImportedPublicationParagraph>[];
+    for (final item in bodyOnly) {
+      fallbackIdx++;
+      if (requestedSet.contains(fallbackIdx)) {
+        out.add(item);
+      }
+    }
+    return out;
+  }
+
+  /// Formata trecho de publicação em citação Markdown limpa pronta para leitura ou impressão.
+  static String formatChapterTranscript({
+    required ImportedPublicationSummary publication,
+    required ImportedPublicationChapterContent chapter,
+    String? paragraphSpec,
+    int maxChars = 3600,
+  }) {
+    final selected = selectParagraphs(chapter, paragraphSpec: paragraphSpec);
+    final list = selected.isNotEmpty ? selected : chapter.resolvedParagraphs;
+    if (list.isEmpty) return '';
+
+    final specClean = paragraphSpec?.trim();
+    final headerSuffix = (specClean != null && specClean.isNotEmpty)
+        ? ' (§/$specClean)'
+        : '';
+    final lines = <String>[
+      '> 📚 **${publication.title} — ${chapter.title}$headerSuffix**',
+    ];
+    var totalLen = lines.first.length;
+    String? lastHeading;
+    for (final p in list) {
+      final txt = p.text.trim();
+      if (txt.isEmpty) continue;
+      if (p.heading != null &&
+          p.heading!.isNotEmpty &&
+          p.heading != lastHeading &&
+          p.heading != txt) {
+        lines.add('> _${p.heading}_');
+        lastHeading = p.heading;
+      }
+      final prefix =
+          (p.number != null &&
+              !txt.startsWith('${p.number} ') &&
+              !txt.startsWith('${p.number}\u00A0'))
+          ? '${p.number}. '
+          : '';
+      final lineText = '> $prefix$txt';
+      if (totalLen + lineText.length > maxChars && lines.length > 1) {
+        lines.add('> *(trecho resumido para manter a nota leve)*');
+        break;
+      }
+      lines.add(lineText);
+      totalLen += lineText.length;
+    }
+    return lines.join('\n');
+  }
+
+  /// Corrige automaticamente capítulos já salvos com título puramente numérico (ex: "11")
+  /// derivando o nome legível a partir dos cabeçalhos armazenados no banco local.
+  static Future<ImportedPublicationSummary?> repairNumericChapterTitlesIfNeeded(
+    AppDatabase db,
+    String publicationId,
+  ) async {
+    final summary = await getPublication(db, publicationId);
+    if (summary == null) return null;
+    final hasBroken = summary.chapters.any((c) => isNumericOnlyLabel(c.title));
+    if (!hasBroken) return summary;
+
+    var changed = false;
+    final updatedMetas = <ImportedPublicationChapterMeta>[];
+    for (final ch in summary.chapters) {
+      if (!isNumericOnlyLabel(ch.title)) {
+        updatedMetas.add(ch);
+        continue;
+      }
+      final content = await loadChapter(
+        db,
+        publicationId: publicationId,
+        chapterIndex: ch.index,
+      );
+      if (content == null || content.paragraphs.isEmpty) {
+        updatedMetas.add(ch);
+        continue;
+      }
+      final p0 = content.paragraphs.first.trim();
+      final p1 = content.paragraphs.length > 1
+          ? content.paragraphs[1].trim()
+          : '';
+      String rebuilt = ch.title;
+      if (p0.isNotEmpty &&
+          p0.length <= 45 &&
+          p1.isNotEmpty &&
+          p1.length <= 95 &&
+          !RegExp(r'^\d+\s').hasMatch(p1)) {
+        rebuilt = '$p0 — $p1';
+      } else if (p0.isNotEmpty && p0.length <= 95) {
+        rebuilt = p0;
+      } else if (p0.isNotEmpty) {
+        rebuilt = '${p0.substring(0, 72).trimRight()}…';
+      }
+      if (rebuilt != ch.title && !isNumericOnlyLabel(rebuilt)) {
+        changed = true;
+        updatedMetas.add(
+          ImportedPublicationChapterMeta(
+            index: ch.index,
+            title: rebuilt,
+            href: ch.href,
+          ),
+        );
+        await _putKv(
+          db,
+          chapterKvKey(publicationId, ch.index),
+          jsonEncode({
+            'title': rebuilt,
+            'paragraphs': content.paragraphs,
+            if (content.paragraphItems.isNotEmpty)
+              'paragraphItems': content.paragraphItems
+                  .map((p) => p.toJson())
+                  .toList(),
+          }),
+        );
+      } else {
+        updatedMetas.add(ch);
+      }
+    }
+
+    if (!changed) return summary;
+    final updatedSummary = ImportedPublicationSummary(
+      id: summary.id,
+      title: summary.title,
+      language: summary.language,
+      sourceFormat: summary.sourceFormat,
+      importedAt: summary.importedAt,
+      chapterCount: updatedMetas.length,
+      coverBase64: summary.coverBase64,
+      chapters: updatedMetas,
+    );
+    final all = await listPublications(db);
+    final nextCatalog = all
+        .map((p) => p.id == publicationId ? updatedSummary : p)
+        .toList();
+    await _putKv(
+      db,
+      catalogKvKey,
+      jsonEncode(nextCatalog.map((e) => e.toJson()).toList()),
+    );
+    return updatedSummary;
+  }
+
+  static ({
+    String title,
+    List<String> paragraphs,
+    List<ImportedPublicationParagraph> paragraphItems,
+  })?
+  _extractChapterFromXhtml(
     String xhtml, {
     String? tocTitleHint,
     required String fallbackTitle,
@@ -541,16 +912,49 @@ class ImportedPublicationsService {
     if (doc == null) return null;
 
     final body = doc.findAllElements('body').firstOrNull ?? doc.rootElement;
-    String? detectedTitle = tocTitleHint?.trim().isNotEmpty == true
-        ? _normalizeWhitespace(tocTitleHint!)
+    final sanitizedHint =
+        (tocTitleHint != null &&
+            tocTitleHint.trim().isNotEmpty &&
+            !isNumericOnlyLabel(tocTitleHint))
+        ? _normalizeWhitespace(tocTitleHint)
         : null;
 
+    String? contextTtlText;
+    for (final p in doc.findAllElements('p')) {
+      final cls = (p.getAttribute('class') ?? '').toLowerCase();
+      if (cls.contains('contextttl')) {
+        final t = _normalizeWhitespace(p.innerText);
+        if (t.isNotEmpty) {
+          contextTtlText = t;
+          break;
+        }
+      }
+    }
+
+    String? h1Text;
+    final h1El = doc.findAllElements('h1').firstOrNull;
+    if (h1El != null) {
+      final t = _normalizeWhitespace(h1El.innerText);
+      if (t.isNotEmpty) h1Text = t;
+    }
+
+    String? detectedTitle = sanitizedHint;
     if (detectedTitle == null || detectedTitle.isEmpty) {
-      for (final tag in const ['h1', 'h2', 'title']) {
+      if (contextTtlText != null &&
+          h1Text != null &&
+          !h1Text.toLowerCase().contains(contextTtlText.toLowerCase()) &&
+          !contextTtlText.toLowerCase().contains(h1Text.toLowerCase())) {
+        detectedTitle = '$contextTtlText — $h1Text';
+      } else {
+        detectedTitle = h1Text ?? contextTtlText;
+      }
+    }
+    if (detectedTitle == null || detectedTitle.isEmpty) {
+      for (final tag in const ['h2', 'title']) {
         final el = doc.findAllElements(tag).firstOrNull;
         if (el != null) {
           final t = _normalizeWhitespace(el.innerText);
-          if (t.isNotEmpty) {
+          if (t.isNotEmpty && !isNumericOnlyLabel(t)) {
             detectedTitle = t;
             break;
           }
@@ -559,7 +963,9 @@ class ImportedPublicationsService {
     }
 
     final paragraphs = <String>[];
+    final paragraphItems = <ImportedPublicationParagraph>[];
     final seen = <String>{};
+    String? activeHeading;
 
     bool isIgnoredElement(XmlElement el) {
       XmlNode? cur = el;
@@ -612,6 +1018,23 @@ class ImportedPublicationsService {
         if (pTag == 'li' || pTag == 'p') continue;
       }
 
+      int? explicitParNum;
+      for (final desc in el.descendants.whereType<XmlElement>()) {
+        final pnumAttr = desc.getAttribute('data-pnum');
+        if (pnumAttr != null && pnumAttr.trim().isNotEmpty) {
+          explicitParNum = int.tryParse(pnumAttr.trim());
+          if (explicitParNum != null) break;
+        }
+        final dCls = (desc.getAttribute('class') ?? '').toLowerCase();
+        if (dCls.contains('parnum')) {
+          final parsed = int.tryParse(_normalizeWhitespace(desc.innerText));
+          if (parsed != null && parsed > 0) {
+            explicitParNum = parsed;
+            break;
+          }
+        }
+      }
+
       final buf = StringBuffer();
       void walk(XmlNode n) {
         if (n is XmlElement) {
@@ -637,8 +1060,18 @@ class ImportedPublicationsService {
       if (tag == 'li') {
         text = '• $text';
       }
+      if (tag == 'h2' || tag == 'h3') {
+        activeHeading = text;
+      }
       if (seen.add(text) || paragraphs.isEmpty || paragraphs.last != text) {
         paragraphs.add(text);
+        paragraphItems.add(
+          ImportedPublicationParagraph(
+            number: explicitParNum,
+            heading: (tag == 'h2' || tag == 'h3') ? text : activeHeading,
+            text: text,
+          ),
+        );
       }
     }
 
@@ -648,6 +1081,7 @@ class ImportedPublicationsService {
           ? detectedTitle
           : fallbackTitle,
       paragraphs: paragraphs,
+      paragraphItems: _applyNumberedSectionFallback(paragraphItems),
     );
   }
 
@@ -659,6 +1093,15 @@ class ImportedPublicationsService {
         ? 'pub'
         : (clean.length > 28 ? clean.substring(0, 28) : clean);
     return '${prefix}_${DateTime.now().millisecondsSinceEpoch}';
+  }
+
+  static bool _isBetterTocLabel(String candidate, String? existing) {
+    if (existing == null || existing.trim().isEmpty) return true;
+    final candNumeric = isNumericOnlyLabel(candidate);
+    final existNumeric = isNumericOnlyLabel(existing);
+    if (candNumeric && !existNumeric) return false;
+    if (!candNumeric && existNumeric) return true;
+    return candidate.length > existing.length;
   }
 
   static void _extractNcxLabels(
@@ -682,8 +1125,15 @@ class ImportedPublicationsService {
             label.isNotEmpty &&
             src != null &&
             src.isNotEmpty) {
+          final hasFragment = src.contains('#');
           final resolved = _resolveZipPath(baseDir, src.split('#').first);
-          outLabels[resolved] = label;
+          final cleanLabel = _normalizeWhitespace(label);
+          if (cleanLabel.isEmpty) continue;
+          if (hasFragment && outLabels.containsKey(resolved)) continue;
+          if (_isBetterTocLabel(cleanLabel, outLabels[resolved]) ||
+              (!hasFragment && isNumericOnlyLabel(outLabels[resolved]))) {
+            outLabels[resolved] = cleanLabel;
+          }
         }
       }
     } catch (_) {}
@@ -697,10 +1147,41 @@ class ImportedPublicationsService {
     try {
       final doc = XmlDocument.parse(_decodeFileUtf8(file));
       for (final a in doc.findAllElements('a')) {
+        // Ignora blocos de paginação (page-list / landmarks) que sobrescrevem títulos com números de página
+        var skipNav = false;
+        XmlNode? parent = a.parent;
+        while (parent is XmlElement) {
+          if (parent.name.local.toLowerCase() == 'nav') {
+            final epubType = parent.attributes
+                .where((attr) => attr.name.local.toLowerCase() == 'type')
+                .map((attr) => attr.value.toLowerCase())
+                .join(' ');
+            final navClass = (parent.getAttribute('class') ?? '').toLowerCase();
+            if (epubType.contains('page-list') ||
+                epubType.contains('landmarks') ||
+                navClass.contains('page')) {
+              skipNav = true;
+            }
+            break;
+          }
+          parent = parent.parent;
+        }
+        if (skipNav) continue;
+
         final href = a.getAttribute('href');
         final label = _normalizeWhitespace(a.innerText);
-        if (href != null && href.isNotEmpty && label.isNotEmpty) {
-          final resolved = _resolveZipPath(baseDir, href.split('#').first);
+        if (href == null || href.isEmpty || label.isEmpty) continue;
+
+        final hashIdx = href.indexOf('#');
+        final fragment = hashIdx >= 0 ? href.substring(hashIdx + 1) : '';
+        // Nunca sobrescreve título de capítulo com links de âncora de página (#page11) ou rótulo só numérico
+        if (fragment.toLowerCase().startsWith('page') ||
+            isNumericOnlyLabel(label)) {
+          continue;
+        }
+
+        final resolved = _resolveZipPath(baseDir, href.split('#').first);
+        if (_isBetterTocLabel(label, outLabels[resolved])) {
           outLabels[resolved] = label;
         }
       }

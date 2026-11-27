@@ -13,6 +13,8 @@ import 'package:ministerio_pessoal/publications/imported_publications_service.da
 import 'package:ministerio_pessoal/references/app_reference.dart';
 import 'package:ministerio_pessoal/ui/widgets/app_reference_picker_dialog.dart';
 import 'package:ministerio_pessoal/ui/widgets/bible_verse_popup_dialog.dart';
+import 'package:ministerio_pessoal/ui/widgets/rich_formatted_editing_controller.dart';
+import 'package:ministerio_pessoal/ui/widgets/rich_markdown_toolbar.dart';
 import 'package:ministerio_pessoal/ui/widgets/settings/offline_library_dialog.dart';
 
 Uint8List _syntheticPublicationEpubBytes() {
@@ -544,6 +546,100 @@ void main() {
         );
         await tester.pumpAndSettle();
         expect(find.text('Escute a Deus (Publicação Teste)'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'AppReferencePickerDialog seleciona capitulo, paragrafos e modo Link + Transcrito para Publicacoes e Biblia',
+      (tester) async {
+        final db = AppDatabase.forTesting(NativeDatabase.memory());
+        addTearDown(() async {
+          await tester.pumpWidget(const SizedBox.shrink());
+          await tester.pumpAndSettle();
+          await db.close();
+        });
+
+        final pub =
+            await ImportedPublicationsService.importPublicationFromBytes(
+              db,
+              bytes: _syntheticPublicationEpubBytes(),
+              fileName: 'pub_paragrafos.epub',
+            );
+
+        await NwtBibleService.saveManualVerse(
+          db,
+          bookNumber: 43,
+          chapter: 3,
+          verse: 16,
+          text: 'Porque Deus amou tanto o mundo.',
+        );
+
+        tester.view.physicalSize = const Size(900, 900);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        AppReferencePickResult? picked;
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Builder(
+              builder: (ctx) => Scaffold(
+                body: ElevatedButton(
+                  onPressed: () async {
+                    picked = await showAppReferencePickerDialog(
+                      ctx,
+                      db: db,
+                      initialCategory: AppRefCategory.publication,
+                    );
+                  },
+                  child: const Text('Abrir Picker'),
+                ),
+              ),
+            ),
+          ),
+        );
+
+        await tester.tap(find.text('Abrir Picker'));
+        await tester.pumpAndSettle();
+
+        // Abre seletor avançado de capítulo/parágrafo da publicação
+        await tester.tap(find.byKey(Key('btn_pick_pub_chapter_${pub.id}')));
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(const Key('dropdown_pub_chapter')), findsOneWidget);
+        await tester.enterText(
+          find.byKey(const Key('field_pub_paragraphs')),
+          '1',
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(const Key('insert_mode_link_and_transcript')),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('btn_insert_pub_ref')));
+        await tester.pumpAndSettle();
+
+        expect(picked, isNotNull);
+        expect(
+          picked!.insertMode,
+          equals(ReferenceInsertMode.linkAndTranscript),
+        );
+        expect(
+          picked!.markdownToken,
+          contains('app://ref/publication/${pub.id}/0/1'),
+        );
+        expect(
+          picked!.transcriptMarkdown,
+          contains('Parágrafo de teste da publicação.'),
+        );
+
+        // Aplica no RichFormattedEditingController mantendo citação e link sem vazamento cru
+        final richCtrl = RichFormattedEditingController();
+        RichMarkdownToolbar.applyPickedReferenceToController(richCtrl, picked!);
+        final markup = richCtrl.toMarkup();
+        expect(markup, contains('app://ref/publication/${pub.id}/0/1'));
+        expect(markup, contains('> '));
+        richCtrl.dispose();
       },
     );
   });

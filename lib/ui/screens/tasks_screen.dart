@@ -13,6 +13,7 @@ import '../widgets/adaptive_ministry_sheet.dart';
 import '../widgets/knowledge_item_reader_dialog.dart';
 import '../widgets/managed_text_controllers.dart';
 import '../widgets/markdown_preview_text.dart';
+import '../widgets/notion/notion_collection_views.dart';
 import '../widgets/rich_formatted_editing_controller.dart';
 import '../widgets/rich_markdown_toolbar.dart';
 import '../widgets/universal_attachment_viewer.dart';
@@ -43,6 +44,8 @@ class _TasksScreenState extends ConsumerState<TasksScreen>
   String _selectedCategory = 'todas';
   String _selectedPriority = 'todas';
   String? _selectedTag;
+  NotionViewMode _tasksViewMode = NotionViewMode.list;
+  NotionViewMode _projectsViewMode = NotionViewMode.list;
 
   @override
   void initState() {
@@ -530,19 +533,74 @@ class _TasksScreenState extends ConsumerState<TasksScreen>
   // ABA 2: TODAS AS TAREFAS PENDENTES
   // ==========================================
 
+  static String _taskStatusLabel(String s) {
+    switch (s) {
+      case 'in_progress':
+        return 'Em Andamento';
+      case 'completed':
+        return 'Concluída';
+      case 'todo':
+      default:
+        return 'A Fazer';
+    }
+  }
+
+  static Color _taskStatusColor(String s) {
+    switch (s) {
+      case 'in_progress':
+        return const Color(0xFFF59E0B);
+      case 'completed':
+        return const Color(0xFF10B981);
+      case 'todo':
+      default:
+        return AppTheme.primaryBlue;
+    }
+  }
+
+  static String _projectStatusLabel(String s) {
+    switch (s) {
+      case 'planning':
+        return 'Planejamento';
+      case 'paused':
+        return 'Pausado';
+      case 'completed':
+        return 'Concluído';
+      case 'active':
+      default:
+        return 'Ativo';
+    }
+  }
+
+  static Color _projectStatusColor(String s) {
+    switch (s) {
+      case 'planning':
+        return const Color(0xFF6366F1);
+      case 'paused':
+        return const Color(0xFFF59E0B);
+      case 'completed':
+        return const Color(0xFF10B981);
+      case 'active':
+      default:
+        return AppTheme.primaryBlue;
+    }
+  }
+
   Widget _buildAllTasksTab(bool isDark) {
     final taskMgr = ref.watch(taskManagerProvider);
 
     return StreamBuilder<List<TaskEntry>>(
-      stream: taskMgr.watchPendingTasks(),
+      stream: _tasksViewMode == NotionViewMode.kanban
+          ? taskMgr.watchAllTasks()
+          : taskMgr.watchPendingTasks(),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
 
         final rawTasks = snapshot.data ?? [];
         final tasks = _filterTasks(rawTasks);
-        if (tasks.isEmpty) {
+        if (tasks.isEmpty && _tasksViewMode != NotionViewMode.kanban) {
           return _buildEmptyState(
             icon: Icons.checklist_rounded,
             title: rawTasks.isEmpty
@@ -555,11 +613,211 @@ class _TasksScreenState extends ConsumerState<TasksScreen>
           );
         }
 
-        return ListView.separated(
-          padding: const EdgeInsets.all(16),
-          itemCount: tasks.length,
-          separatorBuilder: (ctx, i) => const SizedBox(height: 8),
-          itemBuilder: (ctx, i) => _buildTaskTile(tasks[i], taskMgr, isDark),
+        return Column(
+          children: [
+            NotionViewModeBar(
+              mode: _tasksViewMode,
+              availableModes: const [
+                NotionViewMode.list,
+                NotionViewMode.table,
+                NotionViewMode.kanban,
+              ],
+              onChanged: (m) => setState(() => _tasksViewMode = m),
+              isDark: isDark,
+              keyPrefix: 'tasks_view',
+            ),
+            if (_tasksViewMode == NotionViewMode.table)
+              Expanded(
+                child: NotionResponsiveTable(
+                  isDark: isDark,
+                  columns: const [
+                    NotionTableColumnDef(label: 'Tarefa', width: 250),
+                    NotionTableColumnDef(label: 'Status', width: 120),
+                    NotionTableColumnDef(label: 'Prioridade', width: 110),
+                    NotionTableColumnDef(label: 'Categoria', width: 110),
+                    NotionTableColumnDef(label: 'Prazo', width: 100),
+                  ],
+                  rows: [
+                    for (final task in tasks)
+                      NotionTableRowItem(
+                        onTap: () => _showEditTaskModal(task),
+                        cells: [
+                          Text(
+                            task.title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                              decoration: task.isCompleted
+                                  ? TextDecoration.lineThrough
+                                  : null,
+                            ),
+                          ),
+                          Text(
+                            _taskStatusLabel(task.status),
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: _taskStatusColor(task.status),
+                            ),
+                          ),
+                          Text(
+                            _priorityLabel(task.priority),
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          Text(
+                            _categoryLabel(task.category),
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          Text(
+                            task.dueDate != null
+                                ? _formatDate(task.dueDate!)
+                                : '—',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
+              )
+            else if (_tasksViewMode == NotionViewMode.kanban)
+              Expanded(
+                child: NotionKanbanBoard<TaskEntry>(
+                  isDark: isDark,
+                  keyPrefix: 'tasks_kanban',
+                  columns: [
+                    NotionKanbanColumnSpec(
+                      statusKey: 'todo',
+                      label: 'A Fazer',
+                      accentColor: AppTheme.primaryBlue,
+                      onQuickAdd: _showCreateTaskModal,
+                    ),
+                    const NotionKanbanColumnSpec(
+                      statusKey: 'in_progress',
+                      label: 'Em Andamento',
+                      accentColor: Color(0xFFF59E0B),
+                    ),
+                    const NotionKanbanColumnSpec(
+                      statusKey: 'completed',
+                      label: 'Concluídas',
+                      accentColor: Color(0xFF10B981),
+                    ),
+                  ],
+                  itemsByColumn: {
+                    'todo': tasks
+                        .where(
+                          (t) =>
+                              t.status != 'in_progress' &&
+                              t.status != 'completed',
+                        )
+                        .toList(),
+                    'in_progress': tasks
+                        .where((t) => t.status == 'in_progress')
+                        .toList(),
+                    'completed': tasks
+                        .where((t) => t.status == 'completed')
+                        .toList(),
+                  },
+                  itemId: (t) => t.id,
+                  onMoveToColumn: (t, target) async {
+                    await taskMgr.updateTask(t.id, status: target);
+                  },
+                  cardBuilder: (ctx, task, colKey, {required bool isFeedback}) {
+                    return Card(
+                      elevation: isFeedback ? 8 : 0,
+                      margin: EdgeInsets.zero,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(
+                          color: isFeedback
+                              ? _taskStatusColor(colKey)
+                              : (isDark
+                                    ? Colors.white.withValues(alpha: 0.08)
+                                    : const Color(0xFFE2E8F0)),
+                        ),
+                      ),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: isFeedback
+                            ? null
+                            : () => _showEditTaskModal(task),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                task.title,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13.5,
+                                ),
+                              ),
+                              if (task.description != null &&
+                                  task.description!.trim().isNotEmpty) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  MarkdownPreviewText.cleanMarkdown(
+                                    task.description!,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: isDark
+                                        ? const Color(0xFF94A3B8)
+                                        : AppTheme.textMuted,
+                                  ),
+                                ),
+                              ],
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  Text(
+                                    _priorityLabel(task.priority),
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: _taskStatusColor(colKey),
+                                    ),
+                                  ),
+                                  if (task.dueDate != null) ...[
+                                    const Spacer(),
+                                    Text(
+                                      _formatDate(task.dueDate!),
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: isDark
+                                            ? const Color(0xFF94A3B8)
+                                            : AppTheme.textMuted,
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              )
+            else
+              Expanded(
+                child: ListView.separated(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: tasks.length,
+                  separatorBuilder: (ctx, i) => const SizedBox(height: 8),
+                  itemBuilder: (ctx, i) =>
+                      _buildTaskTile(tasks[i], taskMgr, isDark),
+                ),
+              ),
+          ],
         );
       },
     );
@@ -573,15 +831,18 @@ class _TasksScreenState extends ConsumerState<TasksScreen>
     final projectMgr = ref.watch(projectManagerProvider);
 
     return StreamBuilder<List<ProjectEntry>>(
-      stream: projectMgr.watchActiveProjects(),
+      stream: _projectsViewMode == NotionViewMode.kanban
+          ? projectMgr.watchAllProjects()
+          : projectMgr.watchActiveProjects(),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
 
         final rawProjects = snapshot.data ?? [];
         final projects = _filterProjects(rawProjects);
-        if (projects.isEmpty) {
+        if (projects.isEmpty && _projectsViewMode != NotionViewMode.kanban) {
           return _buildEmptyState(
             icon: Icons.folder_open_rounded,
             title: rawProjects.isEmpty
@@ -594,12 +855,324 @@ class _TasksScreenState extends ConsumerState<TasksScreen>
           );
         }
 
-        return ListView.separated(
-          padding: const EdgeInsets.all(16),
-          itemCount: projects.length,
-          separatorBuilder: (ctx, i) => const SizedBox(height: 12),
-          itemBuilder: (ctx, i) =>
-              _buildProjectCard(projects[i], projectMgr, isDark),
+        void openProject(ProjectEntry project) {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => ProjectDetailScreen(projectId: project.id),
+            ),
+          );
+        }
+
+        return Column(
+          children: [
+            NotionViewModeBar(
+              mode: _projectsViewMode,
+              availableModes: const [
+                NotionViewMode.list,
+                NotionViewMode.table,
+                NotionViewMode.kanban,
+                NotionViewMode.gallery,
+              ],
+              onChanged: (m) => setState(() => _projectsViewMode = m),
+              isDark: isDark,
+              keyPrefix: 'projects_view',
+            ),
+            if (_projectsViewMode == NotionViewMode.table)
+              Expanded(
+                child: NotionResponsiveTable(
+                  isDark: isDark,
+                  columns: const [
+                    NotionTableColumnDef(label: 'Projeto', width: 240),
+                    NotionTableColumnDef(label: 'Status', width: 120),
+                    NotionTableColumnDef(label: 'Categoria', width: 120),
+                    NotionTableColumnDef(label: 'Prazo / Meta', width: 120),
+                  ],
+                  rows: [
+                    for (final project in projects)
+                      NotionTableRowItem(
+                        onTap: () => openProject(project),
+                        cells: [
+                          Text(
+                            project.name,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                            ),
+                          ),
+                          Text(
+                            _projectStatusLabel(project.status),
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: _projectStatusColor(project.status),
+                            ),
+                          ),
+                          Text(
+                            _categoryLabel(project.category),
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          Text(
+                            project.targetDate != null
+                                ? _formatDate(project.targetDate!)
+                                : '—',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
+              )
+            else if (_projectsViewMode == NotionViewMode.kanban)
+              Expanded(
+                child: NotionKanbanBoard<ProjectEntry>(
+                  isDark: isDark,
+                  keyPrefix: 'projects_kanban',
+                  columns: [
+                    NotionKanbanColumnSpec(
+                      statusKey: 'planning',
+                      label: 'Planejamento',
+                      accentColor: const Color(0xFF6366F1),
+                      onQuickAdd: _showCreateProjectModal,
+                    ),
+                    const NotionKanbanColumnSpec(
+                      statusKey: 'active',
+                      label: 'Ativo',
+                      accentColor: AppTheme.primaryBlue,
+                    ),
+                    const NotionKanbanColumnSpec(
+                      statusKey: 'paused',
+                      label: 'Pausado',
+                      accentColor: Color(0xFFF59E0B),
+                    ),
+                    const NotionKanbanColumnSpec(
+                      statusKey: 'completed',
+                      label: 'Concluído',
+                      accentColor: Color(0xFF10B981),
+                    ),
+                  ],
+                  itemsByColumn: {
+                    'planning': projects
+                        .where((p) => p.status == 'planning')
+                        .toList(),
+                    'active': projects
+                        .where(
+                          (p) =>
+                              p.status != 'planning' &&
+                              p.status != 'paused' &&
+                              p.status != 'completed',
+                        )
+                        .toList(),
+                    'paused': projects
+                        .where((p) => p.status == 'paused')
+                        .toList(),
+                    'completed': projects
+                        .where((p) => p.status == 'completed')
+                        .toList(),
+                  },
+                  itemId: (p) => p.id,
+                  onMoveToColumn: (p, target) async {
+                    await projectMgr.updateProjectStatus(p.id, target);
+                  },
+                  cardBuilder:
+                      (ctx, project, colKey, {required bool isFeedback}) {
+                        return Card(
+                          elevation: isFeedback ? 8 : 0,
+                          margin: EdgeInsets.zero,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: BorderSide(
+                              color: isFeedback
+                                  ? _projectStatusColor(colKey)
+                                  : (isDark
+                                        ? Colors.white.withValues(alpha: 0.08)
+                                        : const Color(0xFFE2E8F0)),
+                            ),
+                          ),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(12),
+                            onTap: isFeedback
+                                ? null
+                                : () => openProject(project),
+                            child: Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    project.name,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 13.5,
+                                    ),
+                                  ),
+                                  if (project.objective != null &&
+                                      project.objective!.trim().isNotEmpty) ...[
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      MarkdownPreviewText.cleanMarkdown(
+                                        project.objective!,
+                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: isDark
+                                            ? const Color(0xFF94A3B8)
+                                            : AppTheme.textMuted,
+                                      ),
+                                    ),
+                                  ],
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    _categoryLabel(project.category),
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: _projectStatusColor(colKey),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                ),
+              )
+            else if (_projectsViewMode == NotionViewMode.gallery)
+              Expanded(
+                child: NotionGalleryGrid<ProjectEntry>(
+                  items: projects,
+                  itemBuilder: (ctx, project) {
+                    final stColor = _projectStatusColor(project.status);
+                    return Card(
+                      margin: EdgeInsets.zero,
+                      clipBehavior: Clip.antiAlias,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        side: BorderSide(
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.08)
+                              : const Color(0xFFE2E8F0),
+                        ),
+                      ),
+                      child: InkWell(
+                        onTap: () => openProject(project),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Container(
+                              height: 44,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                              ),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    stColor.withValues(
+                                      alpha: isDark ? 0.35 : 0.2,
+                                    ),
+                                    stColor.withValues(
+                                      alpha: isDark ? 0.12 : 0.06,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.folder_special,
+                                    size: 16,
+                                    color: stColor,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      _projectStatusLabel(project.status),
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w700,
+                                        color: stColor,
+                                      ),
+                                    ),
+                                  ),
+                                  if (project.targetDate != null)
+                                    Text(
+                                      _formatDate(project.targetDate!),
+                                      style: const TextStyle(fontSize: 10.5),
+                                    ),
+                                ],
+                              ),
+                            ),
+                            Expanded(
+                              child: Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      project.name,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Expanded(
+                                      child: Text(
+                                        project.objective?.trim().isNotEmpty ==
+                                                true
+                                            ? MarkdownPreviewText.cleanMarkdown(
+                                                project.objective!,
+                                              )
+                                            : 'Toque para acompanhar etapas',
+                                        maxLines: 3,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: isDark
+                                              ? const Color(0xFF94A3B8)
+                                              : AppTheme.textMuted,
+                                        ),
+                                      ),
+                                    ),
+                                    Text(
+                                      _categoryLabel(project.category),
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: stColor,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              )
+            else
+              Expanded(
+                child: ListView.separated(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: projects.length,
+                  separatorBuilder: (ctx, i) => const SizedBox(height: 12),
+                  itemBuilder: (ctx, i) =>
+                      _buildProjectCard(projects[i], projectMgr, isDark),
+                ),
+              ),
+          ],
         );
       },
     );
@@ -962,11 +1535,11 @@ class _TasksScreenState extends ConsumerState<TasksScreen>
     final tags = _extractTags(task.metadata);
     final attachments = _extractAttachments(task.attachments);
 
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+    return Material(
+      color: isDark ? const Color(0xFF1E293B) : Colors.white,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
+        side: BorderSide(
           color: isOverdue
               ? Colors.redAccent.withValues(alpha: 0.5)
               : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
@@ -1262,117 +1835,134 @@ class _TasksScreenState extends ConsumerState<TasksScreen>
                     const SizedBox(height: 6),
                     TextField(
                       controller: descCtrl,
-                      maxLines: 3,
+                      maxLines: 4,
+                      scrollPadding: const EdgeInsets.only(bottom: 140),
                       decoration: const InputDecoration(
                         labelText: 'Descrição ou detalhes',
                         border: OutlineInputBorder(),
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: tagsCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Tags (separadas por vírgula)',
-                        hintText: 'ex: ministério, revisita, prioridade',
-                        prefixIcon: Icon(Icons.tag, size: 18),
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
+                    const SizedBox(height: 10),
+                    CollapsibleMetadataSection(
+                      title: 'Prioridade, Recorrência, Prazo & Tags',
+                      summary:
+                          'Prioridade: ${_priorityLabel(priority)}${dueDate != null ? ' • ${_formatDate(dueDate!)}' : ''}',
+                      initiallyExpanded: false,
                       children: [
-                        Expanded(
-                          child: DropdownButtonFormField<String>(
-                            initialValue: priority,
-                            decoration: const InputDecoration(
-                              labelText: 'Prioridade',
-                              border: OutlineInputBorder(),
-                            ),
-                            items: const [
-                              DropdownMenuItem(
-                                value: 'low',
-                                child: Text('Baixa'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'normal',
-                                child: Text('Normal'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'high',
-                                child: Text('Alta'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'urgent',
-                                child: Text('Urgente'),
-                              ),
-                            ],
-                            onChanged: (v) =>
-                                setModalState(() => priority = v ?? 'normal'),
+                        const SizedBox(height: 6),
+                        TextField(
+                          controller: tagsCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'Tags (separadas por vírgula)',
+                            hintText: 'ex: ministério, revisita, prioridade',
+                            prefixIcon: Icon(Icons.tag, size: 18),
+                            isDense: true,
+                            border: OutlineInputBorder(),
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: DropdownButtonFormField<String>(
-                            initialValue: recurrence,
-                            decoration: const InputDecoration(
-                              labelText: 'Recorrência',
-                              border: OutlineInputBorder(),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: DropdownButtonFormField<String>(
+                                initialValue: priority,
+                                decoration: const InputDecoration(
+                                  labelText: 'Prioridade',
+                                  isDense: true,
+                                  border: OutlineInputBorder(),
+                                ),
+                                items: const [
+                                  DropdownMenuItem(
+                                    value: 'low',
+                                    child: Text('Baixa'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'normal',
+                                    child: Text('Normal'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'high',
+                                    child: Text('Alta'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'urgent',
+                                    child: Text('Urgente'),
+                                  ),
+                                ],
+                                onChanged: (v) => setModalState(
+                                  () => priority = v ?? 'normal',
+                                ),
+                              ),
                             ),
-                            items: const [
-                              DropdownMenuItem(
-                                value: 'none',
-                                child: Text('Nenhuma'),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: DropdownButtonFormField<String>(
+                                initialValue: recurrence,
+                                decoration: const InputDecoration(
+                                  labelText: 'Recorrência',
+                                  isDense: true,
+                                  border: OutlineInputBorder(),
+                                ),
+                                items: const [
+                                  DropdownMenuItem(
+                                    value: 'none',
+                                    child: Text('Nenhuma'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'daily',
+                                    child: Text('Diária'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'weekly',
+                                    child: Text('Semanal'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'monthly',
+                                    child: Text('Mensal'),
+                                  ),
+                                ],
+                                onChanged: (v) => setModalState(
+                                  () => recurrence = v ?? 'none',
+                                ),
                               ),
-                              DropdownMenuItem(
-                                value: 'daily',
-                                child: Text('Diária'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'weekly',
-                                child: Text('Semanal'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'monthly',
-                                child: Text('Mensal'),
-                              ),
-                            ],
-                            onChanged: (v) =>
-                                setModalState(() => recurrence = v ?? 'none'),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          dense: true,
+                          title: Text(
+                            dueDate == null
+                                ? 'Definir Prazo / Vencimento (Opcional)'
+                                : 'Vencimento: ${_formatDate(dueDate!)}',
                           ),
+                          trailing: dueDate != null
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear, size: 18),
+                                  onPressed: () =>
+                                      setModalState(() => dueDate = null),
+                                )
+                              : const Icon(Icons.calendar_today, size: 18),
+                          onTap: () async {
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: dueDate ?? DateTime.now(),
+                              firstDate: DateTime.now().subtract(
+                                const Duration(days: 30),
+                              ),
+                              lastDate: DateTime.now().add(
+                                const Duration(days: 365),
+                              ),
+                            );
+                            if (picked != null) {
+                              setModalState(() => dueDate = picked);
+                            }
+                          },
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
-                    ListTile(
-                      title: Text(
-                        dueDate == null
-                            ? 'Definir Prazo / Vencimento (Opcional)'
-                            : 'Vencimento: ${_formatDate(dueDate!)}',
-                      ),
-                      trailing: dueDate != null
-                          ? IconButton(
-                              icon: const Icon(Icons.clear, size: 18),
-                              onPressed: () =>
-                                  setModalState(() => dueDate = null),
-                            )
-                          : const Icon(Icons.calendar_today),
-                      onTap: () async {
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate: dueDate ?? DateTime.now(),
-                          firstDate: DateTime.now().subtract(
-                            const Duration(days: 30),
-                          ),
-                          lastDate: DateTime.now().add(
-                            const Duration(days: 365),
-                          ),
-                        );
-                        if (picked != null) {
-                          setModalState(() => dueDate = picked);
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 14),
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppTheme.primaryBlue,
@@ -1466,122 +2056,139 @@ class _TasksScreenState extends ConsumerState<TasksScreen>
                     const SizedBox(height: 6),
                     TextField(
                       controller: descCtrl,
-                      maxLines: 3,
+                      maxLines: 4,
+                      scrollPadding: const EdgeInsets.only(bottom: 140),
                       decoration: const InputDecoration(
                         labelText: 'Descrição ou detalhes',
                         border: OutlineInputBorder(),
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: tagsCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Tags (separadas por vírgula)',
-                        prefixIcon: Icon(Icons.tag, size: 18),
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
+                    const SizedBox(height: 10),
+                    CollapsibleMetadataSection(
+                      title: 'Prioridade, Recorrência, Prazo & Tags',
+                      summary:
+                          'Prioridade: ${_priorityLabel(priority)}${dueDate != null ? ' • ${_formatDate(dueDate!)}' : ''}',
+                      initiallyExpanded: false,
                       children: [
-                        Expanded(
-                          child: DropdownButtonFormField<String>(
-                            initialValue: priority,
-                            decoration: const InputDecoration(
-                              labelText: 'Prioridade',
-                              border: OutlineInputBorder(),
-                            ),
-                            items: const [
-                              DropdownMenuItem(
-                                value: 'low',
-                                child: Text('Baixa'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'normal',
-                                child: Text('Normal'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'high',
-                                child: Text('Alta'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'urgent',
-                                child: Text('Urgente'),
-                              ),
-                            ],
-                            onChanged: (v) =>
-                                setModalState(() => priority = v ?? 'normal'),
+                        const SizedBox(height: 6),
+                        TextField(
+                          controller: tagsCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'Tags (separadas por vírgula)',
+                            prefixIcon: Icon(Icons.tag, size: 18),
+                            isDense: true,
+                            border: OutlineInputBorder(),
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: DropdownButtonFormField<String>(
-                            initialValue:
-                                [
-                                  'none',
-                                  'daily',
-                                  'weekly',
-                                  'monthly',
-                                ].contains(recurrence)
-                                ? recurrence
-                                : 'none',
-                            decoration: const InputDecoration(
-                              labelText: 'Recorrência',
-                              border: OutlineInputBorder(),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: DropdownButtonFormField<String>(
+                                initialValue: priority,
+                                decoration: const InputDecoration(
+                                  labelText: 'Prioridade',
+                                  isDense: true,
+                                  border: OutlineInputBorder(),
+                                ),
+                                items: const [
+                                  DropdownMenuItem(
+                                    value: 'low',
+                                    child: Text('Baixa'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'normal',
+                                    child: Text('Normal'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'high',
+                                    child: Text('Alta'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'urgent',
+                                    child: Text('Urgente'),
+                                  ),
+                                ],
+                                onChanged: (v) => setModalState(
+                                  () => priority = v ?? 'normal',
+                                ),
+                              ),
                             ),
-                            items: const [
-                              DropdownMenuItem(
-                                value: 'none',
-                                child: Text('Nenhuma'),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: DropdownButtonFormField<String>(
+                                initialValue:
+                                    [
+                                      'none',
+                                      'daily',
+                                      'weekly',
+                                      'monthly',
+                                    ].contains(recurrence)
+                                    ? recurrence
+                                    : 'none',
+                                decoration: const InputDecoration(
+                                  labelText: 'Recorrência',
+                                  isDense: true,
+                                  border: OutlineInputBorder(),
+                                ),
+                                items: const [
+                                  DropdownMenuItem(
+                                    value: 'none',
+                                    child: Text('Nenhuma'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'daily',
+                                    child: Text('Diária'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'weekly',
+                                    child: Text('Semanal'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'monthly',
+                                    child: Text('Mensal'),
+                                  ),
+                                ],
+                                onChanged: (v) => setModalState(
+                                  () => recurrence = v ?? 'none',
+                                ),
                               ),
-                              DropdownMenuItem(
-                                value: 'daily',
-                                child: Text('Diária'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'weekly',
-                                child: Text('Semanal'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'monthly',
-                                child: Text('Mensal'),
-                              ),
-                            ],
-                            onChanged: (v) =>
-                                setModalState(() => recurrence = v ?? 'none'),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          dense: true,
+                          title: Text(
+                            dueDate == null
+                                ? 'Definir Prazo / Vencimento (Opcional)'
+                                : 'Vencimento: ${_formatDate(dueDate!)}',
                           ),
+                          trailing: dueDate != null
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear, size: 18),
+                                  onPressed: () =>
+                                      setModalState(() => dueDate = null),
+                                )
+                              : const Icon(Icons.calendar_today, size: 18),
+                          onTap: () async {
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: dueDate ?? DateTime.now(),
+                              firstDate: DateTime.now().subtract(
+                                const Duration(days: 30),
+                              ),
+                              lastDate: DateTime.now().add(
+                                const Duration(days: 365),
+                              ),
+                            );
+                            if (picked != null) {
+                              setModalState(() => dueDate = picked);
+                            }
+                          },
                         ),
                       ],
-                    ),
-                    const SizedBox(height: 12),
-                    ListTile(
-                      title: Text(
-                        dueDate == null
-                            ? 'Definir Prazo / Vencimento (Opcional)'
-                            : 'Vencimento: ${_formatDate(dueDate!)}',
-                      ),
-                      trailing: dueDate != null
-                          ? IconButton(
-                              icon: const Icon(Icons.clear, size: 18),
-                              onPressed: () =>
-                                  setModalState(() => dueDate = null),
-                            )
-                          : const Icon(Icons.calendar_today),
-                      onTap: () async {
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate: dueDate ?? DateTime.now(),
-                          firstDate: DateTime.now().subtract(
-                            const Duration(days: 30),
-                          ),
-                          lastDate: DateTime.now().add(
-                            const Duration(days: 365),
-                          ),
-                        );
-                        if (picked != null) {
-                          setModalState(() => dueDate = picked);
-                        }
-                      },
                     ),
                     const SizedBox(height: 16),
                     ElevatedButton(
@@ -1702,111 +2309,128 @@ class _TasksScreenState extends ConsumerState<TasksScreen>
                     const SizedBox(height: 6),
                     TextField(
                       controller: objCtrl,
-                      maxLines: 3,
+                      maxLines: 4,
+                      scrollPadding: const EdgeInsets.only(bottom: 140),
                       decoration: const InputDecoration(
                         labelText: 'Objetivo Principal',
                         border: OutlineInputBorder(),
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: tagsCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Tags (separadas por vírgula)',
-                        hintText: 'ex: pioneiro, alvo, congregação',
-                        prefixIcon: Icon(Icons.tag, size: 18),
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      initialValue: category,
-                      decoration: const InputDecoration(
-                        labelText: 'Categoria',
-                        border: OutlineInputBorder(),
-                      ),
-                      items: const [
-                        DropdownMenuItem(
-                          value: 'ministry',
-                          child: Text('Ministério'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'personal',
-                          child: Text('Pessoal'),
-                        ),
-                        DropdownMenuItem(value: 'study', child: Text('Estudo')),
-                      ],
-                      onChanged: (v) =>
-                          setModalState(() => category = v ?? 'ministry'),
-                    ),
-                    const SizedBox(height: 12),
-                    StreamBuilder<List<KnowledgeAreaEntry>>(
-                      stream: km.watchAreas(),
-                      builder: (context, areaSnap) {
-                        final areas =
-                            areaSnap.data ?? const <KnowledgeAreaEntry>[];
-                        if (areas.isEmpty) return const SizedBox.shrink();
-                        final validArea = areas.any((a) => a.id == areaId)
-                            ? areaId
-                            : null;
-                        return Column(
-                          children: [
-                            DropdownButtonFormField<String?>(
-                              initialValue: validArea,
-                              decoration: const InputDecoration(
-                                labelText: 'Área P.A.R.A. (Segundo Cérebro)',
-                                prefixIcon: Icon(
-                                  Icons.layers_outlined,
-                                  size: 18,
-                                ),
-                                border: OutlineInputBorder(),
-                              ),
-                              items: [
-                                const DropdownMenuItem<String?>(
-                                  value: null,
-                                  child: Text('Sem área vinculada'),
-                                ),
-                                for (final a in areas)
-                                  DropdownMenuItem<String?>(
-                                    value: a.id,
-                                    child: Text(a.name),
-                                  ),
-                              ],
-                              onChanged: (v) => setModalState(() => areaId = v),
-                            ),
-                            const SizedBox(height: 12),
-                          ],
-                        );
-                      },
-                    ),
-                    ListTile(
-                      title: Text(
-                        targetDate == null
-                            ? 'Definir Prazo / Meta (Opcional)'
-                            : 'Meta: ${_formatDate(targetDate!)}',
-                      ),
-                      trailing: targetDate != null
-                          ? IconButton(
-                              icon: const Icon(Icons.clear, size: 18),
-                              onPressed: () =>
-                                  setModalState(() => targetDate = null),
-                            )
-                          : const Icon(Icons.flag_outlined),
-                      onTap: () async {
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate:
-                              targetDate ??
-                              DateTime.now().add(const Duration(days: 30)),
-                          firstDate: DateTime.now(),
-                          lastDate: DateTime.now().add(
-                            const Duration(days: 730),
+                    const SizedBox(height: 10),
+                    CollapsibleMetadataSection(
+                      title: 'Categoria, Área, Meta & Tags',
+                      summary:
+                          'Categoria: ${_categoryLabel(category)}${targetDate != null ? ' • Meta ${_formatDate(targetDate!)}' : ''}',
+                      initiallyExpanded: false,
+                      children: [
+                        const SizedBox(height: 6),
+                        TextField(
+                          controller: tagsCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'Tags (separadas por vírgula)',
+                            hintText: 'ex: pioneiro, alvo, congregação',
+                            prefixIcon: Icon(Icons.tag, size: 18),
+                            isDense: true,
+                            border: OutlineInputBorder(),
                           ),
-                        );
-                        if (picked != null) {
-                          setModalState(() => targetDate = picked);
-                        }
-                      },
+                        ),
+                        const SizedBox(height: 10),
+                        DropdownButtonFormField<String>(
+                          initialValue: category,
+                          decoration: const InputDecoration(
+                            labelText: 'Categoria',
+                            isDense: true,
+                            border: OutlineInputBorder(),
+                          ),
+                          items: const [
+                            DropdownMenuItem(
+                              value: 'ministry',
+                              child: Text('Ministério'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'personal',
+                              child: Text('Pessoal'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'study',
+                              child: Text('Estudo'),
+                            ),
+                          ],
+                          onChanged: (v) =>
+                              setModalState(() => category = v ?? 'ministry'),
+                        ),
+                        const SizedBox(height: 10),
+                        StreamBuilder<List<KnowledgeAreaEntry>>(
+                          stream: km.watchAreas(),
+                          builder: (context, areaSnap) {
+                            final areas =
+                                areaSnap.data ?? const <KnowledgeAreaEntry>[];
+                            if (areas.isEmpty) return const SizedBox.shrink();
+                            final validArea = areas.any((a) => a.id == areaId)
+                                ? areaId
+                                : null;
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: DropdownButtonFormField<String?>(
+                                initialValue: validArea,
+                                decoration: const InputDecoration(
+                                  labelText: 'Área P.A.R.A. (Segundo Cérebro)',
+                                  prefixIcon: Icon(
+                                    Icons.layers_outlined,
+                                    size: 18,
+                                  ),
+                                  isDense: true,
+                                  border: OutlineInputBorder(),
+                                ),
+                                items: [
+                                  const DropdownMenuItem<String?>(
+                                    value: null,
+                                    child: Text('Sem área vinculada'),
+                                  ),
+                                  for (final a in areas)
+                                    DropdownMenuItem<String?>(
+                                      value: a.id,
+                                      child: Text(a.name),
+                                    ),
+                                ],
+                                onChanged: (v) =>
+                                    setModalState(() => areaId = v),
+                              ),
+                            );
+                          },
+                        ),
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          dense: true,
+                          title: Text(
+                            targetDate == null
+                                ? 'Definir Prazo / Meta (Opcional)'
+                                : 'Meta: ${_formatDate(targetDate!)}',
+                          ),
+                          trailing: targetDate != null
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear, size: 18),
+                                  onPressed: () =>
+                                      setModalState(() => targetDate = null),
+                                )
+                              : const Icon(Icons.flag_outlined, size: 18),
+                          onTap: () async {
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate:
+                                  targetDate ??
+                                  DateTime.now().add(const Duration(days: 30)),
+                              firstDate: DateTime.now(),
+                              lastDate: DateTime.now().add(
+                                const Duration(days: 730),
+                              ),
+                            );
+                            if (picked != null) {
+                              setModalState(() => targetDate = picked);
+                            }
+                          },
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 16),
                     ElevatedButton(
@@ -1901,113 +2525,134 @@ class _TasksScreenState extends ConsumerState<TasksScreen>
                     const SizedBox(height: 6),
                     TextField(
                       controller: objCtrl,
-                      maxLines: 3,
+                      maxLines: 4,
+                      scrollPadding: const EdgeInsets.only(bottom: 140),
                       decoration: const InputDecoration(
                         labelText: 'Objetivo Principal',
                         border: OutlineInputBorder(),
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: tagsCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Tags (separadas por vírgula)',
-                        prefixIcon: Icon(Icons.tag, size: 18),
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      initialValue:
-                          ['ministry', 'personal', 'study'].contains(category)
-                          ? category
-                          : 'ministry',
-                      decoration: const InputDecoration(
-                        labelText: 'Categoria',
-                        border: OutlineInputBorder(),
-                      ),
-                      items: const [
-                        DropdownMenuItem(
-                          value: 'ministry',
-                          child: Text('Ministério'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'personal',
-                          child: Text('Pessoal'),
-                        ),
-                        DropdownMenuItem(value: 'study', child: Text('Estudo')),
-                      ],
-                      onChanged: (v) =>
-                          setModalState(() => category = v ?? 'ministry'),
-                    ),
-                    const SizedBox(height: 12),
-                    StreamBuilder<List<KnowledgeAreaEntry>>(
-                      stream: km.watchAreas(),
-                      builder: (context, areaSnap) {
-                        final areas =
-                            areaSnap.data ?? const <KnowledgeAreaEntry>[];
-                        if (areas.isEmpty) return const SizedBox.shrink();
-                        final validArea = areas.any((a) => a.id == areaId)
-                            ? areaId
-                            : null;
-                        return Column(
-                          children: [
-                            DropdownButtonFormField<String?>(
-                              initialValue: validArea,
-                              decoration: const InputDecoration(
-                                labelText: 'Área P.A.R.A. (Segundo Cérebro)',
-                                prefixIcon: Icon(
-                                  Icons.layers_outlined,
-                                  size: 18,
-                                ),
-                                border: OutlineInputBorder(),
-                              ),
-                              items: [
-                                const DropdownMenuItem<String?>(
-                                  value: null,
-                                  child: Text('Sem área vinculada'),
-                                ),
-                                for (final a in areas)
-                                  DropdownMenuItem<String?>(
-                                    value: a.id,
-                                    child: Text(a.name),
-                                  ),
-                              ],
-                              onChanged: (v) => setModalState(() => areaId = v),
-                            ),
-                            const SizedBox(height: 12),
-                          ],
-                        );
-                      },
-                    ),
-                    ListTile(
-                      title: Text(
-                        targetDate == null
-                            ? 'Definir Prazo / Meta (Opcional)'
-                            : 'Meta: ${_formatDate(targetDate!)}',
-                      ),
-                      trailing: targetDate != null
-                          ? IconButton(
-                              icon: const Icon(Icons.clear, size: 18),
-                              onPressed: () =>
-                                  setModalState(() => targetDate = null),
-                            )
-                          : const Icon(Icons.flag_outlined),
-                      onTap: () async {
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate:
-                              targetDate ??
-                              DateTime.now().add(const Duration(days: 30)),
-                          firstDate: DateTime.now(),
-                          lastDate: DateTime.now().add(
-                            const Duration(days: 730),
+                    const SizedBox(height: 10),
+                    CollapsibleMetadataSection(
+                      title: 'Categoria, Área, Meta & Tags',
+                      summary:
+                          'Categoria: ${_categoryLabel(category)}${targetDate != null ? ' • Meta ${_formatDate(targetDate!)}' : ''}',
+                      initiallyExpanded: false,
+                      children: [
+                        const SizedBox(height: 6),
+                        TextField(
+                          controller: tagsCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'Tags (separadas por vírgula)',
+                            prefixIcon: Icon(Icons.tag, size: 18),
+                            isDense: true,
+                            border: OutlineInputBorder(),
                           ),
-                        );
-                        if (picked != null) {
-                          setModalState(() => targetDate = picked);
-                        }
-                      },
+                        ),
+                        const SizedBox(height: 10),
+                        DropdownButtonFormField<String>(
+                          initialValue:
+                              [
+                                'ministry',
+                                'personal',
+                                'study',
+                              ].contains(category)
+                              ? category
+                              : 'ministry',
+                          decoration: const InputDecoration(
+                            labelText: 'Categoria',
+                            isDense: true,
+                            border: OutlineInputBorder(),
+                          ),
+                          items: const [
+                            DropdownMenuItem(
+                              value: 'ministry',
+                              child: Text('Ministério'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'personal',
+                              child: Text('Pessoal'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'study',
+                              child: Text('Estudo'),
+                            ),
+                          ],
+                          onChanged: (v) =>
+                              setModalState(() => category = v ?? 'ministry'),
+                        ),
+                        const SizedBox(height: 10),
+                        StreamBuilder<List<KnowledgeAreaEntry>>(
+                          stream: km.watchAreas(),
+                          builder: (context, areaSnap) {
+                            final areas =
+                                areaSnap.data ?? const <KnowledgeAreaEntry>[];
+                            if (areas.isEmpty) return const SizedBox.shrink();
+                            final validArea = areas.any((a) => a.id == areaId)
+                                ? areaId
+                                : null;
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: DropdownButtonFormField<String?>(
+                                initialValue: validArea,
+                                decoration: const InputDecoration(
+                                  labelText: 'Área P.A.R.A. (Segundo Cérebro)',
+                                  prefixIcon: Icon(
+                                    Icons.layers_outlined,
+                                    size: 18,
+                                  ),
+                                  isDense: true,
+                                  border: OutlineInputBorder(),
+                                ),
+                                items: [
+                                  const DropdownMenuItem<String?>(
+                                    value: null,
+                                    child: Text('Sem área vinculada'),
+                                  ),
+                                  for (final a in areas)
+                                    DropdownMenuItem<String?>(
+                                      value: a.id,
+                                      child: Text(a.name),
+                                    ),
+                                ],
+                                onChanged: (v) =>
+                                    setModalState(() => areaId = v),
+                              ),
+                            );
+                          },
+                        ),
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          dense: true,
+                          title: Text(
+                            targetDate == null
+                                ? 'Definir Prazo / Meta (Opcional)'
+                                : 'Meta: ${_formatDate(targetDate!)}',
+                          ),
+                          trailing: targetDate != null
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear, size: 18),
+                                  onPressed: () =>
+                                      setModalState(() => targetDate = null),
+                                )
+                              : const Icon(Icons.flag_outlined, size: 18),
+                          onTap: () async {
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate:
+                                  targetDate ??
+                                  DateTime.now().add(const Duration(days: 30)),
+                              firstDate: DateTime.now(),
+                              lastDate: DateTime.now().add(
+                                const Duration(days: 730),
+                              ),
+                            );
+                            if (picked != null) {
+                              setModalState(() => targetDate = picked);
+                            }
+                          },
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 16),
                     ElevatedButton(

@@ -44,6 +44,75 @@ class RichMarkdownToolbar extends StatefulWidget {
     this.onReferenceInserted,
   });
 
+  /// Aplica uma referência selecionada em [controller], respeitando o modo
+  /// escolhido (somente link, link + transcrição, ou somente texto transcrito).
+  static void applyPickedReferenceToController(
+    TextEditingController controller,
+    AppReferencePickResult picked, {
+    VoidCallback? onChanged,
+  }) {
+    final linkMatch = RegExp(r'^\[([^\]]+)\]\(([^)]+)\)$')
+        .firstMatch(picked.markdownToken.trim());
+    final pickedLabel = linkMatch != null
+        ? linkMatch.group(1)!
+        : (picked.candidate?.title ?? 'Referência');
+    final pickedUrl = linkMatch != null
+        ? linkMatch.group(2)!
+        : (picked.candidate?.buildUri() ?? '');
+    final hasTranscript =
+        (picked.transcriptHeader != null &&
+            picked.transcriptHeader!.isNotEmpty) ||
+        picked.transcriptLines.isNotEmpty ||
+        (picked.transcriptMarkdown != null &&
+            picked.transcriptMarkdown!.trim().isNotEmpty);
+
+    if (controller is RichFormattedEditingController) {
+      if (picked.insertMode != ReferenceInsertMode.transcriptOnly &&
+          pickedUrl.isNotEmpty) {
+        controller.insertLink(label: pickedLabel, url: pickedUrl);
+      } else if (picked.insertMode == ReferenceInsertMode.linkOnly ||
+          !hasTranscript) {
+        controller.insertLink(label: pickedLabel, url: pickedUrl);
+      }
+
+      if (picked.insertMode != ReferenceInsertMode.linkOnly && hasTranscript) {
+        final lines = picked.transcriptLines.isNotEmpty
+            ? picked.transcriptLines
+            : (picked.transcriptMarkdown ?? '')
+                  .split('\n')
+                  .map((l) => l.replaceFirst(RegExp(r'^>\s*'), ''))
+                  .where((l) => l.trim().isNotEmpty)
+                  .toList();
+        controller.insertQuotedTranscript(
+          header: picked.transcriptHeader,
+          lines: lines,
+        );
+      }
+      onChanged?.call();
+      return;
+    }
+
+    final buf = StringBuffer();
+    if (picked.insertMode != ReferenceInsertMode.transcriptOnly ||
+        !hasTranscript) {
+      buf.write(picked.markdownToken.trim());
+    }
+    if (picked.insertMode != ReferenceInsertMode.linkOnly && hasTranscript) {
+      if (buf.isNotEmpty) buf.write('\n');
+      buf.write((picked.transcriptMarkdown ?? '').trim());
+    }
+    final insertion = '${buf.toString()} ';
+    final sel = controller.selection;
+    final cur = controller.text;
+    final start = (sel.isValid ? sel.start : cur.length).clamp(0, cur.length);
+    final end = (sel.isValid ? sel.end : cur.length).clamp(start, cur.length);
+    controller.value = TextEditingValue(
+      text: cur.replaceRange(start, end, insertion),
+      selection: TextSelection.collapsed(offset: start + insertion.length),
+    );
+    onChanged?.call();
+  }
+
   /// Abre o seletor de referências cruzadas (`📖` TNM / `🔖` Abas) diretamente
   /// para qualquer [TextEditingController], mantendo a edição WYSIWYG limpa.
   static Future<AppReferencePickResult?> pickAndInsertReference(
@@ -60,29 +129,7 @@ class RichMarkdownToolbar extends StatefulWidget {
     );
     if (picked == null) return null;
 
-    final linkMatch = RegExp(r'^\[([^\]]+)\]\(([^)]+)\)$')
-        .firstMatch(picked.markdownToken.trim());
-    final pickedLabel = linkMatch != null
-        ? linkMatch.group(1)!
-        : (picked.candidate?.title ?? 'Referência');
-    final pickedUrl = linkMatch != null
-        ? linkMatch.group(2)!
-        : (picked.candidate?.buildUri() ?? '');
-
-    if (controller is RichFormattedEditingController && pickedUrl.isNotEmpty) {
-      controller.insertLink(label: pickedLabel, url: pickedUrl);
-    } else {
-      final sel = controller.selection;
-      final cur = controller.text;
-      final start = (sel.isValid ? sel.start : cur.length).clamp(0, cur.length);
-      final end = (sel.isValid ? sel.end : cur.length).clamp(start, cur.length);
-      final token = '${picked.markdownToken.trim()} ';
-      controller.value = TextEditingValue(
-        text: cur.replaceRange(start, end, token),
-        selection: TextSelection.collapsed(offset: start + token.length),
-      );
-    }
-    onChanged?.call();
+    applyPickedReferenceToController(controller, picked, onChanged: onChanged);
     return picked;
   }
 
@@ -300,7 +347,6 @@ class _RichMarkdownToolbarState extends State<RichMarkdownToolbar> {
     );
     if (picked == null) return;
 
-    final rich = _richCtrl;
     final tokenMatch = RegExp(r'^\[([^\]]+)\]\(([^\)]+)\)$')
         .firstMatch(picked.markdownToken.trim());
     final pickedLabel =
@@ -310,11 +356,12 @@ class _RichMarkdownToolbarState extends State<RichMarkdownToolbar> {
 
     if (picked.category == AppRefCategory.picture && pickedUrl.isNotEmpty) {
       _insertPictureMarkdownOrVisual(caption: pickedLabel, src: pickedUrl);
-    } else if (rich != null && pickedUrl.isNotEmpty) {
-      rich.insertLink(label: pickedLabel, url: pickedUrl);
-      widget.onChanged?.call();
     } else {
-      _wrapSelection(prefix: '${picked.markdownToken} ', suffix: '');
+      RichMarkdownToolbar.applyPickedReferenceToController(
+        widget.controller,
+        picked,
+        onChanged: widget.onChanged,
+      );
     }
     widget.onReferenceInserted?.call(picked);
   }
@@ -466,6 +513,7 @@ class _RichMarkdownToolbarState extends State<RichMarkdownToolbar> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 40;
     final rich = _richCtrl;
 
     return AnimatedBuilder(
@@ -478,8 +526,10 @@ class _RichMarkdownToolbarState extends State<RichMarkdownToolbar> {
           children: [
             Container(
               key: _toolbarAnchorKey,
-              height: 40,
-              margin: EdgeInsets.only(bottom: inlineImages.isNotEmpty ? 6 : 8),
+              height: keyboardOpen ? 34 : 40,
+              margin: EdgeInsets.only(
+                bottom: inlineImages.isNotEmpty ? 4 : (keyboardOpen ? 4 : 8),
+              ),
               padding: const EdgeInsets.symmetric(horizontal: 4),
               decoration: BoxDecoration(
                 color: isDark
