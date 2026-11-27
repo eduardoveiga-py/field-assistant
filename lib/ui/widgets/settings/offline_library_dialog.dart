@@ -1,7 +1,5 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../../../bible/nwt_bible_books.dart';
@@ -12,16 +10,18 @@ import '../../../database/app_database.dart';
 import '../../../publications/imported_publications_service.dart';
 import '../bible_verse_popup_dialog.dart';
 import '../publication_reader_dialog.dart';
+import 'library_file_picker.dart';
 
 /// Abre a janela de gerenciamento da Biblioteca Offline (Bíblias e Publicações) em Configurações.
 Future<void> showOfflineLibraryDialog(
   BuildContext context, {
   required AppDatabase db,
+  Future<PickedLibraryFile?> Function()? onPickFile,
 }) async {
   await showDialog<void>(
     context: context,
     barrierDismissible: true,
-    builder: (ctx) => OfflineLibraryDialog(db: db),
+    builder: (ctx) => OfflineLibraryDialog(db: db, onPickFile: onPickFile),
   );
 }
 
@@ -29,8 +29,9 @@ Future<void> showOfflineLibraryDialog(
 /// e outras publicações em EPUB (ou JSON para Bíblias), exibindo aviso claro caso .jwpub criptografado seja selecionado.
 class OfflineLibraryDialog extends StatefulWidget {
   final AppDatabase db;
+  final Future<PickedLibraryFile?> Function()? onPickFile;
 
-  const OfflineLibraryDialog({super.key, required this.db});
+  const OfflineLibraryDialog({super.key, required this.db, this.onPickFile});
 
   @override
   State<OfflineLibraryDialog> createState() => _OfflineLibraryDialogState();
@@ -43,6 +44,7 @@ class _OfflineLibraryDialogState extends State<OfflineLibraryDialog>
   List<ImportedPublicationSummary> _publications = const [];
   bool _loading = true;
   bool _importing = false;
+  String? _progressLabel;
   String? _statusMessage;
   bool _statusIsError = false;
 
@@ -71,47 +73,67 @@ class _OfflineLibraryDialogState extends State<OfflineLibraryDialog>
     });
   }
 
-  Future<void> _importBible() async {
+  void _updateImportProgress(int processed, int total) {
+    if (!mounted || total <= 0) return;
+    final pct = ((processed / total) * 100).round().clamp(1, 100);
+    final next = 'Importando ($pct%)...';
+    if (_progressLabel != next) {
+      setState(() => _progressLabel = next);
+    }
+  }
+
+  Future<void> _runImport({
+    required String dialogTitle,
+    required List<String> allowedExtensions,
+    required String failureLogContext,
+    required Future<String> Function(PickedLibraryFile picked) importer,
+  }) async {
     setState(() {
       _importing = true;
+      _progressLabel = 'Selecionando...';
       _statusMessage = null;
       _statusIsError = false;
     });
     try {
-      final files = await FilePicker.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: const ['epub', 'json', 'jwpub', 'jwlpub'],
-      );
-      if (files.isEmpty) {
-        if (mounted) setState(() => _importing = false);
+      final picked = await (widget.onPickFile != null
+          ? widget.onPickFile!()
+          : pickLibraryFile(
+              dialogTitle: dialogTitle,
+              allowedExtensions: allowedExtensions,
+            ));
+      if (picked == null) {
+        if (mounted) {
+          setState(() {
+            _importing = false;
+            _progressLabel = null;
+          });
+        }
         return;
       }
-      final picked = files.first;
-      final Uint8List bytes = await picked.readAsBytes();
-      final res = await NwtBibleService.importFromBytes(
-        widget.db,
-        bytes: bytes,
-        fileName: picked.name,
-      );
+      if (picked.bytes.isEmpty) {
+        throw StateError(
+          'O arquivo "${picked.name}" está vazio ou não pôde ser lido pelo navegador/sistema.',
+        );
+      }
+      if (mounted) {
+        setState(() => _progressLabel = 'Processando...');
+      }
+      final successMessage = await importer(picked);
       await _refresh();
       if (mounted) {
         setState(() {
           _importing = false;
+          _progressLabel = null;
           _statusIsError = false;
-          _statusMessage =
-              'Bíblia "${res.catalog.title}" (${res.catalog.languageDisplay}) importada: '
-              '${res.catalog.bookCount} livro(s), ${res.catalog.verseCount} versículos.';
+          _statusMessage = successMessage;
         });
       }
     } catch (e, st) {
-      AppLogger.warning(
-        'Falha ao importar Bíblia na biblioteca offline',
-        e,
-        st,
-      );
+      AppLogger.warning(failureLogContext, e, st);
       if (mounted) {
         setState(() {
           _importing = false;
+          _progressLabel = null;
           _statusIsError = true;
           _statusMessage = e.toString();
         });
@@ -119,52 +141,41 @@ class _OfflineLibraryDialogState extends State<OfflineLibraryDialog>
     }
   }
 
+  Future<void> _importBible() async {
+    await _runImport(
+      dialogTitle: 'Selecionar Bíblia (.epub ou .json)',
+      allowedExtensions: const ['epub', 'json', 'jwpub', 'jwlpub'],
+      failureLogContext: 'Falha ao importar Bíblia na biblioteca offline',
+      importer: (picked) async {
+        final res = await NwtBibleService.importFromBytes(
+          widget.db,
+          bytes: picked.bytes,
+          fileName: picked.name,
+          onProgress: _updateImportProgress,
+        );
+        return 'Bíblia "${res.catalog.title}" (${res.catalog.languageDisplay}) importada: '
+            '${res.catalog.bookCount} livro(s), ${res.catalog.verseCount} versículos.';
+      },
+    );
+  }
+
   Future<void> _importPublication() async {
-    setState(() {
-      _importing = true;
-      _statusMessage = null;
-      _statusIsError = false;
-    });
-    try {
-      final files = await FilePicker.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: const ['epub', 'jwpub', 'jwlpub'],
-      );
-      if (files.isEmpty) {
-        if (mounted) setState(() => _importing = false);
-        return;
-      }
-      final picked = files.first;
-      final Uint8List bytes = await picked.readAsBytes();
-      final pub = await ImportedPublicationsService.importPublicationFromBytes(
-        widget.db,
-        bytes: bytes,
-        fileName: picked.name,
-      );
-      await _refresh();
-      if (mounted) {
-        setState(() {
-          _importing = false;
-          _statusIsError = false;
-          _statusMessage =
-              'Publicação "${pub.title}" (${NwtBibleBooks.languageDisplayName(pub.language)}) '
-              'importada com ${pub.chapterCount} seção(ões) e disponível na lista de Referências.';
-        });
-      }
-    } catch (e, st) {
-      AppLogger.warning(
-        'Falha ao importar publicação na biblioteca offline',
-        e,
-        st,
-      );
-      if (mounted) {
-        setState(() {
-          _importing = false;
-          _statusIsError = true;
-          _statusMessage = e.toString();
-        });
-      }
-    }
+    await _runImport(
+      dialogTitle: 'Selecionar Publicação (.epub)',
+      allowedExtensions: const ['epub', 'jwpub', 'jwlpub'],
+      failureLogContext: 'Falha ao importar publicação na biblioteca offline',
+      importer: (picked) async {
+        final pub =
+            await ImportedPublicationsService.importPublicationFromBytes(
+              widget.db,
+              bytes: picked.bytes,
+              fileName: picked.name,
+              onProgress: _updateImportProgress,
+            );
+        return 'Publicação "${pub.title}" (${NwtBibleBooks.languageDisplayName(pub.language)}) '
+            'importada com ${pub.chapterCount} seção(ões) e disponível na lista de Referências.';
+      },
+    );
   }
 
   Widget _buildCoverThumbnail(String? coverBase64, IconData fallbackIcon) {
@@ -350,7 +361,7 @@ class _OfflineLibraryDialogState extends State<OfflineLibraryDialog>
                     : const Icon(Icons.upload_file_rounded, size: 18),
                 label: Text(
                   _importing
-                      ? 'Importando...'
+                      ? (_progressLabel ?? 'Importando...')
                       : 'Importar Bíblia (.epub / .json)',
                 ),
               ),
@@ -506,7 +517,9 @@ class _OfflineLibraryDialogState extends State<OfflineLibraryDialog>
                       )
                     : const Icon(Icons.auto_stories_rounded, size: 18),
                 label: Text(
-                  _importing ? 'Importando...' : 'Importar Publicação (.epub)',
+                  _importing
+                      ? (_progressLabel ?? 'Importando...')
+                      : 'Importar Publicação (.epub)',
                 ),
               ),
             ],

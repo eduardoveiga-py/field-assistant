@@ -7,6 +7,7 @@ import '../../../core/app_logger.dart';
 import '../../../core/app_theme.dart';
 import '../../../database/app_database.dart';
 import '../../../sync/supabase_sync_service.dart';
+import '../../../sync/sync_engine.dart';
 import '../../providers.dart';
 
 /// Modal avançado para gestão da fila de sincronização (pendentes, falhas e conflitos).
@@ -32,9 +33,38 @@ class _SyncQueueManagementSheetState
     _loadQueue();
   }
 
-  Future<void> _loadQueue() async {
+  static String _formatSyncFeedback(SyncProcessResult res) {
+    if (res.errors.isEmpty) return res.message;
+    final firstErr = res.errors.first.trim();
+    if (firstErr.isEmpty || res.message.contains(firstErr)) return res.message;
+    return '${res.message}\nDetalhe: $firstErr';
+  }
+
+  static String _friendlyEntityLabel(String entityType) {
+    return switch (entityType) {
+      'inbox_entries' => 'Inbox / E-mail',
+      'email_accounts' => 'Conta de E-mail',
+      'knowledge_notes' => 'Nota',
+      'knowledge_areas' => 'Área (Conhecimento)',
+      'knowledge_questions' => 'Pergunta / Dúvida',
+      'knowledge_documents' => 'Documento',
+      'knowledge_resources' => 'Recurso',
+      'knowledge_links' => 'Backlink',
+      'projects' => 'Projeto',
+      'tasks' => 'Tarefa',
+      'people' => 'Pessoa',
+      'bible_studies' => 'Estudo Bíblico',
+      'visits' => 'Visita / Revisita',
+      'appointments' => 'Agenda / Compromisso',
+      _ => entityType,
+    };
+  }
+
+  Future<void> _loadQueue({bool silent = false}) async {
     if (!mounted) return;
-    setState(() => _loading = true);
+    if (!silent) {
+      setState(() => _loading = true);
+    }
     try {
       final list = await ref
           .read(repositoryProvider)
@@ -54,14 +84,18 @@ class _SyncQueueManagementSheetState
     }
   }
 
+  bool get _canRunSync =>
+      SupabaseSyncService.isInitialized ||
+      ref.read(supabaseSyncServiceProvider).clientOverride != null;
+
   Future<void> _retryOne(SyncQueueEntry op) async {
     setState(() => _busy = true);
     try {
       final repo = ref.read(repositoryProvider);
       await repo.retrySyncOperation(op.id);
-      if (SupabaseSyncService.isInitialized) {
+      if (_canRunSync) {
         final res = await ref.read(supabaseSyncServiceProvider).sync();
-        _statusMessage = res.message;
+        _statusMessage = _formatSyncFeedback(res);
       } else {
         _statusMessage = 'Operação marcada como pendente para reenvio.';
       }
@@ -76,14 +110,39 @@ class _SyncQueueManagementSheetState
     }
   }
 
+  Future<void> _unblockAndResyncAll({bool includeLocalBackfill = true}) async {
+    setState(() => _busy = true);
+    try {
+      if (!_canRunSync) {
+        _statusMessage = 'Supabase não inicializado nesta sessão; mantendo alterações locais seguras.';
+        await _loadQueue();
+        return;
+      }
+      final result = await ref
+          .read(supabaseSyncServiceProvider)
+          .unblockAndResyncPendingQueue(
+            includeLocalBackfill: includeLocalBackfill,
+          );
+      _statusMessage = _formatSyncFeedback(result.syncResult);
+      await _loadQueue();
+    } catch (e, st) {
+      AppLogger.error('Erro ao desbloquear e reenviar fila', e, st);
+      if (mounted) {
+        setState(() => _statusMessage = 'Falha ao desbloquear fila: $e');
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _retryAllFailed() async {
     setState(() => _busy = true);
     try {
       final repo = ref.read(repositoryProvider);
       final count = await repo.retryAllFailedOperations();
-      if (SupabaseSyncService.isInitialized) {
+      if (_canRunSync) {
         final res = await ref.read(supabaseSyncServiceProvider).sync();
-        _statusMessage = '$count reativada(s). ${res.message}';
+        _statusMessage = '$count reativada(s). ${_formatSyncFeedback(res)}';
       } else {
         _statusMessage = '$count operação(ões) marcada(s) como pendente(s).';
       }
@@ -102,9 +161,9 @@ class _SyncQueueManagementSheetState
     setState(() => _busy = true);
     try {
       await ref.read(repositoryProvider).resolveSyncConflictKeepLocal(op.id);
-      if (SupabaseSyncService.isInitialized) {
+      if (_canRunSync) {
         final res = await ref.read(supabaseSyncServiceProvider).sync();
-        _statusMessage = 'Versão local mantida. ${res.message}';
+        _statusMessage = 'Versão local mantida. ${_formatSyncFeedback(res)}';
       } else {
         _statusMessage = 'Versão local selecionada e enfileirada para envio.';
       }
@@ -187,6 +246,14 @@ class _SyncQueueManagementSheetState
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<AsyncValue<SyncStatus>>(syncStatusStreamProvider, (prev, next) {
+      final wasSyncing = prev?.value == SyncStatus.syncing;
+      final cur = next.value;
+      if (wasSyncing && cur != null && cur != SyncStatus.syncing && !_busy) {
+        _loadQueue(silent: true);
+      }
+    });
+
     final pendingCount = _items
         .where((i) => i.status == 'pending' || i.status == 'in_progress')
         .length;
@@ -287,7 +354,7 @@ class _SyncQueueManagementSheetState
                   ),
                 ],
               ),
-              if (failedCount > 0 || SupabaseSyncService.isInitialized) ...[
+              if (failedCount > 0 || _canRunSync) ...[
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
@@ -303,25 +370,36 @@ class _SyncQueueManagementSheetState
                         icon: const Icon(Icons.replay, size: 16),
                         label: Text('Reprocessar $failedCount Falha(s)'),
                       ),
-                    if (SupabaseSyncService.isInitialized && _items.isNotEmpty)
-                      OutlinedButton.icon(
-                        onPressed: _busy
-                            ? null
-                            : () async {
-                                setState(() => _busy = true);
-                                try {
-                                  final res = await ref
-                                      .read(supabaseSyncServiceProvider)
-                                      .sync();
-                                  _statusMessage = res.message;
-                                  await _loadQueue();
-                                } finally {
-                                  if (mounted) setState(() => _busy = false);
-                                }
-                              },
-                        icon: const Icon(Icons.sync, size: 16),
-                        label: const Text('Sincronizar Agora'),
+                    if (_canRunSync) ...[
+                      if (_items.isNotEmpty)
+                        OutlinedButton.icon(
+                          onPressed: _busy
+                              ? null
+                              : () async {
+                                  setState(() => _busy = true);
+                                  try {
+                                    final res = await ref
+                                        .read(supabaseSyncServiceProvider)
+                                        .sync();
+                                    _statusMessage = _formatSyncFeedback(res);
+                                    await _loadQueue();
+                                  } finally {
+                                    if (mounted) setState(() => _busy = false);
+                                  }
+                                },
+                          icon: const Icon(Icons.sync, size: 16),
+                          label: const Text('Sincronizar Agora'),
+                        ),
+                      FilledButton.icon(
+                        onPressed: _busy ? null : _unblockAndResyncAll,
+                        icon: const Icon(Icons.bolt_rounded, size: 16),
+                        label: Text(
+                          pendingCount > 0
+                              ? 'Desbloquear & Reenviar'
+                              : 'Sincronizar Base Completa',
+                        ),
                       ),
+                    ],
                   ],
                 ),
               ],
@@ -393,7 +471,7 @@ class _SyncQueueManagementSheetState
                                       const SizedBox(width: 8),
                                       Expanded(
                                         child: Text(
-                                          '${op.entityType} • ${op.operation}',
+                                          '${_friendlyEntityLabel(op.entityType)} (${op.entityType}) • ${op.operation}',
                                           style: const TextStyle(
                                             fontWeight: FontWeight.bold,
                                             fontSize: 13,

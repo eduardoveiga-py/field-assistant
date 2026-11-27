@@ -25,6 +25,8 @@ import 'crypto/encrypted_media_transfer.dart';
 import 'crypto/encrypted_record.dart';
 import 'crypto/encrypted_record_checkpoint.dart';
 import 'crypto/encrypted_record_sync.dart';
+import 'e2ee_local_backfill.dart';
+import 'realtime_sync_notifier.dart';
 
 class SyncProcessResult {
   final int totalProcessed;
@@ -2853,10 +2855,29 @@ class SupabaseSyncService {
     return true;
   }
 
-  /// Compacta apenas cadeias verificáveis, ainda não enviadas. Qualquer fila
-  /// ambígua ou com tentativa anterior permanece intacta para resolução.
-  Future<void> _coalescePendingChanges() async {
+  /// Compacta apenas cadeias verificáveis, ainda não enviadas. Também consolida
+  /// com segurança cadeias estritamente `pending` (sem tentativas/erros anteriores)
+  /// cujo estado final coincida com o snapshot atual do SQLite quando produtores
+  /// antigos omitiram `_base`.
+  Future<void> _coalescePendingChanges({
+    bool forceResetPendingAttempts = false,
+  }) async {
     await db.transaction(() async {
+      if (forceResetPendingAttempts) {
+        await (db.update(db.syncQueue)..where(
+              (tbl) =>
+                  tbl.status.equals('pending') |
+                  tbl.status.equals('in_progress'),
+            ))
+            .write(
+              const SyncQueueCompanion(
+                status: drift.Value('pending'),
+                attempts: drift.Value(0),
+                lastError: drift.Value(null),
+                lastAttemptAt: drift.Value(null),
+              ),
+            );
+      }
       final all = await repository.getUnresolvedSyncOperations();
       final groups = <String, List<SyncQueueEntry>>{};
       for (final op in all) {
@@ -2869,16 +2890,15 @@ class SupabaseSyncService {
       for (final operations in groups.values) {
         if (operations.length < 2 ||
             operations.any(
-              (op) =>
-                  op.status != 'pending' ||
-                  op.attempts != 0 ||
-                  !const {
-                    'INSERT',
-                    'UPDATE',
-                  }.contains(op.operation.toUpperCase()),
+              (op) => op.status != 'pending' || op.attempts != 0,
             )) {
           continue;
         }
+        final tableName = mapEntityToRemoteTable(operations.first.entityType);
+        final allInsertOrUpdate = operations.every(
+          (op) =>
+              const {'INSERT', 'UPDATE'}.contains(op.operation.toUpperCase()),
+        );
         try {
           final payloads = <String, Map<String, dynamic>>{};
           int? revision(SyncQueueEntry op) {
@@ -2893,74 +2913,154 @@ class SupabaseSyncService {
             }
             payloads[op.id] = decoded;
           }
-          if (operations.any((op) => revision(op) == null)) continue;
-          operations.sort((a, b) => revision(a)!.compareTo(revision(b)!));
-          if (operations
-              .skip(1)
-              .any((op) => op.operation.toUpperCase() != 'UPDATE')) {
-            continue;
-          }
-          var valid = true;
-          for (var i = 1; i < operations.length; i++) {
-            final previous = operations[i - 1];
-            final current = operations[i];
-            final base = payloads[current.id]!['_base'];
-            if (base is! Map || revision(current) != revision(previous)! + 1) {
-              valid = false;
-              break;
+
+          var consolidatedStrict = false;
+          if (allInsertOrUpdate &&
+              operations.every((op) => revision(op) != null)) {
+            operations.sort((a, b) => revision(a)!.compareTo(revision(b)!));
+            if (operations
+                .skip(1)
+                .every((op) => op.operation.toUpperCase() == 'UPDATE')) {
+              var valid = true;
+              for (var i = 1; i < operations.length; i++) {
+                final previous = operations[i - 1];
+                final current = operations[i];
+                final base = payloads[current.id]!['_base'];
+                if (base is! Map ||
+                    revision(current) != revision(previous)! + 1) {
+                  valid = false;
+                  break;
+                }
+                final previousSnapshot = normalizeRemotePayload(
+                  sanitizePayload(previous.entityType, payloads[previous.id]!),
+                );
+                final currentBase = normalizeRemotePayload(
+                  Map<String, dynamic>.from(base),
+                );
+                if ((currentBase['revision'] as num?)?.toInt() !=
+                        revision(previous) ||
+                    !_sameQueuedSnapshot(previousSnapshot, currentBase)) {
+                  valid = false;
+                  break;
+                }
+              }
+              final first = operations.first;
+              final last = operations.last;
+              final local = await _getLocalMap(tableName, last.entityId);
+              final latest = normalizeRemotePayload(
+                sanitizePayload(last.entityType, payloads[last.id]!),
+              );
+              final firstPayload = payloads[first.id]!;
+              final canKeepBaseOrInsert =
+                  first.operation.toUpperCase() != 'UPDATE' ||
+                  firstPayload['_base'] is Map ||
+                  firstPayload['baseData'] is Map;
+              if (valid &&
+                  canKeepBaseOrInsert &&
+                  local != null &&
+                  (local['revision'] as num?)?.toInt() == revision(last) &&
+                  _sameQueuedSnapshot(latest, local)) {
+                final combined = Map<String, dynamic>.from(payloads[last.id]!);
+                combined.remove('_base');
+                combined.remove('baseData');
+                if (firstPayload['_base'] is Map) {
+                  combined['_base'] = firstPayload['_base'];
+                }
+                if (firstPayload['baseData'] is Map) {
+                  combined['baseData'] = firstPayload['baseData'];
+                }
+                await (db.update(
+                  db.syncQueue,
+                )..where((t) => t.id.equals(first.id))).write(
+                  SyncQueueCompanion(
+                    payload: drift.Value(jsonEncode(combined)),
+                  ),
+                );
+                for (final superseded in operations.skip(1)) {
+                  await (db.delete(
+                    db.syncQueue,
+                  )..where((t) => t.id.equals(superseded.id))).go();
+                }
+                consolidatedStrict = true;
+              }
             }
-            final previousSnapshot = normalizeRemotePayload(
-              sanitizePayload(previous.entityType, payloads[previous.id]!),
+          }
+
+          if (!consolidatedStrict) {
+            // Caminho seguro para cadeias puramente pending (ex.: UPDATEs legados de e-mail sem _base)
+            operations.sort((a, b) {
+              final cmp = a.createdAt.compareTo(b.createdAt);
+              if (cmp != 0) return cmp;
+              return (revision(a) ?? 0).compareTo(revision(b) ?? 0);
+            });
+            final prefixValid = operations
+                .take(operations.length - 1)
+                .every(
+                  (op) => const {
+                    'INSERT',
+                    'UPDATE',
+                  }.contains(op.operation.toUpperCase()),
+                );
+            final last = operations.last;
+            final lastOpName = last.operation.toUpperCase();
+            final tailValid = const {
+              'INSERT',
+              'UPDATE',
+              'DELETE',
+            }.contains(lastOpName);
+            if (!prefixValid || !tailValid) continue;
+
+            final local = await _getLocalMap(tableName, last.entityId);
+            if (local == null) continue;
+
+            final latestNormalized = normalizeRemotePayload(
+              sanitizePayload(last.entityType, payloads[last.id]!),
             );
-            final currentBase = normalizeRemotePayload(
-              Map<String, dynamic>.from(base),
+            final isSoftDeletedLocally = local['deletedAt'] != null;
+            final matchesLatest = lastOpName == 'DELETE'
+                ? isSoftDeletedLocally
+                : (_sameQueuedSnapshot(latestNormalized, local) ||
+                      (revision(last) != null &&
+                          (local['revision'] as num?)?.toInt() ==
+                              revision(last)));
+            if (!matchesLatest) continue;
+
+            final first = operations.first;
+            final firstOpName = first.operation.toUpperCase();
+            final combinedOp = lastOpName == 'DELETE'
+                ? 'DELETE'
+                : (firstOpName == 'INSERT' ? 'INSERT' : 'UPDATE');
+            final combined = SyncTimestamp.normalizeMapDates(
+              Map<String, dynamic>.from(local),
             );
-            if ((currentBase['revision'] as num?)?.toInt() !=
-                    revision(previous) ||
-                !_sameQueuedSnapshot(previousSnapshot, currentBase)) {
-              valid = false;
-              break;
+            combined.remove('_base');
+            combined.remove('baseData');
+            if (combinedOp != 'INSERT') {
+              for (final op in operations) {
+                final p = payloads[op.id]!;
+                if (p['_base'] is Map) {
+                  combined['_base'] = p['_base'];
+                  break;
+                }
+                if (p['baseData'] is Map) {
+                  combined['baseData'] = p['baseData'];
+                  break;
+                }
+              }
             }
-          }
-          final first = operations.first;
-          final last = operations.last;
-          final local = await _getLocalMap(
-            mapEntityToRemoteTable(last.entityType),
-            last.entityId,
-          );
-          final latest = normalizeRemotePayload(
-            sanitizePayload(last.entityType, payloads[last.id]!),
-          );
-          if (!valid ||
-              local == null ||
-              (local['revision'] as num?)?.toInt() != revision(last) ||
-              !_sameQueuedSnapshot(latest, local)) {
-            continue;
-          }
-          final combined = Map<String, dynamic>.from(payloads[last.id]!);
-          combined.remove('_base');
-          combined.remove('baseData');
-          final firstPayload = payloads[first.id]!;
-          if (first.operation.toUpperCase() == 'UPDATE' &&
-              firstPayload['_base'] is! Map &&
-              firstPayload['baseData'] is! Map) {
-            continue;
-          }
-          if (firstPayload['_base'] is Map) {
-            combined['_base'] = firstPayload['_base'];
-          }
-          if (firstPayload['baseData'] is Map) {
-            combined['baseData'] = firstPayload['baseData'];
-          }
-          await (db.update(
-            db.syncQueue,
-          )..where((t) => t.id.equals(first.id))).write(
-            SyncQueueCompanion(payload: drift.Value(jsonEncode(combined))),
-          );
-          for (final superseded in operations.skip(1)) {
-            await (db.delete(
+            await (db.update(
               db.syncQueue,
-            )..where((t) => t.id.equals(superseded.id))).go();
+            )..where((t) => t.id.equals(first.id))).write(
+              SyncQueueCompanion(
+                operation: drift.Value(combinedOp),
+                payload: drift.Value(jsonEncode(combined)),
+              ),
+            );
+            for (final superseded in operations.skip(1)) {
+              await (db.delete(
+                db.syncQueue,
+              )..where((t) => t.id.equals(superseded.id))).go();
+            }
           }
         } on FormatException {
           // Dados antigos ou incompletos não são consolidados automaticamente.
@@ -3204,7 +3304,11 @@ class SupabaseSyncService {
 
   /// Realiza o ciclo completo de sincronização bidirecional:
   /// 1. Busca e mescla alterações remotas (pull)
-  /// 2. Envia mutações locais pendentes somente se o pull for bem-sucedido
+  /// 2. Executa backfill E2EE inicial de registros locais pré-existentes (uma vez por conta)
+  /// 3. Envia mutações locais pendentes somente se o pull for bem-sucedido
+  final RealtimeSyncNotifier _realtimeNotifier = RealtimeSyncNotifier();
+  RealtimeSyncNotifier get realtimeNotifier => _realtimeNotifier;
+
   Future<SyncProcessResult>? _activeSync;
   Future<void> _operationsTail = Future<void>.value();
 
@@ -3217,6 +3321,79 @@ class SupabaseSyncService {
       onError: (Object error, StackTrace stack) {},
     );
     return result;
+  }
+
+  /// Inicia inscrição Realtime opaca (Broadcast + `encrypted_records`) quando o gate E2EE permite.
+  Future<void> ensureRealtimeStarted({
+    required void Function() onRemoteActivity,
+  }) async {
+    if (!isConfigured || _legacyTestMode) return;
+    SupabaseClient? client;
+    try {
+      client = clientOverride ?? Supabase.instance.client;
+    } catch (e, st) {
+      AppLogger.debug(
+        'Cliente Supabase indisponível ao iniciar Realtime E2EE: $e',
+        st,
+      );
+      return;
+    }
+    final gate = await _evaluateSyncGate(client);
+    if (gate.blockedResult != null || gate.ownerId == null) return;
+    await _realtimeNotifier.start(
+      client: client,
+      ownerId: gate.ownerId!,
+      onRemoteActivity: onRemoteActivity,
+    );
+  }
+
+  Future<void> stopRealtime() => _realtimeNotifier.stop();
+
+  /// Varre tabelas locais e enfileira registros que ainda não possuem checkpoint E2EE.
+  Future<int> enqueueMissingLocalRecordsForSync({bool force = false}) {
+    return _serializeSyncOperation(() async {
+      if (!isConfigured || _legacyTestMode) return 0;
+      SupabaseClient? client;
+      try {
+        client = clientOverride ?? Supabase.instance.client;
+      } catch (e, st) {
+        AppLogger.debug(
+          'Cliente Supabase indisponível durante backfill E2EE: $e',
+          st,
+        );
+        return 0;
+      }
+      final gate = await _evaluateSyncGate(client);
+      if (gate.blockedResult != null || gate.ownerId == null) return 0;
+      final ownerId = gate.ownerId!;
+      final key = await e2eeService.getKey(ownerId);
+      if (key == null) return 0;
+      return E2eeLocalBackfill.enqueueMissingRecords(
+        db: db,
+        repository: repository,
+        ownerId: ownerId,
+        key: key,
+        syncTables: syncTables,
+        mapEntityToRemoteTable: mapEntityToRemoteTable,
+        loadLocalRow: _getLocalMap,
+        force: force,
+      );
+    });
+  }
+
+  /// Destrava explicitamente operações `pending` (ex.: pares legados sem `_base`
+  /// ou em backoff), consolida e dispara sincronização completa.
+  Future<({int consolidatedCount, SyncProcessResult syncResult})>
+  unblockAndResyncPendingQueue({bool includeLocalBackfill = false}) async {
+    await _serializeSyncOperation(() async {
+      await _coalescePendingChanges(forceResetPendingAttempts: true);
+    });
+    if (includeLocalBackfill && !_legacyTestMode) {
+      await enqueueMissingLocalRecordsForSync(force: true);
+    }
+    final remaining = await repository.getPendingSyncOperations();
+    final res = await sync();
+    return (consolidatedCount: remaining.length, syncResult: res);
   }
 
   Future<SyncProcessResult> sync() {
@@ -3234,16 +3411,38 @@ class SupabaseSyncService {
         pullResult.errors.isNotEmpty) {
       return pullResult;
     }
+    if (!_legacyTestMode) {
+      try {
+        await enqueueMissingLocalRecordsForSync(force: false);
+      } catch (e, st) {
+        AppLogger.warning(
+          'Falha não-bloqueante ao verificar registros locais pré-existentes E2EE',
+          e,
+          st,
+        );
+      }
+    }
     final pushResult = await processQueue();
+    if (!_legacyTestMode && pushResult.successCount > 0) {
+      unawaited(_realtimeNotifier.notifyRemoteDevices());
+    }
     final allErrors = [...pullResult.errors, ...pushResult.errors];
+    final issueParts = <String>[
+      if (pushResult.failureCount > 0)
+        '${pushResult.failureCount} bloqueado(s)/falha(s)',
+      if (pushResult.conflictCount > 0)
+        '${pushResult.conflictCount} conflito(s)',
+    ];
+    final message = issueParts.isNotEmpty
+        ? 'Sincronização bidirecional: ${pullResult.successCount} recebidos, ${pushResult.successCount} enviados (${issueParts.join(', ')}).'
+        : 'Sincronização bidirecional: ${pullResult.successCount} recebidos, ${pushResult.successCount} enviados.';
     return SyncProcessResult(
       totalProcessed: pullResult.totalProcessed + pushResult.totalProcessed,
       successCount: pullResult.successCount + pushResult.successCount,
       failureCount: pullResult.failureCount + pushResult.failureCount,
       conflictCount: pullResult.conflictCount + pushResult.conflictCount,
       errors: allErrors,
-      message:
-          'Sincronização bidirecional: ${pullResult.successCount} recebidos, ${pushResult.successCount} enviados.',
+      message: message,
     );
   }
 
@@ -5486,6 +5685,7 @@ class SupabaseSyncService {
   }
 
   void dispose() {
+    unawaited(_realtimeNotifier.dispose());
     _statusController.close();
   }
 }

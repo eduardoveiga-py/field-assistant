@@ -2682,6 +2682,8 @@ class JwEmailService {
         final refreshed = await (db.select(
           db.inboxEntries,
         )..where((t) => t.id.equals(row.id))).getSingle();
+        final payload = SyncTimestamp.normalizeMapDates(refreshed.toJson());
+        payload['_base'] = SyncTimestamp.normalizeMapDates(row.toJson());
         await db
             .into(db.syncQueue)
             .insert(
@@ -2690,7 +2692,7 @@ class JwEmailService {
                 entityType: 'inbox_entries',
                 entityId: row.id,
                 operation: 'UPDATE',
-                payload: jsonEncode(refreshed.toJson()),
+                payload: jsonEncode(payload),
                 createdAt: now,
               ),
             );
@@ -2752,6 +2754,8 @@ class JwEmailService {
         final refreshed = await (db.select(
           db.inboxEntries,
         )..where((t) => t.id.equals(row.id))).getSingle();
+        final payload = SyncTimestamp.normalizeMapDates(refreshed.toJson());
+        payload['_base'] = SyncTimestamp.normalizeMapDates(row.toJson());
         await db
             .into(db.syncQueue)
             .insert(
@@ -2760,7 +2764,7 @@ class JwEmailService {
                 entityType: 'inbox_entries',
                 entityId: row.id,
                 operation: 'UPDATE',
-                payload: jsonEncode(refreshed.toJson()),
+                payload: jsonEncode(payload),
                 createdAt: now,
               ),
             );
@@ -2797,6 +2801,11 @@ class JwEmailService {
             revision: drift.Value(row.revision + 1),
           ),
         );
+        final refreshed = await (db.select(
+          db.inboxEntries,
+        )..where((t) => t.id.equals(row.id))).getSingle();
+        final payload = SyncTimestamp.normalizeMapDates(refreshed.toJson());
+        payload['_base'] = SyncTimestamp.normalizeMapDates(row.toJson());
         await db
             .into(db.syncQueue)
             .insert(
@@ -2805,10 +2814,7 @@ class JwEmailService {
                 entityType: 'inbox_entries',
                 entityId: row.id,
                 operation: 'UPDATE',
-                payload: jsonEncode({
-                  'id': row.id,
-                  'deleted_at': now.toIso8601String(),
-                }),
+                payload: jsonEncode(payload),
                 createdAt: now,
               ),
             );

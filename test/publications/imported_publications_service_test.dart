@@ -190,5 +190,53 @@ void main() {
         ),
       );
     });
+
+    test('Importa publicacao EPUB com BOM UTF-8, href URL-encoded (%20) e entidades HTML comuns', () async {
+      final archive = Archive();
+      void addRaw(String path, String text) {
+        final raw = utf8.encode('\uFEFF$text');
+        archive.addFile(ArchiveFile(path, raw.length, raw));
+      }
+
+      addRaw('META-INF/container.xml', '''<?xml version="1.0"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles>
+</container>''');
+      addRaw('OEBPS/content.opf', '''<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://www.idpf.org/opf" version="2.0">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:title>Organizados Teste</dc:title>
+    <dc:language>pt</dc:language>
+  </metadata>
+  <manifest>
+    <item id="c1" href="Cap%2001.xhtml" media-type="application/xhtml+xml"/>
+  </manifest>
+  <spine><itemref idref="c1"/></spine>
+</package>''');
+      addRaw('OEBPS/Cap 01.xhtml', '''<?xml version="1.0" encoding="utf-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<body>
+  <h1>Capítulo&nbsp;1 &mdash; Organização</h1>
+  <p>Primeiro parágrafo&rsquo;s texto&hellip;</p>
+</body>
+</html>''');
+
+      final summary =
+          await ImportedPublicationsService.importPublicationFromBytes(
+            db,
+            bytes: Uint8List.fromList(ZipEncoder().encode(archive)),
+            fileName: 'od_T.epub',
+          );
+
+      expect(summary.title, equals('Organizados Teste'));
+      expect(summary.chapterCount, equals(1));
+      final ch0 = await ImportedPublicationsService.loadChapter(
+        db,
+        publicationId: summary.id,
+        chapterIndex: 0,
+      );
+      expect(ch0, isNotNull);
+      expect(ch0!.paragraphs.join(' '), contains('Organização'));
+    });
   });
 }

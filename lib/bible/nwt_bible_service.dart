@@ -728,7 +728,8 @@ class NwtBibleService {
       );
     }
 
-    if (lowerName.endsWith('.json')) {
+    if (lowerName.endsWith('.json') ||
+        (!lowerName.endsWith('.epub') && _looksLikeJson(bytes))) {
       return _importJsonBytes(
         db,
         bytes,
@@ -749,6 +750,47 @@ class NwtBibleService {
     );
   }
 
+  static bool _looksLikeJson(Uint8List bytes) {
+    var i = 0;
+    if (bytes.length >= 3 &&
+        bytes[0] == 0xEF &&
+        bytes[1] == 0xBB &&
+        bytes[2] == 0xBF) {
+      i = 3;
+    }
+    while (i < bytes.length && i < 128) {
+      final b = bytes[i];
+      if (b == 0x20 || b == 0x09 || b == 0x0A || b == 0x0D) {
+        i++;
+        continue;
+      }
+      return b == 0x7B || b == 0x5B; // '{' ou '['
+    }
+    return false;
+  }
+
+  static int? _parsePositiveInt(dynamic raw) {
+    if (raw is num) {
+      final v = raw.toInt();
+      return v >= 1 ? v : null;
+    }
+    if (raw != null) {
+      final v = int.tryParse(raw.toString().trim());
+      return (v != null && v >= 1) ? v : null;
+    }
+    return null;
+  }
+
+  static String _decodeUtf8Text(Uint8List bytes) {
+    String raw;
+    try {
+      raw = utf8.decode(bytes);
+    } on FormatException {
+      raw = utf8.decode(bytes, allowMalformed: true);
+    }
+    return raw.startsWith('\uFEFF') ? raw.substring(1) : raw;
+  }
+
   static Future<BibleImportResult> _importJsonBytes(
     AppDatabase db,
     Uint8List bytes, {
@@ -758,7 +800,7 @@ class NwtBibleService {
   }) async {
     dynamic decoded;
     try {
-      decoded = jsonDecode(utf8.decode(bytes));
+      decoded = jsonDecode(_decodeUtf8Text(bytes));
     } catch (e) {
       throw BibleImportException('JSON bíblico inválido: $e');
     }
@@ -805,8 +847,8 @@ class NwtBibleService {
             (item['book'] ?? item['bookNumber'] ?? item['name'] ?? '')
                 .toString(),
           );
-          final ch = (item['chapter'] as num?)?.toInt();
-          final v = (item['verse'] as num?)?.toInt();
+          final ch = _parsePositiveInt(item['chapter']);
+          final v = _parsePositiveInt(item['verse']);
           final text = item['text']?.toString().trim() ?? '';
           if (info != null && ch != null && v != null && text.isNotEmpty) {
             parsedBooks
@@ -822,8 +864,8 @@ class NwtBibleService {
         final info = NwtBibleBooks.findByQuery(
           (item['book'] ?? item['bookNumber'] ?? item['name'] ?? '').toString(),
         );
-        final ch = (item['chapter'] as num?)?.toInt();
-        final v = (item['verse'] as num?)?.toInt();
+        final ch = _parsePositiveInt(item['chapter']);
+        final v = _parsePositiveInt(item['verse']);
         final text = item['text']?.toString().trim() ?? '';
         if (info != null && ch != null && v != null && text.isNotEmpty) {
           parsedBooks
@@ -886,15 +928,13 @@ class NwtBibleService {
     }
 
     final opfPath = _findOpfPath(filesByPath);
-    if (opfPath == null) {
+    final opfFile = opfPath == null
+        ? null
+        : _lookupArchiveFile(filesByPath, opfPath);
+    if (opfPath == null || opfFile == null) {
       throw const BibleImportException(
         'Arquivo EPUB inválido: documento package/content .opf não encontrado.',
       );
-    }
-
-    final opfFile = filesByPath[opfPath];
-    if (opfFile == null) {
-      throw const BibleImportException('Arquivo .opf não encontrado no EPUB.');
     }
 
     final opfXml = XmlDocument.parse(_decodeFileUtf8(opfFile));
@@ -946,27 +986,32 @@ class NwtBibleService {
     }
 
     String? coverBase64;
-    if (coverImagePath != null && filesByPath.containsKey(coverImagePath)) {
-      final coverBytes = filesByPath[coverImagePath]!.content;
-      if (coverBytes.isNotEmpty && coverBytes.length <= 180 * 1024) {
-        coverBase64 = base64Encode(coverBytes);
+    if (coverImagePath != null) {
+      final coverFile = _lookupArchiveFile(filesByPath, coverImagePath);
+      if (coverFile != null) {
+        final coverBytes = coverFile.content;
+        if (coverBytes.isNotEmpty && coverBytes.length <= 180 * 1024) {
+          coverBase64 = base64Encode(coverBytes);
+        }
       }
     }
 
     final tocLabelsByHref = <String, String>{};
-    if (ncxPath != null && filesByPath.containsKey(ncxPath)) {
-      _extractNcxLabels(
-        filesByPath[ncxPath]!,
-        _dirname(ncxPath),
-        tocLabelsByHref,
-      );
+    if (ncxPath != null) {
+      final ncxFile = _lookupArchiveFile(filesByPath, ncxPath);
+      if (ncxFile != null) {
+        _extractNcxLabels(ncxFile, _dirname(ncxPath), tocLabelsByHref);
+      }
     }
-    if (navXhtmlPath != null && filesByPath.containsKey(navXhtmlPath)) {
-      _extractNavXhtmlLabels(
-        filesByPath[navXhtmlPath]!,
-        _dirname(navXhtmlPath),
-        tocLabelsByHref,
-      );
+    if (navXhtmlPath != null) {
+      final navFile = _lookupArchiveFile(filesByPath, navXhtmlPath);
+      if (navFile != null) {
+        _extractNavXhtmlLabels(
+          navFile,
+          _dirname(navXhtmlPath),
+          tocLabelsByHref,
+        );
+      }
     }
 
     final spinePaths = <String>[];
@@ -974,11 +1019,12 @@ class NwtBibleService {
       final idref = itemref.getAttribute('idref');
       if (idref != null && manifestHrefById.containsKey(idref)) {
         final path = manifestHrefById[idref]!;
-        final media = manifestMediaById[idref] ?? '';
+        final lowerHref = path.toLowerCase();
+        final media = (manifestMediaById[idref] ?? '').toLowerCase();
         if (media.isEmpty ||
             media.contains('html') ||
-            path.endsWith('.xhtml') ||
-            path.endsWith('.html')) {
+            lowerHref.endsWith('.xhtml') ||
+            lowerHref.endsWith('.html')) {
           spinePaths.add(path);
         }
       }
@@ -986,9 +1032,10 @@ class NwtBibleService {
 
     if (spinePaths.isEmpty) {
       spinePaths.addAll(
-        filesByPath.keys.where(
-          (k) => k.endsWith('.xhtml') || k.endsWith('.html'),
-        ),
+        filesByPath.keys.where((k) {
+          final lk = k.toLowerCase();
+          return lk.endsWith('.xhtml') || lk.endsWith('.html');
+        }),
       );
     }
 
@@ -996,7 +1043,7 @@ class NwtBibleService {
     final total = spinePaths.length;
     for (var idx = 0; idx < total; idx++) {
       final path = spinePaths[idx];
-      final archiveFile = filesByPath[path];
+      final archiveFile = _lookupArchiveFile(filesByPath, path);
       if (archiveFile == null) continue;
 
       final lowerPath = path.toLowerCase();
@@ -1099,18 +1146,8 @@ class NwtBibleService {
     var totalVerses = 0;
 
     final sortedBookNums = parsedBooks.keys.toList()..sort();
-    if (targetId == defaultTranslationId) {
-      await (db.delete(
-        db.appKvStore,
-      )..where((t) => t.key.like('bible_nwt_book_%'))).go();
-    } else {
-      await (db.delete(
-        db.appKvStore,
-      )..where((t) => t.key.like('bible_tr_${targetId}_book_%'))).go();
-    }
-
-    for (var i = 0; i < sortedBookNums.length; i++) {
-      final bookNum = sortedBookNums[i];
+    final encodedBooks = <int, String>{};
+    for (final bookNum in sortedBookNums) {
       final chapters = parsedBooks[bookNum]!;
       chaptersByBook[bookNum] = chapters.length;
       totalChapters += chapters.length;
@@ -1123,16 +1160,7 @@ class NwtBibleService {
             '${vEntry.key}': vEntry.value,
         };
       }
-
-      await _putKv(
-        db,
-        translationBookKvKey(targetId, bookNum),
-        jsonEncode(encodedChapters),
-      );
-      if (i > 0 && i % 6 == 0) {
-        onProgress?.call(i + 1, sortedBookNums.length);
-        await Future<void>.delayed(Duration.zero);
-      }
+      encodedBooks[bookNum] = jsonEncode(encodedChapters);
     }
 
     final catalog = BibleNwtCatalog(
@@ -1156,20 +1184,41 @@ class NwtBibleService {
     }
     nextList.insert(0, catalog);
 
-    await _putKv(
-      db,
-      translationsCatalogKvKey,
-      jsonEncode(nextList.map((e) => e.toJson()).toList()),
-    );
-    if (shouldBePrimary || targetId == defaultTranslationId) {
-      await _putKv(db, catalogKvKey, jsonEncode(catalog.toJson()));
-    }
-
     final currentSelected = await loadSelectedComparisonIds(db);
-    if (!currentSelected.contains(targetId)) {
-      await saveSelectedComparisonIds(db, [...currentSelected, targetId]);
-    }
 
+    await db.transaction(() async {
+      if (targetId == defaultTranslationId) {
+        await (db.delete(
+          db.appKvStore,
+        )..where((t) => t.key.like('bible_nwt_book_%'))).go();
+      } else {
+        await (db.delete(
+          db.appKvStore,
+        )..where((t) => t.key.like('bible_tr_${targetId}_book_%'))).go();
+      }
+
+      for (final bookNum in sortedBookNums) {
+        await _putKv(
+          db,
+          translationBookKvKey(targetId, bookNum),
+          encodedBooks[bookNum]!,
+        );
+      }
+
+      await _putKv(
+        db,
+        translationsCatalogKvKey,
+        jsonEncode(nextList.map((e) => e.toJson()).toList()),
+      );
+      if (shouldBePrimary || targetId == defaultTranslationId) {
+        await _putKv(db, catalogKvKey, jsonEncode(catalog.toJson()));
+      }
+      if (!currentSelected.contains(targetId)) {
+        await saveSelectedComparisonIds(db, [...currentSelected, targetId]);
+      }
+    });
+
+    onProgress?.call(1, 1);
     return BibleImportResult(catalog);
   }
 
@@ -1224,12 +1273,7 @@ class NwtBibleService {
   }) {
     if (xhtml.trim().isEmpty) return;
 
-    XmlDocument? doc;
-    try {
-      doc = XmlDocument.parse(xhtml);
-    } catch (_) {
-      doc = null;
-    }
+    final XmlDocument? doc = _tryParseXhtmlXml(xhtml);
 
     if (doc != null) {
       if (_isNonBibleNavigationOrExtractDocument(doc)) {
@@ -1750,9 +1794,68 @@ class NwtBibleService {
     } catch (_) {}
   }
 
+  static ArchiveFile? _lookupArchiveFile(
+    Map<String, ArchiveFile> files,
+    String rawPath,
+  ) {
+    final direct = files[rawPath];
+    if (direct != null) return direct;
+    try {
+      final decoded = _normalizeZipPath(Uri.decodeFull(rawPath));
+      if (files[decoded] != null) return files[decoded];
+      final lowerDecoded = decoded.toLowerCase();
+      for (final e in files.entries) {
+        if (e.key.toLowerCase() == lowerDecoded) return e.value;
+      }
+    } catch (_) {
+      final lowerRaw = rawPath.toLowerCase();
+      for (final e in files.entries) {
+        if (e.key.toLowerCase() == lowerRaw) return e.value;
+      }
+    }
+    return null;
+  }
+
+  static XmlDocument? _tryParseXhtmlXml(String xhtml) {
+    try {
+      return XmlDocument.parse(xhtml);
+    } catch (_) {
+      final sanitized = _replaceCommonHtmlEntities(xhtml);
+      if (sanitized == xhtml) return null;
+      try {
+        return XmlDocument.parse(sanitized);
+      } catch (_) {
+        return null;
+      }
+    }
+  }
+
+  static String _replaceCommonHtmlEntities(String raw) {
+    const map = <String, String>{
+      '&nbsp;': '&#160;',
+      '&mdash;': '&#8212;',
+      '&ndash;': '&#8211;',
+      '&rsquo;': '&#8217;',
+      '&lsquo;': '&#8216;',
+      '&rdquo;': '&#8221;',
+      '&ldquo;': '&#8220;',
+      '&hellip;': '&#8230;',
+      '&copy;': '&#169;',
+      '&reg;': '&#174;',
+      '&laquo;': '&#171;',
+      '&raquo;': '&#187;',
+    };
+    var out = raw;
+    for (final e in map.entries) {
+      if (out.contains(e.key)) {
+        out = out.replaceAll(e.key, e.value);
+      }
+    }
+    return out;
+  }
+
   static String? _findOpfPath(Map<String, ArchiveFile> files) {
-    final container =
-        files['meta-inf/container.xml'] ?? files['META-INF/container.xml'];
+    final container = _lookupArchiveFile(files, 'META-INF/container.xml');
     if (container != null) {
       try {
         final doc = XmlDocument.parse(_decodeFileUtf8(container));
@@ -1850,7 +1953,8 @@ class NwtBibleService {
   }
 
   static String _decodeFileUtf8(ArchiveFile f) {
-    return utf8.decode(f.content, allowMalformed: true);
+    final decoded = utf8.decode(f.content, allowMalformed: true);
+    return decoded.startsWith('\uFEFF') ? decoded.substring(1) : decoded;
   }
 
   static String _normalizeZipPath(String raw) {

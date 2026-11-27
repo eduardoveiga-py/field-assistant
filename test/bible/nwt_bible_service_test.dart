@@ -704,5 +704,95 @@ void main() {
       );
       expect(ep12Epub.verses.single.text, equals('Nüü̃ nadau 2:11'));
     });
+
+    test('importa JSON com BOM UTF-8, sem extensao e capitulo/versiculo em string', () async {
+      final rawJson =
+          '\uFEFF${jsonEncode({
+            'title': 'Bíblia BOM Teste',
+            'language': 'tca',
+            'books': [
+              {'bookNumber': '43', 'chapter': '3', 'verse': '16', 'text': 'Texto com BOM e números em string.'},
+            ],
+          })}';
+
+      final res = await NwtBibleService.importFromBytes(
+        db,
+        bytes: Uint8List.fromList(utf8.encode(rawJson)),
+        fileName: 'document_10492',
+      );
+
+      expect(res.catalog.title, equals('Bíblia BOM Teste'));
+      expect(res.catalog.sourceFormat, equals('json'));
+      expect(res.catalog.verseCount, equals(1));
+
+      final lookup = await NwtBibleService.lookupPassage(
+        db,
+        bookNumber: 43,
+        chapter: 3,
+        verseSpec: '16',
+        translationId: res.catalog.id,
+      );
+      expect(lookup.verses, hasLength(1));
+      expect(
+        lookup.verses.single.text,
+        equals('Texto com BOM e números em string.'),
+      );
+    });
+
+    test(
+      'importa EPUB com BOM, href URL-encoded (%20) e entidades HTML comuns',
+      () async {
+        final archive = Archive();
+        void addRaw(String path, List<int> data) {
+          archive.addFile(ArchiveFile(path, data.length, data));
+        }
+
+        addRaw(
+          'META-INF/container.xml',
+          utf8.encode('''\uFEFF<?xml version="1.0"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles>
+</container>'''),
+        );
+        addRaw(
+          'OEBPS/content.opf',
+          utf8.encode('''\uFEFF<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://www.idpf.org/opf" version="2.0">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:title>Bíblia Entidades</dc:title>
+    <dc:language>pt-BR</dc:language>
+  </metadata>
+  <manifest><item id="j1" href="Jo%203.xhtml" media-type="application/xhtml+xml"/></manifest>
+  <spine><itemref idref="j1"/></spine>
+</package>'''),
+        );
+        addRaw(
+          'OEBPS/Jo 3.xhtml',
+          utf8.encode('''\uFEFF<?xml version="1.0" encoding="utf-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<body>
+  <p class="w_biblebookname">João 3</p>
+  <p class="sb"><span class="verse" id="v43-3-16"><sup>16</sup>&nbsp;Deus amou&mdash;o mundo.&hellip;</span></p>
+</body>
+</html>'''),
+        );
+
+        final res = await NwtBibleService.importFromBytes(
+          db,
+          bytes: Uint8List.fromList(ZipEncoder().encode(archive)),
+          fileName: 'ENTIDADES.EPUB',
+        );
+        expect(res.catalog.title, equals('Bíblia Entidades'));
+        final lookup = await NwtBibleService.lookupPassage(
+          db,
+          bookNumber: 43,
+          chapter: 3,
+          verseSpec: '16',
+          translationId: res.catalog.id,
+        );
+        expect(lookup.verses, hasLength(1));
+        expect(lookup.verses.single.text, contains('Deus amou'));
+      },
+    );
   });
 }
