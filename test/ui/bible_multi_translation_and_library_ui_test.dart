@@ -469,5 +469,82 @@ void main() {
         );
       },
     );
+
+    testWidgets(
+      'OfflineLibraryDialog importa Biblia JSON, Publicacao EPUB e trata cancelamento ou arquivo vazio',
+      (tester) async {
+        final db = AppDatabase.forTesting(NativeDatabase.memory());
+        addTearDown(() async {
+          await tester.pumpWidget(const SizedBox.shrink());
+          await tester.pumpAndSettle();
+          await db.close();
+        });
+
+        ({String name, Uint8List bytes})? nextPick;
+
+        tester.view.physicalSize = const Size(1000, 900);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: OfflineLibraryDialog(
+                db: db,
+                onPickFile: () async => nextPick,
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // 1) Cancelamento retorna sem travar spinner
+        nextPick = null;
+        await tester.tap(find.byKey(const Key('btn_settings_import_bible')));
+        await tester.pumpAndSettle();
+        expect(find.text('Importar Bíblia (.epub / .json)'), findsOneWidget);
+
+        // 2) Arquivo vazio exibe erro legível
+        nextPick = (name: 'vazio.json', bytes: Uint8List(0));
+        await tester.tap(find.byKey(const Key('btn_settings_import_bible')));
+        await tester.pumpAndSettle();
+        expect(find.textContaining('vazio.json'), findsOneWidget);
+
+        // 3) JSON Bíblico com BOM importa com sucesso e lista tradução
+        nextPick = (
+          name: 'ticuna_bom.json',
+          bytes: Uint8List.fromList(
+            utf8.encode(
+              '\uFEFF${jsonEncode({
+                'title': 'Bíblia UI BOM',
+                'language': 'tca',
+                'books': {
+                  '43': {
+                    '3': {'16': 'Versículo importado pela UI.'},
+                  },
+                },
+              })}',
+            ),
+          ),
+        );
+        await tester.tap(find.byKey(const Key('btn_settings_import_bible')));
+        await tester.pumpAndSettle();
+        expect(find.text('Bíblia UI BOM'), findsOneWidget);
+
+        // 4) Aba Publicações importa EPUB e exibe título na lista
+        await tester.tap(find.text('Publicações (0)'));
+        await tester.pumpAndSettle();
+        nextPick = (
+          name: 'publicacao_ui.epub',
+          bytes: _syntheticPublicationEpubBytes(),
+        );
+        await tester.tap(
+          find.byKey(const Key('btn_settings_import_publication')),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('Escute a Deus (Publicação Teste)'), findsOneWidget);
+      },
+    );
   });
 }

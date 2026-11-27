@@ -109,6 +109,8 @@ class SyncTimestamp {
     'answered_at',
     'lastReviewedAt',
     'last_reviewed_at',
+    'nextReviewAt',
+    'next_review_at',
   };
 
   /// Normaliza todos os campos de data conhecidos de um mapa (ex: `entry.toJson()`)

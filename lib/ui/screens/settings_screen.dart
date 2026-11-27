@@ -56,6 +56,7 @@ import 'appointments_screen.dart';
 import '../widgets/settings/backup_and_pin_dialogs.dart';
 import '../widgets/settings/offline_library_dialog.dart';
 import '../widgets/settings/sync_queue_management_sheet.dart';
+import '../widgets/settings/sync_status_summary.dart';
 import '../../bible/nwt_bible_service.dart';
 import '../../publications/imported_publications_service.dart';
 
@@ -687,42 +688,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           Card(
             child: Column(
               children: [
-                ListTile(
-                  leading: Icon(
-                    syncCounts.conflict > 0
-                        ? Icons.merge_type
-                        : syncCounts.failed > 0
-                        ? Icons.warning_amber_rounded
-                        : Icons.sync,
-                    color: syncCounts.conflict > 0 || syncCounts.failed > 0
-                        ? AppTheme.alertRed
-                        : AppTheme.primaryBlue,
-                  ),
-                  title: const Text('Estado da Sincronização'),
-                  subtitle: Text(
-                    syncCounts.conflict > 0
-                        ? '${syncCounts.conflict} conflito(s) aguardando resolução e ${syncCounts.pending} pendente(s).'
-                        : syncCounts.failed > 0
-                        ? '${syncCounts.failed} operação(ões) em falha e ${syncCounts.pending} pendente(s).'
-                        : syncCounts.pending > 0
-                        ? '${syncCounts.pending} alteração(ões) salva(s) localmente aguardando envio.'
-                        : 'Dados locais; a sincronização com a nuvem está pausada.',
-                  ),
-                  trailing: Chip(
-                    label: Text(
-                      syncCounts.conflict > 0
-                          ? '${syncCounts.conflict} Conflitos'
-                          : syncCounts.failed > 0
-                          ? '${syncCounts.failed} Falhas'
-                          : 'Local-First',
-                      style: const TextStyle(fontSize: 11),
-                    ),
-                    backgroundColor:
-                        (syncCounts.conflict > 0 || syncCounts.failed > 0)
-                        ? const Color(0xFFFEE2E2)
-                        : const Color(0xFFE0E7FF),
-                  ),
-                ),
+                SyncStatusSummaryHeader(syncCounts: syncCounts),
                 Padding(
                   padding: const EdgeInsets.only(
                     left: 16,

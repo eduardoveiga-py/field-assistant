@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 
 import '../core/app_logger.dart';
 import '../core/biometric_auth_service.dart';
+import '../core/sync_timestamp.dart';
 import '../database/app_database.dart';
 import 'email_account_model.dart';
 import 'email_contacts_manager.dart';
@@ -341,7 +342,13 @@ class EmailSyncCoordinator {
             movedRemoteLookup[remoteId] = row;
           }
         }
-      } catch (_) {}
+      } catch (e, st) {
+        AppLogger.warning(
+          'Falha ao ler remoteId de metadata de e-mail (${row.id})',
+          e,
+          st,
+        );
+      }
     }
 
     const txBatchSize = 25;
@@ -383,23 +390,42 @@ class EmailSyncCoordinator {
               final existingLabels =
                   (existingEmailMap['labels'] as List<dynamic>?)
                       ?.map((e) => e.toString())
-                      .toList() ??
-                  const <String>[];
+                      .toSet() ??
+                  const <String>{};
+              final incomingLabels = msg.labels.toSet();
 
               final labelsChanged =
                   msg.labels.isNotEmpty &&
-                  !listEquals(existingLabels, msg.labels);
+                  !setEquals(existingLabels, incomingLabels);
               final readChanged = existingIsRead != msg.isRead;
-              final folderChanged =
-                  (msg.folderName != null &&
-                      msg.folderName != existingFolder) ||
-                  (msg.folderId != null && msg.folderId != existingFolderId);
+              final folderNameChanged =
+                  msg.folderName != null && msg.folderName != existingFolder;
+              final folderIdChanged =
+                  existingFolderId != null &&
+                  existingFolderId.isNotEmpty &&
+                  msg.folderId != null &&
+                  msg.folderId != existingFolderId;
+              final folderChanged = folderNameChanged || folderIdChanged;
               final draftChanged = existingIsDraft != msg.isDraft;
 
               if (!readChanged &&
                   !folderChanged &&
                   !draftChanged &&
                   !labelsChanged) {
+                // Hidrata folderId localmente apenas quando ausente sem gerar churn na sync_queue.
+                if ((existingFolderId == null || existingFolderId.isEmpty) &&
+                    msg.folderId != null &&
+                    msg.folderId!.isNotEmpty) {
+                  existingEmailMap['folderId'] = msg.folderId;
+                  existingMeta['email'] = existingEmailMap;
+                  await (db.update(
+                    db.inboxEntries,
+                  )..where((t) => t.id.equals(existing.id))).write(
+                    InboxEntriesCompanion(
+                      metadata: drift.Value(jsonEncode(existingMeta)),
+                    ),
+                  );
+                }
                 continue;
               }
 
@@ -437,6 +463,12 @@ class EmailSyncCoordinator {
               final updatedRow = await (db.select(
                 db.inboxEntries,
               )..where((t) => t.id.equals(existing.id))).getSingle();
+              final updatedPayload = SyncTimestamp.normalizeMapDates(
+                updatedRow.toJson(),
+              );
+              updatedPayload['_base'] = SyncTimestamp.normalizeMapDates(
+                existing.toJson(),
+              );
               await db
                   .into(db.syncQueue)
                   .insert(
@@ -445,7 +477,7 @@ class EmailSyncCoordinator {
                       entityType: 'inbox_entries',
                       entityId: existing.id,
                       operation: 'UPDATE',
-                      payload: jsonEncode(updatedRow.toJson()),
+                      payload: jsonEncode(updatedPayload),
                       createdAt: now,
                     ),
                   );
@@ -526,7 +558,9 @@ class EmailSyncCoordinator {
                   entityType: 'inbox_entries',
                   entityId: entryId,
                   operation: 'INSERT',
-                  payload: jsonEncode(inserted.toJson()),
+                  payload: jsonEncode(
+                    SyncTimestamp.normalizeMapDates(inserted.toJson()),
+                  ),
                   createdAt: now,
                 ),
               );
@@ -749,7 +783,13 @@ class EmailSyncCoordinator {
           final rid = emailRaw['remoteId']?.toString();
           if (rid != null && rid.isNotEmpty) return rid;
         }
-      } catch (_) {}
+      } catch (e, st) {
+        AppLogger.warning(
+          'Falha ao ler remoteId de metadata de e-mail (${row.id})',
+          e,
+          st,
+        );
+      }
     }
     return msg.id.startsWith('email_') ? msg.id.substring(6) : msg.id;
   }

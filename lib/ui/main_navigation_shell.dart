@@ -8,6 +8,7 @@ import '../core/i18n/app_locale_strings.dart';
 import '../appointments/calendar_provider.dart';
 import '../appointments/calendar_sync_coordinator.dart';
 import '../navigation/app_navigation_controller.dart';
+import '../sync/platform_sync_triggers.dart';
 import '../sync/supabase_sync_service.dart';
 import '../sync/sync_owner_guard.dart';
 import 'providers.dart';
@@ -41,28 +42,65 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
     with WidgetsBindingObserver {
   Timer? _syncTimer;
   Timer? _syncDebounce;
+  StreamSubscription<({int pending, int failed, int conflict})>? _queueSub;
+  PlatformSyncTriggersHandle? _platformTriggers;
+  int _lastObservedPending = 0;
+  bool _autoPushPausedOnStall = false;
   bool _autoSyncRunning = false;
+  bool _syncRequestedWhileRunning = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _syncTimer = Timer.periodic(const Duration(minutes: 2), (_) => _autoSync());
+    _syncTimer = Timer.periodic(
+      const Duration(seconds: 45),
+      (_) => _autoSync(),
+    );
+    _platformTriggers = registerPlatformSyncTriggers(
+      onSyncTrigger: () {
+        _autoPushPausedOnStall = false;
+        _scheduleSync(delay: const Duration(milliseconds: 650));
+      },
+    );
+    _queueSub = ref.read(repositoryProvider).watchSyncQueueCounts().listen((
+      counts,
+    ) {
+      if (counts.pending <= 0) {
+        _lastObservedPending = 0;
+        _autoPushPausedOnStall = false;
+        return;
+      }
+      final grewOrChanged = counts.pending != _lastObservedPending;
+      final increased = counts.pending > _lastObservedPending;
+      _lastObservedPending = counts.pending;
+      if (increased || (grewOrChanged && !_autoPushPausedOnStall)) {
+        _autoPushPausedOnStall = false;
+        _scheduleSync(delay: const Duration(milliseconds: 1400));
+      }
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) => _autoSync());
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _scheduleSync();
+    if (state == AppLifecycleState.resumed) {
+      _autoPushPausedOnStall = false;
+      _scheduleSync(delay: const Duration(milliseconds: 800));
+    }
   }
 
-  void _scheduleSync() {
+  void _scheduleSync({Duration delay = const Duration(milliseconds: 900)}) {
     _syncDebounce?.cancel();
-    _syncDebounce = Timer(const Duration(seconds: 5), _autoSync);
+    _syncDebounce = Timer(delay, _autoSync);
   }
 
   Future<void> _autoSync() async {
-    if (!mounted || _autoSyncRunning) return;
+    if (!mounted) return;
+    if (_autoSyncRunning) {
+      _syncRequestedWhileRunning = true;
+      return;
+    }
     try {
       if (!SupabaseSyncService.isInitialized ||
           Supabase.instance.client.auth.currentSession == null) {
@@ -77,7 +115,25 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
       );
       if (!guard.isAllowed) return;
       if (!mounted) return;
-      await ref.read(supabaseSyncServiceProvider).sync();
+      final syncService = ref.read(supabaseSyncServiceProvider);
+      await syncService.ensureRealtimeStarted(
+        onRemoteActivity: () {
+          if (mounted) {
+            _autoPushPausedOnStall = false;
+            _scheduleSync(delay: const Duration(milliseconds: 450));
+          }
+        },
+      );
+      if (!mounted) return;
+      final syncResult = await syncService.sync();
+      final currentCounts = await repo.getPendingSyncOperations();
+      if (currentCounts.isNotEmpty &&
+          syncResult.successCount == 0 &&
+          (!syncResult.success || syncResult.failureCount > 0)) {
+        _autoPushPausedOnStall = true;
+      } else {
+        _autoPushPausedOnStall = false;
+      }
       if (!mounted) return;
       final coordinator = ref.read(calendarSyncCoordinatorProvider);
       final connected = <CalendarProviderType>{};
@@ -96,6 +152,10 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
       debugPrint('Sincronização automática adiada: $error');
     } finally {
       _autoSyncRunning = false;
+      if (_syncRequestedWhileRunning && mounted) {
+        _syncRequestedWhileRunning = false;
+        _scheduleSync(delay: const Duration(milliseconds: 450));
+      }
     }
   }
 
@@ -104,6 +164,8 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
     WidgetsBinding.instance.removeObserver(this);
     _syncTimer?.cancel();
     _syncDebounce?.cancel();
+    unawaited(_queueSub?.cancel());
+    _platformTriggers?.dispose();
     super.dispose();
   }
 

@@ -279,13 +279,16 @@ class ImportedPublicationsService {
     }
 
     final opfPath = _findOpfPath(filesByPath);
-    if (opfPath == null || !filesByPath.containsKey(opfPath)) {
+    final opfFile = opfPath == null
+        ? null
+        : _lookupArchiveFile(filesByPath, opfPath);
+    if (opfPath == null || opfFile == null) {
       throw const PublicationImportException(
         'Arquivo EPUB inválido: documento package/content .opf não encontrado.',
       );
     }
 
-    final opfXml = XmlDocument.parse(_decodeFileUtf8(filesByPath[opfPath]!));
+    final opfXml = XmlDocument.parse(_decodeFileUtf8(opfFile));
     final opfDir = _dirname(opfPath);
 
     final rawTitle =
@@ -334,27 +337,32 @@ class ImportedPublicationsService {
     }
 
     String? coverBase64;
-    if (coverImagePath != null && filesByPath.containsKey(coverImagePath)) {
-      final coverBytes = filesByPath[coverImagePath]!.content;
-      if (coverBytes.isNotEmpty && coverBytes.length <= 180 * 1024) {
-        coverBase64 = base64Encode(coverBytes);
+    if (coverImagePath != null) {
+      final coverFile = _lookupArchiveFile(filesByPath, coverImagePath);
+      if (coverFile != null) {
+        final coverBytes = coverFile.content;
+        if (coverBytes.isNotEmpty && coverBytes.length <= 180 * 1024) {
+          coverBase64 = base64Encode(coverBytes);
+        }
       }
     }
 
     final tocLabelsByHref = <String, String>{};
-    if (ncxPath != null && filesByPath.containsKey(ncxPath)) {
-      _extractNcxLabels(
-        filesByPath[ncxPath]!,
-        _dirname(ncxPath),
-        tocLabelsByHref,
-      );
+    if (ncxPath != null) {
+      final ncxFile = _lookupArchiveFile(filesByPath, ncxPath);
+      if (ncxFile != null) {
+        _extractNcxLabels(ncxFile, _dirname(ncxPath), tocLabelsByHref);
+      }
     }
-    if (navXhtmlPath != null && filesByPath.containsKey(navXhtmlPath)) {
-      _extractNavXhtmlLabels(
-        filesByPath[navXhtmlPath]!,
-        _dirname(navXhtmlPath),
-        tocLabelsByHref,
-      );
+    if (navXhtmlPath != null) {
+      final navFile = _lookupArchiveFile(filesByPath, navXhtmlPath);
+      if (navFile != null) {
+        _extractNavXhtmlLabels(
+          navFile,
+          _dirname(navXhtmlPath),
+          tocLabelsByHref,
+        );
+      }
     }
 
     final spinePaths = <String>[];
@@ -399,7 +407,7 @@ class ImportedPublicationsService {
         }
         continue;
       }
-      final f = filesByPath[path];
+      final f = _lookupArchiveFile(filesByPath, path);
       if (f == null) continue;
       final xhtml = _decodeFileUtf8(f);
       final extracted = _extractChapterFromXhtml(
@@ -517,12 +525,20 @@ class ImportedPublicationsService {
     required String fallbackTitle,
   }) {
     if (xhtml.trim().isEmpty) return null;
-    XmlDocument doc;
+    XmlDocument? doc;
     try {
       doc = XmlDocument.parse(xhtml);
     } catch (_) {
-      return null;
+      final sanitized = _replaceCommonHtmlEntities(xhtml);
+      if (sanitized != xhtml) {
+        try {
+          doc = XmlDocument.parse(sanitized);
+        } catch (_) {
+          doc = null;
+        }
+      }
     }
+    if (doc == null) return null;
 
     final body = doc.findAllElements('body').firstOrNull ?? doc.rootElement;
     String? detectedTitle = tocTitleHint?.trim().isNotEmpty == true
@@ -691,9 +707,54 @@ class ImportedPublicationsService {
     } catch (_) {}
   }
 
+  static String _replaceCommonHtmlEntities(String raw) {
+    const map = <String, String>{
+      '&nbsp;': '&#160;',
+      '&mdash;': '&#8212;',
+      '&ndash;': '&#8211;',
+      '&rsquo;': '&#8217;',
+      '&lsquo;': '&#8216;',
+      '&rdquo;': '&#8221;',
+      '&ldquo;': '&#8220;',
+      '&hellip;': '&#8230;',
+      '&copy;': '&#169;',
+      '&reg;': '&#174;',
+      '&laquo;': '&#171;',
+      '&raquo;': '&#187;',
+    };
+    var out = raw;
+    for (final e in map.entries) {
+      if (out.contains(e.key)) {
+        out = out.replaceAll(e.key, e.value);
+      }
+    }
+    return out;
+  }
+
+  static ArchiveFile? _lookupArchiveFile(
+    Map<String, ArchiveFile> files,
+    String rawPath,
+  ) {
+    final direct = files[rawPath];
+    if (direct != null) return direct;
+    try {
+      final decoded = _normalizeZipPath(Uri.decodeFull(rawPath));
+      if (files[decoded] != null) return files[decoded];
+      final lowerDecoded = decoded.toLowerCase();
+      for (final e in files.entries) {
+        if (e.key.toLowerCase() == lowerDecoded) return e.value;
+      }
+    } catch (_) {
+      final lowerRaw = rawPath.toLowerCase();
+      for (final e in files.entries) {
+        if (e.key.toLowerCase() == lowerRaw) return e.value;
+      }
+    }
+    return null;
+  }
+
   static String? _findOpfPath(Map<String, ArchiveFile> files) {
-    final container =
-        files['meta-inf/container.xml'] ?? files['META-INF/container.xml'];
+    final container = _lookupArchiveFile(files, 'META-INF/container.xml');
     if (container != null) {
       try {
         final doc = XmlDocument.parse(_decodeFileUtf8(container));
@@ -722,8 +783,10 @@ class ImportedPublicationsService {
         );
   }
 
-  static String _decodeFileUtf8(ArchiveFile f) =>
-      utf8.decode(f.content, allowMalformed: true);
+  static String _decodeFileUtf8(ArchiveFile f) {
+    final decoded = utf8.decode(f.content, allowMalformed: true);
+    return decoded.startsWith('\uFEFF') ? decoded.substring(1) : decoded;
+  }
 
   static String _normalizeZipPath(String raw) {
     final forward = raw.replaceAll('\\', '/').replaceFirst(RegExp(r'^/+'), '');
