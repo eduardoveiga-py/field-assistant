@@ -51,9 +51,7 @@ Future<T?> showAdaptiveMinistrySheet<T>({
               ? availableHeight
               : availableHeight * (keyboardOpen ? 0.96 : 0.88);
           final vertPad = isFullscreen || keyboardOpen ? 8.0 : 20.0;
-          final horizPad = isFullscreen
-              ? 8.0
-              : (isCompactHeight ? 12.0 : 20.0);
+          final horizPad = isFullscreen ? 8.0 : (isCompactHeight ? 12.0 : 20.0);
 
             return Dialog(
               backgroundColor: Colors.transparent,
