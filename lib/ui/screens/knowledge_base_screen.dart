@@ -572,7 +572,10 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
               ),
             );
 
-            void openSingleNote(KnowledgeNoteEntry note) {
+            void openSingleNote(
+              KnowledgeNoteEntry note, {
+              bool fullScreen = false,
+            }) {
               List<String> noteTags = [];
               try {
                 noteTags = (jsonDecode(note.tags) as List)
@@ -582,6 +585,7 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
               } catch (_) {}
               showKnowledgeItemReader(
                 context,
+                initialFullScreen: fullScreen,
                 title: note.title,
                 content: note.content,
                 category: note.category,
@@ -693,61 +697,83 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                                   }
                                   openSingleNote(note);
                                 },
-                                trailingMenu: PopupMenuButton<String>(
-                                  icon: const Icon(Icons.more_vert, size: 20),
-                                  onSelected: (val) {
-                                    if (val == 'pin') {
-                                      km.togglePinNote(note.id);
-                                    }
-                                    if (val == 'edit') {
-                                      _showEditNoteModal(note);
-                                    }
-                                    if (val == 'research') {
-                                      _transformNoteToResearch(note);
-                                    }
-                                    if (val == 'export_pdf') {
-                                      _exportNotePdf(note);
-                                    }
-                                    if (val == 'export') {
-                                      _exportNote(note);
-                                    }
-                                    if (val == 'delete') {
-                                      km.softDeleteNote(note.id);
-                                    }
-                                  },
-                                  itemBuilder: (ctx) => [
-                                    PopupMenuItem(
-                                      value: 'pin',
-                                      child: Text(
-                                        note.isPinned
-                                            ? 'Desafixar'
-                                            : 'Fixar no Topo',
+                                trailingMenu: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.open_in_full,
+                                        size: 18,
+                                      ),
+                                      tooltip: 'Abrir em tela cheia',
+                                      visualDensity: VisualDensity.compact,
+                                      onPressed: () => openSingleNote(
+                                        note,
+                                        fullScreen: true,
                                       ),
                                     ),
-                                    const PopupMenuItem(
-                                      value: 'edit',
-                                      child: Text('Editar Nota'),
-                                    ),
-                                    const PopupMenuItem(
-                                      value: 'research',
-                                      child: Text('Transformar em Pesquisa'),
-                                    ),
-                                    const PopupMenuItem(
-                                      value: 'export_pdf',
-                                      child: Text('Baixar PDF (.pdf)'),
-                                    ),
-                                    const PopupMenuItem(
-                                      value: 'export',
-                                      child: Text('Exportar Nota'),
-                                    ),
-                                    const PopupMenuItem(
-                                      value: 'delete',
-                                      child: Text(
-                                        'Excluir Nota',
-                                        style: TextStyle(
-                                          color: Colors.redAccent,
+                                    PopupMenuButton<String>(
+                                      icon: const Icon(
+                                        Icons.more_vert,
+                                        size: 20,
+                                      ),
+                                      onSelected: (val) {
+                                        if (val == 'pin') {
+                                          km.togglePinNote(note.id);
+                                        }
+                                        if (val == 'edit') {
+                                          _showEditNoteModal(note);
+                                        }
+                                        if (val == 'research') {
+                                          _transformNoteToResearch(note);
+                                        }
+                                        if (val == 'export_pdf') {
+                                          _exportNotePdf(note);
+                                        }
+                                        if (val == 'export') {
+                                          _exportNote(note);
+                                        }
+                                        if (val == 'delete') {
+                                          km.softDeleteNote(note.id);
+                                        }
+                                      },
+                                      itemBuilder: (ctx) => [
+                                        PopupMenuItem(
+                                          value: 'pin',
+                                          child: Text(
+                                            note.isPinned
+                                                ? 'Desafixar'
+                                                : 'Fixar no Topo',
+                                          ),
                                         ),
-                                      ),
+                                        const PopupMenuItem(
+                                          value: 'edit',
+                                          child: Text('Editar Nota'),
+                                        ),
+                                        const PopupMenuItem(
+                                          value: 'research',
+                                          child: Text(
+                                            'Transformar em Pesquisa',
+                                          ),
+                                        ),
+                                        const PopupMenuItem(
+                                          value: 'export_pdf',
+                                          child: Text('Baixar PDF (.pdf)'),
+                                        ),
+                                        const PopupMenuItem(
+                                          value: 'export',
+                                          child: Text('Exportar Nota'),
+                                        ),
+                                        const PopupMenuItem(
+                                          value: 'delete',
+                                          child: Text(
+                                            'Excluir Nota',
+                                            style: TextStyle(
+                                              color: Colors.redAccent,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ],
                                 ),
@@ -1010,7 +1036,10 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
 
         final questions = snapshot.data ?? [];
 
-        void openQuestionReader(KnowledgeQuestionEntry q) {
+        void openQuestionReader(
+          KnowledgeQuestionEntry q, {
+          bool fullScreen = false,
+        }) {
           final isAnswered = q.status == 'answered';
           final hasAnswer = q.answer != null && q.answer!.trim().isNotEmpty;
           final readerSubtitle = isAnswered
@@ -1020,6 +1049,7 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
               : 'Em Aberto';
           showKnowledgeItemReader(
             context,
+            initialFullScreen: fullScreen,
             title: q.question,
             content: hasAnswer
                 ? q.answer!
@@ -1287,48 +1317,66 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                             isDark: isDark,
                             onTap: () => openQuestionReader(q),
                             onQuickAnswer: () => _showAnswerQuestionModal(q),
-                            trailingMenu: PopupMenuButton<String>(
-                              icon: const Icon(Icons.more_vert, size: 20),
-                              onSelected: (val) {
-                                if (val == 'answer') {
-                                  _showAnswerQuestionModal(q);
-                                }
-                                if (val == 'edit') _showEditQuestionModal(q);
-                                if (val == 'research') {
-                                  _transformQuestionToResearch(q);
-                                }
-                                if (val == 'export') _exportQuestion(q);
-                                if (val == 'delete') {
-                                  km.softDeleteQuestion(q.id);
-                                }
-                              },
-                              itemBuilder: (ctx) => [
-                                PopupMenuItem(
-                                  value: 'answer',
-                                  child: Text(
-                                    isAnswered
-                                        ? 'Editar Resposta'
-                                        : 'Inserir Resposta',
+                            trailingMenu: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.open_in_full,
+                                    size: 18,
                                   ),
+                                  tooltip: 'Abrir em tela cheia',
+                                  visualDensity: VisualDensity.compact,
+                                  onPressed: () =>
+                                      openQuestionReader(q, fullScreen: true),
                                 ),
-                                const PopupMenuItem(
-                                  value: 'edit',
-                                  child: Text('Editar Dúvida'),
-                                ),
-                                const PopupMenuItem(
-                                  value: 'research',
-                                  child: Text('Transformar em Pesquisa'),
-                                ),
-                                const PopupMenuItem(
-                                  value: 'export',
-                                  child: Text('Exportar'),
-                                ),
-                                const PopupMenuItem(
-                                  value: 'delete',
-                                  child: Text(
-                                    'Excluir',
-                                    style: TextStyle(color: Colors.redAccent),
-                                  ),
+                                PopupMenuButton<String>(
+                                  icon: const Icon(Icons.more_vert, size: 20),
+                                  onSelected: (val) {
+                                    if (val == 'answer') {
+                                      _showAnswerQuestionModal(q);
+                                    }
+                                    if (val == 'edit')
+                                      _showEditQuestionModal(q);
+                                    if (val == 'research') {
+                                      _transformQuestionToResearch(q);
+                                    }
+                                    if (val == 'export') _exportQuestion(q);
+                                    if (val == 'delete') {
+                                      km.softDeleteQuestion(q.id);
+                                    }
+                                  },
+                                  itemBuilder: (ctx) => [
+                                    PopupMenuItem(
+                                      value: 'answer',
+                                      child: Text(
+                                        isAnswered
+                                            ? 'Editar Resposta'
+                                            : 'Inserir Resposta',
+                                      ),
+                                    ),
+                                    const PopupMenuItem(
+                                      value: 'edit',
+                                      child: Text('Editar Dúvida'),
+                                    ),
+                                    const PopupMenuItem(
+                                      value: 'research',
+                                      child: Text('Transformar em Pesquisa'),
+                                    ),
+                                    const PopupMenuItem(
+                                      value: 'export',
+                                      child: Text('Exportar'),
+                                    ),
+                                    const PopupMenuItem(
+                                      value: 'delete',
+                                      child: Text(
+                                        'Excluir',
+                                        style: TextStyle(
+                                          color: Colors.redAccent,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
@@ -1728,9 +1776,10 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                             }
                           }
 
-                          void openDocDetails() {
+                          void openDocDetails({bool fullScreen = false}) {
                             showKnowledgeItemReader(
                               context,
+                              initialFullScreen: fullScreen,
                               title: doc.title,
                               content:
                                   doc.description?.trim().isNotEmpty == true
@@ -1763,47 +1812,65 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                             onOpen: () => _openDocument(doc),
                             onOpenDetails: openDocDetails,
                             onExportPdf: exportDocPdf,
-                            trailingMenu: PopupMenuButton<String>(
-                              icon: const Icon(Icons.more_vert, size: 20),
-                              onSelected: (val) {
-                                if (val == 'open') _openDocument(doc);
-                                if (val == 'details') openDocDetails();
-                                if (val == 'external') {
-                                  _openDocumentExternal(doc);
-                                }
-                                if (val == 'export_pdf') exportDocPdf();
-                                if (val == 'edit') _showEditDocumentModal(doc);
-                                if (val == 'delete') {
-                                  km.softDeleteDocument(doc.id);
-                                }
-                              },
-                              itemBuilder: (_) => [
-                                const PopupMenuItem(
-                                  value: 'open',
-                                  child: Text('Abrir Arquivo no App'),
-                                ),
-                                const PopupMenuItem(
-                                  value: 'details',
-                                  child: Text('Anotações & Referências'),
-                                ),
-                                const PopupMenuItem(
-                                  value: 'external',
-                                  child: Text('Abrir Externamente'),
-                                ),
-                                const PopupMenuItem(
-                                  value: 'export_pdf',
-                                  child: Text('Exportar Resumo em PDF'),
-                                ),
-                                const PopupMenuItem(
-                                  value: 'edit',
-                                  child: Text('Editar'),
-                                ),
-                                const PopupMenuItem(
-                                  value: 'delete',
-                                  child: Text(
-                                    'Excluir',
-                                    style: TextStyle(color: Colors.redAccent),
+                            trailingMenu: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.open_in_full,
+                                    size: 18,
                                   ),
+                                  tooltip: 'Abrir em tela cheia',
+                                  visualDensity: VisualDensity.compact,
+                                  onPressed: () =>
+                                      openDocDetails(fullScreen: true),
+                                ),
+                                PopupMenuButton<String>(
+                                  icon: const Icon(Icons.more_vert, size: 20),
+                                  onSelected: (val) {
+                                    if (val == 'open') _openDocument(doc);
+                                    if (val == 'details') openDocDetails();
+                                    if (val == 'external') {
+                                      _openDocumentExternal(doc);
+                                    }
+                                    if (val == 'export_pdf') exportDocPdf();
+                                    if (val == 'edit')
+                                      _showEditDocumentModal(doc);
+                                    if (val == 'delete') {
+                                      km.softDeleteDocument(doc.id);
+                                    }
+                                  },
+                                  itemBuilder: (_) => [
+                                    const PopupMenuItem(
+                                      value: 'open',
+                                      child: Text('Abrir Arquivo no App'),
+                                    ),
+                                    const PopupMenuItem(
+                                      value: 'details',
+                                      child: Text('Anotações & Referências'),
+                                    ),
+                                    const PopupMenuItem(
+                                      value: 'external',
+                                      child: Text('Abrir Externamente'),
+                                    ),
+                                    const PopupMenuItem(
+                                      value: 'export_pdf',
+                                      child: Text('Exportar Resumo em PDF'),
+                                    ),
+                                    const PopupMenuItem(
+                                      value: 'edit',
+                                      child: Text('Editar'),
+                                    ),
+                                    const PopupMenuItem(
+                                      value: 'delete',
+                                      child: Text(
+                                        'Excluir',
+                                        style: TextStyle(
+                                          color: Colors.redAccent,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
@@ -2205,40 +2272,87 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                                 ? () => _openUrl(r.url!)
                                 : null,
                             onExportPdf: exportResPdf,
-                            trailingMenu: PopupMenuButton<String>(
-                              icon: const Icon(Icons.more_vert, size: 20),
-                              onSelected: (val) {
-                                if (val == 'open' &&
-                                    r.url != null &&
-                                    r.url!.isNotEmpty) {
-                                  _openUrl(r.url!);
-                                }
-                                if (val == 'export_pdf') exportResPdf();
-                                if (val == 'edit') _showEditResourceModal(r);
-                                if (val == 'delete') {
-                                  km.softDeleteResource(r.id);
-                                }
-                              },
-                              itemBuilder: (_) => [
-                                if (r.url != null && r.url!.isNotEmpty)
-                                  const PopupMenuItem(
-                                    value: 'open',
-                                    child: Text('Abrir Link'),
+                            trailingMenu: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.open_in_full,
+                                    size: 18,
                                   ),
-                                const PopupMenuItem(
-                                  value: 'export_pdf',
-                                  child: Text('Exportar em PDF'),
+                                  tooltip: 'Abrir em tela cheia',
+                                  visualDensity: VisualDensity.compact,
+                                  onPressed: () {
+                                    final hasDesc =
+                                        r.description != null &&
+                                        r.description!.trim().isNotEmpty;
+                                    showKnowledgeItemReader(
+                                      context,
+                                      title: r.title,
+                                      content: r.description ?? 'Recurso / Link salvo na Base de Conhecimento.',
+                                      category: r.category,
+                                      itemType: 'Recurso',
+                                      url: r.url,
+                                      tags: resTags,
+                                      updatedAt: r.updatedAt,
+                                      allowHighlights: hasDesc,
+                                      backlinkTargetType: 'resource',
+                                      backlinkTargetId: r.id,
+                                      initialFullScreen: true,
+                                      onContentUpdated: hasDesc
+                                          ? (updated) async {
+                                              await km.updateResource(
+                                                r.id,
+                                                description: updated,
+                                              );
+                                            }
+                                          : null,
+                                      onEdit: () => _showEditResourceModal(r),
+                                      onDelete: () =>
+                                          km.softDeleteResource(r.id),
+                                      onExportPdf: exportResPdf,
+                                    );
+                                  },
                                 ),
-                                const PopupMenuItem(
-                                  value: 'edit',
-                                  child: Text('Editar'),
-                                ),
-                                const PopupMenuItem(
-                                  value: 'delete',
-                                  child: Text(
-                                    'Excluir',
-                                    style: TextStyle(color: Colors.redAccent),
-                                  ),
+                                PopupMenuButton<String>(
+                                  icon: const Icon(Icons.more_vert, size: 20),
+                                  onSelected: (val) {
+                                    if (val == 'open' &&
+                                        r.url != null &&
+                                        r.url!.isNotEmpty) {
+                                      _openUrl(r.url!);
+                                    }
+                                    if (val == 'export_pdf') exportResPdf();
+                                    if (val == 'edit')
+                                      _showEditResourceModal(r);
+                                    if (val == 'delete') {
+                                      km.softDeleteResource(r.id);
+                                    }
+                                  },
+                                  itemBuilder: (_) => [
+                                    if (r.url != null && r.url!.isNotEmpty)
+                                      const PopupMenuItem(
+                                        value: 'open',
+                                        child: Text('Abrir Link'),
+                                      ),
+                                    const PopupMenuItem(
+                                      value: 'export_pdf',
+                                      child: Text('Exportar em PDF'),
+                                    ),
+                                    const PopupMenuItem(
+                                      value: 'edit',
+                                      child: Text('Editar'),
+                                    ),
+                                    const PopupMenuItem(
+                                      value: 'delete',
+                                      child: Text(
+                                        'Excluir',
+                                        style: TextStyle(
+                                          color: Colors.redAccent,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
@@ -2785,17 +2899,18 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
               final propSummary = '$catLabel • $statusLabel • $priorityProp';
 
               return Column(
+                mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Expanded(
+                  Flexible(
                     child: SingleChildScrollView(
                       controller: scroll,
                       physics: const ClampingScrollPhysics(),
                       padding: EdgeInsets.fromLTRB(
                         16,
-                        keyboardOpen ? 10 : 16,
+                        keyboardOpen ? 6 : 16,
                         16,
-                        12,
+                        keyboardOpen ? 6 : 12,
                       ),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
@@ -2909,8 +3024,8 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                           SecondBrainRichEditor(
                             controller: contentCtrl,
                             labelText: 'Conteúdo da Nota',
-                            minLines: isEdit ? 7 : 6,
-                            maxLines: 16,
+                            minLines: keyboardOpen ? 5 : (isEdit ? 10 : 8),
+                            maxLines: keyboardOpen ? 10 : 20,
                             onCreateInlineNote: (title) =>
                                 _createInlineNoteFromEditor(title, areaId),
                           ),

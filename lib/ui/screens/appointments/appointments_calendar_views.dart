@@ -170,9 +170,13 @@ extension _AppointmentsCalendarViews on _AppointmentsScreenState {
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 7,
-                  mainAxisExtent: 72,
+                  mainAxisExtent:
+                      72 *
+                      MediaQuery.textScalerOf(context)
+                          .scale(1.0)
+                          .clamp(1.0, 2.0),
                   crossAxisSpacing: 3,
                   mainAxisSpacing: 3,
                 ),
@@ -367,102 +371,108 @@ extension _AppointmentsCalendarViews on _AppointmentsScreenState {
                                             ),
                                           ),
                                         )
-                                      : Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.stretch,
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            for (final a in dayAppts.take(
-                                              maxVisibleAppts,
-                                            ))
-                                              Builder(
-                                                builder: (context) {
-                                                  final color =
-                                                      _AppointmentsScreenState._getAppointmentActivityColor(
-                                                        a,
-                                                      );
-                                                  final timeStr =
-                                                      AppDateUtils.formatTime(
-                                                        a.startTime,
-                                                      );
-                                                  return Container(
-                                                    margin:
-                                                        const EdgeInsets.only(
-                                                          top: 2,
-                                                        ),
-                                                    padding:
-                                                        const EdgeInsets.symmetric(
-                                                          horizontal: 3,
-                                                          vertical: 1,
-                                                        ),
-                                                    decoration: BoxDecoration(
-                                                      color: color.withValues(
-                                                        alpha: isDark
-                                                            ? 0.35
-                                                            : 0.15,
-                                                      ),
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                            3,
+                                      : SingleChildScrollView(
+                                          physics:
+                                              const NeverScrollableScrollPhysics(),
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.stretch,
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              for (final a in dayAppts.take(
+                                                maxVisibleAppts,
+                                              ))
+                                                Builder(
+                                                  builder: (context) {
+                                                    final color =
+                                                        _AppointmentsScreenState._getAppointmentActivityColor(
+                                                          a,
+                                                        );
+                                                    final timeStr =
+                                                        AppDateUtils.formatTime(
+                                                          a.startTime,
+                                                        );
+                                                    return Container(
+                                                      margin:
+                                                          const EdgeInsets.only(
+                                                            top: 2,
                                                           ),
-                                                      border: Border.all(
+                                                      padding:
+                                                          const EdgeInsets.symmetric(
+                                                            horizontal: 3,
+                                                            vertical: 1,
+                                                          ),
+                                                      decoration: BoxDecoration(
                                                         color: color.withValues(
-                                                          alpha: 0.6,
+                                                          alpha: isDark
+                                                              ? 0.35
+                                                              : 0.15,
                                                         ),
-                                                        width: 0.6,
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                              3,
+                                                            ),
+                                                        border: Border.all(
+                                                          color: color
+                                                              .withValues(
+                                                                alpha: 0.6,
+                                                              ),
+                                                          width: 0.6,
+                                                        ),
                                                       ),
-                                                    ),
-                                                    child: Row(
-                                                      children: [
-                                                        Flexible(
-                                                          child: Text(
-                                                            timeStr,
-                                                            style: TextStyle(
-                                                              fontSize: 8.5,
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .bold,
-                                                              color: isDark
-                                                                  ? color.withValues(
-                                                                      alpha:
-                                                                          0.95,
-                                                                    )
-                                                                  : color,
+                                                      child: Row(
+                                                        children: [
+                                                          Flexible(
+                                                            child: Text(
+                                                              timeStr,
+                                                              style: TextStyle(
+                                                                fontSize: 8.5,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .bold,
+                                                                color: isDark
+                                                                    ? color.withValues(
+                                                                        alpha:
+                                                                            0.95,
+                                                                      )
+                                                                    : color,
+                                                              ),
+                                                              maxLines: 1,
+                                                              overflow:
+                                                                  TextOverflow
+                                                                      .ellipsis,
                                                             ),
-                                                            maxLines: 1,
-                                                            overflow:
-                                                                TextOverflow
-                                                                    .ellipsis,
                                                           ),
-                                                        ),
-                                                        const SizedBox(
-                                                          width: 2,
-                                                        ),
-                                                        Expanded(
-                                                          child: Text(
-                                                            a.title,
-                                                            style: TextStyle(
-                                                              fontSize: 8.5,
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .w600,
-                                                              color: isDark
-                                                                  ? Colors.white
-                                                                  : AppTheme
-                                                                        .textDark,
+                                                          const SizedBox(
+                                                            width: 2,
+                                                          ),
+                                                          Expanded(
+                                                            child: Text(
+                                                              a.title,
+                                                              style: TextStyle(
+                                                                fontSize: 8.5,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w600,
+                                                                color: isDark
+                                                                    ? Colors
+                                                                          .white
+                                                                    : AppTheme
+                                                                          .textDark,
+                                                              ),
+                                                              maxLines: 1,
+                                                              overflow:
+                                                                  TextOverflow
+                                                                      .ellipsis,
                                                             ),
-                                                            maxLines: 1,
-                                                            overflow:
-                                                                TextOverflow
-                                                                    .ellipsis,
                                                           ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  );
-                                                },
-                                              ),
-                                          ],
+                                                        ],
+                                                      ),
+                                                    );
+                                                  },
+                                                ),
+                                            ],
+                                          ),
                                         ),
                                 ),
                               ),

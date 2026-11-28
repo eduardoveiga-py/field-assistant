@@ -1,0 +1,44 @@
+name: Auto Format Dart
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    paths:
+      - 'lib/**/*.dart'
+      - 'test/**/*.dart'
+      - 'integration_test/**/*.dart'
+      - '.github/workflows/auto-format.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  format:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Run dart format
+        run: dart format lib test integration_test
+      - name: Commit formatted files
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -A
+            git commit -m "style: auto-format dart files"
+            git push origin "HEAD:${HEAD_REF}"
+          fi
