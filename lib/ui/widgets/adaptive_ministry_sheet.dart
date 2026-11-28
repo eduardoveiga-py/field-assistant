@@ -46,12 +46,14 @@ Future<T?> showAdaptiveMinistrySheet<T>({
                 ? (mqSize.width - 16).clamp(360.0, 1280.0)
                 : (keyboardOpen ? 820.0 : 720.0);
             final isLandscape = mqSize.width > mqSize.height;
-          final isCompactHeight = availableHeight < 520;
-          final maxHeight = isFullscreen || (keyboardOpen && isLandscape)
-              ? availableHeight
-              : availableHeight * (keyboardOpen ? 0.96 : 0.88);
-          final vertPad = isFullscreen || keyboardOpen ? 8.0 : 20.0;
-          final horizPad = isFullscreen ? 8.0 : (isCompactHeight ? 12.0 : 20.0);
+            final isCompactHeight = availableHeight < 520;
+            final maxHeight = isFullscreen || (keyboardOpen && isLandscape)
+                ? availableHeight
+                : availableHeight * (keyboardOpen ? 0.96 : 0.88);
+            final vertPad = isFullscreen || keyboardOpen ? 8.0 : 20.0;
+            final horizPad = isFullscreen
+                ? 8.0
+                : (isCompactHeight ? 12.0 : 20.0);
 
             return Dialog(
               backgroundColor: Colors.transparent,

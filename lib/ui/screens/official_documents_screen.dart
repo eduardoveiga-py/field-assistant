@@ -986,42 +986,42 @@ class _OfficialDocumentsScreenState
                       style: const TextStyle(fontSize: 11.5),
                     ),
                     trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                      icon: const Icon(Icons.open_in_full, size: 18),
-                        tooltip: 'Abrir em tela cheia',
-                        visualDensity: VisualDensity.compact,
-                        onPressed: () => _openFullScreen(d, bundle, isDark),
-                      ),
-                      PopupMenuButton<String>(
-                            iconSize: 18,
-                            onSelected: (action) async {
-                              if (action == 'pin') {
-                                await _manager.togglePinDocument(d.id);
-                              } else if (action == 'delete') {
-                                await _manager.deleteDocument(d.id);
-                                if (_selectedDocId == d.id && mounted) {
-                                  setState(() {
-                                    _selectedDocId = null;
-                                    _editingDoc = null;
-                                  });
-                                }
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.open_in_full, size: 18),
+                          tooltip: 'Abrir em tela cheia',
+                          visualDensity: VisualDensity.compact,
+                          onPressed: () => _openFullScreen(d, bundle, isDark),
+                        ),
+                        PopupMenuButton<String>(
+                          iconSize: 18,
+                          onSelected: (action) async {
+                            if (action == 'pin') {
+                              await _manager.togglePinDocument(d.id);
+                            } else if (action == 'delete') {
+                              await _manager.deleteDocument(d.id);
+                              if (_selectedDocId == d.id && mounted) {
+                                setState(() {
+                                  _selectedDocId = null;
+                                  _editingDoc = null;
+                                });
                               }
-                            },
-                            itemBuilder: (_) => [
-                              PopupMenuItem(
-                                value: 'pin',
-                                child: Text(d.isPinned ? 'Desafixar' : 'Fixar'),
-                              ),
-                              const PopupMenuItem(
-                                value: 'delete',
-                                child: Text('Excluir'),
-                              ),
-                        ],
-                      ),
-                    ],
-                  ),
+                            }
+                          },
+                          itemBuilder: (_) => [
+                            PopupMenuItem(
+                              value: 'pin',
+                              child: Text(d.isPinned ? 'Desafixar' : 'Fixar'),
+                            ),
+                            const PopupMenuItem(
+                              value: 'delete',
+                              child: Text('Excluir'),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                     onTap: () => _bindDocument(d),
                   );
                 },
@@ -1677,20 +1677,20 @@ class _OfficialDocumentsScreenState
     );
   }
 
-void _openFullScreen(
-  OfficialDocumentRecord doc,
-  OfficialDocProfileBundle bundle,
-  bool isDark,
-) {
-  final header = _resolveHeader(doc, bundle);
-  final groupTitle = _manager.resolveGroupTitle(doc, bundle);
-  final signers = _manager.resolveEffectiveSigners(doc, bundle);
+  void _openFullScreen(
+    OfficialDocumentRecord doc,
+    OfficialDocProfileBundle bundle,
+    bool isDark,
+  ) {
+    final header = _resolveHeader(doc, bundle);
+    final groupTitle = _manager.resolveGroupTitle(doc, bundle);
+    final signers = _manager.resolveEffectiveSigners(doc, bundle);
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-      fullscreenDialog: true,
+        fullscreenDialog: true,
         builder: (ctx) => Scaffold(
           appBar: AppBar(
-          title: Text(doc.title.isEmpty ? 'Documento' : doc.title),
+            title: Text(doc.title.isEmpty ? 'Documento' : doc.title),
           ),
           body: Container(
             color: isDark ? const Color(0xFF0B1120) : const Color(0xFFE2E8F0),

@@ -39,7 +39,7 @@ Future<void> showKnowledgeItemReader(
   String jumpToTabLabel = 'Ir para a aba',
   String? backlinkTargetType,
   String? backlinkTargetId,
-   bool initialFullScreen = false, 
+  bool initialFullScreen = false,
 }) async {
   await showDialog(
     context: context,
@@ -520,17 +520,17 @@ class _KnowledgeItemReaderDialogState extends State<KnowledgeItemReaderDialog> {
                         ),
                       ),
                     IconButton(
-                       icon: Icon(
-                          _isFullScreen
-                               ? Icons.close_fullscreen
-                               : Icons.open_in_full,
-                           ),
-                        tooltip: _isFullScreen
-                            ? 'Sair da tela cheia'
-                            : 'Tela cheia',
-                        onPressed: () =>
-                            setState(() => _isFullScreen = !_isFullScreen),
+                      icon: Icon(
+                        _isFullScreen
+                            ? Icons.close_fullscreen
+                            : Icons.open_in_full,
                       ),
+                      tooltip: _isFullScreen
+                          ? 'Sair da tela cheia'
+                          : 'Tela cheia',
+                      onPressed: () =>
+                          setState(() => _isFullScreen = !_isFullScreen),
+                    ),
                     IconButton(
                       icon: const Icon(Icons.close),
                       tooltip: 'Fechar Leitor',
