@@ -348,7 +348,15 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
       ),
       body: Column(
         children: [
-          const Padding(
+       ConstrainedBox(
+         constraints: BoxConstraints(
+           maxHeight: MediaQuery.sizeOf(context).height * 0.45,
+           ),
+           child: SingleChildScrollView(
+             child: Column(
+               mainAxisSize: MainAxisSize.min,
+               children: [
+                 const Padding(
             padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
             child: ScheduleConflictResolutionBanner(),
           ),
@@ -417,7 +425,11 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                 _showFieldMinistryScheduleModal(context),
           ),
           const Divider(height: 1),
-
+      ],
+                ),
+      ),
+    ),
+    
           // Área de visualização do calendário
           Expanded(
             child: appointmentsAsync.when(
