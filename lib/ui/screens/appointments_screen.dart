@@ -348,88 +348,92 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
       ),
       body: Column(
         children: [
-       ConstrainedBox(
-         constraints: BoxConstraints(
-           maxHeight: MediaQuery.sizeOf(context).height * 0.45,
-           ),
-           child: SingleChildScrollView(
-             child: Column(
-               mainAxisSize: MainAxisSize.min,
-               children: [
-                 const Padding(
-            padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
-            child: ScheduleConflictResolutionBanner(),
-          ),
-          // Barra de controles de visualização (Mês, Semana, Dia, Lista)
-          AppointmentsControlsBar(
-            viewMode: _viewMode,
-            selectedDate: _selectedDate,
-            isDark: isDark,
-            onViewModeChanged: (val) {
-              setState(() => _viewMode = val);
-              if (_viewMode == 'Dia') {
-                WidgetsBinding.instance.addPostFrameCallback(
-                  (_) => _scrollToCurrentTime(),
-                );
-              }
-            },
-            onPreviousDate: () {
-              setState(() {
-                if (_viewMode == 'Mês') {
-                  _selectedDate = DateTime(
-                    _selectedDate.year,
-                    _selectedDate.month - 1,
-                    _selectedDate.day.clamp(1, 28),
-                  );
-                } else if (_viewMode == 'Semana') {
-                  _selectedDate = _selectedDate.subtract(
-                    const Duration(days: 7),
-                  );
-                } else {
-                  _selectedDate = _selectedDate.subtract(
-                    const Duration(days: 1),
-                  );
-                }
-              });
-            },
-            onNextDate: () {
-              setState(() {
-                if (_viewMode == 'Mês') {
-                  _selectedDate = DateTime(
-                    _selectedDate.year,
-                    _selectedDate.month + 1,
-                    _selectedDate.day.clamp(1, 28),
-                  );
-                } else if (_viewMode == 'Semana') {
-                  _selectedDate = _selectedDate.add(const Duration(days: 7));
-                } else {
-                  _selectedDate = _selectedDate.add(const Duration(days: 1));
-                }
-              });
-            },
-            onTodayPressed: () {
-              setState(() => _selectedDate = DateTime.now());
-              _scrollToCurrentTime();
-            },
-          ),
-          const Divider(height: 1),
+          ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.sizeOf(context).height * 0.45,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
+                    child: ScheduleConflictResolutionBanner(),
+                  ),
+                  // Barra de controles de visualização (Mês, Semana, Dia, Lista)
+                  AppointmentsControlsBar(
+                    viewMode: _viewMode,
+                    selectedDate: _selectedDate,
+                    isDark: isDark,
+                    onViewModeChanged: (val) {
+                      setState(() => _viewMode = val);
+                      if (_viewMode == 'Dia') {
+                        WidgetsBinding.instance.addPostFrameCallback(
+                          (_) => _scrollToCurrentTime(),
+                        );
+                      }
+                    },
+                    onPreviousDate: () {
+                      setState(() {
+                        if (_viewMode == 'Mês') {
+                          _selectedDate = DateTime(
+                            _selectedDate.year,
+                            _selectedDate.month - 1,
+                            _selectedDate.day.clamp(1, 28),
+                          );
+                        } else if (_viewMode == 'Semana') {
+                          _selectedDate = _selectedDate.subtract(
+                            const Duration(days: 7),
+                          );
+                        } else {
+                          _selectedDate = _selectedDate.subtract(
+                            const Duration(days: 1),
+                          );
+                        }
+                      });
+                    },
+                    onNextDate: () {
+                      setState(() {
+                        if (_viewMode == 'Mês') {
+                          _selectedDate = DateTime(
+                            _selectedDate.year,
+                            _selectedDate.month + 1,
+                            _selectedDate.day.clamp(1, 28),
+                          );
+                        } else if (_viewMode == 'Semana') {
+                          _selectedDate = _selectedDate.add(
+                            const Duration(days: 7),
+                          );
+                        } else {
+                          _selectedDate = _selectedDate.add(
+                            const Duration(days: 1),
+                          );
+                        }
+                      });
+                    },
+                    onTodayPressed: () {
+                      setState(() => _selectedDate = DateTime.now());
+                      _scrollToCurrentTime();
+                    },
+                  ),
+                  const Divider(height: 1),
 
-          // Comparativo Horas Programadas vs Horas Efetivas Realizadas
-          AppointmentsHoursSummaryBanner(
-            scheduledHours: scheduledHours,
-            actualHours: actualHours,
-            isDark: isDark,
-            onCopySchedule: () =>
-                _showMonthlyScheduleCopyWizard(context, allAppts),
-            onScheduleFieldMinistry: () =>
-                _showFieldMinistryScheduleModal(context),
+                  // Comparativo Horas Programadas vs Horas Efetivas Realizadas
+                  AppointmentsHoursSummaryBanner(
+                    scheduledHours: scheduledHours,
+                    actualHours: actualHours,
+                    isDark: isDark,
+                    onCopySchedule: () =>
+                        _showMonthlyScheduleCopyWizard(context, allAppts),
+                    onScheduleFieldMinistry: () =>
+                        _showFieldMinistryScheduleModal(context),
+                  ),
+                  const Divider(height: 1),
+                ],
+              ),
+            ),
           ),
-          const Divider(height: 1),
-      ],
-                ),
-      ),
-    ),
-    
+
           // Área de visualização do calendário
           Expanded(
             child: appointmentsAsync.when(
