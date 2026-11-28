@@ -170,9 +170,10 @@ extension _AppointmentsCalendarViews on _AppointmentsScreenState {
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 7,
-                  mainAxisExtent: 72,
+                  mainAxisExtent: 72 *
+                      MediaQuery.textScalerOf(context).scale(1.0).clamp(1.0, 2.0),
                   crossAxisSpacing: 3,
                   mainAxisSpacing: 3,
                 ),
@@ -367,7 +368,9 @@ extension _AppointmentsCalendarViews on _AppointmentsScreenState {
                                             ),
                                           ),
                                         )
-                                      : Column(
+                                      : SingleChildScrollView(
+                                            physics: const NeverScrollableScrollPhysics(),
+                                            child: Column(
                                           crossAxisAlignment:
                                               CrossAxisAlignment.stretch,
                                           mainAxisSize: MainAxisSize.min,
@@ -463,7 +466,8 @@ extension _AppointmentsCalendarViews on _AppointmentsScreenState {
                                                 },
                                               ),
                                           ],
-                                        ),
+                                            ),
+                                ),
                                 ),
                               ),
                             ],
